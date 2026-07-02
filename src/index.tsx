@@ -1386,8 +1386,8 @@ tr.inactive td{opacity:0.45;}
 <div class="topbar">
   <div class="logo">CoEldery <em>85</em></div>
   <div class="nav-tabs">
-    <div class="nav-tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
-    <div class="nav-tab" onclick="switchTab('members')">👥 會員管理</div>
+    <div class="nav-tab active" onclick="switchTab('dashboard',this)">📊 Dashboard</div>
+    <div class="nav-tab" onclick="switchTab('members',this)">👥 會員管理</div>
   </div>
   <div class="topbar-right">coeldery85.com/membership/admin</div>
 </div>
@@ -1526,11 +1526,11 @@ var currentPage=1, totalPages=1;
 var srcLabel={'walk-in':'Walk-in','roadshow':'Roadshow','referral':'會員介紹','whatsapp':'WhatsApp','social':'社交媒體','institution':'機構轉介','online':'網上登記'};
 
 // ── Tab switching
-function switchTab(t){
+function switchTab(t, el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+t).classList.add('active');
-  event.currentTarget.classList.add('active');
+  if(el) el.classList.add('active');
   if(t==='dashboard') loadStats();
   if(t==='members') loadMembers(1);
 }
@@ -1588,7 +1588,8 @@ async function loadMembers(page){
   var r=await fetch('/api/admin/members?'+p); var d=await r.json(); if(!d.ok)return;
   totalPages=Math.ceil(d.total/50)||1;
   document.getElementById('searchCount').textContent='共 '+d.total+' 筆記錄';
-  document.getElementById('membersTbody').innerHTML=d.members.map(m=>\`
+  window._members=d.members;
+  document.getElementById('membersTbody').innerHTML=d.members.map(function(m,i){ return \`
     <tr class="\${m.status==='INACTIVE'?'inactive':''}">
       <td><a href="/membership/card/\${m.member_no}" target="_blank" style="color:var(--forest);font-weight:700;">\${m.member_no}</a></td>
       <td><span class="badge badge-\${(m.status||'active').toLowerCase()}">\${m.status||'ACTIVE'}</span></td>
@@ -1603,12 +1604,12 @@ async function loadMembers(page){
       <td>\${(m.expires_at||'').slice(0,10)}</td>
       <td style="font-size:11px;">\${(m.created_at||'').slice(0,16).replace('T',' ')}</td>
       <td>
-        <button class="act-btn act-edit" onclick="openEdit(\${JSON.stringify(m).replace(/"/g,'&quot;')})">編輯</button>
+        <button class="act-btn act-edit" onclick="openEdit(\${i})">編輯</button>
         \${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc(\''+m.member_no+'\')">KYC✓</button>':''}
         \${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="toggleStatus(\''+m.member_no+'\',\'INACTIVE\')">停用</button>':
           m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="toggleStatus(\''+m.member_no+'\',\'ACTIVE\')">啟用</button>':''}
       </td>
-    </tr>\`).join('');
+    </tr>\`;}).join('');
   renderPagination();
 }
 
@@ -1632,7 +1633,8 @@ async function toggleStatus(no,status){
 }
 
 // ── Edit modal
-function openEdit(m){
+function openEdit(i){
+  var m=window._members[i];
   document.getElementById('editNo').value=m.member_no;
   document.getElementById('eNameZh').value=m.name_zh||'';
   document.getElementById('eNameEn').value=m.name_en||'';
