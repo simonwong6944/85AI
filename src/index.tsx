@@ -39,7 +39,7 @@ app.post('/api/members', async (c) => {
       tier: string; nameZh: string; phone: string;
       nameEn?: string; gender?: string; birthYear?: string;
       district?: string; idPrefix?: string;
-      parentPhone?: string; parentName?: string; relation?: string;
+      parentPhone?: string; parentName?: string; parentNo?: string; relation?: string;
       roadshow?: string;
     }>()
 
@@ -60,13 +60,25 @@ app.post('/api/members', async (c) => {
     // Find parent for FAMILY tier
     let parentNo = ''
     let parentName = body.parentName || ''
-    if (body.tier === 'FAMILY' && body.parentPhone) {
-      const parent = await db.prepare(
-        'SELECT member_no, name_zh FROM members WHERE phone = ? AND tier = ?'
-      ).bind(body.parentPhone.replace(/\D/g, ''), 'PRIMARY').first<{ member_no: string; name_zh: string }>()
-      if (parent) {
-        parentNo = parent.member_no
-        parentName = parent.name_zh
+    if (body.tier === 'FAMILY') {
+      if (body.parentNo) {
+        // Direct lookup by member_no (from /member/:no profile page link)
+        const parent = await db.prepare(
+          'SELECT member_no, name_zh FROM members WHERE member_no = ? AND tier = ?'
+        ).bind(body.parentNo, 'PRIMARY').first<{ member_no: string; name_zh: string }>()
+        if (parent) {
+          parentNo = parent.member_no
+          parentName = parent.name_zh
+        }
+      } else if (body.parentPhone) {
+        // Lookup by phone (manual entry)
+        const parent = await db.prepare(
+          'SELECT member_no, name_zh FROM members WHERE phone = ? AND tier = ?'
+        ).bind(body.parentPhone.replace(/\D/g, ''), 'PRIMARY').first<{ member_no: string; name_zh: string }>()
+        if (parent) {
+          parentNo = parent.member_no
+          parentName = parent.name_zh
+        }
       }
     }
 
@@ -214,6 +226,42 @@ app.patch('/api/admin/members/:no', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── API: Get family cards of a member ───────────────────────────────────────
+app.get('/api/members/:no/family', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  const rows = await db.prepare(
+    'SELECT member_no, name_zh, name_en, phone, role, kyc_status, expires_at, created_at FROM members WHERE parent_no = ? ORDER BY created_at'
+  ).bind(no).all()
+  return c.json({ ok: true, family: rows.results })
+})
+
+// ─── API: Member self-update profile ─────────────────────────────────────────
+app.patch('/api/members/:no/profile', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  const body = await c.req.json<{
+    phone?: string; nameEn?: string; gender?: string;
+    birthYear?: string; district?: string; idPrefix?: string;
+  }>()
+  // Verify member exists first
+  const existing = await db.prepare('SELECT member_no FROM members WHERE member_no = ?').bind(no).first()
+  if (!existing) return c.json({ ok: false, error: '查無此會員' }, 404)
+
+  const fields: string[] = []
+  const vals: (string | number | null)[] = []
+  if (body.nameEn !== undefined)  { fields.push('name_en = ?');   vals.push(body.nameEn?.trim().toUpperCase() || '') }
+  if (body.gender !== undefined)  { fields.push('gender = ?');    vals.push(body.gender) }
+  if (body.birthYear !== undefined){ fields.push('birth_year = ?'); vals.push(body.birthYear ? parseInt(body.birthYear) : null) }
+  if (body.district !== undefined){ fields.push('district = ?');  vals.push(body.district) }
+  if (body.idPrefix !== undefined){ fields.push('id_prefix = ?'); vals.push(body.idPrefix?.toUpperCase() || '') }
+
+  if (!fields.length) return c.json({ ok: false, error: '沒有資料需要更新' }, 400)
+  await db.prepare(`UPDATE members SET ${fields.join(', ')} WHERE member_no = ?`)
+    .bind(...vals, no).run()
+  return c.json({ ok: true })
+})
+
 // ─── Pages ────────────────────────────────────────────────────────────────────
 app.get('/', (c) => c.redirect('/join'))
 
@@ -222,6 +270,15 @@ app.get('/join-family', (c) => c.html(signupSubHtml()))
 app.get('/admin', (c) => c.html(adminHtml()))
 app.get('/poster', (c) => c.html(posterHtml()))
 app.get('/sop', (c) => c.html(sopHtml()))
+
+// ─── Member profile page ──────────────────────────────────────────────────────
+app.get('/member/:no', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  const row = await db.prepare('SELECT * FROM members WHERE member_no = ?').bind(no).first<any>()
+  if (!row) return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>查無此會員</h2><p>${no}</p><a href="/join">立即登記</a></body></html>`, 404)
+  return c.html(memberProfileHtml(row))
+})
 
 // ─── HTML Pages ───────────────────────────────────────────────────────────────
 function htmlHead(title: string, extra = '') {
@@ -474,6 +531,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     </button>
 
     <div class="footer-links">
+      <a id="myPageLink" href="#" style="color:var(--forest);font-weight:700;">🪪 查看我的會員頁</a><br>
       <a href="/join">重新登記</a> · <a href="/">返回首頁</a>
     </div>
   </div>
@@ -541,6 +599,9 @@ function showSuccess(data) {
   var cardUrl = location.origin + '/member/' + data.memberNo;
   try { QRCode.toCanvas(document.getElementById('cardQr'), cardUrl, {width:40,margin:0,color:{dark:'#0d3e12',light:'#ffffff'},errorCorrectionLevel:'H'}); } catch(e) { console.warn('QR error (non-fatal):', e); }
   document.getElementById('successSection').classList.add('show');
+  // Set link to member profile page
+  var myLink = document.getElementById('myPageLink');
+  if(myLink) myLink.href = '/member/' + data.memberNo;
   window.scrollTo(0,0);
   // Build card image after short delay (let DOM paint)
   setTimeout(function(){ renderCardImage(data, 'PRIMARY'); }, 100);
@@ -951,6 +1012,11 @@ async function submitForm(){
     try { QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'}); } catch(e) { console.warn('QR error (non-fatal):',e); }
     document.getElementById('successSection').classList.add('show');
     window.scrollTo(0,0);
+    // Show "view my member page" link
+    var mySubLink = document.getElementById('mySubPageLink');
+    var mySubSep = document.getElementById('mySubPageSep');
+    if(mySubLink){ mySubLink.href='/member/'+data.memberNo; mySubLink.style.display='inline'; }
+    if(mySubSep){ mySubSep.style.display='inline'; }
     setTimeout(function(){ renderCardImage(data, 'FAMILY'); }, 100);
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
 }
@@ -1381,6 +1447,403 @@ function sopHtml() {
     <div style="margin-top:8px;font-size:14px;opacity:0.9;">WhatsApp 技術支援：<strong>9147-7341</strong><br>後台管理：<a href="/admin" style="color:#FFD86B;">coeldery85.com/admin</a></div>
   </div>
 </div>
+</body></html>`
+}
+
+// ─── Member Profile HTML ──────────────────────────────────────────────────────
+function memberProfileHtml(m: any) {
+  const isPrimary = m.tier === 'PRIMARY'
+  const forestDeep = '#0d3e12', forest = '#2E7D32'
+  const ferrari = '#C62828', ferrariDeep = '#8B0000'
+  const accentDark = isPrimary ? forestDeep : ferrariDeep
+  const accentMid  = isPrimary ? forest     : ferrari
+  const expYear = m.expires_at ? m.expires_at.slice(0,4) : ''
+  const expMonth = m.expires_at ? m.expires_at.slice(5,7) : ''
+  const expDisp = expMonth && expYear ? `${expMonth} / ${expYear}` : '—'
+  const kycLabel: Record<string,string> = { PENDING:'待核實', VERIFIED:'已核實', REJECTED:'未通過' }
+  const roleLabel: Record<string,string> = { CoExplorery:'探索者', CoFounder:'創始人', CoChampion:'支持者' }
+
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>${m.name_zh} · 老有卡 · CoEldery 85</title>
+<link rel="stylesheet" href="/shared.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Noto+Serif+TC:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans TC",sans-serif;}
+.topbar{background:${accentDark};color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
+.topbar .mark{width:36px;height:36px;background:${accentMid};border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:"Noto Serif TC",serif;font-weight:900;font-size:16px;}
+.topbar .title{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;letter-spacing:2px;}
+.topbar .no{font-family:"Space Grotesk",monospace;font-size:12px;opacity:0.7;margin-top:2px;}
+.wrap{max-width:480px;margin:0 auto;padding:20px 16px 40px;}
+
+/* ── Card canvas area ── */
+.card-wrap{margin-bottom:16px;text-align:center;}
+.card-wrap canvas{display:none;}
+.card-wrap img#cardImg{width:100%;max-width:420px;border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,0.2);}
+.card-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.card-btn{padding:13px 8px;background:#fff;border:2px solid ${accentMid};color:${accentDark};font-family:"Noto Serif TC",serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;border-radius:6px;text-align:center;text-decoration:none;display:block;}
+.card-btn.primary{background:${accentDark};color:#fff;border-color:${accentDark};}
+.card-btn.wa{background:#25D366;border-color:#25D366;color:#fff;grid-column:1/-1;font-size:15px;}
+
+/* ── Info sections ── */
+.section{background:#fff;border-radius:8px;padding:20px;margin-bottom:14px;}
+.section-title{font-family:"Noto Serif TC",serif;font-size:13px;color:${accentMid};letter-spacing:3px;font-weight:700;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #eee;}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5;}
+.info-row:last-child{border-bottom:none;}
+.info-label{font-size:12px;color:#999;letter-spacing:1px;}
+.info-value{font-size:15px;color:#333;font-weight:500;text-align:right;}
+.info-value.big{font-family:"Space Grotesk",monospace;font-size:18px;font-weight:700;color:${accentDark};}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:1px;}
+.badge.green{background:#E8F5E9;color:${forestDeep};}
+.badge.red{background:#FFEBEE;color:${ferrariDeep};}
+.badge.grey{background:#f5f5f5;color:#666;}
+.badge.yellow{background:#FFF9C4;color:#795548;}
+
+/* ── Family cards list ── */
+.family-card{background:#fff9f9;border:1px solid #FFCDD2;border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+.family-card .fc-name{font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;color:${ferrariDeep};}
+.family-card .fc-no{font-family:"Space Grotesk",monospace;font-size:12px;color:#999;}
+.family-card .fc-link{padding:6px 14px;background:${ferrari};color:#fff;border-radius:4px;font-size:12px;font-weight:700;text-decoration:none;}
+.add-family-btn{width:100%;padding:15px;background:#fff;border:2px dashed ${ferrari};color:${ferrari};font-family:"Noto Serif TC",serif;font-size:14px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:8px;text-align:center;text-decoration:none;display:block;margin-top:4px;}
+
+/* ── Edit form ── */
+.edit-section{display:none;}
+.edit-section.open{display:block;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-family:"Noto Serif TC",serif;font-size:13px;color:${accentDark};font-weight:700;letter-spacing:1px;margin-bottom:6px;}
+.field input,.field select{width:100%;padding:12px 14px;border:2px solid #e0e0e0;border-radius:6px;font-size:16px;font-family:inherit;color:#333;background:#fff;transition:border 0.2s;}
+.field input:focus,.field select:focus{outline:0;border-color:${accentMid};}
+.save-btn{width:100%;padding:16px;background:${accentDark};color:#fff;border:0;border-radius:6px;font-size:17px;font-family:"Noto Serif TC",serif;font-weight:700;letter-spacing:3px;cursor:pointer;margin-top:8px;}
+.cancel-btn{width:100%;padding:12px;background:transparent;border:2px solid #ccc;color:#999;border-radius:6px;font-size:14px;font-family:inherit;cursor:pointer;margin-top:8px;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:30px;font-size:14px;opacity:0;transition:opacity 0.3s;z-index:100;pointer-events:none;}
+.toast.show{opacity:1;}
+.toggle-edit-btn{background:none;border:none;color:${accentMid};font-size:13px;font-family:"Noto Serif TC",serif;cursor:pointer;font-weight:700;letter-spacing:1px;text-decoration:underline;padding:0;}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="mark">${isPrimary ? '老' : '家'}</div>
+  <div>
+    <div class="title">CoEldery 85 · ${isPrimary ? '老有卡' : '家庭同行卡'}</div>
+    <div class="no">${m.member_no}</div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ── 會員卡圖片 ── -->
+  <div class="card-wrap">
+    <canvas id="offCanvas"></canvas>
+    <img id="cardImg" alt="會員卡" style="opacity:0;transition:opacity 0.3s;">
+  </div>
+
+  <!-- ── 卡片操作 ── -->
+  <div class="card-actions">
+    <button class="card-btn" onclick="saveCardImage()">💾 儲存卡圖</button>
+    <button class="card-btn" onclick="shareCardToWA()">📤 分享</button>
+    <button class="card-btn wa" onclick="shareCardToWA()">
+      📱 WhatsApp 分享會員卡
+    </button>
+  </div>
+
+  <!-- ── 會員資料 ── -->
+  <div class="section">
+    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>◆ 會員資料</span>
+      <button class="toggle-edit-btn" onclick="toggleEdit()">✏️ 編輯</button>
+    </div>
+
+    <!-- 顯示模式 -->
+    <div id="viewMode">
+      <div class="info-row">
+        <span class="info-label">中文姓名</span>
+        <span class="info-value" style="font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;color:${accentDark};">${m.name_zh}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">英文姓名</span>
+        <span class="info-value" id="vNameEn">${m.name_en || '—'}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">會員編號</span>
+        <span class="info-value big">${m.member_no}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">類別</span>
+        <span class="info-value">
+          <span class="badge ${isPrimary ? 'green' : 'red'}">${isPrimary ? '長者主卡' : '家庭同行卡'}</span>
+        </span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">身份</span>
+        <span class="info-value">
+          <span class="badge green">${roleLabel[m.role] || m.role}</span>
+        </span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">KYC 狀態</span>
+        <span class="info-value">
+          <span class="badge ${m.kyc_status === 'VERIFIED' ? 'green' : m.kyc_status === 'REJECTED' ? 'red' : 'yellow'}">${kycLabel[m.kyc_status] || m.kyc_status}</span>
+        </span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">有效期至</span>
+        <span class="info-value big">${expDisp}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">性別</span>
+        <span class="info-value" id="vGender">${m.gender === 'M' ? '男' : m.gender === 'F' ? '女' : m.gender === 'X' ? '其他' : '—'}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">出生年份</span>
+        <span class="info-value" id="vBirthYear">${m.birth_year || '—'}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">居住地區</span>
+        <span class="info-value" id="vDistrict">${m.district || '—'}</span>
+      </div>
+      ${m.parent_no ? `
+      <div class="info-row">
+        <span class="info-label">主卡會員</span>
+        <span class="info-value"><a href="/member/${m.parent_no}" style="color:${ferrari};font-weight:700;">${m.parent_no}${m.parent_name ? ' · '+m.parent_name : ''}</a></span>
+      </div>` : ''}
+      <div class="info-row">
+        <span class="info-label">登記日期</span>
+        <span class="info-value">${m.created_at ? m.created_at.slice(0,10) : '—'}</span>
+      </div>
+    </div>
+
+    <!-- 編輯模式 -->
+    <div id="editMode" class="edit-section">
+      <div class="field">
+        <label>英文姓名</label>
+        <input id="eNameEn" type="text" placeholder="例：CHAN TAI MAN" value="${m.name_en || ''}" style="text-transform:uppercase;">
+      </div>
+      <div class="field">
+        <label>性別</label>
+        <select id="eGender">
+          <option value="">— 請選擇 —</option>
+          <option value="M" ${m.gender==='M'?'selected':''}>男 M</option>
+          <option value="F" ${m.gender==='F'?'selected':''}>女 F</option>
+          <option value="X" ${m.gender==='X'?'selected':''}>其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>出生年份</label>
+        <input id="eBirthYear" type="number" placeholder="例：1960" min="1920" max="2010" value="${m.birth_year || ''}">
+      </div>
+      <div class="field">
+        <label>居住地區</label>
+        <select id="eDistrict">
+          <option value="">— 請選擇 —</option>
+          ${['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','荃灣','屯門','元朗','北區','大埔','沙田','西貢','葵青','離島'].map(d=>`<option value="${d}" ${m.district===d?'selected':''}>${d}</option>`).join('')}
+        </select>
+      </div>
+      <button class="save-btn" onclick="saveProfile()">儲存更新</button>
+      <button class="cancel-btn" onclick="toggleEdit()">取消</button>
+    </div>
+  </div>
+
+  ${isPrimary ? `
+  <!-- ── 家庭同行卡 ── -->
+  <div class="section">
+    <div class="section-title">◆ 家庭同行卡</div>
+    <div id="familyList">
+      <div style="text-align:center;color:#aaa;padding:10px;font-size:13px;">載入中…</div>
+    </div>
+    <a href="/join-family?parent=${m.member_no}" class="add-family-btn">＋ 為家人申請家庭同行卡</a>
+  </div>` : ''}
+
+  <!-- ── 底部連結 ── -->
+  <div style="text-align:center;margin-top:20px;font-size:12px;color:#aaa;line-height:2;">
+    <a href="/join" style="color:${accentMid};">← 返回登記頁</a>
+    &nbsp;·&nbsp;
+    如有疑問 WhatsApp：<a href="https://wa.me/85291477341" style="color:${accentMid};">9147-7341</a>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+var MEMBER_NO = '${m.member_no}';
+var MEMBER_DATA = ${JSON.stringify({
+  memberNo: m.member_no,
+  nameZh: m.name_zh,
+  nameEn: m.name_en || '',
+  tier: m.tier,
+  expiresAt: m.expires_at || '',
+  parentNo: m.parent_no || '',
+  parentName: m.parent_name || '',
+  role: m.role
+})};
+
+// ── QR + Card render on load ──────────────────────────────────────────────────
+window.addEventListener('load', function(){
+  renderCardImage(MEMBER_DATA, MEMBER_DATA.tier);
+  ${isPrimary ? 'loadFamily();' : ''}
+});
+
+function showToast(msg, dur) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, dur || 2000);
+}
+
+// ── Edit toggle ───────────────────────────────────────────────────────────────
+function toggleEdit() {
+  var vm = document.getElementById('viewMode');
+  var em = document.getElementById('editMode');
+  var isOpen = em.classList.contains('open');
+  if(isOpen){ em.classList.remove('open'); vm.style.display=''; }
+  else { em.classList.add('open'); vm.style.display='none'; }
+}
+
+// ── Save profile ──────────────────────────────────────────────────────────────
+async function saveProfile() {
+  var btn = document.querySelector('.save-btn');
+  btn.disabled = true; btn.textContent = '儲存中…';
+  try {
+    var res = await fetch('/api/members/'+MEMBER_NO+'/profile', {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        nameEn: document.getElementById('eNameEn').value.trim().toUpperCase(),
+        gender: document.getElementById('eGender').value,
+        birthYear: document.getElementById('eBirthYear').value || '',
+        district: document.getElementById('eDistrict').value
+      })
+    });
+    var data = await res.json();
+    if(!data.ok){ showToast('❌ 更新失敗：' + (data.error||''), 3000); }
+    else {
+      // Update view fields
+      document.getElementById('vNameEn').textContent = document.getElementById('eNameEn').value.trim().toUpperCase() || '—';
+      var gMap = {'M':'男','F':'女','X':'其他','':'—'};
+      document.getElementById('vGender').textContent = gMap[document.getElementById('eGender').value] || '—';
+      document.getElementById('vBirthYear').textContent = document.getElementById('eBirthYear').value || '—';
+      document.getElementById('vDistrict').textContent = document.getElementById('eDistrict').value || '—';
+      showToast('✅ 資料已更新！');
+      // Re-render card with updated name
+      MEMBER_DATA.nameEn = document.getElementById('eNameEn').value.trim().toUpperCase();
+      setTimeout(function(){ renderCardImage(MEMBER_DATA, MEMBER_DATA.tier); }, 300);
+      toggleEdit();
+    }
+  } catch(e) { showToast('❌ 網絡錯誤，請再試', 3000); }
+  btn.disabled = false; btn.textContent = '儲存更新';
+}
+
+// ── Load family cards ─────────────────────────────────────────────────────────
+async function loadFamily() {
+  try {
+    var res = await fetch('/api/members/'+MEMBER_NO+'/family');
+    var data = await res.json();
+    var el = document.getElementById('familyList');
+    if(!data.family || data.family.length === 0){
+      el.innerHTML = '<div style="text-align:center;color:#aaa;padding:10px;font-size:13px;">暫無家庭同行卡</div>';
+      return;
+    }
+    el.innerHTML = data.family.map(function(f){
+      return '<div class="family-card">' +
+        '<div><div class="fc-name">'+f.name_zh+'</div><div class="fc-no">'+f.member_no+'</div></div>' +
+        '<a href="/member/'+f.member_no+'" class="fc-link">查看</a>' +
+        '</div>';
+    }).join('');
+  } catch(e){ console.warn('family load error', e); }
+}
+
+// ── Card image rendering (same engine as signup pages) ────────────────────────
+function renderCardImage(data, tier) {
+  var W=680, H=430;
+  var canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  var ctx=canvas.getContext('2d');
+  var isPrimary=(tier!=='FAMILY');
+  var forestDeep='#0d3e12',forest='#2E7D32',forestPale='#E8F5E9';
+  var ferrari='#C62828',ferrariDeep='#8B0000',ferrariPale='#FFEBEE';
+  var accentDark=isPrimary?forestDeep:ferrariDeep;
+  var accentMid2=isPrimary?forest:ferrari;
+  var qrDark=isPrimary?forestDeep:'#a80000';
+  var bg=ctx.createLinearGradient(0,0,W,H);
+  if(isPrimary){bg.addColorStop(0,'#FDFAF3');bg.addColorStop(1,'#F0EBD8');}
+  else{bg.addColorStop(0,'#FFF8F8');bg.addColorStop(1,'#FFE8E8');}
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.globalAlpha=0.06; ctx.fillStyle=accentDark;
+  ctx.font='bold 320px "Noto Serif TC",serif'; ctx.textAlign='right';
+  ctx.fillText(isPrimary?'老':'家',W+20,H+20); ctx.textAlign='left'; ctx.restore();
+  var stripeH=8;
+  ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
+  ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
+  var logoX=28,logoY=stripeH+20;
+  ctx.fillStyle=forest; ctx.font='bold 19px "Noto Serif TC",sans-serif'; ctx.fillText('CoEldery',logoX,logoY+18);
+  ctx.fillStyle=ferrari; ctx.font='bold 28px "Noto Serif TC",serif'; ctx.fillText('85',logoX+78,logoY+20);
+  ctx.fillStyle=forest; ctx.font='bold 13px "Noto Serif TC",serif'; ctx.fillText('老有聯盟',logoX,logoY+34);
+  ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(logoX+114,logoY+4); ctx.lineTo(logoX+114,logoY+42); ctx.stroke();
+  ctx.fillStyle=accentDark;
+  if(isPrimary){ctx.font='bold 22px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+28);}
+  else{ctx.font='bold 19px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+16);ctx.fillText('家庭同行',logoX+124,logoY+38);}
+  var badgeW=220,badgeH=36,badgeX=W-badgeW-28,badgeY=stripeH+14;
+  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=1.5;
+  ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,4); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=ferrari; ctx.font='bold 14px sans-serif'; ctx.fillText('◆',badgeX+10,badgeY+24);
+  ctx.fillStyle=accentDark; ctx.font='bold 17px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+30,badgeY+24);
+  ctx.fillStyle=ferrari; ctx.font='bold 16px "Noto Serif TC",serif'; ctx.textAlign='right';
+  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-28,badgeY+badgeH+22); ctx.textAlign='left';
+  var nameAreaY=210;
+  ctx.fillStyle='#aaa'; ctx.font='13px "Noto Serif TC",serif';
+  var lbl='會員姓名',lx=28;
+  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+6;}
+  ctx.fillStyle=accentDark;
+  var zh=data.nameZh||'';
+  var zhSz=zh.length<=2?96:zh.length<=3?86:zh.length<=4?70:54;
+  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,28,nameAreaY+zhSz+4);
+  var enY=nameAreaY+zhSz+4;
+  if(data.nameEn&&data.nameEn.trim()){ctx.fillStyle=accentDark;ctx.font='bold 24px "Noto Serif TC",serif';enY+=32;ctx.fillText(data.nameEn.trim(),28,enY);}
+  if(!isPrimary&&data.parentNo){ctx.fillStyle=ferrari;ctx.font='14px "Noto Serif TC",serif';ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),28,enY+24);}
+  var footY=H-18;
+  ctx.fillStyle='#aaa'; ctx.font='14px "Noto Serif TC",serif'; ctx.fillText('會員編號',28,footY-36);
+  ctx.fillStyle=accentDark; ctx.font='bold 28px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',28,footY-8);
+  if(data.expiresAt){
+    var expStr=data.expiresAt.slice(0,7).replace('-','/');
+    var expDisp2=expStr.slice(5)+' / '+expStr.slice(0,4);
+    ctx.fillStyle='#aaa'; ctx.font='14px "Noto Serif TC",serif'; ctx.fillText('有效日期',280,footY-36);
+    ctx.fillStyle=accentDark; ctx.font='bold 28px "Space Grotesk",monospace'; ctx.fillText(expDisp2,280,footY-8);
+  }
+  var qrSz=86,qrX=W-qrSz-24,qrY2=H-qrSz-16;
+  ctx.fillStyle='#fff'; ctx.fillRect(qrX-5,qrY2-5,qrSz+10,qrSz+10);
+  ctx.strokeStyle=accentMid2; ctx.lineWidth=2; ctx.strokeRect(qrX-5,qrY2-5,qrSz+10,qrSz+10);
+  try{var qr=qrcode(0,'M');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){if(qr.isDark(row,col))ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);}}}catch(e){console.warn('QR img err',e);}
+  canvas.toBlob(function(blob){
+    if(!blob)return;
+    window._cardBlob=blob; window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
+    var url=URL.createObjectURL(blob);
+    var img=document.getElementById('cardImg');
+    if(img){img.src=url; img.style.opacity='1';}
+  },'image/jpeg',0.95);
+}
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
+function saveCardImage(){
+  if(!window._cardBlob){showToast('圖片生成中，請稍候…');return;}
+  var a=document.createElement('a');a.href=URL.createObjectURL(window._cardBlob);a.download=window._cardFileName||'coeldery85-card.jpg';a.click();
+}
+async function shareCardToWA(){
+  if(!window._cardBlob){showToast('圖片生成中，請稍候…');return;}
+  var file=new File([window._cardBlob],window._cardFileName||'coeldery85-card.jpg',{type:'image/jpeg'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:'CoEldery 85 老有卡',text:'我的 CoEldery 85 老有聯盟會員卡'});return;}
+    catch(e){if(e.name!=='AbortError')console.warn('share err',e);}
+  }
+  saveCardImage();
+  showToast('圖片已下載，請貼入 WhatsApp 傳送', 3000);
+}
+</script>
 </body></html>`
 }
 
