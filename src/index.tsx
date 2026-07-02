@@ -438,6 +438,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     <h1>登記成功！</h1>
     <p class="welcome">歡迎加入 CoEldery 85 老有聯盟</p>
 
+    <!-- Live card (display only) -->
     <div class="gen-card" id="genCard">
       <div class="gc-brand">
         <div class="gc-cardname">老有卡</div>
@@ -458,14 +459,19 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </div>
     </div>
 
+    <!-- Card image preview (rendered canvas) -->
+    <div id="cardImgWrap" style="display:none;margin:0 auto 16px;max-width:340px;">
+      <img id="cardImg" style="width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.18);" alt="會員卡">
+    </div>
+
     <div class="action-row">
-      <button class="action-btn" onclick="shareCard()">分享會員卡</button>
+      <button class="action-btn" id="saveImgBtn" onclick="saveCardImage()">💾 儲存卡圖</button>
       <button class="action-btn red" onclick="window.location.href='/join-family'">家人申請</button>
     </div>
 
-    <a class="wa-link" id="waLink" href="#" target="_blank">
-      📱 WhatsApp 儲存會員卡
-    </a>
+    <button class="wa-link" id="waImgBtn" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">
+      📱 WhatsApp 分享會員卡圖片
+    </button>
 
     <div class="footer-links">
       <a href="/join">重新登記</a> · <a href="/">返回首頁</a>
@@ -534,22 +540,167 @@ function showSuccess(data) {
   document.getElementById('cardNo').textContent = data.memberNo;
   var cardUrl = location.origin + '/member/' + data.memberNo;
   try { QRCode.toCanvas(document.getElementById('cardQr'), cardUrl, {width:40,margin:0,color:{dark:'#0d3e12',light:'#ffffff'},errorCorrectionLevel:'H'}); } catch(e) { console.warn('QR error (non-fatal):', e); }
-  var waMsg = encodeURIComponent('【CoEldery 85 老有聯盟】\\n您好，' + data.nameZh + '！\\n\\n✓ 您已成功登記成為會員\\n\\n會員編號：' + data.memberNo + '\\n有效日期：' + data.expiresAt + '\\n\\n感謝您加入我哋 · 一齊共同擁有！');
-  document.getElementById('waLink').href = 'https://wa.me/?text=' + waMsg;
   document.getElementById('successSection').classList.add('show');
   window.scrollTo(0,0);
+  // Build card image after short delay (let DOM paint)
+  setTimeout(function(){ renderCardImage(data, 'PRIMARY'); }, 100);
 }
 
-function shareCard() {
-  if(navigator.share) {
-    navigator.share({title:'我的老有卡',text:'我剛加入了 CoEldery 85 老有聯盟！',url:location.href});
+// ── Draw member card onto an off-screen canvas and return a Blob URL ──────────
+function renderCardImage(data, tier) {
+  var DPR = 2; // retina quality
+  var W = 680, H = 464; // 340x232 × 2
+  var canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  var ctx = canvas.getContext('2d');
+
+  var isPrimary = (tier !== 'FAMILY');
+  var forestDeep='#0d3e12', forest='#2E7D32', forestLight='#4CAF50', forestPale='#E8F5E9';
+  var ferrari='#C62828', ferrariDeep='#7f0000', ferrariPale='#FFEBEE';
+  var cardBg1 = isPrimary ? '#FAF7F0' : '#FFF5F5';
+  var cardBg2 = isPrimary ? '#F0EBD8' : '#FFE8E8';
+  var accentDark = isPrimary ? forestDeep : ferrariDeep;
+  var accentMid  = isPrimary ? forest    : ferrari;
+  var accentLight= isPrimary ? forestPale: ferrariPale;
+  var qrDark     = isPrimary ? forestDeep: '#a80000';
+
+  // Background gradient (simple two-stop)
+  var grad = ctx.createLinearGradient(0,0,W*Math.cos(Math.PI*150/180),H*Math.sin(Math.PI*150/180));
+  grad.addColorStop(0, cardBg1); grad.addColorStop(1, cardBg2);
+  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+
+  // Top stripe: primary/family split
+  if(isPrimary){
+    ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,10);
+    ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W,10);
   } else {
-    navigator.clipboard.writeText(location.href).then(()=>alert('連結已複製'));
+    ctx.fillStyle=ferrari; ctx.fillRect(0,0,W,10);
   }
+
+  // Border
+  ctx.strokeStyle='#E5DEC8'; ctx.lineWidth=2;
+  ctx.strokeRect(1,1,W-2,H-2);
+
+  // Brand label (top-left)
+  ctx.fillStyle=accentDark;
+  ctx.font='bold '+(26*DPR/2)+'px "Noto Serif TC",serif';
+  ctx.fillText(isPrimary?'老有卡':'老有卡 家庭同行', 36, 50);
+
+  // Badge top-right
+  if(isPrimary){
+    var badgeW=260, badgeH=44, badgeX=W-badgeW-36, badgeY=26;
+    ctx.fillStyle=forestPale; ctx.strokeStyle=forest; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.rect(badgeX,badgeY,badgeW,badgeH); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=ferrari; ctx.font='bold 18px sans-serif'; ctx.fillText('◆', badgeX+10, badgeY+30);
+    ctx.fillStyle=forestDeep; ctx.font='bold 20px "Noto Serif TC",serif';
+    ctx.fillText('CoExplorery 探索者', badgeX+34, badgeY+30);
+    // Tier label below badge
+    ctx.fillStyle=ferrari; ctx.font='bold 20px "Noto Serif TC",serif';
+    ctx.textAlign='right';
+    ctx.fillText('PRIMARY MEMBER', W-36, badgeY+badgeH+30);
+    ctx.textAlign='left';
+  } else {
+    var badgeW=140, badgeH=40, badgeX=W-badgeW-36, badgeY=28;
+    ctx.fillStyle=ferrariPale; ctx.strokeStyle=ferrari; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.rect(badgeX,badgeY,badgeW,badgeH); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=ferrariDeep; ctx.font='bold 20px "Noto Serif TC",serif'; ctx.textAlign='center';
+    ctx.fillText('FAMILY', badgeX+badgeW/2, badgeY+28);
+    ctx.textAlign='left';
+  }
+
+  // Name block
+  var nameY = isPrimary ? 290 : 280;
+  ctx.fillStyle='#999'; ctx.font='22px "Noto Serif TC",serif';
+  ctx.letterSpacing='8px';
+  ctx.fillText('MEMBER NAME · 姓名', 36, nameY);
+  ctx.letterSpacing='0px';
+
+  // Chinese name (big)
+  ctx.fillStyle=accentDark;
+  var zhName = data.nameZh || '';
+  var zhFontSize = zhName.length <= 3 ? 88 : zhName.length <= 4 ? 72 : 56;
+  ctx.font = 'bold '+zhFontSize+'px "Noto Serif TC",serif';
+  ctx.fillText(zhName, 36, nameY + zhFontSize + 8);
+
+  // English name
+  if(data.nameEn){
+    ctx.fillStyle=accentDark; ctx.font='bold 30px "Noto Serif TC",serif';
+    ctx.fillText(data.nameEn, 36, nameY + zhFontSize + 50);
+  }
+
+  // Footer: member no
+  ctx.fillStyle='#999'; ctx.font='20px "Noto Serif TC",serif';
+  ctx.fillText('MEMBER NO.', 36, H-60);
+  ctx.fillStyle=accentDark; ctx.font='bold 34px "Space Grotesk",monospace';
+  ctx.fillText(data.memberNo || '', 36, H-28);
+
+  // QR code in bottom-right
+  var qrSize = 92;
+  var qrX = W - qrSize - 36, qrY = H - qrSize - 28;
+  // White background + border
+  ctx.fillStyle='#fff'; ctx.fillRect(qrX-6,qrY-6,qrSize+12,qrSize+12);
+  ctx.strokeStyle=accentMid; ctx.lineWidth=3;
+  ctx.strokeRect(qrX-6,qrY-6,qrSize+12,qrSize+12);
+  // Draw QR modules
+  try {
+    var qr = qrcode(0,'H');
+    qr.addData(location.origin+'/member/'+(data.memberNo||''));
+    qr.make();
+    var mc = qr.getModuleCount();
+    var cell = Math.floor(qrSize/mc);
+    ctx.fillStyle=qrDark;
+    for(var row=0;row<mc;row++){
+      for(var col=0;col<mc;col++){
+        if(qr.isDark(row,col)) ctx.fillRect(qrX+col*cell, qrY+row*cell, cell, cell);
+      }
+    }
+  } catch(e){ console.warn('QR img error',e); }
+
+  // Convert to JPEG blob and show preview
+  canvas.toBlob(function(blob){
+    if(!blob){ console.warn('canvas.toBlob failed'); return; }
+    window._cardBlob = blob;
+    window._cardFileName = 'CoEldery85_' + (data.memberNo||'card') + '.jpg';
+    var url = URL.createObjectURL(blob);
+    var img = document.getElementById('cardImg');
+    if(img){ img.src = url; }
+    var wrap = document.getElementById('cardImgWrap');
+    if(wrap){ wrap.style.display='block'; }
+    // Hide the CSS card, show the rendered image instead
+    var cssCard = document.getElementById('genCard');
+    if(cssCard){ cssCard.style.display='none'; }
+  }, 'image/jpeg', 0.95);
+}
+
+function saveCardImage() {
+  if(!window._cardBlob){ alert('圖片未準備好，請稍候再試'); return; }
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(window._cardBlob);
+  a.download = window._cardFileName || 'coeldery85-card.jpg';
+  a.click();
+}
+
+async function shareCardToWA() {
+  if(!window._cardBlob){ alert('圖片未準備好，請稍候再試'); return; }
+  var file = new File([window._cardBlob], window._cardFileName||'coeldery85-card.jpg', {type:'image/jpeg'});
+  if(navigator.canShare && navigator.canShare({files:[file]})) {
+    try {
+      await navigator.share({
+        files:[file],
+        title:'CoEldery 85 老有卡',
+        text:'我已成功登記 CoEldery 85 老有聯盟會員！'
+      });
+      return;
+    } catch(e){ if(e.name!=='AbortError') console.warn('share error',e); }
+  }
+  // Fallback: download the image
+  saveCardImage();
+  alert('請在相簿選取剛下載的會員卡圖片，貼入 WhatsApp 傳送。');
 }
 </script>
 </body></html>`
 }
+
 
 // ─── Signup Sub HTML ──────────────────────────────────────────────────────────
 function signupSubHtml() {
@@ -673,7 +824,8 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     <h1>申請成功！</h1>
     <p style="font-size:14px;color:var(--grey-2);margin-bottom:24px;">家庭同行卡已發出</p>
 
-    <div class="gen-card">
+    <!-- Live CSS card (hidden after image renders) -->
+    <div class="gen-card" id="genCard">
       <div class="gc-brand"><div class="gc-cardname">老有卡 家庭同行</div></div>
       <div class="gc-family-badge">FAMILY</div>
       <div class="gc-name-block">
@@ -687,7 +839,17 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </div>
     </div>
 
-    <a class="wa-link" id="waLink" href="#" target="_blank">📱 WhatsApp 儲存會員卡</a>
+    <!-- Rendered JPEG preview -->
+    <div id="cardImgWrap" style="display:none;margin:0 auto 16px;max-width:340px;">
+      <img id="cardImg" style="width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.18);" alt="家庭同行卡">
+    </div>
+
+    <div class="action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:4px;" onclick="saveCardImage()">💾 儲存卡圖</button>
+      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:4px;" onclick="window.location.href='/join'">← 返回主卡</button>
+    </div>
+
+    <button class="wa-link" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
     <div class="footer-links"><a href="/join">← 返回主卡登記</a></div>
   </div>
 </div>
@@ -697,8 +859,8 @@ function showErr(msg){var el=document.getElementById('errMsg');el.textContent=ms
 async function submitForm(){
   document.getElementById('errMsg').classList.remove('show');
   var nameZh=document.getElementById('nameZh').value.trim();
-  var phone=document.getElementById('phone').value.replace(/\\D/g,'');
-  var parentPhone=document.getElementById('parentPhone').value.replace(/\\D/g,'');
+  var phone=document.getElementById('phone').value.replace(/\D/g,'');
+  var parentPhone=document.getElementById('parentPhone').value.replace(/\D/g,'');
   if(!nameZh){showErr('請填寫中文姓名');return;}
   if(phone.length!==8){showErr('請填寫正確的 8 位電話');return;}
   if(parentPhone.length!==8){showErr('請填寫長輩的 8 位電話');return;}
@@ -716,11 +878,81 @@ async function submitForm(){
     document.getElementById('cardNo').textContent=data.memberNo;
     var cardUrl=location.origin+'/member/'+data.memberNo;
     try { QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'}); } catch(e) { console.warn('QR error (non-fatal):',e); }
-    var waMsg=encodeURIComponent('【CoEldery 85 老有聯盟】家庭同行卡\\n\\n會員：'+data.nameZh+'\\n編號：'+data.memberNo+'\\n\\n感謝你嘅支持！');
-    document.getElementById('waLink').href='https://wa.me/?text='+waMsg;
     document.getElementById('successSection').classList.add('show');
     window.scrollTo(0,0);
+    setTimeout(function(){ renderCardImage(data, 'FAMILY'); }, 100);
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
+}
+
+function renderCardImage(data, tier) {
+  var W=680, H=464;
+  var canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  var ctx=canvas.getContext('2d');
+  var isPrimary=(tier!=='FAMILY');
+  var forestDeep='#0d3e12',forest='#2E7D32',forestPale='#E8F5E9';
+  var ferrari='#C62828',ferrariDeep='#7f0000',ferrariPale='#FFEBEE';
+  var accentDark=isPrimary?forestDeep:ferrariDeep;
+  var accentMid=isPrimary?forest:ferrari;
+  var qrDark=isPrimary?forestDeep:'#a80000';
+  var bg1=isPrimary?'#FAF7F0':'#FFF5F5', bg2=isPrimary?'#F0EBD8':'#FFE8E8';
+  var grad=ctx.createLinearGradient(0,0,W*0.5,H);
+  grad.addColorStop(0,bg1); grad.addColorStop(1,bg2);
+  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+  if(isPrimary){ctx.fillStyle=forest;ctx.fillRect(0,0,W*0.45,10);ctx.fillStyle=ferrari;ctx.fillRect(W*0.45,0,W,10);}
+  else{ctx.fillStyle=ferrari;ctx.fillRect(0,0,W,10);}
+  ctx.strokeStyle='#E5DEC8';ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
+  ctx.fillStyle=accentDark;ctx.font='bold 26px "Noto Serif TC",serif';
+  ctx.fillText(isPrimary?'老有卡':'老有卡 家庭同行',36,50);
+  if(isPrimary){
+    var bW=260,bH=44,bX=W-bW-36,bY=26;
+    ctx.fillStyle=forestPale;ctx.strokeStyle=forest;ctx.lineWidth=2;ctx.beginPath();ctx.rect(bX,bY,bW,bH);ctx.fill();ctx.stroke();
+    ctx.fillStyle=ferrari;ctx.font='bold 18px sans-serif';ctx.fillText('◆',bX+10,bY+30);
+    ctx.fillStyle=forestDeep;ctx.font='bold 20px "Noto Serif TC",serif';ctx.fillText('CoExplorery 探索者',bX+34,bY+30);
+    ctx.fillStyle=ferrari;ctx.font='bold 20px "Noto Serif TC",serif';ctx.textAlign='right';ctx.fillText('PRIMARY MEMBER',W-36,bY+bH+30);ctx.textAlign='left';
+  }else{
+    var bW=140,bH=40,bX=W-bW-36,bY=28;
+    ctx.fillStyle=ferrariPale;ctx.strokeStyle=ferrari;ctx.lineWidth=2;ctx.beginPath();ctx.rect(bX,bY,bW,bH);ctx.fill();ctx.stroke();
+    ctx.fillStyle=ferrariDeep;ctx.font='bold 20px "Noto Serif TC",serif';ctx.textAlign='center';ctx.fillText('FAMILY',bX+bW/2,bY+28);ctx.textAlign='left';
+  }
+  var nameY=isPrimary?290:280;
+  ctx.fillStyle='#999';ctx.font='22px "Noto Serif TC",serif';ctx.fillText('MEMBER NAME · 姓名',36,nameY);
+  ctx.fillStyle=accentDark;
+  var zh=data.nameZh||'';
+  var zhSz=zh.length<=3?88:zh.length<=4?72:56;
+  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif';ctx.fillText(zh,36,nameY+zhSz+8);
+  if(data.nameEn){ctx.fillStyle=accentDark;ctx.font='bold 30px "Noto Serif TC",serif';ctx.fillText(data.nameEn,36,nameY+zhSz+50);}
+  ctx.fillStyle='#999';ctx.font='20px "Noto Serif TC",serif';ctx.fillText('MEMBER NO.',36,H-60);
+  ctx.fillStyle=accentDark;ctx.font='bold 34px "Space Grotesk",monospace';ctx.fillText(data.memberNo||'',36,H-28);
+  var qrSz=92,qrX=W-qrSz-36,qrY2=H-qrSz-28;
+  ctx.fillStyle='#fff';ctx.fillRect(qrX-6,qrY2-6,qrSz+12,qrSz+12);
+  ctx.strokeStyle=accentMid;ctx.lineWidth=3;ctx.strokeRect(qrX-6,qrY2-6,qrSz+12,qrSz+12);
+  try{var qr=qrcode(0,'H');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var r=0;r<mc;r++){for(var c2=0;c2<mc;c2++){if(qr.isDark(r,c2))ctx.fillRect(qrX+c2*cell,qrY2+r*cell,cell,cell);}}}catch(e){console.warn('QR img err',e);}
+  canvas.toBlob(function(blob){
+    if(!blob)return;
+    window._cardBlob=blob;
+    window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
+    var url=URL.createObjectURL(blob);
+    var img=document.getElementById('cardImg');if(img)img.src=url;
+    var wrap=document.getElementById('cardImgWrap');if(wrap)wrap.style.display='block';
+    var cssCard=document.getElementById('genCard');if(cssCard)cssCard.style.display='none';
+  },'image/jpeg',0.95);
+}
+
+function saveCardImage(){
+  if(!window._cardBlob){alert('圖片未準備好，請稍候再試');return;}
+  var a=document.createElement('a');a.href=URL.createObjectURL(window._cardBlob);a.download=window._cardFileName||'coeldery85-card.jpg';a.click();
+}
+
+async function shareCardToWA(){
+  if(!window._cardBlob){alert('圖片未準備好，請稍候再試');return;}
+  var file=new File([window._cardBlob],window._cardFileName||'coeldery85-card.jpg',{type:'image/jpeg'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:'CoEldery 85 老有卡',text:'我已成功申請 CoEldery 85 家庭同行卡！'});return;}
+    catch(e){if(e.name!=='AbortError')console.warn('share error',e);}
+  }
+  saveCardImage();
+  alert('請在相簿選取剛下載的會員卡圖片，貼入 WhatsApp 傳送。');
 }
 </script>
 </body></html>`
