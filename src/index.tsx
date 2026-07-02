@@ -611,7 +611,8 @@ function showSuccess(data) {
 
 // ── Draw member card onto an off-screen canvas — design-matched ───────────────
 function renderCardImage(data, tier) {
-  document.fonts.ready.then(function() {
+  var logoImg = new Image();
+  logoImg.onload = function() {
   // Card dimensions: 680×430px (≈ credit-card 85.6×54mm @2×)
   var W=680, H=430;
   var canvas=document.createElement('canvas');
@@ -628,13 +629,12 @@ function renderCardImage(data, tier) {
   var qrDark     = isPrimary ? forestDeep : '#a80000';
 
   // ── Background ──────────────────────────────────────────────────────────
-  // Warm cream gradient
   var bg = ctx.createLinearGradient(0,0,W,H);
   if(isPrimary){ bg.addColorStop(0,'#FDFAF3'); bg.addColorStop(1,'#F0EBD8'); }
   else         { bg.addColorStop(0,'#FFF8F8'); bg.addColorStop(1,'#FFE8E8'); }
   ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
 
-  // ── Watermark (大字 background) ──────────────────────────────────────────
+  // ── Watermark ──────────────────────────────────────────────────────────
   ctx.save();
   ctx.globalAlpha=0.06;
   ctx.fillStyle=accentDark;
@@ -649,38 +649,28 @@ function renderCardImage(data, tier) {
   ctx.fillStyle=forest;   ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari;  ctx.fillRect(W*0.45,0,W*0.55,stripeH);
 
-  // ── Logo block (top-left) ────────────────────────────────────────────────
-  // "CoEldery" green + red "85" + 老有聯盟
-  var logoX=28, logoY=stripeH+20;
-
-  // CoEldery text
-  ctx.fillStyle=forest;
-  ctx.font='bold 19px "Noto Serif TC",sans-serif';
-  ctx.fillText('CoEldery', logoX, logoY+18);
-
-  // Red "85" numeral
-  ctx.fillStyle=ferrari;
-  ctx.font='bold 28px "Noto Serif TC",serif';
-  ctx.fillText('85', logoX+78, logoY+20);
-
-  // 老有聯盟 below
-  ctx.fillStyle=forest;
-  ctx.font='bold 13px "Noto Serif TC",serif';
-  ctx.fillText('老有聯盟', logoX, logoY+34);
+  // ── Logo image (top-left) ────────────────────────────────────────────────
+  // Real logo image: 1024×410 → draw at 160×64 with white bg pill
+  var logoX=18, logoY=stripeH+8;
+  var logoW=160, logoH=64;
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); roundRect(ctx, logoX-4, logoY-4, logoW+8, logoH+8, 6); ctx.fill();
+  ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
 
   // Vertical divider
   ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(logoX+114, logoY+4); ctx.lineTo(logoX+114, logoY+42); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(logoX+logoW+14, logoY+4); ctx.lineTo(logoX+logoW+14, logoY+logoH-4); ctx.stroke();
 
-  // Card name (老有卡 / 老有卡\n家庭同行)
+  // Card name (老有卡 / 老有卡 家庭同行)
+  var cardNameX = logoX+logoW+24;
   ctx.fillStyle=accentDark;
   if(isPrimary){
     ctx.font='bold 22px "Noto Serif TC",serif';
-    ctx.fillText('老有卡', logoX+124, logoY+28);
+    ctx.fillText('老有卡', cardNameX, logoY+logoH/2+8);
   } else {
     ctx.font='bold 19px "Noto Serif TC",serif';
-    ctx.fillText('老有卡', logoX+124, logoY+16);
-    ctx.fillText('家庭同行', logoX+124, logoY+38);
+    ctx.fillText('老有卡', cardNameX, logoY+logoH/2-4);
+    ctx.fillText('家庭同行', cardNameX, logoY+logoH/2+20);
   }
 
   // ── Badge (top-right) ────────────────────────────────────────────────────
@@ -795,7 +785,8 @@ function renderCardImage(data, tier) {
     var cssCard=document.getElementById('genCard');
     if(cssCard){ cssCard.style.display='none'; }
   },'image/jpeg',0.95);
-  }); // end document.fonts.ready.then
+  }; // end logoImg.onload
+  logoImg.src = '/static/logo.jpg';
 }
 
 // Helper: rounded rectangle path
@@ -1051,7 +1042,8 @@ async function submitForm(){
 }
 
 function renderCardImage(data, tier) {
-  document.fonts.ready.then(function() {
+  var logoImg=new Image();
+  logoImg.onload=function(){
   var W=680, H=430;
   var canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
@@ -1072,15 +1064,16 @@ function renderCardImage(data, tier) {
   var stripeH=8;
   ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
-  var logoX=28,logoY=stripeH+20;
-  ctx.fillStyle=forest; ctx.font='bold 19px "Noto Serif TC",sans-serif'; ctx.fillText('CoEldery',logoX,logoY+18);
-  ctx.fillStyle=ferrari; ctx.font='bold 28px "Noto Serif TC",serif'; ctx.fillText('85',logoX+78,logoY+20);
-  ctx.fillStyle=forest; ctx.font='bold 13px "Noto Serif TC",serif'; ctx.fillText('老有聯盟',logoX,logoY+34);
+  var logoX=18,logoY=stripeH+8,logoW=160,logoH=64;
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); roundRect(ctx,logoX-4,logoY-4,logoW+8,logoH+8,6); ctx.fill();
+  ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
   ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(logoX+114,logoY+4); ctx.lineTo(logoX+114,logoY+42); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(logoX+logoW+14,logoY+4); ctx.lineTo(logoX+logoW+14,logoY+logoH-4); ctx.stroke();
+  var cardNameX=logoX+logoW+24;
   ctx.fillStyle=accentDark;
-  if(isPrimary){ctx.font='bold 22px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+28);}
-  else{ctx.font='bold 19px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+16);ctx.fillText('家庭同行',logoX+124,logoY+38);}
+  if(isPrimary){ctx.font='bold 22px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+8);}
+  else{ctx.font='bold 19px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2-4);ctx.fillText('家庭同行',cardNameX,logoY+logoH/2+20);}
   var badgeW=220,badgeH=36,badgeX=W-badgeW-28,badgeY=stripeH+14;
   ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=1.5;
   ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,4); ctx.fill(); ctx.stroke();
@@ -1120,7 +1113,8 @@ function renderCardImage(data, tier) {
     var wrap=document.getElementById('cardImgWrap'); if(wrap)wrap.style.display='block';
     var cssCard=document.getElementById('genCard'); if(cssCard)cssCard.style.display='none';
   },'image/jpeg',0.95);
-  }); // end document.fonts.ready.then
+  }; // end logoImg.onload
+  logoImg.src='/static/logo.jpg';
 }
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
 function saveCardImage(){
@@ -1791,7 +1785,8 @@ async function loadFamily() {
 
 // ── Card image rendering (same engine as signup pages) ────────────────────────
 function renderCardImage(data, tier) {
-  document.fonts.ready.then(function() {
+  var logoImg=new Image();
+  logoImg.onload=function(){
   var W=680, H=430;
   var canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
@@ -1812,15 +1807,16 @@ function renderCardImage(data, tier) {
   var stripeH=8;
   ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
-  var logoX=28,logoY=stripeH+20;
-  ctx.fillStyle=forest; ctx.font='bold 19px "Noto Serif TC",sans-serif'; ctx.fillText('CoEldery',logoX,logoY+18);
-  ctx.fillStyle=ferrari; ctx.font='bold 28px "Noto Serif TC",serif'; ctx.fillText('85',logoX+78,logoY+20);
-  ctx.fillStyle=forest; ctx.font='bold 13px "Noto Serif TC",serif'; ctx.fillText('老有聯盟',logoX,logoY+34);
+  var logoX=18,logoY=stripeH+8,logoW=160,logoH=64;
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); roundRect(ctx,logoX-4,logoY-4,logoW+8,logoH+8,6); ctx.fill();
+  ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
   ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(logoX+114,logoY+4); ctx.lineTo(logoX+114,logoY+42); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(logoX+logoW+14,logoY+4); ctx.lineTo(logoX+logoW+14,logoY+logoH-4); ctx.stroke();
+  var cardNameX=logoX+logoW+24;
   ctx.fillStyle=accentDark;
-  if(isPrimary){ctx.font='bold 22px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+28);}
-  else{ctx.font='bold 19px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+16);ctx.fillText('家庭同行',logoX+124,logoY+38);}
+  if(isPrimary){ctx.font='bold 22px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+8);}
+  else{ctx.font='bold 19px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2-4);ctx.fillText('家庭同行',cardNameX,logoY+logoH/2+20);}
   var badgeW=220,badgeH=36,badgeX=W-badgeW-28,badgeY=stripeH+14;
   ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=1.5;
   ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,4); ctx.fill(); ctx.stroke();
@@ -1859,7 +1855,8 @@ function renderCardImage(data, tier) {
     var img=document.getElementById('cardImg');
     if(img){img.src=url; img.style.opacity='1';}
   },'image/jpeg',0.95);
-  }); // end document.fonts.ready.then
+  }; // end logoImg.onload
+  logoImg.src='/static/logo.jpg';
 }
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
 function saveCardImage(){
@@ -2174,7 +2171,8 @@ function showSuccess(data){
 }
 
 function renderCardImage(data, tier) {
-  document.fonts.ready.then(function() {
+  var logoImg=new Image();
+  logoImg.onload=function(){
   var W=680, H=430;
   var canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
@@ -2195,15 +2193,16 @@ function renderCardImage(data, tier) {
   var stripeH=8;
   ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
-  var logoX=28,logoY=stripeH+20;
-  ctx.fillStyle=forest; ctx.font='bold 19px "Noto Serif TC",sans-serif'; ctx.fillText('CoEldery',logoX,logoY+18);
-  ctx.fillStyle=ferrari; ctx.font='bold 28px "Noto Serif TC",serif'; ctx.fillText('85',logoX+78,logoY+20);
-  ctx.fillStyle=forest; ctx.font='bold 13px "Noto Serif TC",serif'; ctx.fillText('老有聯盟',logoX,logoY+34);
+  var logoX=18,logoY=stripeH+8,logoW=160,logoH=64;
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); roundRect(ctx,logoX-4,logoY-4,logoW+8,logoH+8,6); ctx.fill();
+  ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
   ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(logoX+114,logoY+4); ctx.lineTo(logoX+114,logoY+42); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(logoX+logoW+14,logoY+4); ctx.lineTo(logoX+logoW+14,logoY+logoH-4); ctx.stroke();
+  var cardNameX=logoX+logoW+24;
   ctx.fillStyle=accentDark;
-  if(isPrimary){ctx.font='bold 22px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+28);}
-  else{ctx.font='bold 19px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+16);ctx.fillText('家庭同行',logoX+124,logoY+38);}
+  if(isPrimary){ctx.font='bold 22px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+8);}
+  else{ctx.font='bold 19px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2-4);ctx.fillText('家庭同行',cardNameX,logoY+logoH/2+20);}
   var badgeW=220,badgeH=36,badgeX=W-badgeW-28,badgeY=stripeH+14;
   ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=1.5;
   ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,4); ctx.fill(); ctx.stroke();
@@ -2243,7 +2242,8 @@ function renderCardImage(data, tier) {
     var wrap=document.getElementById('cardImgWrap'); if(wrap)wrap.style.display='block';
     var cssCard=document.getElementById('genCard'); if(cssCard)cssCard.style.display='none';
   },'image/jpeg',0.95);
-  }); // end document.fonts.ready.then
+  }; // end logoImg.onload
+  logoImg.src='/static/logo.jpg';
 }
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
 function saveCardImage(){
