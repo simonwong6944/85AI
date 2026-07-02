@@ -1122,6 +1122,9 @@ async function submitForm() {
         birthYear: birthYear.toString(),
         district: district,
         roadshow: params.get('rs') || 'walk-in',
+        source: params.get('src') || (params.get('rs') ? 'roadshow' : params.get('ref') ? 'referral' : 'walk-in'),
+        referrerNo: params.get('ref') || '',
+        roadshowLocation: params.get('loc') || '',
         applyMedical: applyMedical,
         medNameZh: medPayload?.medNameZh || '',
         medNameEn: medPayload?.medNameEn || '',
@@ -1501,7 +1504,7 @@ async function submitForm(){
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.textContent='處理中…';
   var params=new URLSearchParams(location.search);
-  var payload={tier:'FAMILY',nameZh,phone,nameEn:document.getElementById('nameEn').value.trim().toUpperCase(),relation:document.getElementById('relation').value,roadshow:params.get('rs')||'walk-in'};
+  var payload={tier:'FAMILY',nameZh,phone,nameEn:document.getElementById('nameEn').value.trim().toUpperCase(),relation:document.getElementById('relation').value,roadshow:params.get('rs')||'walk-in',source:params.get('src')||(params.get('rs')?'roadshow':params.get('ref')?'referral':'walk-in'),referrerNo:params.get('ref')||'',roadshowLocation:params.get('loc')||''};
   if(linkedParentNo){payload.parentNo=linkedParentNo;}else{payload.parentPhone=parentPhone;}
   try{
     var res=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -1742,6 +1745,45 @@ tr.inactive td{opacity:0.45;}
 .modal-field input,.modal-field select,.modal-field textarea{padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;font-family:inherit;}
 .modal-field textarea{height:70px;resize:vertical;}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;}
+/* QR generator */
+.qr-layout{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start;}
+@media(max-width:900px){.qr-layout{grid-template-columns:1fr;}}
+.qr-form-card{background:#fff;border-radius:8px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.qr-form-card h3{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;color:var(--forest-deep);margin-bottom:18px;}
+.qr-field{margin-bottom:14px;}
+.qr-field label{display:block;font-size:11px;font-weight:700;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;}
+.qr-field input,.qr-field select{width:100%;padding:9px 11px;border:1.5px solid #ddd;border-radius:5px;font-size:13px;font-family:inherit;color:var(--ink);transition:border-color 0.2s;}
+.qr-field input:focus,.qr-field select:focus{outline:none;border-color:var(--forest);}
+.qr-field .hint{font-size:11px;color:#aaa;margin-top:3px;}
+.qr-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.qr-type-btn{padding:10px 8px;border:2px solid #e0e0e0;border-radius:6px;background:#fff;cursor:pointer;text-align:center;font-family:inherit;font-size:12px;font-weight:700;color:#888;transition:all 0.2s;line-height:1.4;}
+.qr-type-btn.active{border-color:var(--forest);background:#f0f7f0;color:var(--forest-deep);}
+.qr-type-btn .icon{font-size:20px;display:block;margin-bottom:3px;}
+.qr-preview-card{background:#fff;border-radius:8px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06);position:sticky;top:24px;}
+.qr-preview-card h3{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;color:var(--forest-deep);margin-bottom:16px;}
+.qr-canvas-wrap{background:#f9f9f9;border:1.5px solid #e8e8e8;border-radius:8px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:14px;min-height:200px;}
+.qr-canvas-wrap canvas{width:200px;height:200px;image-rendering:pixelated;}
+.qr-label-text{font-size:11px;font-weight:700;letter-spacing:2px;color:#555;text-align:center;text-transform:uppercase;}
+.qr-url-box{background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:8px 10px;font-size:11px;font-family:monospace;color:#444;word-break:break-all;margin-bottom:12px;line-height:1.5;}
+.qr-actions{display:flex;flex-direction:column;gap:8px;}
+.qr-action-btn{width:100%;padding:10px;border:none;border-radius:5px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:0.5px;}
+.qr-action-btn.dl-png{background:var(--forest);color:#fff;}
+.qr-action-btn.cp-url{background:#e8f5e9;color:var(--forest-deep);border:1.5px solid var(--forest);}
+.qr-action-btn.cp-url.copied{background:var(--forest-deep);color:#fff;}
+/* saved links table */
+.links-table-wrap{background:#fff;border-radius:8px;margin-top:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06);overflow:hidden;}
+.links-table-wrap .ltitle{padding:14px 18px;font-size:12px;font-weight:700;letter-spacing:2px;color:#555;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase;}
+.links-table-wrap table{width:100%;border-collapse:collapse;font-size:12px;}
+.links-table-wrap th{background:#fafafa;color:#888;padding:8px 14px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #eee;}
+.links-table-wrap td{padding:10px 14px;border-bottom:1px solid #f8f8f8;vertical-align:middle;}
+.links-table-wrap tr:last-child td{border-bottom:none;}
+.links-table-wrap tr:hover td{background:#f9fffe;}
+.link-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.5px;}
+.link-tag.roadshow{background:#E8F5E9;color:#1B5E20;}
+.link-tag.institution{background:#E3F2FD;color:#0D47A1;}
+.link-tag.referral{background:#FFF3E0;color:#E65100;}
+.link-tag.online{background:#F3E5F5;color:#4A148C;}
+.link-tag.walkin{background:#F5F5F5;color:#616161;}
 </style>`) + `
 <body>
 <div class="topbar">
@@ -1750,6 +1792,7 @@ tr.inactive td{opacity:0.45;}
     <div class="nav-tab active" onclick="switchTab('dashboard',this)">📊 Dashboard</div>
     <div class="nav-tab" onclick="switchTab('members',this)">👥 會員管理</div>
     <div class="nav-tab" onclick="switchTab('medical',this)">🏥 醫健卡申請</div>
+    <div class="nav-tab" onclick="switchTab('qrgen',this)">🔗 QR 連結</div>
   </div>
   <div class="topbar-right">coeldery85.com/membership/admin</div>
 </div>
@@ -1866,6 +1909,138 @@ tr.inactive td{opacity:0.45;}
     <div id="medicalCount" style="padding:8px 0;font-size:12px;color:#888;"></div>
   </div>
 
+  <!-- ── QR GENERATOR PAGE ── -->
+  <div class="page" id="page-qrgen">
+    <div class="qr-layout">
+
+      <!-- LEFT: form -->
+      <div>
+        <div class="qr-form-card">
+          <h3>🔗 生成登記連結 &amp; QR Code</h3>
+
+          <!-- type selector -->
+          <div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#888;letter-spacing:1px;text-transform:uppercase;">登記來源類型</div>
+          <div class="qr-type-grid">
+            <button class="qr-type-btn active" id="qtype-roadshow" onclick="setQrType('roadshow')"><span class="icon">🏪</span>Roadshow 攤位</button>
+            <button class="qr-type-btn" id="qtype-institution" onclick="setQrType('institution')"><span class="icon">🏢</span>機構 / 合作夥伴</button>
+            <button class="qr-type-btn" id="qtype-referral" onclick="setQrType('referral')"><span class="icon">👤</span>會員個人介紹</button>
+            <button class="qr-type-btn" id="qtype-online" onclick="setQrType('online')"><span class="icon">🌐</span>網上 / 社媒推廣</button>
+          </div>
+
+          <!-- ROADSHOW fields -->
+          <div id="qfields-roadshow">
+            <div class="qr-field">
+              <label>Roadshow 場次代碼 <span style="color:var(--ferrari)">*</span></label>
+              <input id="qRsCode" type="text" placeholder="例：cwb_2025_07_01" oninput="updateQr()" style="font-family:monospace;letter-spacing:1px;">
+              <div class="hint">只用英文小寫、數字、底線。建議格式：地區_年份_月份_場次</div>
+            </div>
+            <div class="qr-field">
+              <label>活動名稱 / 地點（顯示用）</label>
+              <input id="qRsLabel" type="text" placeholder="例：銅鑼灣時代廣場 7月份攤位" oninput="updateQr()">
+              <div class="hint">此名稱會記錄在 roadshow_location 欄位</div>
+            </div>
+          </div>
+
+          <!-- INSTITUTION fields -->
+          <div id="qfields-institution" style="display:none;">
+            <div class="qr-field">
+              <label>機構名稱 <span style="color:var(--ferrari)">*</span></label>
+              <input id="qInstName" type="text" placeholder="例：基督教家庭服務中心 荃灣" oninput="updateQr()">
+              <div class="hint">會記錄在 roadshow_location 欄位</div>
+            </div>
+            <div class="qr-field">
+              <label>機構代碼（選填）</label>
+              <input id="qInstCode" type="text" placeholder="例：cfsc_tw" oninput="updateQr()" style="font-family:monospace;letter-spacing:1px;">
+              <div class="hint">只用英文小寫、數字、底線。留空則用機構名稱縮寫</div>
+            </div>
+          </div>
+
+          <!-- REFERRAL fields -->
+          <div id="qfields-referral" style="display:none;">
+            <div class="qr-field">
+              <label>介紹人會員編號 <span style="color:var(--ferrari)">*</span></label>
+              <input id="qRefNo" type="text" placeholder="例：CE85-000012" oninput="updateQr()" style="font-family:monospace;letter-spacing:2px;font-weight:700;">
+              <div class="hint">掃碼後自動填入 referrer_no 欄位，系統會驗證編號是否有效</div>
+            </div>
+            <div class="qr-field">
+              <label>介紹人姓名（選填，顯示用）</label>
+              <input id="qRefName" type="text" placeholder="例：陳大文" oninput="updateQr()">
+            </div>
+          </div>
+
+          <!-- ONLINE fields -->
+          <div id="qfields-online" style="display:none;">
+            <div class="qr-field">
+              <label>推廣渠道 <span style="color:var(--ferrari)">*</span></label>
+              <select id="qOnlineCh" onchange="updateQr()">
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="website">官方網站</option>
+                <option value="email">電子郵件</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+            <div class="qr-field">
+              <label>推廣活動標籤（選填）</label>
+              <input id="qOnlineTag" type="text" placeholder="例：july_promo" oninput="updateQr()" style="font-family:monospace;letter-spacing:1px;">
+              <div class="hint">用於區分同一渠道不同時期的推廣</div>
+            </div>
+          </div>
+
+          <!-- common: target form -->
+          <div class="qr-field" style="margin-top:6px;">
+            <label>目標登記頁面</label>
+            <select id="qTarget" onchange="updateQr()">
+              <option value="primary">主卡登記（長者用）</option>
+              <option value="family">家庭同行卡（家人用）</option>
+              <option value="both">登記頁主頁（有 Login/Register tab）</option>
+            </select>
+          </div>
+
+          <button class="btn btn-green" style="width:100%;margin-top:8px;padding:12px;" onclick="saveQrLink()">💾 儲存至連結記錄</button>
+        </div>
+
+        <!-- saved links table -->
+        <div class="links-table-wrap">
+          <div class="ltitle">
+            <span>📋 已儲存的連結</span>
+            <button class="btn btn-grey" style="font-size:11px;padding:4px 10px;" onclick="loadQrLinks()">重新整理</button>
+          </div>
+          <table>
+            <thead><tr>
+              <th>類型</th><th>標籤</th><th>代碼 / 介紹人</th><th>目標頁</th><th>建立日期</th><th>操作</th>
+            </tr></thead>
+            <tbody id="qrLinksTbody"><tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px 0;">載入中…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RIGHT: live preview -->
+      <div>
+        <div class="qr-preview-card">
+          <h3>📱 即時預覽</h3>
+          <div class="qr-canvas-wrap" id="qrCanvasWrap">
+            <div style="color:#ccc;font-size:13px;text-align:center;padding:30px 0;">填寫左方資料<br>即時生成 QR Code</div>
+          </div>
+          <div class="qr-label-text" id="qrLabelText" style="margin-bottom:10px;"></div>
+          <div class="qr-url-box" id="qrUrlBox" style="display:none;"></div>
+          <div class="qr-actions" id="qrActionBtns" style="display:none;">
+            <button class="qr-action-btn dl-png" onclick="downloadQr()">⬇ 下載 QR Code (PNG)</button>
+            <button class="qr-action-btn cp-url" id="cpUrlBtn" onclick="copyUrl()">📋 複製連結</button>
+          </div>
+          <div style="margin-top:16px;padding:12px;background:#fffde7;border-radius:5px;font-size:11px;color:#795548;line-height:1.6;" id="qrTips">
+            <strong>💡 使用提示</strong><br>
+            • 下載 PNG 後可直接列印或發送<br>
+            • 掃碼者登記時，來源渠道自動記錄<br>
+            • 可儲存連結以便日後重用
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 
 <!-- ── EDIT MODAL ── -->
@@ -1936,6 +2111,274 @@ function switchTab(t, el){
   if(t==='dashboard') loadStats();
   if(t==='members') loadMembers(1);
   if(t==='medical') loadMedical();
+  if(t==='qrgen'){ updateQr(); loadQrLinks(); }
+}
+
+// ── QR Generator
+var _qrType = 'roadshow';
+var _qrCanvas = null;
+var _qrCurrentUrl = '';
+var _qrLinks = [];
+
+function setQrType(t){
+  _qrType = t;
+  ['roadshow','institution','referral','online'].forEach(function(x){
+    document.getElementById('qtype-'+x).classList.toggle('active', x===t);
+    document.getElementById('qfields-'+x).style.display = x===t ? '' : 'none';
+  });
+  updateQr();
+}
+
+function buildQrUrl(){
+  var base = location.origin;
+  var target = document.getElementById('qTarget').value;
+  var path = target==='primary' ? '/membership/join' : target==='family' ? '/membership/join-family' : '/membership';
+  var p = new URLSearchParams();
+
+  if(_qrType==='roadshow'){
+    var code = document.getElementById('qRsCode').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_');
+    var label = document.getElementById('qRsLabel').value.trim();
+    if(!code) return null;
+    p.set('src','roadshow');
+    p.set('rs', code);
+    if(label) p.set('loc', label);
+
+  } else if(_qrType==='institution'){
+    var name = document.getElementById('qInstName').value.trim();
+    var icode = document.getElementById('qInstCode').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_');
+    if(!name) return null;
+    var slug = icode || name.toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,20);
+    p.set('src','institution');
+    p.set('rs', 'inst_'+slug);
+    p.set('loc', name);
+
+  } else if(_qrType==='referral'){
+    var refno = document.getElementById('qRefNo').value.trim().toUpperCase();
+    if(!refno) return null;
+    p.set('src','referral');
+    p.set('ref', refno);
+
+  } else if(_qrType==='online'){
+    var ch = document.getElementById('qOnlineCh').value;
+    var tag = document.getElementById('qOnlineTag').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_');
+    p.set('src','online');
+    p.set('ch', ch);
+    if(tag) p.set('tag', tag);
+  }
+
+  return base + path + '?' + p.toString();
+}
+
+function getQrLabel(){
+  if(_qrType==='roadshow'){
+    var label = document.getElementById('qRsLabel').value.trim();
+    var code = document.getElementById('qRsCode').value.trim();
+    return label || code || 'Roadshow';
+  } else if(_qrType==='institution'){
+    return document.getElementById('qInstName').value.trim() || '機構合作';
+  } else if(_qrType==='referral'){
+    var name = document.getElementById('qRefName').value.trim();
+    var no = document.getElementById('qRefNo').value.trim();
+    return name ? name + '（'+no+'）' : no || '會員介紹';
+  } else {
+    var ch2 = document.getElementById('qOnlineCh').value;
+    var chLabel = {'facebook':'Facebook','instagram':'Instagram','whatsapp':'WhatsApp','website':'官方網站','email':'電子郵件','other':'其他'}[ch2]||ch2;
+    var tag2 = document.getElementById('qOnlineTag').value.trim();
+    return chLabel + (tag2 ? ' · '+tag2 : '');
+  }
+}
+
+function updateQr(){
+  var url = buildQrUrl();
+  var wrap = document.getElementById('qrCanvasWrap');
+  var urlBox = document.getElementById('qrUrlBox');
+  var actionBtns = document.getElementById('qrActionBtns');
+  var labelEl = document.getElementById('qrLabelText');
+
+  if(!url){
+    wrap.innerHTML = '<div style="color:#ccc;font-size:13px;text-align:center;padding:30px 0;">請填寫必填欄位<br>即時生成 QR Code</div>';
+    urlBox.style.display='none';
+    actionBtns.style.display='none';
+    labelEl.textContent='';
+    _qrCurrentUrl='';
+    return;
+  }
+
+  _qrCurrentUrl = url;
+
+  // generate QR
+  try {
+    var qr = qrcode(0,'M');
+    qr.addData(url);
+    qr.make();
+    var mc = qr.getModuleCount();
+    var sz = 200;
+    var cell = sz/mc;
+
+    var canvas = document.createElement('canvas');
+    canvas.width = sz + 40;
+    canvas.height = sz + 40;
+    var ctx = canvas.getContext('2d');
+
+    // white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // QR modules
+    ctx.fillStyle = '#1B5E20';
+    for(var r=0;r<mc;r++){
+      for(var cc=0;cc<mc;cc++){
+        if(qr.isDark(r,cc)) ctx.fillRect(20+cc*cell, 20+r*cell, cell, cell);
+      }
+    }
+
+    wrap.innerHTML = '';
+    canvas.style.width='200px';
+    canvas.style.height='200px';
+    canvas.style.imageRendering='pixelated';
+    wrap.appendChild(canvas);
+    _qrCanvas = canvas;
+
+    var label = getQrLabel();
+    labelEl.textContent = label;
+    urlBox.textContent = url;
+    urlBox.style.display = '';
+    actionBtns.style.display = '';
+  } catch(e){
+    wrap.innerHTML = '<div style="color:#c00;font-size:12px;text-align:center;padding:20px;">QR 生成失敗：'+e.message+'</div>';
+  }
+}
+
+function downloadQr(){
+  if(!_qrCanvas) return;
+  var label = getQrLabel().replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_').slice(0,30);
+  // create larger canvas for download (4x)
+  var src = _qrCanvas;
+  var out = document.createElement('canvas');
+  var scale = 4;
+  out.width = src.width * scale;
+  out.height = src.height * scale;
+  var ctx = out.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(src, 0, 0, out.width, out.height);
+
+  // add label text below QR
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, out.height - 60, out.width, 60);
+  ctx.fillStyle = '#1B5E20';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('CoEldery 85', out.width/2, out.height - 34);
+  ctx.fillStyle = '#555';
+  ctx.font = '16px sans-serif';
+  var shortLabel = label.replace(/_/g,' ').slice(0,40);
+  ctx.fillText(shortLabel, out.width/2, out.height - 12);
+
+  var a = document.createElement('a');
+  a.download = 'coeldery85_qr_' + label + '.png';
+  a.href = out.toDataURL('image/png');
+  a.click();
+}
+
+function copyUrl(){
+  if(!_qrCurrentUrl) return;
+  navigator.clipboard.writeText(_qrCurrentUrl).then(function(){
+    var btn = document.getElementById('cpUrlBtn');
+    btn.textContent = '✅ 已複製！';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent='📋 複製連結'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// ── QR Links persistence (stored in KV via API, fallback to localStorage)
+function saveQrLink(){
+  var url = buildQrUrl();
+  if(!url){ alert('請先填寫必要欄位再儲存'); return; }
+  var label = getQrLabel();
+  var target = document.getElementById('qTarget').value;
+  var targetLabel = {'primary':'主卡登記','family':'家庭同行卡','both':'登記主頁'}[target];
+  var typeLabel = {'roadshow':'🏪 Roadshow','institution':'🏢 機構','referral':'👤 會員介紹','online':'🌐 網上'}[_qrType];
+  var code = _qrType==='roadshow' ? document.getElementById('qRsCode').value.trim()
+           : _qrType==='institution' ? (document.getElementById('qInstCode').value.trim()||'—')
+           : _qrType==='referral' ? document.getElementById('qRefNo').value.trim()
+           : document.getElementById('qOnlineCh').value;
+
+  var entry = { type:_qrType, typeLabel:typeLabel, label:label, code:code, targetLabel:targetLabel, url:url, created:new Date().toLocaleDateString('zh-HK') };
+  _qrLinks.unshift(entry);
+  // persist to localStorage
+  try{ localStorage.setItem('coeldery85_qr_links', JSON.stringify(_qrLinks.slice(0,50))); }catch(e){}
+  renderQrLinks();
+  alert('✅ 已儲存！可在下方連結記錄查看');
+}
+
+function loadQrLinks(){
+  try{
+    var saved = localStorage.getItem('coeldery85_qr_links');
+    _qrLinks = saved ? JSON.parse(saved) : [];
+  }catch(e){ _qrLinks=[]; }
+  renderQrLinks();
+}
+
+function renderQrLinks(){
+  var tbody = document.getElementById('qrLinksTbody');
+  if(!_qrLinks.length){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px 0;">暫無儲存連結</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _qrLinks.map(function(l,i){
+    var tagClass = {'roadshow':'roadshow','institution':'institution','referral':'referral','online':'online','walk-in':'walkin'}[l.type]||'walkin';
+    return \`<tr>
+      <td><span class="link-tag \${tagClass}">\${l.typeLabel||l.type}</span></td>
+      <td style="font-weight:700;max-width:180px;overflow:hidden;text-overflow:ellipsis;">\${l.label}</td>
+      <td style="font-family:monospace;font-size:11px;color:#555;">\${l.code||'—'}</td>
+      <td style="font-size:11px;">\${l.targetLabel||'—'}</td>
+      <td style="font-size:11px;color:#aaa;">\${l.created||'—'}</td>
+      <td>
+        <button class="act-btn act-edit" onclick="reloadQrLink(\${i})">載入</button>
+        <button class="act-btn act-kyc" onclick="copyQrLinkUrl(\${i})">複製</button>
+        <button class="act-btn act-deact" onclick="deleteQrLink(\${i})">刪除</button>
+      </td>
+    </tr>\`;
+  }).join('');
+}
+
+function reloadQrLink(i){
+  var l = _qrLinks[i];
+  setQrType(l.type);
+  // restore target
+  var p = new URL(l.url);
+  var path = p.pathname;
+  var tgt = path.includes('join-family')?'family':path.includes('join')?'primary':'both';
+  document.getElementById('qTarget').value = tgt;
+
+  if(l.type==='roadshow'){
+    document.getElementById('qRsCode').value = p.searchParams.get('rs')||'';
+    document.getElementById('qRsLabel').value = p.searchParams.get('loc')||'';
+  } else if(l.type==='institution'){
+    document.getElementById('qInstName').value = p.searchParams.get('loc')||'';
+    var rs2 = p.searchParams.get('rs')||'';
+    document.getElementById('qInstCode').value = rs2.replace(/^inst_/,'');
+  } else if(l.type==='referral'){
+    document.getElementById('qRefNo').value = p.searchParams.get('ref')||'';
+    document.getElementById('qRefName').value = l.label.replace(/（.*）$/,'').trim();
+  } else if(l.type==='online'){
+    document.getElementById('qOnlineCh').value = p.searchParams.get('ch')||'facebook';
+    document.getElementById('qOnlineTag').value = p.searchParams.get('tag')||'';
+  }
+  updateQr();
+}
+
+function copyQrLinkUrl(i){
+  navigator.clipboard.writeText(_qrLinks[i].url).then(function(){
+    alert('✅ 連結已複製到剪貼簿');
+  });
+}
+
+function deleteQrLink(i){
+  if(!confirm('確認刪除此連結記錄？')) return;
+  _qrLinks.splice(i,1);
+  try{ localStorage.setItem('coeldery85_qr_links', JSON.stringify(_qrLinks)); }catch(e){}
+  renderQrLinks();
 }
 
 // ── Stats + Charts
