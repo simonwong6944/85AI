@@ -1605,9 +1605,9 @@ async function loadMembers(page){
       <td style="font-size:11px;">\${(m.created_at||'').slice(0,16).replace('T',' ')}</td>
       <td>
         <button class="act-btn act-edit" onclick="openEdit(\${i})">編輯</button>
-        \${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc(\''+m.member_no+'\')">KYC✓</button>':''}
-        \${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="toggleStatus(\''+m.member_no+'\',\'INACTIVE\')">停用</button>':
-          m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="toggleStatus(\''+m.member_no+'\',\'ACTIVE\')">啟用</button>':''}
+        \${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc('+i+')">KYC\u2713</button>':''}
+        \${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="deactivateMember('+i+')">\u505c\u7528</button>':
+          m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="reactivateMember('+i+')">\u555f\u7528</button>':''}
       </td>
     </tr>\`;}).join('');
   renderPagination();
@@ -1620,15 +1620,22 @@ function renderPagination(){
 }
 
 // ── Actions
-async function approveKyc(no){
+async function approveKyc(i){
+  var no=window._members[i].member_no;
   if(!confirm('確認標記 '+no+' KYC 為 DONE？'))return;
   await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kyc_status:'DONE'})});
   loadMembers(currentPage);
 }
-async function toggleStatus(no,status){
-  var msg=status==='INACTIVE'?'確認停用會員 '+no+'？':'確認重新啟用 '+no+'？';
-  if(!confirm(msg))return;
-  await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+async function deactivateMember(i){
+  var no=window._members[i].member_no;
+  if(!confirm('確認停用會員 '+no+'？'))return;
+  await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'INACTIVE'})});
+  loadMembers(currentPage);
+}
+async function reactivateMember(i){
+  var no=window._members[i].member_no;
+  if(!confirm('確認重新啟用 '+no+'？'))return;
+  await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'ACTIVE'})});
   loadMembers(currentPage);
 }
 
