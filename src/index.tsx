@@ -42,6 +42,7 @@ app.post('/api/members', async (c) => {
       parentPhone?: string; parentName?: string; parentNo?: string; relation?: string;
       roadshow?: string;
       source?: string; referrerNo?: string; roadshowLocation?: string;
+      applyMedical?: boolean; medNameZh?: string; medNameEn?: string; medHkid?: string;
     }>()
 
     // Validate required fields
@@ -123,6 +124,23 @@ app.post('/api/members', async (c) => {
       ).bind(roadshow, memberNo).run()
     }
 
+    // Medical card application (if opted in)
+    let medicalApplied = false
+    if (body.applyMedical && body.medNameZh && body.medNameEn && body.medHkid) {
+      await db.prepare(`
+        INSERT INTO medical_card_applications
+          (member_no, name_zh_full, name_en_full, hkid_prefix, phone)
+        VALUES (?,?,?,?,?)
+      `).bind(
+        memberNo,
+        body.medNameZh.trim(),
+        body.medNameEn.trim().toUpperCase(),
+        body.medHkid.trim().toUpperCase(),
+        phoneClean
+      ).run()
+      medicalApplied = true
+    }
+
     return c.json({
       ok: true,
       memberNo,
@@ -130,7 +148,8 @@ app.post('/api/members', async (c) => {
       nameEn: body.nameEn?.trim() || '',
       tier: body.tier || 'PRIMARY',
       expiresAt: expires,
-      role: 'CoExplorery'
+      role: 'CoExplorery',
+      medicalApplied
     })
   } catch (err) {
     console.error(err)
@@ -302,6 +321,63 @@ app.get('/api/members/:no/family', async (c) => {
     'SELECT member_no, name_zh, name_en, phone, role, kyc_status, expires_at, created_at FROM members WHERE parent_no = ? ORDER BY created_at'
   ).bind(no).all()
   return c.json({ ok: true, family: rows.results })
+})
+
+// ─── API: Admin — List medical card applications ──────────────────────────────
+app.get('/api/admin/medical', async (c) => {
+  const db = c.env.DB
+  const status = c.req.query('status') || ''
+  const exportCsv = c.req.query('export') === 'csv'
+  let where = 'WHERE 1=1'
+  const params: string[] = []
+  if (status) { where += ' AND m.status = ?'; params.push(status) }
+
+  const rows = await db.prepare(`
+    SELECT m.id, m.member_no, m.name_zh_full, m.name_en_full, m.hkid_prefix,
+           m.phone, m.status, m.applied_at, m.sent_at, m.notes,
+           mb.name_zh as member_name_zh, mb.district
+    FROM medical_card_applications m
+    LEFT JOIN members mb ON mb.member_no = m.member_no
+    ${where}
+    ORDER BY m.applied_at DESC
+  `).bind(...params).all()
+
+  if (exportCsv) {
+    const header = 'ID,會員編號,中文全名,英文全名,HKID頭4位,電話,狀態,申請日期,傳送日期,備註'
+    const lines = (rows.results as any[]).map(r =>
+      [r.id, r.member_no, r.name_zh_full, r.name_en_full, r.hkid_prefix,
+       r.phone, r.status, r.applied_at, r.sent_at||'', r.notes||'']
+      .map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')
+    )
+    return new Response([header, ...lines].join('\n'), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="medical_applications_${new Date().toISOString().slice(0,10)}.csv"`
+      }
+    })
+  }
+  return c.json({ ok: true, total: rows.results.length, applications: rows.results })
+})
+
+// ─── API: Admin — Update medical application status ───────────────────────────
+app.patch('/api/admin/medical/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const body = await c.req.json<{ status?: string; sent_at?: string; notes?: string }>()
+  const allowed = ['status', 'sent_at', 'notes']
+  const fields: string[] = []
+  const vals: any[] = []
+  for (const key of allowed) {
+    if (body[key as keyof typeof body] !== undefined) {
+      fields.push(`${key} = ?`)
+      vals.push(body[key as keyof typeof body])
+    }
+  }
+  if (!fields.length) return c.json({ ok: false, error: 'No fields to update' }, 400)
+  vals.push(id)
+  await db.prepare(`UPDATE medical_card_applications SET ${fields.join(', ')} WHERE id = ?`)
+    .bind(...vals).run()
+  return c.json({ ok: true })
 })
 
 // ─── API: Member self-update profile ─────────────────────────────────────────
@@ -549,6 +625,26 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .consent label{display:flex;gap:10px;cursor:pointer;}
 .consent input{width:20px;height:20px;margin-top:2px;flex-shrink:0;accent-color:var(--forest);}
 .consent a{color:var(--forest);text-decoration:underline;}
+/* Medical card opt-in block */
+.medical-block{border:2px solid #1565C0;border-radius:6px;overflow:hidden;margin-bottom:20px;}
+.medical-header{background:#1565C0;color:#fff;padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;}
+.medical-header .mh-left{display:flex;align-items:center;gap:10px;}
+.medical-header .mh-icon{font-size:22px;line-height:1;}
+.medical-header .mh-title{font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:1px;}
+.medical-header .mh-sub{font-size:11px;opacity:0.85;margin-top:2px;letter-spacing:0.5px;}
+.medical-header .mh-badge{background:#fff;color:#1565C0;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:1px;white-space:nowrap;}
+.medical-toggle{background:#EEF2FF;padding:12px 16px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid #C5CAE9;}
+.medical-toggle input[type=checkbox]{width:20px;height:20px;margin-top:1px;flex-shrink:0;accent-color:#1565C0;}
+.medical-toggle label{font-size:13px;color:#1A237E;line-height:1.6;cursor:pointer;font-weight:600;}
+.medical-extra{display:none;padding:16px;background:#fff;}
+.medical-extra.show{display:block;}
+.medical-extra .notice{background:#FFF8E1;border-left:3px solid #F9A825;padding:10px 12px;font-size:12px;color:#5D4037;line-height:1.6;margin-bottom:16px;border-radius:0 4px 4px 0;}
+.medical-extra .field label{color:#1565C0;}
+.medical-extra .field input{border-color:#90CAF9;}
+.medical-extra .field input:focus{border-color:#1565C0;}
+.medical-privacy{background:#E3F2FD;border-radius:4px;padding:12px 14px;font-size:11px;color:#37474F;line-height:1.8;margin-top:12px;}
+.medical-privacy label{display:flex;gap:8px;cursor:pointer;align-items:flex-start;}
+.medical-privacy input{width:18px;height:18px;flex-shrink:0;margin-top:1px;accent-color:#1565C0;}
 .submit-btn{width:100%;padding:18px;background:var(--forest);color:#fff;border:0;border-radius:4px;font-size:18px;font-family:"Noto Serif TC",sans-serif;font-weight:700;letter-spacing:4px;cursor:pointer;box-shadow:0 4px 0 var(--forest-deep);transition:all 0.1s;}
 .submit-btn:active{transform:translateY(2px);box-shadow:0 2px 0 var(--forest-deep);}
 .submit-btn:disabled{background:var(--grey-3);box-shadow:0 4px 0 var(--grey-2);cursor:not-allowed;}
@@ -664,6 +760,61 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
         </div>
       </div>
 
+      <!-- ── 醫健卡 opt-in ── -->
+      <div class="medical-block">
+        <div class="medical-header">
+          <div class="mh-left">
+            <div class="mh-icon">🏥</div>
+            <div>
+              <div class="mh-title">同時申請免費醫健卡</div>
+              <div class="mh-sub">由合作 NGO 香港商貿慈善基金提供</div>
+            </div>
+          </div>
+          <div class="mh-badge">免費</div>
+        </div>
+        <div class="medical-toggle">
+          <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)">
+          <label for="applyMedical">
+            我希望同時申請醫健卡（免費）<br>
+            <span style="font-size:11px;color:#5C6BC0;font-weight:400;">NGO 職員將會以電話或 WhatsApp 聯絡辦理手續，一次登記同時擁有兩張卡</span>
+          </label>
+        </div>
+        <div class="medical-extra" id="medicalExtra">
+          <div class="notice">
+            ⚕️ 醫健卡資料必須與<strong>香港身份證完全一致</strong>，請確保中英文姓名及身份證號碼頭4位正確無誤。
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="medNameZh">中文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
+              <span class="req">✽ 必填</span>
+            </div>
+            <input id="medNameZh" type="text" placeholder="例：陳大文">
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="medNameEn">英文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
+              <span class="req">✽ 必填</span>
+            </div>
+            <input id="medNameEn" type="text" placeholder="例：CHAN TAI MAN" style="text-transform:uppercase;">
+            <div class="hint">請使用全大楷，與身份證英文姓名一致</div>
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="medHkid">身份證頭4位</label>
+              <span class="req">✽ 必填</span>
+            </div>
+            <input id="medHkid" type="text" placeholder="例：K608" maxlength="4" style="text-transform:uppercase;letter-spacing:4px;font-size:20px;font-weight:700;">
+            <div class="hint">香港身份證號碼首4個字符，例如 A123、K608</div>
+          </div>
+          <div class="medical-privacy">
+            <label>
+              <input type="checkbox" id="medConsent">
+              <span>本人同意將以上個人資料（包括姓名及身份證頭4位）提供予<strong>香港商貿慈善基金</strong>，用於申請及發出醫健卡。本人明白 NGO 職員將以電話或 WhatsApp 與本人聯絡辦理手續，並同意接受聯絡。本人已閱讀並同意<a href="https://www.hmmp.com.hk" target="_blank" style="color:#1565C0;">香港商貿慈善基金私隱政策</a>。</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div class="consent">
         <label>
           <input type="checkbox" id="consent" required>
@@ -714,6 +865,15 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       <img id="cardImg" style="width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.18);" alt="會員卡">
     </div>
 
+    <!-- Medical card notice (shown if applied) -->
+    <div id="medSuccessNotice" style="display:none;background:#E3F2FD;border:1.5px solid #1565C0;border-radius:6px;padding:14px 16px;margin-bottom:16px;text-align:left;">
+      <div style="font-size:15px;font-weight:700;color:#0D47A1;margin-bottom:6px;">🏥 醫健卡申請已提交</div>
+      <div style="font-size:13px;color:#1A237E;line-height:1.7;">
+        你的醫健卡申請已記錄，<strong>香港商貿慈善基金</strong>職員將會以<strong>電話或 WhatsApp</strong> 聯絡你安排發卡手續。<br>
+        <span style="font-size:11px;color:#5C6BC0;">如有查詢請致電：9888 5708 或瀏覽 hmmp.com.hk</span>
+      </div>
+    </div>
+
     <div class="action-row">
       <button class="action-btn" id="saveImgBtn" onclick="saveCardImage()">💾 儲存卡圖</button>
       <button class="action-btn red" onclick="window.location.href='/membership/join-family'">家人申請</button>
@@ -739,6 +899,22 @@ function setGender(v, btn) {
   btn.classList.add('active');
 }
 
+function toggleMedical(cb) {
+  var extra = document.getElementById('medicalExtra');
+  if (cb.checked) {
+    extra.classList.add('show');
+    // Pre-fill from main form
+    var zh = document.getElementById('nameZh').value.trim();
+    var en = document.getElementById('nameEn').value.trim().toUpperCase();
+    if (zh && !document.getElementById('medNameZh').value) document.getElementById('medNameZh').value = zh;
+    if (en && !document.getElementById('medNameEn').value) document.getElementById('medNameEn').value = en;
+    document.getElementById('submitBtn').textContent = '立即登記（兩卡同申）';
+  } else {
+    extra.classList.remove('show');
+    document.getElementById('submitBtn').textContent = '立即登記';
+  }
+}
+
 function showErr(msg) {
   var el = document.getElementById('errMsg');
   el.textContent = msg;
@@ -751,10 +927,25 @@ async function submitForm() {
   var nameZh = document.getElementById('nameZh').value.trim();
   var phone = document.getElementById('phone').value.replace(/\\D/g,'');
   var consent = document.getElementById('consent').checked;
+  var applyMedical = document.getElementById('applyMedical').checked;
 
   if (!nameZh) { showErr('請填寫中文姓名'); return; }
   if (phone.length !== 8) { showErr('請填寫正確的 8 位香港電話'); return; }
   if (!consent) { showErr('請同意私隱政策'); return; }
+
+  // Validate medical card fields if opted in
+  var medPayload = null;
+  if (applyMedical) {
+    var medNameZh = document.getElementById('medNameZh').value.trim();
+    var medNameEn = document.getElementById('medNameEn').value.trim().toUpperCase();
+    var medHkid = document.getElementById('medHkid').value.trim().toUpperCase();
+    var medConsent = document.getElementById('medConsent').checked;
+    if (!medNameZh) { showErr('申請醫健卡：請填寫中文全名'); return; }
+    if (!medNameEn) { showErr('申請醫健卡：請填寫英文全名'); return; }
+    if (!medHkid || medHkid.length < 3) { showErr('申請醫健卡：請填寫身份證頭4位（如 K608）'); return; }
+    if (!medConsent) { showErr('申請醫健卡：請同意醫健卡私隱條款，授權 NGO 聯絡你'); return; }
+    medPayload = { medNameZh, medNameEn, medHkid };
+  }
 
   var btn = document.getElementById('submitBtn');
   btn.disabled = true;
@@ -773,25 +964,32 @@ async function submitForm() {
         gender: selectedGender,
         birthYear: document.getElementById('birthYear').value || '',
         district: document.getElementById('district').value,
-        roadshow: params.get('rs') || 'walk-in'
+        roadshow: params.get('rs') || 'walk-in',
+        applyMedical: applyMedical,
+        medNameZh: medPayload?.medNameZh || '',
+        medNameEn: medPayload?.medNameEn || '',
+        medHkid: medPayload?.medHkid || ''
       })
     });
     var data = await res.json();
-    if (!data.ok) { showErr(data.error || '登記失敗，請再試一次'); btn.disabled=false; btn.textContent='立即登記'; return; }
-    showSuccess(data);
+    if (!data.ok) { showErr(data.error || '登記失敗，請再試一次'); btn.disabled=false; btn.textContent=applyMedical?'立即登記（兩卡同申）':'立即登記'; return; }
+    showSuccess(data, applyMedical);
   } catch(e) {
     showErr('網絡錯誤，請再試一次');
-    btn.disabled=false; btn.textContent='立即登記';
+    btn.disabled=false; btn.textContent=applyMedical?'立即登記（兩卡同申）':'立即登記';
   }
 }
 
-function showSuccess(data) {
+function showSuccess(data, appliedMedical) {
   document.getElementById('formSection').style.display='none';
   document.getElementById('cardZh').textContent = data.nameZh;
   document.getElementById('cardEn').textContent = data.nameEn || '';
   document.getElementById('cardNo').textContent = data.memberNo;
   var cardUrl = location.origin + '/membership/card/' + data.memberNo;
   try { QRCode.toCanvas(document.getElementById('cardQr'), cardUrl, {width:40,margin:0,color:{dark:'#0d3e12',light:'#ffffff'},errorCorrectionLevel:'H'}); } catch(e) { console.warn('QR error (non-fatal):', e); }
+  // Show medical card notice if applied
+  var medNotice = document.getElementById('medSuccessNotice');
+  if (medNotice) medNotice.style.display = appliedMedical ? 'block' : 'none';
   document.getElementById('successSection').classList.add('show');
   // Set link to member profile page
   var myLink = document.getElementById('myPageLink');
@@ -1384,6 +1582,7 @@ tr.inactive td{opacity:0.45;}
   <div class="nav-tabs">
     <div class="nav-tab active" onclick="switchTab('dashboard',this)">📊 Dashboard</div>
     <div class="nav-tab" onclick="switchTab('members',this)">👥 會員管理</div>
+    <div class="nav-tab" onclick="switchTab('medical',this)">🏥 醫健卡申請</div>
   </div>
   <div class="topbar-right">coeldery85.com/membership/admin</div>
 </div>
@@ -1462,6 +1661,31 @@ tr.inactive td{opacity:0.45;}
     </div>
   </div>
 
+  <!-- ── MEDICAL CARD PAGE ── -->
+  <div class="page" id="page-medical">
+    <div class="filter-bar">
+      <select id="medFilterStatus" onchange="loadMedical()">
+        <option value="">全部狀態</option>
+        <option value="PENDING">待傳送</option>
+        <option value="SENT">已傳送 NGO</option>
+        <option value="ISSUED">已發卡</option>
+        <option value="DECLINED">已拒絕</option>
+      </select>
+      <button class="btn btn-green" onclick="loadMedical()">🔍 重新整理</button>
+      <a class="btn btn-blue" href="/api/admin/medical?export=csv" target="_blank">⬇ CSV 匯出</a>
+    </div>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr>
+        <th>ID</th><th>會員編號</th><th>中文全名</th><th>英文全名</th>
+        <th>HKID頭4位</th><th>電話</th><th>狀態</th><th>申請日期</th><th>操作</th>
+      </tr></thead>
+      <tbody id="medicalTbody"></tbody>
+    </table>
+    </div>
+    <div id="medicalCount" style="padding:8px 0;font-size:12px;color:#888;"></div>
+  </div>
+
 </div>
 
 <!-- ── EDIT MODAL ── -->
@@ -1528,6 +1752,7 @@ function switchTab(t, el){
   if(el) el.classList.add('active');
   if(t==='dashboard') loadStats();
   if(t==='members') loadMembers(1);
+  if(t==='medical') loadMedical();
 }
 
 // ── Stats + Charts
@@ -1703,6 +1928,50 @@ function exportCsv(){
 }
 
 document.getElementById('search').addEventListener('keydown',function(e){if(e.key==='Enter')loadMembers(1);});
+
+// ── Medical Card Tab
+var medStatusLabel={'PENDING':'⏳ 待傳送','SENT':'📤 已傳送','ISSUED':'✅ 已發卡','DECLINED':'❌ 已拒絕'};
+var medStatusColor={'PENDING':'#F57F17','SENT':'#1565C0','ISSUED':'#2E7D32','DECLINED':'#B71C1C'};
+
+async function loadMedical(){
+  var st=document.getElementById('medFilterStatus').value;
+  var url='/api/admin/medical'+(st?'?status='+encodeURIComponent(st):'');
+  var r=await fetch(url); var d=await r.json(); if(!d.ok)return;
+  document.getElementById('medicalCount').textContent='共 '+d.total+' 筆申請';
+  window._medical=d.applications;
+  document.getElementById('medicalTbody').innerHTML=d.applications.map(function(m,i){
+    var col=medStatusColor[m.status]||'#888';
+    var lbl=medStatusLabel[m.status]||m.status;
+    return \`<tr>
+      <td style="font-size:11px;color:#aaa;">#\${m.id}</td>
+      <td><a href="/membership/card/\${m.member_no}" target="_blank" style="color:var(--forest);font-weight:700;">\${m.member_no}</a></td>
+      <td style="font-weight:700;">\${m.name_zh_full}</td>
+      <td style="font-size:12px;letter-spacing:1px;">\${m.name_en_full}</td>
+      <td style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:4px;">\${m.hkid_prefix}</td>
+      <td><a href="tel:+852\${m.phone}">\${m.phone}</a></td>
+      <td><span style="color:\${col};font-weight:700;font-size:12px;">\${lbl}</span></td>
+      <td style="font-size:11px;">\${(m.applied_at||'').slice(0,16).replace('T',' ')}</td>
+      <td>
+        \${m.status==='PENDING'?'<button class="act-btn act-kyc" onclick="markMedSent('+i+')">標記已傳送</button>':''}
+        \${m.status==='SENT'?'<button class="act-btn act-react" onclick="markMedIssued('+i+')">標記已發卡</button>':''}
+      </td>
+    </tr>\`;
+  }).join('');
+}
+
+async function markMedSent(i){
+  var m=window._medical[i];
+  if(!confirm('確認已將申請 #'+m.id+' ('+m.name_zh_full+') 資料傳送給 NGO？'))return;
+  var now=new Date().toISOString().slice(0,19).replace('T',' ');
+  await fetch('/api/admin/medical/'+m.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'SENT',sent_at:now})});
+  loadMedical();
+}
+async function markMedIssued(i){
+  var m=window._medical[i];
+  if(!confirm('確認 #'+m.id+' ('+m.name_zh_full+') 醫健卡已成功發出？'))return;
+  await fetch('/api/admin/medical/'+m.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'ISSUED'})});
+  loadMedical();
+}
 
 // Init: load dashboard
 loadStats();
