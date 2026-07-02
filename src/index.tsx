@@ -721,16 +721,16 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
           </div>
           <div class="mh-badge">✦ 免費</div>
         </div>
-        <div class="medical-cta" id="medCta" style="background:#C8D8FA" onclick="document.getElementById('applyMedical').click();toggleMedical(document.getElementById('applyMedical'))">
+        <div class="medical-cta" id="medCta" onclick="toggleMedicalClick()">
           <label onclick="event.preventDefault()">
             <div class="medical-cta-check">
-              <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)" onclick="event.stopPropagation()" checked>
+              <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)" onclick="event.stopPropagation()">
             </div>
             <div class="medical-cta-text">
-              <div class="medical-cta-main">✅ 已勾選申請免費醫健卡</div>
+              <div class="medical-cta-main" id="medCtaMain">點擊此處申請免費醫健卡（選擇性）</div>
               <div class="medical-cta-sub">一次登記，同時擁有老有卡 + 醫健卡 · NGO 職員以 WhatsApp 聯絡辦理</div>
             </div>
-            <div class="medical-cta-arrow open" id="medArrow">▼</div>
+            <div class="medical-cta-arrow" id="medArrow">▼</div>
           </label>
         </div>
         <div class="medical-extra" id="medicalExtra">
@@ -924,14 +924,23 @@ function syncNameFromMedical() {
   if (en) document.getElementById('nameEn').value = en;
 }
 
+function toggleMedicalClick() {
+  // Flip the checkbox, then call toggleMedical
+  var cb = document.getElementById('applyMedical');
+  cb.checked = !cb.checked;
+  toggleMedical(cb);
+}
+
 function toggleMedical(cb) {
   var extra = document.getElementById('medicalExtra');
   var arrow = document.getElementById('medArrow');
-  var cta = document.querySelector('.medical-cta');
+  var cta = document.getElementById('medCta');
+  var mainLabel = document.getElementById('medCtaMain');
   if (cb.checked) {
     extra.classList.add('show');
-    if(arrow) arrow.classList.add('open');
-    if(cta) cta.style.background='#C8D8FA';
+    if(arrow){ arrow.classList.add('open'); }
+    if(cta){ cta.style.background='#C8D8FA'; }
+    if(mainLabel){ mainLabel.textContent='✅ 已勾選申請免費醫健卡'; }
     // Pre-fill medical fields from main form
     var zh = document.getElementById('nameZh').value.trim();
     var en = document.getElementById('nameEn').value.trim().toUpperCase();
@@ -941,8 +950,9 @@ function toggleMedical(cb) {
     extra.scrollIntoView({behavior:'smooth', block:'nearest'});
   } else {
     extra.classList.remove('show');
-    if(arrow) arrow.classList.remove('open');
-    if(cta) cta.style.background='';
+    if(arrow){ arrow.classList.remove('open'); }
+    if(cta){ cta.style.background=''; }
+    if(mainLabel){ mainLabel.textContent='點擊此處申請免費醫健卡（選擇性）'; }
     document.getElementById('submitBtn').textContent = '立即登記';
   }
 }
