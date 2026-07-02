@@ -546,132 +546,203 @@ function showSuccess(data) {
   setTimeout(function(){ renderCardImage(data, 'PRIMARY'); }, 100);
 }
 
-// ── Draw member card onto an off-screen canvas and return a Blob URL ──────────
+// ── Draw member card onto an off-screen canvas — design-matched ───────────────
 function renderCardImage(data, tier) {
-  var DPR = 2; // retina quality
-  var W = 680, H = 464; // 340x232 × 2
-  var canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  var ctx = canvas.getContext('2d');
+  // Card dimensions: 680×430px (≈ credit-card 85.6×54mm @2×)
+  var W=680, H=430;
+  var canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  var ctx=canvas.getContext('2d');
 
-  var isPrimary = (tier !== 'FAMILY');
-  var forestDeep='#0d3e12', forest='#2E7D32', forestLight='#4CAF50', forestPale='#E8F5E9';
-  var ferrari='#C62828', ferrariDeep='#7f0000', ferrariPale='#FFEBEE';
-  var cardBg1 = isPrimary ? '#FAF7F0' : '#FFF5F5';
-  var cardBg2 = isPrimary ? '#F0EBD8' : '#FFE8E8';
+  var isPrimary=(tier!=='FAMILY');
+
+  // ── Colours ─────────────────────────────────────────────────────────────
+  var forestDeep='#0d3e12', forest='#2E7D32', forestPale='#E8F5E9';
+  var ferrari='#C62828', ferrariDeep='#8B0000', ferrariPale='#FFEBEE';
   var accentDark = isPrimary ? forestDeep : ferrariDeep;
-  var accentMid  = isPrimary ? forest    : ferrari;
-  var accentLight= isPrimary ? forestPale: ferrariPale;
-  var qrDark     = isPrimary ? forestDeep: '#a80000';
+  var accentMid  = isPrimary ? forest     : ferrari;
+  var qrDark     = isPrimary ? forestDeep : '#a80000';
 
-  // Background gradient (simple two-stop)
-  var grad = ctx.createLinearGradient(0,0,W*Math.cos(Math.PI*150/180),H*Math.sin(Math.PI*150/180));
-  grad.addColorStop(0, cardBg1); grad.addColorStop(1, cardBg2);
-  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+  // ── Background ──────────────────────────────────────────────────────────
+  // Warm cream gradient
+  var bg = ctx.createLinearGradient(0,0,W,H);
+  if(isPrimary){ bg.addColorStop(0,'#FDFAF3'); bg.addColorStop(1,'#F0EBD8'); }
+  else         { bg.addColorStop(0,'#FFF8F8'); bg.addColorStop(1,'#FFE8E8'); }
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
 
-  // Top stripe: primary/family split
-  if(isPrimary){
-    ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,10);
-    ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W,10);
-  } else {
-    ctx.fillStyle=ferrari; ctx.fillRect(0,0,W,10);
-  }
-
-  // Border
-  ctx.strokeStyle='#E5DEC8'; ctx.lineWidth=2;
-  ctx.strokeRect(1,1,W-2,H-2);
-
-  // Brand label (top-left)
+  // ── Watermark (大字 background) ──────────────────────────────────────────
+  ctx.save();
+  ctx.globalAlpha=0.06;
   ctx.fillStyle=accentDark;
-  ctx.font='bold '+(26*DPR/2)+'px "Noto Serif TC",serif';
-  ctx.fillText(isPrimary?'老有卡':'老有卡 家庭同行', 36, 50);
+  ctx.font='bold 320px "Noto Serif TC",serif';
+  ctx.textAlign='right';
+  ctx.fillText(isPrimary?'老':'家', W+20, H+20);
+  ctx.textAlign='left';
+  ctx.restore();
 
-  // Badge top-right
-  if(isPrimary){
-    var badgeW=260, badgeH=44, badgeX=W-badgeW-36, badgeY=26;
-    ctx.fillStyle=forestPale; ctx.strokeStyle=forest; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.rect(badgeX,badgeY,badgeW,badgeH); ctx.fill(); ctx.stroke();
-    ctx.fillStyle=ferrari; ctx.font='bold 18px sans-serif'; ctx.fillText('◆', badgeX+10, badgeY+30);
-    ctx.fillStyle=forestDeep; ctx.font='bold 20px "Noto Serif TC",serif';
-    ctx.fillText('CoExplorery 探索者', badgeX+34, badgeY+30);
-    // Tier label below badge
-    ctx.fillStyle=ferrari; ctx.font='bold 20px "Noto Serif TC",serif';
-    ctx.textAlign='right';
-    ctx.fillText('PRIMARY MEMBER', W-36, badgeY+badgeH+30);
-    ctx.textAlign='left';
-  } else {
-    var badgeW=140, badgeH=40, badgeX=W-badgeW-36, badgeY=28;
-    ctx.fillStyle=ferrariPale; ctx.strokeStyle=ferrari; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.rect(badgeX,badgeY,badgeW,badgeH); ctx.fill(); ctx.stroke();
-    ctx.fillStyle=ferrariDeep; ctx.font='bold 20px "Noto Serif TC",serif'; ctx.textAlign='center';
-    ctx.fillText('FAMILY', badgeX+badgeW/2, badgeY+28);
-    ctx.textAlign='left';
-  }
+  // ── Top stripe (green | red split) ──────────────────────────────────────
+  var stripeH=8;
+  ctx.fillStyle=forest;   ctx.fillRect(0,0,W*0.45,stripeH);
+  ctx.fillStyle=ferrari;  ctx.fillRect(W*0.45,0,W*0.55,stripeH);
 
-  // Name block
-  var nameY = isPrimary ? 290 : 280;
-  ctx.fillStyle='#999'; ctx.font='22px "Noto Serif TC",serif';
-  ctx.letterSpacing='8px';
-  ctx.fillText('MEMBER NAME · 姓名', 36, nameY);
-  ctx.letterSpacing='0px';
+  // ── Logo block (top-left) ────────────────────────────────────────────────
+  // "CoEldery" green + red "85" + 老有聯盟
+  var logoX=28, logoY=stripeH+20;
 
-  // Chinese name (big)
+  // CoEldery text
+  ctx.fillStyle=forest;
+  ctx.font='bold 19px "Noto Serif TC",sans-serif';
+  ctx.fillText('CoEldery', logoX, logoY+18);
+
+  // Red "85" numeral
+  ctx.fillStyle=ferrari;
+  ctx.font='bold 28px "Noto Serif TC",serif';
+  ctx.fillText('85', logoX+78, logoY+20);
+
+  // 老有聯盟 below
+  ctx.fillStyle=forest;
+  ctx.font='bold 13px "Noto Serif TC",serif';
+  ctx.fillText('老有聯盟', logoX, logoY+34);
+
+  // Vertical divider
+  ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(logoX+114, logoY+4); ctx.lineTo(logoX+114, logoY+42); ctx.stroke();
+
+  // Card name (老有卡 / 老有卡\n家庭同行)
   ctx.fillStyle=accentDark;
-  var zhName = data.nameZh || '';
-  var zhFontSize = zhName.length <= 3 ? 88 : zhName.length <= 4 ? 72 : 56;
-  ctx.font = 'bold '+zhFontSize+'px "Noto Serif TC",serif';
-  ctx.fillText(zhName, 36, nameY + zhFontSize + 8);
-
-  // English name
-  if(data.nameEn){
-    ctx.fillStyle=accentDark; ctx.font='bold 30px "Noto Serif TC",serif';
-    ctx.fillText(data.nameEn, 36, nameY + zhFontSize + 50);
+  if(isPrimary){
+    ctx.font='bold 22px "Noto Serif TC",serif';
+    ctx.fillText('老有卡', logoX+124, logoY+28);
+  } else {
+    ctx.font='bold 19px "Noto Serif TC",serif';
+    ctx.fillText('老有卡', logoX+124, logoY+16);
+    ctx.fillText('家庭同行', logoX+124, logoY+38);
   }
 
-  // Footer: member no
-  ctx.fillStyle='#999'; ctx.font='20px "Noto Serif TC",serif';
-  ctx.fillText('MEMBER NO.', 36, H-60);
-  ctx.fillStyle=accentDark; ctx.font='bold 34px "Space Grotesk",monospace';
-  ctx.fillText(data.memberNo || '', 36, H-28);
+  // ── Badge (top-right) ────────────────────────────────────────────────────
+  var badgeW=220, badgeH=36, badgeX=W-badgeW-28, badgeY=stripeH+14;
+  ctx.fillStyle=isPrimary?forestPale:ferrariPale;
+  ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 4);
+  ctx.fill(); ctx.stroke();
+  // ◆ diamond
+  ctx.fillStyle=ferrari;
+  ctx.font='bold 14px sans-serif';
+  ctx.fillText('◆', badgeX+10, badgeY+24);
+  // CoExplorery 探索者
+  ctx.fillStyle=accentDark;
+  ctx.font='bold 17px "Noto Serif TC",serif';
+  ctx.fillText('CoExplorery 探索者', badgeX+30, badgeY+24);
 
-  // QR code in bottom-right
-  var qrSize = 92;
-  var qrX = W - qrSize - 36, qrY = H - qrSize - 28;
-  // White background + border
-  ctx.fillStyle='#fff'; ctx.fillRect(qrX-6,qrY-6,qrSize+12,qrSize+12);
-  ctx.strokeStyle=accentMid; ctx.lineWidth=3;
-  ctx.strokeRect(qrX-6,qrY-6,qrSize+12,qrSize+12);
-  // Draw QR modules
+  // Tier label below badge
+  ctx.fillStyle=ferrari;
+  ctx.font='bold 16px "Noto Serif TC",serif';
+  ctx.textAlign='right';
+  if(isPrimary){
+    ctx.fillText('主卡 · PRIMARY', W-28, badgeY+badgeH+22);
+  } else {
+    ctx.fillText('附屬 · FAMILY', W-28, badgeY+badgeH+22);
+  }
+  ctx.textAlign='left';
+
+  // ── Name area ────────────────────────────────────────────────────────────
+  var nameAreaY=210;
+
+  // "會員姓名" label
+  ctx.fillStyle='#aaa';
+  ctx.font='13px "Noto Serif TC",serif';
+  // Letter-spaced manually
+  var lbl='會員姓名'; var lx=28;
+  for(var i=0;i<lbl.length;i++){
+    ctx.fillText(lbl[i], lx, nameAreaY); lx+=ctx.measureText(lbl[i]).width+6;
+  }
+
+  // Chinese name (large)
+  ctx.fillStyle=accentDark;
+  var zh=data.nameZh||'';
+  var zhSz = zh.length<=2?96 : zh.length<=3?86 : zh.length<=4?70 : 54;
+  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif';
+  ctx.fillText(zh, 28, nameAreaY+zhSz+4);
+
+  // English name (below Chinese, only if present)
+  var enY = nameAreaY+zhSz+4;
+  if(data.nameEn && data.nameEn.trim()){
+    ctx.fillStyle=accentDark;
+    ctx.font='bold 24px "Noto Serif TC",serif';
+    enY += 32;
+    ctx.fillText(data.nameEn.trim(), 28, enY);
+  }
+
+  // Family card: parent binding line
+  if(!isPrimary && data.parentNo){
+    ctx.fillStyle=ferrari;
+    ctx.font='14px "Noto Serif TC",serif';
+    ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''), 28, enY+24);
+  }
+
+  // ── Footer ───────────────────────────────────────────────────────────────
+  var footY=H-18;
+
+  // Member no label + value
+  ctx.fillStyle='#aaa'; ctx.font='14px "Noto Serif TC",serif';
+  ctx.fillText('會員編號', 28, footY-36);
+  ctx.fillStyle=accentDark; ctx.font='bold 28px "Space Grotesk",monospace';
+  ctx.fillText(data.memberNo||'', 28, footY-8);
+
+  // Expiry label + value
+  if(data.expiresAt){
+    var expStr=data.expiresAt.slice(0,7).replace('-','/'); // "2029/07"
+    var expDisp=expStr.slice(5)+' / '+expStr.slice(0,4);  // "07 / 2029"
+    ctx.fillStyle='#aaa'; ctx.font='14px "Noto Serif TC",serif';
+    ctx.fillText('有效日期', 280, footY-36);
+    ctx.fillStyle=accentDark; ctx.font='bold 28px "Space Grotesk",monospace';
+    ctx.fillText(expDisp, 280, footY-8);
+  }
+
+  // ── QR code (bottom-right) ───────────────────────────────────────────────
+  var qrSz=86, qrX=W-qrSz-24, qrY2=H-qrSz-16;
+  ctx.fillStyle='#fff'; ctx.fillRect(qrX-5,qrY2-5,qrSz+10,qrSz+10);
+  ctx.strokeStyle=accentMid; ctx.lineWidth=2;
+  ctx.strokeRect(qrX-5,qrY2-5,qrSz+10,qrSz+10);
   try {
-    var qr = qrcode(0,'H');
+    var qr=qrcode(0,'M');
     qr.addData(location.origin+'/member/'+(data.memberNo||''));
     qr.make();
-    var mc = qr.getModuleCount();
-    var cell = Math.floor(qrSize/mc);
+    var mc=qr.getModuleCount(), cell=Math.floor(qrSz/mc);
     ctx.fillStyle=qrDark;
     for(var row=0;row<mc;row++){
       for(var col=0;col<mc;col++){
-        if(qr.isDark(row,col)) ctx.fillRect(qrX+col*cell, qrY+row*cell, cell, cell);
+        if(qr.isDark(row,col)) ctx.fillRect(qrX+col*cell, qrY2+row*cell, cell, cell);
       }
     }
-  } catch(e){ console.warn('QR img error',e); }
+  } catch(e){ console.warn('QR img err',e); }
 
-  // Convert to JPEG blob and show preview
+  // ── Convert → JPEG blob ──────────────────────────────────────────────────
   canvas.toBlob(function(blob){
     if(!blob){ console.warn('canvas.toBlob failed'); return; }
-    window._cardBlob = blob;
-    window._cardFileName = 'CoEldery85_' + (data.memberNo||'card') + '.jpg';
-    var url = URL.createObjectURL(blob);
-    var img = document.getElementById('cardImg');
-    if(img){ img.src = url; }
-    var wrap = document.getElementById('cardImgWrap');
+    window._cardBlob=blob;
+    window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
+    var url=URL.createObjectURL(blob);
+    var img=document.getElementById('cardImg');
+    if(img){ img.src=url; }
+    var wrap=document.getElementById('cardImgWrap');
     if(wrap){ wrap.style.display='block'; }
-    // Hide the CSS card, show the rendered image instead
-    var cssCard = document.getElementById('genCard');
+    var cssCard=document.getElementById('genCard');
     if(cssCard){ cssCard.style.display='none'; }
-  }, 'image/jpeg', 0.95);
+  },'image/jpeg',0.95);
 }
 
+// Helper: rounded rectangle path
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.arcTo(x+w,y,   x+w,y+r,   r);
+  ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w,y+h, x+w-r,y+h, r);
+  ctx.lineTo(x+r, y+h);   ctx.arcTo(x,y+h,   x,y+h-r,   r);
+  ctx.lineTo(x, y+r);     ctx.arcTo(x,y,     x+r,y,     r);
+  ctx.closePath();
+}
 function saveCardImage() {
   if(!window._cardBlob){ alert('圖片未準備好，請稍候再試'); return; }
   var a = document.createElement('a');
@@ -885,60 +956,76 @@ async function submitForm(){
 }
 
 function renderCardImage(data, tier) {
-  var W=680, H=464;
+  var W=680, H=430;
   var canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
   var ctx=canvas.getContext('2d');
   var isPrimary=(tier!=='FAMILY');
   var forestDeep='#0d3e12',forest='#2E7D32',forestPale='#E8F5E9';
-  var ferrari='#C62828',ferrariDeep='#7f0000',ferrariPale='#FFEBEE';
+  var ferrari='#C62828',ferrariDeep='#8B0000',ferrariPale='#FFEBEE';
   var accentDark=isPrimary?forestDeep:ferrariDeep;
   var accentMid=isPrimary?forest:ferrari;
   var qrDark=isPrimary?forestDeep:'#a80000';
-  var bg1=isPrimary?'#FAF7F0':'#FFF5F5', bg2=isPrimary?'#F0EBD8':'#FFE8E8';
-  var grad=ctx.createLinearGradient(0,0,W*0.5,H);
-  grad.addColorStop(0,bg1); grad.addColorStop(1,bg2);
-  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
-  if(isPrimary){ctx.fillStyle=forest;ctx.fillRect(0,0,W*0.45,10);ctx.fillStyle=ferrari;ctx.fillRect(W*0.45,0,W,10);}
-  else{ctx.fillStyle=ferrari;ctx.fillRect(0,0,W,10);}
-  ctx.strokeStyle='#E5DEC8';ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
-  ctx.fillStyle=accentDark;ctx.font='bold 26px "Noto Serif TC",serif';
-  ctx.fillText(isPrimary?'老有卡':'老有卡 家庭同行',36,50);
-  if(isPrimary){
-    var bW=260,bH=44,bX=W-bW-36,bY=26;
-    ctx.fillStyle=forestPale;ctx.strokeStyle=forest;ctx.lineWidth=2;ctx.beginPath();ctx.rect(bX,bY,bW,bH);ctx.fill();ctx.stroke();
-    ctx.fillStyle=ferrari;ctx.font='bold 18px sans-serif';ctx.fillText('◆',bX+10,bY+30);
-    ctx.fillStyle=forestDeep;ctx.font='bold 20px "Noto Serif TC",serif';ctx.fillText('CoExplorery 探索者',bX+34,bY+30);
-    ctx.fillStyle=ferrari;ctx.font='bold 20px "Noto Serif TC",serif';ctx.textAlign='right';ctx.fillText('PRIMARY MEMBER',W-36,bY+bH+30);ctx.textAlign='left';
-  }else{
-    var bW=140,bH=40,bX=W-bW-36,bY=28;
-    ctx.fillStyle=ferrariPale;ctx.strokeStyle=ferrari;ctx.lineWidth=2;ctx.beginPath();ctx.rect(bX,bY,bW,bH);ctx.fill();ctx.stroke();
-    ctx.fillStyle=ferrariDeep;ctx.font='bold 20px "Noto Serif TC",serif';ctx.textAlign='center';ctx.fillText('FAMILY',bX+bW/2,bY+28);ctx.textAlign='left';
-  }
-  var nameY=isPrimary?290:280;
-  ctx.fillStyle='#999';ctx.font='22px "Noto Serif TC",serif';ctx.fillText('MEMBER NAME · 姓名',36,nameY);
+  var bg=ctx.createLinearGradient(0,0,W,H);
+  if(isPrimary){bg.addColorStop(0,'#FDFAF3');bg.addColorStop(1,'#F0EBD8');}
+  else{bg.addColorStop(0,'#FFF8F8');bg.addColorStop(1,'#FFE8E8');}
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.globalAlpha=0.06; ctx.fillStyle=accentDark;
+  ctx.font='bold 320px "Noto Serif TC",serif'; ctx.textAlign='right';
+  ctx.fillText(isPrimary?'老':'家',W+20,H+20); ctx.textAlign='left'; ctx.restore();
+  var stripeH=8;
+  ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
+  ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
+  var logoX=28,logoY=stripeH+20;
+  ctx.fillStyle=forest; ctx.font='bold 19px "Noto Serif TC",sans-serif'; ctx.fillText('CoEldery',logoX,logoY+18);
+  ctx.fillStyle=ferrari; ctx.font='bold 28px "Noto Serif TC",serif'; ctx.fillText('85',logoX+78,logoY+20);
+  ctx.fillStyle=forest; ctx.font='bold 13px "Noto Serif TC",serif'; ctx.fillText('老有聯盟',logoX,logoY+34);
+  ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(logoX+114,logoY+4); ctx.lineTo(logoX+114,logoY+42); ctx.stroke();
+  ctx.fillStyle=accentDark;
+  if(isPrimary){ctx.font='bold 22px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+28);}
+  else{ctx.font='bold 19px "Noto Serif TC",serif';ctx.fillText('老有卡',logoX+124,logoY+16);ctx.fillText('家庭同行',logoX+124,logoY+38);}
+  var badgeW=220,badgeH=36,badgeX=W-badgeW-28,badgeY=stripeH+14;
+  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=1.5;
+  ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,4); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=ferrari; ctx.font='bold 14px sans-serif'; ctx.fillText('◆',badgeX+10,badgeY+24);
+  ctx.fillStyle=accentDark; ctx.font='bold 17px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+30,badgeY+24);
+  ctx.fillStyle=ferrari; ctx.font='bold 16px "Noto Serif TC",serif'; ctx.textAlign='right';
+  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-28,badgeY+badgeH+22); ctx.textAlign='left';
+  var nameAreaY=210;
+  ctx.fillStyle='#aaa'; ctx.font='13px "Noto Serif TC",serif';
+  var lbl='會員姓名',lx=28;
+  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+6;}
   ctx.fillStyle=accentDark;
   var zh=data.nameZh||'';
-  var zhSz=zh.length<=3?88:zh.length<=4?72:56;
-  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif';ctx.fillText(zh,36,nameY+zhSz+8);
-  if(data.nameEn){ctx.fillStyle=accentDark;ctx.font='bold 30px "Noto Serif TC",serif';ctx.fillText(data.nameEn,36,nameY+zhSz+50);}
-  ctx.fillStyle='#999';ctx.font='20px "Noto Serif TC",serif';ctx.fillText('MEMBER NO.',36,H-60);
-  ctx.fillStyle=accentDark;ctx.font='bold 34px "Space Grotesk",monospace';ctx.fillText(data.memberNo||'',36,H-28);
-  var qrSz=92,qrX=W-qrSz-36,qrY2=H-qrSz-28;
-  ctx.fillStyle='#fff';ctx.fillRect(qrX-6,qrY2-6,qrSz+12,qrSz+12);
-  ctx.strokeStyle=accentMid;ctx.lineWidth=3;ctx.strokeRect(qrX-6,qrY2-6,qrSz+12,qrSz+12);
-  try{var qr=qrcode(0,'H');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var r=0;r<mc;r++){for(var c2=0;c2<mc;c2++){if(qr.isDark(r,c2))ctx.fillRect(qrX+c2*cell,qrY2+r*cell,cell,cell);}}}catch(e){console.warn('QR img err',e);}
+  var zhSz=zh.length<=2?96:zh.length<=3?86:zh.length<=4?70:54;
+  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,28,nameAreaY+zhSz+4);
+  var enY=nameAreaY+zhSz+4;
+  if(data.nameEn&&data.nameEn.trim()){ctx.fillStyle=accentDark;ctx.font='bold 24px "Noto Serif TC",serif';enY+=32;ctx.fillText(data.nameEn.trim(),28,enY);}
+  if(!isPrimary&&data.parentNo){ctx.fillStyle=ferrari;ctx.font='14px "Noto Serif TC",serif';ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),28,enY+24);}
+  var footY=H-18;
+  ctx.fillStyle='#aaa'; ctx.font='14px "Noto Serif TC",serif'; ctx.fillText('會員編號',28,footY-36);
+  ctx.fillStyle=accentDark; ctx.font='bold 28px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',28,footY-8);
+  if(data.expiresAt){
+    var expStr=data.expiresAt.slice(0,7).replace('-','/');
+    var expDisp=expStr.slice(5)+' / '+expStr.slice(0,4);
+    ctx.fillStyle='#aaa'; ctx.font='14px "Noto Serif TC",serif'; ctx.fillText('有效日期',280,footY-36);
+    ctx.fillStyle=accentDark; ctx.font='bold 28px "Space Grotesk",monospace'; ctx.fillText(expDisp,280,footY-8);
+  }
+  var qrSz=86,qrX=W-qrSz-24,qrY2=H-qrSz-16;
+  ctx.fillStyle='#fff'; ctx.fillRect(qrX-5,qrY2-5,qrSz+10,qrSz+10);
+  ctx.strokeStyle=accentMid; ctx.lineWidth=2; ctx.strokeRect(qrX-5,qrY2-5,qrSz+10,qrSz+10);
+  try{var qr=qrcode(0,'M');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){if(qr.isDark(row,col))ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);}}}catch(e){console.warn('QR img err',e);}
   canvas.toBlob(function(blob){
     if(!blob)return;
-    window._cardBlob=blob;
-    window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
+    window._cardBlob=blob; window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
     var url=URL.createObjectURL(blob);
-    var img=document.getElementById('cardImg');if(img)img.src=url;
-    var wrap=document.getElementById('cardImgWrap');if(wrap)wrap.style.display='block';
-    var cssCard=document.getElementById('genCard');if(cssCard)cssCard.style.display='none';
+    var img=document.getElementById('cardImg'); if(img)img.src=url;
+    var wrap=document.getElementById('cardImgWrap'); if(wrap)wrap.style.display='block';
+    var cssCard=document.getElementById('genCard'); if(cssCard)cssCard.style.display='none';
   },'image/jpeg',0.95);
 }
-
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
 function saveCardImage(){
   if(!window._cardBlob){alert('圖片未準備好，請稍候再試');return;}
   var a=document.createElement('a');a.href=URL.createObjectURL(window._cardBlob);a.download=window._cardFileName||'coeldery85-card.jpg';a.click();
