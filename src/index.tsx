@@ -700,6 +700,62 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     <div class="err-msg" id="errMsg"></div>
 
     <form id="signupForm" onsubmit="return false;">
+
+      <!-- ── 醫健卡 opt-in ── -->
+      <div class="medical-block">
+        <div class="medical-header">
+          <div class="mh-left">
+            <div class="mh-icon">🏥</div>
+            <div>
+              <div class="mh-title">同時申請免費醫健卡</div>
+              <div class="mh-sub">由合作 NGO 香港商貿慈善基金提供</div>
+            </div>
+          </div>
+          <div class="mh-badge">免費</div>
+        </div>
+        <div class="medical-toggle">
+          <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)">
+          <label for="applyMedical">
+            我希望同時申請醫健卡（免費）<br>
+            <span style="font-size:11px;color:#5C6BC0;font-weight:400;">NGO 職員將會以電話或 WhatsApp 聯絡辦理手續，一次登記同時擁有兩張卡</span>
+          </label>
+        </div>
+        <div class="medical-extra" id="medicalExtra">
+          <div class="notice">
+            ⚕️ 醫健卡資料必須與<strong>香港身份證完全一致</strong>，請確保中英文姓名及身份證號碼頭4位正確無誤。
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="medNameZh">中文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
+              <span class="req">✽ 必填</span>
+            </div>
+            <input id="medNameZh" type="text" placeholder="例：陳大文">
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="medNameEn">英文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
+              <span class="req">✽ 必填</span>
+            </div>
+            <input id="medNameEn" type="text" placeholder="例：CHAN TAI MAN" style="text-transform:uppercase;">
+            <div class="hint">請使用全大楷，與身份證英文姓名一致</div>
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="medHkid">身份證頭4位</label>
+              <span class="req">✽ 必填</span>
+            </div>
+            <input id="medHkid" type="text" placeholder="例：K608" maxlength="4" style="text-transform:uppercase;letter-spacing:4px;font-size:20px;font-weight:700;">
+            <div class="hint">香港身份證號碼首4個字符，例如 A123、K608</div>
+          </div>
+          <div class="medical-privacy">
+            <label>
+              <input type="checkbox" id="medConsent">
+              <span>本人同意將以上個人資料（包括姓名及身份證頭4位）提供予<strong>香港商貿慈善基金</strong>，用於申請及發出醫健卡。本人明白 NGO 職員將以電話或 WhatsApp 與本人聯絡辦理手續，並同意接受聯絡。本人已閱讀並同意<a href="https://www.hmmp.com.hk" target="_blank" style="color:#1565C0;">香港商貿慈善基金私隱政策</a>。</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div class="form-card">
         <div class="step-note">
           <strong>★ 必填資料</strong>：只需中文姓名同 WhatsApp 電話，30秒完成
@@ -757,61 +813,6 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
             <option>北區</option><option>大埔</option><option>沙田</option><option>西貢</option>
             <option>葵青</option><option>離島</option>
           </select>
-        </div>
-      </div>
-
-      <!-- ── 醫健卡 opt-in ── -->
-      <div class="medical-block">
-        <div class="medical-header">
-          <div class="mh-left">
-            <div class="mh-icon">🏥</div>
-            <div>
-              <div class="mh-title">同時申請免費醫健卡</div>
-              <div class="mh-sub">由合作 NGO 香港商貿慈善基金提供</div>
-            </div>
-          </div>
-          <div class="mh-badge">免費</div>
-        </div>
-        <div class="medical-toggle">
-          <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)">
-          <label for="applyMedical">
-            我希望同時申請醫健卡（免費）<br>
-            <span style="font-size:11px;color:#5C6BC0;font-weight:400;">NGO 職員將會以電話或 WhatsApp 聯絡辦理手續，一次登記同時擁有兩張卡</span>
-          </label>
-        </div>
-        <div class="medical-extra" id="medicalExtra">
-          <div class="notice">
-            ⚕️ 醫健卡資料必須與<strong>香港身份證完全一致</strong>，請確保中英文姓名及身份證號碼頭4位正確無誤。
-          </div>
-          <div class="field">
-            <div class="label-row">
-              <label for="medNameZh">中文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
-              <span class="req">✽ 必填</span>
-            </div>
-            <input id="medNameZh" type="text" placeholder="例：陳大文">
-          </div>
-          <div class="field">
-            <div class="label-row">
-              <label for="medNameEn">英文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
-              <span class="req">✽ 必填</span>
-            </div>
-            <input id="medNameEn" type="text" placeholder="例：CHAN TAI MAN" style="text-transform:uppercase;">
-            <div class="hint">請使用全大楷，與身份證英文姓名一致</div>
-          </div>
-          <div class="field">
-            <div class="label-row">
-              <label for="medHkid">身份證頭4位</label>
-              <span class="req">✽ 必填</span>
-            </div>
-            <input id="medHkid" type="text" placeholder="例：K608" maxlength="4" style="text-transform:uppercase;letter-spacing:4px;font-size:20px;font-weight:700;">
-            <div class="hint">香港身份證號碼首4個字符，例如 A123、K608</div>
-          </div>
-          <div class="medical-privacy">
-            <label>
-              <input type="checkbox" id="medConsent">
-              <span>本人同意將以上個人資料（包括姓名及身份證頭4位）提供予<strong>香港商貿慈善基金</strong>，用於申請及發出醫健卡。本人明白 NGO 職員將以電話或 WhatsApp 與本人聯絡辦理手續，並同意接受聯絡。本人已閱讀並同意<a href="https://www.hmmp.com.hk" target="_blank" style="color:#1565C0;">香港商貿慈善基金私隱政策</a>。</span>
-            </label>
-          </div>
         </div>
       </div>
 
