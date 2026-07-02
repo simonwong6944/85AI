@@ -389,7 +389,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       <div class="consent">
         <label>
           <input type="checkbox" id="consent" required>
-          <span>本人同意 CoEldery 85（85 AI Technology Limited）根據<a href="#" target="_blank">私隱政策</a>收集及使用以上個人資料，用於會員登記及相關服務。</span>
+          <span>本人同意 85 AI Technology Limited 根據<a href="#" target="_blank">私隱政策</a>收集及使用以上個人資料，用於會員登記及相關服務。</span>
         </label>
       </div>
 
@@ -399,7 +399,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 
       <div class="footer-links">
         <a href="/join-family">家庭同行卡申請 →</a><br>
-        如有疑問 WhatsApp：<a href="https://wa.me/85299999999" target="_blank">9999-9999</a>
+        如有疑問 WhatsApp：<a href="https://wa.me/85291477341" target="_blank">9147-7341</a>
       </div>
     </form>
   </div>
@@ -965,7 +965,7 @@ body{background:#333;padding:24px 0;}
   </div>
   <div class="poster-footer">
     <div><div class="brand">CoEldery <em>85</em> 老有聯盟</div><div class="site" style="opacity:0.85;font-size:11px;margin-top:4px;">www.coeldery85.com</div></div>
-    <div class="hotline">☎ 有疑問？WhatsApp: 9XXX-XXXX</div>
+    <div class="hotline">☎ 有疑問？WhatsApp: 9147-7341</div>
   </div>
 </div>
 </div>
@@ -1031,7 +1031,7 @@ function sopHtml() {
   <div style="background:var(--ferrari);color:#fff;padding:24px 32px;border-radius:4px;">
     <div style="font-size:11px;letter-spacing:3px;margin-bottom:8px;opacity:0.8;">◆ 緊急聯絡</div>
     <div style="font-family:'Noto Serif TC',serif;font-size:18px;font-weight:700;">技術問題 / 系統故障</div>
-    <div style="margin-top:8px;font-size:14px;opacity:0.9;">WhatsApp 技術支援：<strong>9XXX-XXXX</strong><br>後台管理：<a href="/admin" style="color:#FFD86B;">coeldery85.com/admin</a></div>
+    <div style="margin-top:8px;font-size:14px;opacity:0.9;">WhatsApp 技術支援：<strong>9147-7341</strong><br>後台管理：<a href="/admin" style="color:#FFD86B;">coeldery85.com/admin</a></div>
   </div>
 </div>
 </body></html>`
