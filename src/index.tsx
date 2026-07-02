@@ -644,8 +644,8 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .medical-cta-sub{font-size:12px;color:#5C6BC0;line-height:1.5;}
 .medical-cta-arrow{font-size:20px;color:#1565C0;padding-right:14px;flex-shrink:0;transition:transform 0.2s;}
 .medical-cta-arrow.open{transform:rotate(180deg);}
-.medical-extra{display:block;padding:16px;background:#fff;}
-.medical-extra.show{display:block;}
+.medical-extra{display:none;padding:16px;background:#fff;}
+.medical-extra.show{display:block !important;}
 .medical-extra .notice{background:#FFF8E1;border-left:3px solid #F9A825;padding:10px 12px;font-size:12px;color:#5D4037;line-height:1.6;margin-bottom:16px;border-radius:0 4px 4px 0;}
 .medical-extra .field label{color:#1565C0;}
 .medical-extra .field input{border-color:#90CAF9;}
