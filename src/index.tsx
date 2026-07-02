@@ -262,26 +262,150 @@ app.patch('/api/members/:no/profile', async (c) => {
   return c.json({ ok: true })
 })
 
-// ─── Pages ────────────────────────────────────────────────────────────────────
-app.get('/', (c) => c.html(homeHtml()))
-app.get('/login', (c) => c.html(loginHtml()))
+// ─── Root: 85 AI Technology Limited Dashboard ────────────────────────────────
+app.get('/', (c) => c.html(dashboardHtml()))
 
-app.get('/join', (c) => c.html(signupMainHtml()))
-app.get('/join-family', (c) => c.html(signupSubHtml()))
-app.get('/admin', (c) => c.html(adminHtml()))
-app.get('/poster', (c) => c.html(posterHtml()))
-app.get('/sop', (c) => c.html(sopHtml()))
-
-// ─── Member profile page ──────────────────────────────────────────────────────
-app.get('/member/:no', async (c) => {
+// ─── Membership module: /membership/* ────────────────────────────────────────
+app.get('/membership',          (c) => c.redirect('/membership/login', 301))
+app.get('/membership/login',    (c) => c.html(loginHtml()))
+app.get('/membership/join',     (c) => c.html(signupMainHtml()))
+app.get('/membership/join-family', (c) => c.html(signupSubHtml()))
+app.get('/membership/admin',    (c) => c.html(adminHtml()))
+app.get('/membership/card/:no', async (c) => {
   const no = c.req.param('no')
   const db = c.env.DB
   const row = await db.prepare('SELECT * FROM members WHERE member_no = ?').bind(no).first<any>()
-  if (!row) return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>查無此會員</h2><p>${no}</p><a href="/join">立即登記</a></body></html>`, 404)
+  if (!row) return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>查無此會員</h2><p>${no}</p><a href="/membership/join">立即登記</a></body></html>`, 404)
   return c.html(memberProfileHtml(row))
 })
 
+// ─── Future modules (placeholder) ────────────────────────────────────────────
+app.get('/accounting',  (c) => c.html(comingSoonHtml('Accounting', '財務管理')))
+app.get('/governance',  (c) => c.html(comingSoonHtml('Governance', '治理管理')))
+app.get('/events',      (c) => c.html(comingSoonHtml('Events', '活動管理')))
+app.get('/volunteers',  (c) => c.html(comingSoonHtml('Volunteers', '義工管理')))
+
+// ─── Legacy redirects (old URLs → new URLs, keeps old links working) ──────────
+app.get('/login',       (c) => c.redirect('/membership/login', 301))
+app.get('/join',        (c) => c.redirect('/membership/join', 301))
+app.get('/join-family', (c) => c.redirect('/membership/join-family', 301))
+app.get('/admin',       (c) => c.redirect('/membership/admin', 301))
+app.get('/member/:no',  (c) => c.redirect(`/membership/card/${c.req.param('no')}`, 301))
+app.get('/poster',      (c) => c.redirect('/', 301))
+app.get('/sop',         (c) => c.redirect('/', 301))
+
 // ─── HTML Pages ───────────────────────────────────────────────────────────────
+
+// ── 85 AI Technology Limited Dashboard (Homepage) ────────────────────────────
+function dashboardHtml() {
+  const modules = [
+    { path: '/membership/join', icon: '🪪', en: 'Membership', zh: '會員系統', status: 'live', desc: '會員登記、會員卡、資料管理' },
+    { path: '/accounting',      icon: '📊', en: 'Accounting',  zh: '財務管理', status: 'soon', desc: '收支記錄、報表、審計' },
+    { path: '/governance',      icon: '⚖️', en: 'Governance',  zh: '治理管理', status: 'soon', desc: '董事會、會議記錄、決策' },
+    { path: '/events',          icon: '📅', en: 'Events',      zh: '活動管理', status: 'soon', desc: '活動策劃、報名、出席' },
+    { path: '/volunteers',      icon: '🤝', en: 'Volunteers',  zh: '義工管理', status: 'soon', desc: '義工招募、時數記錄' },
+  ]
+  const cards = modules.map(m => {
+    const isLive = m.status === 'live'
+    return `
+    <a href="${m.path}" class="mod-card ${isLive ? 'mod-live' : 'mod-soon'}">
+      <div class="mod-icon">${m.icon}</div>
+      <div class="mod-body">
+        <div class="mod-en">${m.en}</div>
+        <div class="mod-zh">${m.zh}</div>
+        <div class="mod-desc">${m.desc}</div>
+      </div>
+      <div class="mod-badge">${isLive ? '使用中' : '即將推出'}</div>
+    </a>`
+  }).join('')
+
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>85 AI Technology Limited</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Space+Grotesk:wght@400;500;700&family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Noto Sans TC",sans-serif;background:#0a0f1e;color:#e8eaf0;min-height:100vh;display:flex;flex-direction:column}
+/* ── Header */
+.hdr{padding:48px 40px 32px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.hdr-company{font-family:"Montserrat",sans-serif;font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#6c7a9c;margin-bottom:12px}
+.hdr-name{font-family:"Space Grotesk",sans-serif;font-size:clamp(28px,4vw,46px);font-weight:700;color:#fff;letter-spacing:-0.5px;line-height:1.15}
+.hdr-name span{color:#4f8ef7}
+.hdr-sub{margin-top:8px;font-size:14px;color:#4a5568;letter-spacing:0.5px}
+/* ── Modules grid */
+.main{flex:1;padding:40px}
+.section-label{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#4a5568;margin-bottom:20px}
+.mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.mod-card{display:flex;align-items:center;gap:20px;padding:24px;border-radius:16px;border:1px solid rgba(255,255,255,0.07);text-decoration:none;color:inherit;position:relative;transition:transform 0.15s,border-color 0.15s,background 0.15s}
+.mod-live{background:rgba(79,142,247,0.06);border-color:rgba(79,142,247,0.25)}
+.mod-live:hover{transform:translateY(-2px);background:rgba(79,142,247,0.1);border-color:rgba(79,142,247,0.5)}
+.mod-soon{background:rgba(255,255,255,0.02);opacity:0.5;pointer-events:none}
+.mod-icon{font-size:32px;flex-shrink:0;width:52px;text-align:center}
+.mod-body{flex:1;min-width:0}
+.mod-en{font-family:"Space Grotesk",sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4f8ef7;margin-bottom:4px}
+.mod-zh{font-size:18px;font-weight:700;color:#e8eaf0;margin-bottom:4px}
+.mod-desc{font-size:12px;color:#4a5568;line-height:1.5}
+.mod-badge{position:absolute;top:16px;right:16px;font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:20px}
+.mod-live .mod-badge{background:rgba(79,142,247,0.15);color:#4f8ef7;border:1px solid rgba(79,142,247,0.3)}
+.mod-soon .mod-badge{background:rgba(255,255,255,0.05);color:#4a5568;border:1px solid rgba(255,255,255,0.1)}
+/* ── Footer */
+.ftr{padding:24px 40px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center}
+.ftr-copy{font-size:12px;color:#2d3748}
+.ftr-link{font-size:12px;color:#4a5568;text-decoration:none}
+.ftr-link:hover{color:#4f8ef7}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-company">85 AI Technology Limited · Management Platform</div>
+  <div class="hdr-name">85 AI<span>.</span></div>
+  <div class="hdr-sub">社企管理平台 · Enterprise Management System</div>
+</header>
+<main class="main">
+  <div class="section-label">Modules · 功能模組</div>
+  <div class="mod-grid">${cards}</div>
+</main>
+<footer class="ftr">
+  <span class="ftr-copy">© 2026 85 AI Technology Limited. All rights reserved.</span>
+  <a href="https://coeldery85.org" class="ftr-link" target="_blank">coeldery85.org →</a>
+</footer>
+</body>
+</html>`
+}
+
+// ── Coming Soon placeholder ───────────────────────────────────────────────────
+function comingSoonHtml(en: string, zh: string) {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${zh} · 85 AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Noto Sans TC",sans-serif;background:#0a0f1e;color:#e8eaf0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px}
+.back{position:absolute;top:24px;left:24px;font-size:13px;color:#4a5568;text-decoration:none;font-family:"Space Grotesk",sans-serif}
+.back:hover{color:#4f8ef7}
+.icon{font-size:64px;margin-bottom:24px;opacity:0.3}
+.en{font-family:"Space Grotesk",sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#4a5568;margin-bottom:12px}
+.zh{font-size:28px;font-weight:700;color:#fff;margin-bottom:16px}
+.msg{font-size:14px;color:#4a5568;line-height:1.8}
+</style>
+</head>
+<body>
+<a href="/" class="back">← 返回主頁</a>
+<div class="icon">🚧</div>
+<div class="en">${en}</div>
+<div class="zh">${zh}</div>
+<div class="msg">此模組正在開發中<br>Coming Soon</div>
+</body>
+</html>`
+}
+
 function htmlHead(title: string, extra = '') {
   return `<!DOCTYPE html>
 <html lang="zh-HK">
@@ -484,7 +608,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </button>
 
       <div class="footer-links">
-        <a href="/join-family">家庭同行卡申請 →</a><br>
+        <a href="/membership/join-family">家庭同行卡申請 →</a><br>
         如有疑問 WhatsApp：<a href="https://wa.me/85291477341" target="_blank">9147-7341</a>
       </div>
     </form>
@@ -524,7 +648,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 
     <div class="action-row">
       <button class="action-btn" id="saveImgBtn" onclick="saveCardImage()">💾 儲存卡圖</button>
-      <button class="action-btn red" onclick="window.location.href='/join-family'">家人申請</button>
+      <button class="action-btn red" onclick="window.location.href='/membership/join-family'">家人申請</button>
     </div>
 
     <button class="wa-link" id="waImgBtn" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">
@@ -533,8 +657,8 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 
     <div class="footer-links">
       <a id="myPageLink" href="#" style="color:var(--forest);font-weight:700;">🪪 查看我的會員頁</a><br>
-      <a href="/login" style="color:var(--forest);">🔐 下次用電話登入</a><br>
-      <a href="/join">重新登記</a> · <a href="/">返回首頁</a>
+      <a href="/membership/login" style="color:var(--forest);">🔐 下次用電話登入</a><br>
+      <a href="/membership/join">重新登記</a> · <a href="/">返回首頁</a>
     </div>
   </div>
 </div>
@@ -598,12 +722,12 @@ function showSuccess(data) {
   document.getElementById('cardZh').textContent = data.nameZh;
   document.getElementById('cardEn').textContent = data.nameEn || '';
   document.getElementById('cardNo').textContent = data.memberNo;
-  var cardUrl = location.origin + '/member/' + data.memberNo;
+  var cardUrl = location.origin + '/membership/card/' + data.memberNo;
   try { QRCode.toCanvas(document.getElementById('cardQr'), cardUrl, {width:40,margin:0,color:{dark:'#0d3e12',light:'#ffffff'},errorCorrectionLevel:'H'}); } catch(e) { console.warn('QR error (non-fatal):', e); }
   document.getElementById('successSection').classList.add('show');
   // Set link to member profile page
   var myLink = document.getElementById('myPageLink');
-  if(myLink) myLink.href = '/member/' + data.memberNo;
+  if(myLink) myLink.href = '/membership/card/' + data.memberNo;
   window.scrollTo(0,0);
   // Build card image after short delay (let DOM paint)
   setTimeout(function(){ renderCardImage(data, 'PRIMARY'); }, 100);
@@ -682,7 +806,7 @@ function renderCardImage(data, tier) {
   ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-8,qrY2-8,qrSz+16,qrSz+16);
   try{
     var qr=qrcode(0,'M');
-    qr.addData(location.origin+'/member/'+(data.memberNo||''));
+    qr.addData(location.origin+'/membership/card/'+(data.memberNo||''));
     qr.make();
     var mc=qr.getModuleCount();
     // Use exact cell size so modules fill entire qrSz — no fractional gap
@@ -866,7 +990,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </button>
 
       <div class="footer-links">
-        <a href="/join">← 我係長者，申請主卡</a>
+        <a href="/membership/join">← 我係長者，申請主卡</a>
       </div>
     </form>
     <input type="hidden" id="linkedParentNo" value="">
@@ -899,14 +1023,14 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 
     <div class="action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
       <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:4px;" onclick="saveCardImage()">💾 儲存卡圖</button>
-      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:4px;" onclick="window.location.href='/join'">← 返回主卡</button>
+      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:4px;" onclick="window.location.href='/membership/join'">← 返回主卡</button>
     </div>
 
     <button class="wa-link" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
     <div class="footer-links">
       <a id="mySubPageLink" href="#" style="color:var(--ferrari-deep);font-weight:700;display:none;">🪪 查看我的會員頁</a>
       <span id="mySubPageSep" style="display:none;"> &middot; </span>
-      <a href="/join">← 返回主卡登記</a>
+      <a href="/membership/join">← 返回主卡登記</a>
     </div>
   </div>
 </div>
@@ -954,13 +1078,13 @@ async function submitForm(){
     document.getElementById('cardZh').textContent=data.nameZh;
     document.getElementById('cardEn').textContent=data.nameEn||'';
     document.getElementById('cardNo').textContent=data.memberNo;
-    var cardUrl=location.origin+'/member/'+data.memberNo;
+    var cardUrl=location.origin+'/membership/card/'+data.memberNo;
     try{QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'});}catch(e){console.warn('QR error (non-fatal):',e);}
     document.getElementById('successSection').classList.add('show');
     window.scrollTo(0,0);
     var mySubLink=document.getElementById('mySubPageLink');
     var mySubSep=document.getElementById('mySubPageSep');
-    if(mySubLink){mySubLink.href='/member/'+data.memberNo;mySubLink.style.display='inline';}
+    if(mySubLink){mySubLink.href='/membership/card/'+data.memberNo;mySubLink.style.display='inline';}
     if(mySubSep){mySubSep.style.display='inline';}
     setTimeout(function(){renderCardImage(data,'FAMILY');},100);
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
@@ -1038,7 +1162,7 @@ function renderCardImage(data, tier) {
   ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-8,qrY2-8,qrSz+16,qrSz+16);
   try{
     var qr=qrcode(0,'M');
-    qr.addData(location.origin+'/member/'+(data.memberNo||''));
+    qr.addData(location.origin+'/membership/card/'+(data.memberNo||''));
     qr.make();
     var mc=qr.getModuleCount();
     // Use exact cell size so modules fill entire qrSz — no fractional gap
@@ -1422,7 +1546,7 @@ function sopHtml() {
   <div style="background:var(--ferrari);color:#fff;padding:24px 32px;border-radius:4px;">
     <div style="font-size:11px;letter-spacing:3px;margin-bottom:8px;opacity:0.8;">◆ 緊急聯絡</div>
     <div style="font-family:'Noto Serif TC',serif;font-size:18px;font-weight:700;">技術問題 / 系統故障</div>
-    <div style="margin-top:8px;font-size:14px;opacity:0.9;">WhatsApp 技術支援：<strong>9147-7341</strong><br>後台管理：<a href="/admin" style="color:#FFD86B;">coeldery85.com/admin</a></div>
+    <div style="margin-top:8px;font-size:14px;opacity:0.9;">WhatsApp 技術支援：<strong>9147-7341</strong><br>後台管理：<a href="/membership/admin" style="color:#FFD86B;">coeldery85.com/admin</a></div>
   </div>
 </div>
 </body></html>`
@@ -1589,7 +1713,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
       ${m.parent_no ? `
       <div class="info-row">
         <span class="info-label">主卡會員</span>
-        <span class="info-value"><a href="/member/${m.parent_no}" style="color:${ferrari};font-weight:700;">${m.parent_no}${m.parent_name ? ' · '+m.parent_name : ''}</a></span>
+        <span class="info-value"><a href="/membership/card/${m.parent_no}" style="color:${ferrari};font-weight:700;">${m.parent_no}${m.parent_name ? ' · '+m.parent_name : ''}</a></span>
       </div>` : ''}
       <div class="info-row">
         <span class="info-label">登記日期</span>
@@ -1635,12 +1759,12 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
     <div id="familyList">
       <div style="text-align:center;color:#aaa;padding:10px;font-size:13px;">載入中…</div>
     </div>
-    <a href="/join-family?parent=${m.member_no}" class="add-family-btn">＋ 為家人申請家庭同行卡</a>
+    <a href="/membership/join-family?parent=${m.member_no}" class="add-family-btn">＋ 為家人申請家庭同行卡</a>
   </div>` : ''}
 
   <!-- ── 底部連結 ── -->
   <div style="text-align:center;margin-top:20px;font-size:12px;color:#aaa;line-height:2;">
-    <a href="/join" style="color:${accentMid};">← 返回登記頁</a>
+    <a href="/membership/join" style="color:${accentMid};">← 返回登記頁</a>
     &nbsp;·&nbsp;
     如有疑問 WhatsApp：<a href="https://wa.me/85291477341" style="color:${accentMid};">9147-7341</a>
   </div>
@@ -1730,7 +1854,7 @@ async function loadFamily() {
     el.innerHTML = data.family.map(function(f){
       return '<div class="family-card">' +
         '<div><div class="fc-name">'+f.name_zh+'</div><div class="fc-no">'+f.member_no+'</div></div>' +
-        '<a href="/member/'+f.member_no+'" class="fc-link">查看</a>' +
+        '<a href="/membership/card/'+f.member_no+'" class="fc-link">查看</a>' +
         '</div>';
     }).join('');
   } catch(e){ console.warn('family load error', e); }
@@ -1799,7 +1923,7 @@ function renderCardImage(data, tier) {
   ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-8,qrY2-8,qrSz+16,qrSz+16);
   try{
     var qr=qrcode(0,'M');
-    qr.addData(location.origin+'/member/'+(data.memberNo||''));
+    qr.addData(location.origin+'/membership/card/'+(data.memberNo||''));
     qr.make();
     var mc=qr.getModuleCount();
     var cell=qrSz/mc;
@@ -1955,7 +2079,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 
       <div class="footer-links">
         未有會員？點上方「首次登記」<br>
-        <a href="/join-family">為家人申請家庭同行卡 →</a>
+        <a href="/membership/join-family">為家人申請家庭同行卡 →</a>
       </div>
     </div>
 
@@ -2002,7 +2126,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 
       <button type="button" class="submit-btn" id="registerBtn" onclick="doRegister()">立即登記老有卡</button>
 
-      <div class="footer-links"><a href="/join-family">為家人申請家庭同行卡 →</a></div>
+      <div class="footer-links"><a href="/membership/join-family">為家人申請家庭同行卡 →</a></div>
     </div>
 
   </div><!-- /panel -->
@@ -2036,19 +2160,19 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
       <button class="action-btn" onclick="saveCardImage()">💾 儲存卡圖</button>
-      <button class="action-btn red" onclick="window.location.href='/join-family'">家人申請</button>
+      <button class="action-btn red" onclick="window.location.href='/membership/join-family'">家人申請</button>
     </div>
     <button class="wa-link" id="waImgBtn" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
     <div class="footer-links">
       <a id="myPageLink" href="#" style="color:var(--forest);font-weight:700;">🪪 查看我的會員頁</a><br>
-      <a href="/login" style="color:var(--forest);">🔐 下次用電話登入</a><br>
+      <a href="/membership/login" style="color:var(--forest);">🔐 下次用電話登入</a><br>
       <a href="/">返回首頁</a>
     </div>
   </div>
 
   <div class="footer-note">
     如有疑問 WhatsApp：<a href="https://wa.me/85291477341">9147-7341</a> ·
-    <a href="/admin">後台</a>
+    <a href="/membership/admin">後台</a>
   </div>
 </div>
 
@@ -2078,7 +2202,7 @@ async function doLogin(){
     var m=data.member;
     document.getElementById('rbName').textContent=m.name_zh;
     document.getElementById('rbNo').textContent=m.member_no+' · '+(m.tier==='PRIMARY'?'長者主卡':'家庭同行卡');
-    document.getElementById('rbGoBtn').href='/member/'+m.member_no;
+    document.getElementById('rbGoBtn').href='/membership/card/'+m.member_no;
     document.getElementById('loginResult').classList.add('show');
     btn.style.display='none';
     document.getElementById('loginPhone').disabled=true;
@@ -2087,7 +2211,7 @@ async function doLogin(){
       var fd=await fr.json();
       if(fd.ok&&fd.family&&fd.family.length>0){
         document.getElementById('rbFamilyList').innerHTML=fd.family.map(function(f){
-          return '<div class="fc-row"><div><div class="fn">'+f.name_zh+'</div><div class="fno">'+f.member_no+'</div></div><a href="/member/'+f.member_no+'">查看</a></div>';
+          return '<div class="fc-row"><div><div class="fn">'+f.name_zh+'</div><div class="fno">'+f.member_no+'</div></div><a href="/membership/card/'+f.member_no+'">查看</a></div>';
         }).join('');
         document.getElementById('rbFamilyWrap').style.display='block';
       }
@@ -2131,10 +2255,10 @@ function showSuccess(data){
   document.getElementById('cardZh').textContent=data.nameZh;
   document.getElementById('cardEn').textContent=data.nameEn||'';
   document.getElementById('cardNo').textContent=data.memberNo;
-  var cardUrl=location.origin+'/member/'+data.memberNo;
+  var cardUrl=location.origin+'/membership/card/'+data.memberNo;
   try{QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:38,margin:0,color:{dark:'#0d3e12',light:'#ffffff'},errorCorrectionLevel:'H'});}catch(e){console.warn('QR:',e);}
   var myLink=document.getElementById('myPageLink');
-  if(myLink)myLink.href='/member/'+data.memberNo;
+  if(myLink)myLink.href='/membership/card/'+data.memberNo;
   window.scrollTo(0,0);
   setTimeout(function(){renderCardImage(data,'PRIMARY');},200);
 }
@@ -2211,7 +2335,7 @@ function renderCardImage(data, tier) {
   ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-8,qrY2-8,qrSz+16,qrSz+16);
   try{
     var qr=qrcode(0,'M');
-    qr.addData(location.origin+'/member/'+(data.memberNo||''));
+    qr.addData(location.origin+'/membership/card/'+(data.memberNo||''));
     qr.make();
     var mc=qr.getModuleCount();
     // Use exact cell size so modules fill entire qrSz — no fractional gap
@@ -2328,7 +2452,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </button>
     </div>
     <div class="footer-links">
-      <a href="/join">← 未有會員？立即登記</a><br>
+      <a href="/membership/join">← 未有會員？立即登記</a><br>
       <a href="/">返回首頁</a>
     </div>
   </div>
@@ -2348,7 +2472,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
   </div>
 
   <div id="afterResult" style="display:none;" class="footer-links">
-    <a href="/join">← 返回登記頁</a> · <a href="/">首頁</a>
+    <a href="/membership/join">← 返回登記頁</a> · <a href="/">首頁</a>
   </div>
 </div>
 
@@ -2375,7 +2499,7 @@ async function doLogin(){
     document.getElementById('formSection').style.display='none';
     document.getElementById('rcName').textContent=m.name_zh;
     document.getElementById('rcNo').textContent=m.member_no+' · '+(m.tier==='PRIMARY'?'長者主卡':'家庭同行卡');
-    document.getElementById('rcGoBtn').href='/member/'+m.member_no;
+    document.getElementById('rcGoBtn').href='/membership/card/'+m.member_no;
     document.getElementById('resultCard').classList.add('show');
 
     // If primary, also look up family cards
@@ -2384,7 +2508,7 @@ async function doLogin(){
       var fd=await fr.json();
       if(fd.ok && fd.family && fd.family.length>0){
         var html=fd.family.map(function(f){
-          return '<div class="fc-item"><div><div class="fc-name">'+f.name_zh+'</div><div class="fc-no">'+f.member_no+'</div></div><a href="/member/'+f.member_no+'" class="fc-btn">查看</a></div>';
+          return '<div class="fc-item"><div><div class="fc-name">'+f.name_zh+'</div><div class="fc-no">'+f.member_no+'</div></div><a href="/membership/card/'+f.member_no+'" class="fc-btn">查看</a></div>';
         }).join('');
         document.getElementById('familyList').innerHTML=html;
         document.getElementById('familyResult').classList.add('show');
