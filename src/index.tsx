@@ -178,7 +178,7 @@ app.get('/api/admin/members', async (c) => {
   const params: (string | number)[] = []
   if (tier) { where += ' AND tier = ?'; params.push(tier) }
   if (status) { where += ' AND status = ?'; params.push(status) }
-  else { where += " AND status != 'DELETED'" }
+  // no-op: deletion disabled by policy, all records visible
   if (source) { where += ' AND source = ?'; params.push(source) }
   if (district) { where += ' AND district = ?'; params.push(district) }
   if (search) {
@@ -230,19 +230,19 @@ app.get('/api/admin/members', async (c) => {
 app.get('/api/admin/stats', async (c) => {
   const db = c.env.DB
   const [total, primary, family, pending, active, inactive, todayNew, monthNew] = await Promise.all([
-    db.prepare("SELECT COUNT(*) as n FROM members WHERE status!='DELETED'").first<{ n: number }>(),
-    db.prepare("SELECT COUNT(*) as n FROM members WHERE tier='PRIMARY' AND status!='DELETED'").first<{ n: number }>(),
-    db.prepare("SELECT COUNT(*) as n FROM members WHERE tier='FAMILY' AND status!='DELETED'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE tier='PRIMARY'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE tier='FAMILY'").first<{ n: number }>(),
     db.prepare("SELECT COUNT(*) as n FROM members WHERE kyc_status='PENDING' AND status='ACTIVE'").first<{ n: number }>(),
     db.prepare("SELECT COUNT(*) as n FROM members WHERE status='ACTIVE'").first<{ n: number }>(),
     db.prepare("SELECT COUNT(*) as n FROM members WHERE status='INACTIVE'").first<{ n: number }>(),
-    db.prepare("SELECT COUNT(*) as n FROM members WHERE date(created_at)=date('now') AND status!='DELETED'").first<{ n: number }>(),
-    db.prepare("SELECT COUNT(*) as n FROM members WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now') AND status!='DELETED'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE date(created_at)=date('now')").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now')").first<{ n: number }>(),
   ])
   const [bySource, byDistrict, byMonth] = await Promise.all([
-    db.prepare("SELECT source, COUNT(*) as cnt FROM members WHERE status!='DELETED' GROUP BY source ORDER BY cnt DESC").all(),
-    db.prepare("SELECT district, COUNT(*) as cnt FROM members WHERE district!='' AND status!='DELETED' GROUP BY district ORDER BY cnt DESC LIMIT 10").all(),
-    db.prepare("SELECT strftime('%Y-%m',created_at) as month, COUNT(*) as cnt FROM members WHERE status!='DELETED' GROUP BY month ORDER BY month DESC LIMIT 12").all(),
+    db.prepare("SELECT source, COUNT(*) as cnt FROM members GROUP BY source ORDER BY cnt DESC").all(),
+    db.prepare("SELECT district, COUNT(*) as cnt FROM members WHERE district!='' GROUP BY district ORDER BY cnt DESC LIMIT 10").all(),
+    db.prepare("SELECT strftime('%Y-%m',created_at) as month, COUNT(*) as cnt FROM members GROUP BY month ORDER BY month DESC LIMIT 12").all(),
   ])
   return c.json({
     ok: true,
@@ -289,13 +289,9 @@ app.patch('/api/admin/members/:no', async (c) => {
   return c.json({ ok: true })
 })
 
-// ─── API: Delete member (soft delete) ────────────────────────────────────────
-app.delete('/api/admin/members/:no', async (c) => {
-  const no = c.req.param('no')
-  const db = c.env.DB
-  await db.prepare("UPDATE members SET status='DELETED' WHERE member_no = ?")
-    .bind(no).run()
-  return c.json({ ok: true })
+// ─── API: Delete member — DISABLED (no data deletion policy) ────────────────
+app.delete('/api/admin/members/:no', (c) => {
+  return c.json({ ok: false, error: '系統政策：不允許刪除會員資料。如需停用請使用 PATCH status=INACTIVE。' }, 403)
 })
 
 // ─── API: Get family cards of a member ───────────────────────────────────────
@@ -1515,7 +1511,6 @@ tr.inactive td{opacity:0.45;}
     </div>
     <div class="modal-actions">
       <button class="btn btn-grey" onclick="closeModal()">取消</button>
-      <button class="btn btn-red" onclick="deleteMember()">🗑 刪除</button>
       <button class="btn btn-green" onclick="saveEdit()">💾 儲存</button>
     </div>
   </div>
@@ -1686,14 +1681,7 @@ async function saveEdit(){
   else alert('儲存失敗：'+(d.error||'未知錯誤'));
 }
 
-async function deleteMember(){
-  var no=document.getElementById('editNo').value;
-  if(!confirm('⚠️ 確認永久刪除會員 '+no+'？\\n此操作不可復原，資料將被標記為 DELETED。'))return;
-  var r=await fetch('/api/admin/members/'+no,{method:'DELETE'});
-  var d=await r.json();
-  if(d.ok){closeModal();loadMembers(currentPage);}
-  else alert('刪除失敗');
-}
+// deleteMember() removed — no data deletion policy
 
 function clearFilters(){
   document.getElementById('search').value='';
