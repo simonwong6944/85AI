@@ -613,175 +613,104 @@ function showSuccess(data) {
 function renderCardImage(data, tier) {
   var logoImg = new Image();
   logoImg.onload = function() {
-  // Card dimensions: 680×430px (≈ credit-card 85.6×54mm @2×)
+  // Canvas: 1360×860 @2x (displays as 680×430, credit-card ratio)
   var W=1360, H=860;
   var canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
   var ctx=canvas.getContext('2d');
-
   var isPrimary=(tier!=='FAMILY');
-
-  // ── Colours ─────────────────────────────────────────────────────────────
-  var forestDeep='#0d3e12', forest='#2E7D32', forestPale='#E8F5E9';
-  var ferrari='#C62828', ferrariDeep='#8B0000', ferrariPale='#FFEBEE';
-  var accentDark = isPrimary ? forestDeep : ferrariDeep;
-  var accentMid  = isPrimary ? forest     : ferrari;
-  var qrDark     = isPrimary ? forestDeep : '#a80000';
-
-  // ── Background ──────────────────────────────────────────────────────────
-  var bg = ctx.createLinearGradient(0,0,W,H);
-  if(isPrimary){ bg.addColorStop(0,'#FDFAF3'); bg.addColorStop(1,'#F0EBD8'); }
-  else         { bg.addColorStop(0,'#FFF8F8'); bg.addColorStop(1,'#FFE8E8'); }
+  var forestDeep='#0d3e12',forest='#2E7D32',forestPale='#E8F5E9';
+  var ferrari='#C62828',ferrariDeep='#8B0000',ferrariPale='#FFEBEE';
+  var accentDark=isPrimary?forestDeep:ferrariDeep;
+  var accentMid=isPrimary?forest:ferrari;
+  var qrDark=isPrimary?forestDeep:'#a80000';
+  // ── Background gradient
+  var bg=ctx.createLinearGradient(0,0,W,H);
+  if(isPrimary){bg.addColorStop(0,'#FDFAF3');bg.addColorStop(1,'#F0EBD8');}
+  else{bg.addColorStop(0,'#FFF8F8');bg.addColorStop(1,'#FFE8E8');}
   ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
-
-  // ── Watermark ──────────────────────────────────────────────────────────
-  ctx.save();
-  ctx.globalAlpha=0.06;
-  ctx.fillStyle=accentDark;
-  ctx.font='bold 380px "Space Grotesk",monospace';
-  ctx.textAlign='right';
-  ctx.fillText('85', W+20, H+20);
-  ctx.textAlign='left';
-  ctx.restore();
-
-  // ── Top stripe (green | red split) ──────────────────────────────────────
+  // ── Watermark "85" — centred, large, faint
+  ctx.save(); ctx.globalAlpha=0.07; ctx.fillStyle=accentDark;
+  ctx.font='bold 700px "Space Grotesk",monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('85',W*0.72,H*0.56); ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.restore();
+  // ── Top colour stripe (green left | red right)
   var stripeH=16;
-  ctx.fillStyle=forest;   ctx.fillRect(0,0,W*0.45,stripeH);
-  ctx.fillStyle=ferrari;  ctx.fillRect(W*0.45,0,W*0.55,stripeH);
-
-  // ── Logo image (top-left) ────────────────────────────────────────────────
-  // Real logo image: 1024×410 → draw at 160×64 with white bg pill
-  var logoX=36, logoY=stripeH+16;
-  var logoW=320, logoH=128;
-  ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
-
-  // Vertical divider
+  ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
+  ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
+  // ── Logo (top-left)
+  var logoX=40,logoY=stripeH+20,logoW=300,logoH=120;
+  ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
+  // Vertical divider after logo
   ctx.strokeStyle=accentDark; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(logoX+logoW+28, logoY+8); ctx.lineTo(logoX+logoW+28, logoY+logoH-8); ctx.stroke();
-
-  // Card name (老有卡 / 老有卡 家庭同行)
-  var cardNameX = logoX+logoW+48;
+  ctx.beginPath(); ctx.moveTo(logoX+logoW+24,logoY+10); ctx.lineTo(logoX+logoW+24,logoY+logoH-10); ctx.stroke();
+  // Card type label (老有卡 / 家庭同行)
+  var cardNameX=logoX+logoW+44;
   ctx.fillStyle=accentDark;
-  if(isPrimary){
-    ctx.font='bold 44px "Noto Serif TC",serif';
-    ctx.fillText('老有卡', cardNameX, logoY+logoH/2+16);
-  } else {
-    ctx.font='bold 38px "Noto Serif TC",serif';
-    ctx.fillText('老有卡', cardNameX, logoY+logoH/2-8);
-    ctx.fillText('家庭同行', cardNameX, logoY+logoH/2+40);
-  }
-
-  // ── Badge (top-right) ────────────────────────────────────────────────────
-  var badgeW=440, badgeH=72, badgeX=W-badgeW-56, badgeY=stripeH+28;
-  ctx.fillStyle=isPrimary?forestPale:ferrariPale;
-  ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=3;
-  ctx.beginPath();
-  roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 8);
-  ctx.fill(); ctx.stroke();
-  // ◆ diamond
-  ctx.fillStyle=ferrari;
-  ctx.font='bold 28px sans-serif';
-  ctx.fillText('◆', badgeX+20, badgeY+48);
-  // CoExplorery 探索者
-  ctx.fillStyle=accentDark;
-  ctx.font='bold 34px "Noto Serif TC",serif';
-  ctx.fillText('CoExplorery 探索者', badgeX+60, badgeY+48);
-
-  // Tier label below badge
-  ctx.fillStyle=ferrari;
-  ctx.font='bold 32px "Noto Serif TC",serif';
-  ctx.textAlign='right';
-  if(isPrimary){
-    ctx.fillText('主卡 · PRIMARY', W-56, badgeY+badgeH+44);
-  } else {
-    ctx.fillText('附屬 · FAMILY', W-56, badgeY+badgeH+44);
-  }
-  ctx.textAlign='left';
-
-  // ── Name area ────────────────────────────────────────────────────────────
-  var nameAreaY=420;
-
-  // "會員姓名" label
-  ctx.fillStyle='#aaa';
-  ctx.font='26px "Noto Serif TC",serif';
-  // Letter-spaced manually
-  var lbl='會員姓名'; var lx=56;
-  for(var i=0;i<lbl.length;i++){
-    ctx.fillText(lbl[i], lx, nameAreaY); lx+=ctx.measureText(lbl[i]).width+12;
-  }
-
-  // Chinese name (large)
+  if(isPrimary){ctx.font='bold 46px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+16);}
+  else{ctx.font='bold 38px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2-8);ctx.fillText('家庭同行',cardNameX,logoY+logoH/2+40);}
+  // ── Badge (top-right)
+  var badgeW=420,badgeH=68,badgeX=W-badgeW-48,badgeY=stripeH+26;
+  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=accentMid; ctx.lineWidth=3;
+  ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,8); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=ferrari; ctx.font='bold 26px sans-serif'; ctx.fillText('◆',badgeX+18,badgeY+45);
+  ctx.fillStyle=accentDark; ctx.font='bold 32px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+54,badgeY+45);
+  // Tier label (right-aligned, below badge)
+  ctx.fillStyle=ferrari; ctx.font='bold 30px "Noto Serif TC",serif'; ctx.textAlign='right';
+  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-48,badgeY+badgeH+42); ctx.textAlign='left';
+  // ── Horizontal divider line across card
+  var divY=stripeH+170;
+  ctx.strokeStyle=accentDark; ctx.globalAlpha=0.12; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(40,divY); ctx.lineTo(W-40,divY); ctx.stroke(); ctx.globalAlpha=1;
+  // ── Name area (left side, vertically centred)
+  var nameAreaY=divY+56;
+  ctx.fillStyle='#999'; ctx.font='26px "Noto Serif TC",serif';
+  var lbl='會員姓名',lx=48;
+  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+10;}
   ctx.fillStyle=accentDark;
   var zh=data.nameZh||'';
-  var zhSz = zh.length<=2?192 : zh.length<=3?172 : zh.length<=4?140 : 108;
-  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif';
-  ctx.fillText(zh, 56, nameAreaY+zhSz+8);
-
-  // English name (below Chinese, only if present)
-  var enY = nameAreaY+zhSz+8;
-  if(data.nameEn && data.nameEn.trim()){
-    ctx.fillStyle=accentDark;
-    ctx.font='bold 48px "Noto Serif TC",serif';
-    enY += 64;
-    ctx.fillText(data.nameEn.trim(), 56, enY);
+  var zhSz=zh.length<=2?200:zh.length<=3?178:zh.length<=4?148:112;
+  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,48,nameAreaY+zhSz+10);
+  var enY=nameAreaY+zhSz+10;
+  if(data.nameEn&&data.nameEn.trim()){
+    ctx.fillStyle=accentDark; ctx.font='bold 46px "Noto Serif TC",serif'; enY+=60;
+    ctx.fillText(data.nameEn.trim(),48,enY);
   }
-
-  // Family card: parent binding line
-  if(!isPrimary && data.parentNo){
-    ctx.fillStyle=ferrari;
-    ctx.font='28px "Noto Serif TC",serif';
-    ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''), 56, enY+48);
+  if(!isPrimary&&data.parentNo){
+    ctx.fillStyle=ferrari; ctx.font='26px "Noto Serif TC",serif';
+    ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),48,enY+48);
   }
-
-  // ── Footer ───────────────────────────────────────────────────────────────
-  var footY=H-36;
-
-  // Member no label + value
-  ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif';
-  ctx.fillText('會員編號', 56, footY-72);
-  ctx.fillStyle=accentDark; ctx.font='bold 56px "Space Grotesk",monospace';
-  ctx.fillText(data.memberNo||'', 56, footY-16);
-
-  // Expiry label + value
+  // ── QR code (right side, vertically centred in name area)
+  var qrSz=200,qrX=W-qrSz-56,qrY2=divY+30;
+  ctx.fillStyle='#fff'; ctx.fillRect(qrX-12,qrY2-12,qrSz+24,qrSz+24);
+  ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-12,qrY2-12,qrSz+24,qrSz+24);
+  try{var qr=qrcode(0,'M');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){if(qr.isDark(row,col))ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);}}}catch(e){console.warn('QR err',e);}
+  // QR label below
+  ctx.fillStyle='#aaa'; ctx.font='22px "Noto Serif TC",serif'; ctx.textAlign='center';
+  ctx.fillText('掃碼查看我的卡',qrX+qrSz/2,qrY2+qrSz+36); ctx.textAlign='left';
+  // ── Footer bar
+  var footBarY=H-140;
+  ctx.fillStyle=accentDark; ctx.globalAlpha=0.06; ctx.fillRect(0,footBarY,W,H-footBarY); ctx.globalAlpha=1;
+  ctx.strokeStyle=accentDark; ctx.globalAlpha=0.15; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,footBarY); ctx.lineTo(W,footBarY); ctx.stroke(); ctx.globalAlpha=1;
+  // Member number
+  var footTextY=footBarY+46;
+  ctx.fillStyle='#999'; ctx.font='24px "Noto Serif TC",serif'; ctx.fillText('會員編號',48,footTextY);
+  ctx.fillStyle=accentDark; ctx.font='bold 60px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',48,footTextY+68);
+  // Expiry date (right of member number, well clear of QR)
   if(data.expiresAt){
-    var expStr=data.expiresAt.slice(0,7).replace('-','/'); // "2029/07"
-    var expDisp=expStr.slice(5)+' / '+expStr.slice(0,4);  // "07 / 2029"
-    ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif';
-    ctx.fillText('有效日期', 560, footY-72);
-    ctx.fillStyle=accentDark; ctx.font='bold 56px "Space Grotesk",monospace';
-    ctx.fillText(expDisp, 560, footY-16);
+    var expStr=data.expiresAt.slice(0,7).replace('-','/');
+    var expDisp=expStr.slice(5)+' / '+expStr.slice(0,4);
+    ctx.fillStyle='#999'; ctx.font='24px "Noto Serif TC",serif'; ctx.fillText('有效期至',520,footTextY);
+    ctx.fillStyle=accentDark; ctx.font='bold 60px "Space Grotesk",monospace'; ctx.fillText(expDisp,520,footTextY+68);
   }
-
-  // ── QR code (bottom-right) ───────────────────────────────────────────────
-  var qrSz=172, qrX=W-qrSz-48, qrY2=H-qrSz-32;
-  ctx.fillStyle='#fff'; ctx.fillRect(qrX-10,qrY2-10,qrSz+20,qrSz+20);
-  ctx.strokeStyle=accentMid; ctx.lineWidth=4;
-  ctx.strokeRect(qrX-10,qrY2-10,qrSz+20,qrSz+20);
-  try {
-    var qr=qrcode(0,'M');
-    qr.addData(location.origin+'/member/'+(data.memberNo||''));
-    qr.make();
-    var mc=qr.getModuleCount(), cell=Math.floor(qrSz/mc);
-    ctx.fillStyle=qrDark;
-    for(var row=0;row<mc;row++){
-      for(var col=0;col<mc;col++){
-        if(qr.isDark(row,col)) ctx.fillRect(qrX+col*cell, qrY2+row*cell, cell, cell);
-      }
-    }
-  } catch(e){ console.warn('QR img err',e); }
-
-  // ── Convert → JPEG blob ──────────────────────────────────────────────────
+  // ── Convert → JPEG blob
   canvas.toBlob(function(blob){
-    if(!blob){ console.warn('canvas.toBlob failed'); return; }
-    window._cardBlob=blob;
-    window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
+    if(!blob)return;
+    window._cardBlob=blob; window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
     var url=URL.createObjectURL(blob);
-    var img=document.getElementById('cardImg');
-    if(img){ img.src=url; }
-    var wrap=document.getElementById('cardImgWrap');
-    if(wrap){ wrap.style.display='block'; }
-    var cssCard=document.getElementById('genCard');
-    if(cssCard){ cssCard.style.display='none'; }
+    var img=document.getElementById('cardImg'); if(img)img.src=url;
+    var wrap=document.getElementById('cardImgWrap'); if(wrap)wrap.style.display='block';
+    var cssCard=document.getElementById('genCard'); if(cssCard)cssCard.style.display='none';
   },'image/jpeg',0.95);
   }; // end logoImg.onload
   logoImg.src = '/static/logo.png';
@@ -1042,6 +971,7 @@ async function submitForm(){
 function renderCardImage(data, tier) {
   var logoImg=new Image();
   logoImg.onload=function(){
+  // Canvas: 1360×860 @2x (displays as 680×430, credit-card ratio)
   var W=1360, H=860;
   var canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
@@ -1052,55 +982,86 @@ function renderCardImage(data, tier) {
   var accentDark=isPrimary?forestDeep:ferrariDeep;
   var accentMid=isPrimary?forest:ferrari;
   var qrDark=isPrimary?forestDeep:'#a80000';
+  // ── Background gradient
   var bg=ctx.createLinearGradient(0,0,W,H);
   if(isPrimary){bg.addColorStop(0,'#FDFAF3');bg.addColorStop(1,'#F0EBD8');}
   else{bg.addColorStop(0,'#FFF8F8');bg.addColorStop(1,'#FFE8E8');}
   ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
-  ctx.save(); ctx.globalAlpha=0.06; ctx.fillStyle=accentDark;
-  ctx.font='bold 380px "Space Grotesk",monospace'; ctx.textAlign='right';
-  ctx.fillText('85',W+20,H+20); ctx.textAlign='left'; ctx.restore();
+  // ── Watermark "85" — centred, large, faint
+  ctx.save(); ctx.globalAlpha=0.07; ctx.fillStyle=accentDark;
+  ctx.font='bold 700px "Space Grotesk",monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('85',W*0.72,H*0.56); ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.restore();
+  // ── Top colour stripe (green left | red right)
   var stripeH=16;
   ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
-  var logoX=36,logoY=stripeH+16,logoW=320,logoH=128;
+  // ── Logo (top-left)
+  var logoX=40,logoY=stripeH+20,logoW=300,logoH=120;
   ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
+  // Vertical divider after logo
   ctx.strokeStyle=accentDark; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(logoX+logoW+28,logoY+8); ctx.lineTo(logoX+logoW+28,logoY+logoH-8); ctx.stroke();
-  var cardNameX=logoX+logoW+48;
+  ctx.beginPath(); ctx.moveTo(logoX+logoW+24,logoY+10); ctx.lineTo(logoX+logoW+24,logoY+logoH-10); ctx.stroke();
+  // Card type label (老有卡 / 家庭同行)
+  var cardNameX=logoX+logoW+44;
   ctx.fillStyle=accentDark;
-  if(isPrimary){ctx.font='bold 44px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+16);}
+  if(isPrimary){ctx.font='bold 46px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+16);}
   else{ctx.font='bold 38px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2-8);ctx.fillText('家庭同行',cardNameX,logoY+logoH/2+40);}
-  var badgeW=440,badgeH=72,badgeX=W-badgeW-56,badgeY=stripeH+28;
-  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=3;
+  // ── Badge (top-right)
+  var badgeW=420,badgeH=68,badgeX=W-badgeW-48,badgeY=stripeH+26;
+  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=accentMid; ctx.lineWidth=3;
   ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,8); ctx.fill(); ctx.stroke();
-  ctx.fillStyle=ferrari; ctx.font='bold 28px sans-serif'; ctx.fillText('◆',badgeX+20,badgeY+48);
-  ctx.fillStyle=accentDark; ctx.font='bold 34px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+60,badgeY+48);
-  ctx.fillStyle=ferrari; ctx.font='bold 32px "Noto Serif TC",serif'; ctx.textAlign='right';
-  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-56,badgeY+badgeH+44); ctx.textAlign='left';
-  var nameAreaY=420;
-  ctx.fillStyle='#aaa'; ctx.font='26px "Noto Serif TC",serif';
-  var lbl='會員姓名',lx=56;
-  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+12;}
+  ctx.fillStyle=ferrari; ctx.font='bold 26px sans-serif'; ctx.fillText('◆',badgeX+18,badgeY+45);
+  ctx.fillStyle=accentDark; ctx.font='bold 32px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+54,badgeY+45);
+  // Tier label (right-aligned, below badge)
+  ctx.fillStyle=ferrari; ctx.font='bold 30px "Noto Serif TC",serif'; ctx.textAlign='right';
+  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-48,badgeY+badgeH+42); ctx.textAlign='left';
+  // ── Horizontal divider line across card
+  var divY=stripeH+170;
+  ctx.strokeStyle=accentDark; ctx.globalAlpha=0.12; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(40,divY); ctx.lineTo(W-40,divY); ctx.stroke(); ctx.globalAlpha=1;
+  // ── Name area (left side, vertically centred)
+  var nameAreaY=divY+56;
+  ctx.fillStyle='#999'; ctx.font='26px "Noto Serif TC",serif';
+  var lbl='會員姓名',lx=48;
+  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+10;}
   ctx.fillStyle=accentDark;
   var zh=data.nameZh||'';
-  var zhSz=zh.length<=2?192:zh.length<=3?172:zh.length<=4?140:108;
-  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,56,nameAreaY+zhSz+8);
-  var enY=nameAreaY+zhSz+4;
-  if(data.nameEn&&data.nameEn.trim()){ctx.fillStyle=accentDark;ctx.font='bold 48px "Noto Serif TC",serif';enY+=64;ctx.fillText(data.nameEn.trim(),56,enY);}
-  if(!isPrimary&&data.parentNo){ctx.fillStyle=ferrari;ctx.font='28px "Noto Serif TC",serif';ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),56,enY+48);}
-  var footY=H-36;
-  ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif'; ctx.fillText('會員編號',56,footY-72);
-  ctx.fillStyle=accentDark; ctx.font='bold 56px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',56,footY-16);
+  var zhSz=zh.length<=2?200:zh.length<=3?178:zh.length<=4?148:112;
+  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,48,nameAreaY+zhSz+10);
+  var enY=nameAreaY+zhSz+10;
+  if(data.nameEn&&data.nameEn.trim()){
+    ctx.fillStyle=accentDark; ctx.font='bold 46px "Noto Serif TC",serif'; enY+=60;
+    ctx.fillText(data.nameEn.trim(),48,enY);
+  }
+  if(!isPrimary&&data.parentNo){
+    ctx.fillStyle=ferrari; ctx.font='26px "Noto Serif TC",serif';
+    ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),48,enY+48);
+  }
+  // ── QR code (right side, vertically centred in name area)
+  var qrSz=200,qrX=W-qrSz-56,qrY2=divY+30;
+  ctx.fillStyle='#fff'; ctx.fillRect(qrX-12,qrY2-12,qrSz+24,qrSz+24);
+  ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-12,qrY2-12,qrSz+24,qrSz+24);
+  try{var qr=qrcode(0,'M');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){if(qr.isDark(row,col))ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);}}}catch(e){console.warn('QR err',e);}
+  // QR label below
+  ctx.fillStyle='#aaa'; ctx.font='22px "Noto Serif TC",serif'; ctx.textAlign='center';
+  ctx.fillText('掃碼查看我的卡',qrX+qrSz/2,qrY2+qrSz+36); ctx.textAlign='left';
+  // ── Footer bar
+  var footBarY=H-140;
+  ctx.fillStyle=accentDark; ctx.globalAlpha=0.06; ctx.fillRect(0,footBarY,W,H-footBarY); ctx.globalAlpha=1;
+  ctx.strokeStyle=accentDark; ctx.globalAlpha=0.15; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,footBarY); ctx.lineTo(W,footBarY); ctx.stroke(); ctx.globalAlpha=1;
+  // Member number
+  var footTextY=footBarY+46;
+  ctx.fillStyle='#999'; ctx.font='24px "Noto Serif TC",serif'; ctx.fillText('會員編號',48,footTextY);
+  ctx.fillStyle=accentDark; ctx.font='bold 60px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',48,footTextY+68);
+  // Expiry date (right of member number, well clear of QR)
   if(data.expiresAt){
     var expStr=data.expiresAt.slice(0,7).replace('-','/');
     var expDisp=expStr.slice(5)+' / '+expStr.slice(0,4);
-    ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif'; ctx.fillText('有效日期',560,footY-72);
-    ctx.fillStyle=accentDark; ctx.font='bold 56px "Space Grotesk",monospace'; ctx.fillText(expDisp,560,footY-16);
+    ctx.fillStyle='#999'; ctx.font='24px "Noto Serif TC",serif'; ctx.fillText('有效期至',520,footTextY);
+    ctx.fillStyle=accentDark; ctx.font='bold 60px "Space Grotesk",monospace'; ctx.fillText(expDisp,520,footTextY+68);
   }
-  var qrSz=172,qrX=W-qrSz-48,qrY2=H-qrSz-32;
-  ctx.fillStyle='#fff'; ctx.fillRect(qrX-10,qrY2-10,qrSz+20,qrSz+20);
-  ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-10,qrY2-10,qrSz+20,qrSz+20);
-  try{var qr=qrcode(0,'M');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){if(qr.isDark(row,col))ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);}}}catch(e){console.warn('QR img err',e);}
+  // ── Convert → JPEG blob
   canvas.toBlob(function(blob){
     if(!blob)return;
     window._cardBlob=blob; window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
@@ -1791,57 +1752,75 @@ function renderCardImage(data, tier) {
   var forestDeep='#0d3e12',forest='#2E7D32',forestPale='#E8F5E9';
   var ferrari='#C62828',ferrariDeep='#8B0000',ferrariPale='#FFEBEE';
   var accentDark=isPrimary?forestDeep:ferrariDeep;
-  var accentMid2=isPrimary?forest:ferrari;
+  var accentMid=isPrimary?forest:ferrari;
   var qrDark=isPrimary?forestDeep:'#a80000';
+  // ── Background gradient
   var bg=ctx.createLinearGradient(0,0,W,H);
   if(isPrimary){bg.addColorStop(0,'#FDFAF3');bg.addColorStop(1,'#F0EBD8');}
   else{bg.addColorStop(0,'#FFF8F8');bg.addColorStop(1,'#FFE8E8');}
   ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
-  ctx.save(); ctx.globalAlpha=0.06; ctx.fillStyle=accentDark;
-  ctx.font='bold 380px "Space Grotesk",monospace'; ctx.textAlign='right';
-  ctx.fillText('85',W+20,H+20); ctx.textAlign='left'; ctx.restore();
+  // ── Watermark "85" — centred, large, faint
+  ctx.save(); ctx.globalAlpha=0.07; ctx.fillStyle=accentDark;
+  ctx.font='bold 700px "Space Grotesk",monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('85',W*0.72,H*0.56); ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.restore();
+  // ── Top colour stripe
   var stripeH=16;
   ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
-  var logoX=36,logoY=stripeH+16,logoW=320,logoH=128;
+  // ── Logo (top-left)
+  var logoX=40,logoY=stripeH+20,logoW=300,logoH=120;
   ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
   ctx.strokeStyle=accentDark; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(logoX+logoW+28,logoY+8); ctx.lineTo(logoX+logoW+28,logoY+logoH-8); ctx.stroke();
-  var cardNameX=logoX+logoW+48;
+  ctx.beginPath(); ctx.moveTo(logoX+logoW+24,logoY+10); ctx.lineTo(logoX+logoW+24,logoY+logoH-10); ctx.stroke();
+  var cardNameX=logoX+logoW+44;
   ctx.fillStyle=accentDark;
-  if(isPrimary){ctx.font='bold 44px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+16);}
+  if(isPrimary){ctx.font='bold 46px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+16);}
   else{ctx.font='bold 38px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2-8);ctx.fillText('家庭同行',cardNameX,logoY+logoH/2+40);}
-  var badgeW=440,badgeH=72,badgeX=W-badgeW-56,badgeY=stripeH+28;
-  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=3;
+  // ── Badge (top-right)
+  var badgeW=420,badgeH=68,badgeX=W-badgeW-48,badgeY=stripeH+26;
+  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=accentMid; ctx.lineWidth=3;
   ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,8); ctx.fill(); ctx.stroke();
-  ctx.fillStyle=ferrari; ctx.font='bold 28px sans-serif'; ctx.fillText('◆',badgeX+20,badgeY+48);
-  ctx.fillStyle=accentDark; ctx.font='bold 34px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+60,badgeY+48);
-  ctx.fillStyle=ferrari; ctx.font='bold 32px "Noto Serif TC",serif'; ctx.textAlign='right';
-  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-56,badgeY+badgeH+44); ctx.textAlign='left';
-  var nameAreaY=420;
-  ctx.fillStyle='#aaa'; ctx.font='26px "Noto Serif TC",serif';
-  var lbl='會員姓名',lx=56;
-  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+12;}
+  ctx.fillStyle=ferrari; ctx.font='bold 26px sans-serif'; ctx.fillText('◆',badgeX+18,badgeY+45);
+  ctx.fillStyle=accentDark; ctx.font='bold 32px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+54,badgeY+45);
+  ctx.fillStyle=ferrari; ctx.font='bold 30px "Noto Serif TC",serif'; ctx.textAlign='right';
+  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-48,badgeY+badgeH+42); ctx.textAlign='left';
+  // ── Horizontal divider
+  var divY=stripeH+170;
+  ctx.strokeStyle=accentDark; ctx.globalAlpha=0.12; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(40,divY); ctx.lineTo(W-40,divY); ctx.stroke(); ctx.globalAlpha=1;
+  // ── Name area
+  var nameAreaY=divY+56;
+  ctx.fillStyle='#999'; ctx.font='26px "Noto Serif TC",serif';
+  var lbl='會員姓名',lx=48;
+  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+10;}
   ctx.fillStyle=accentDark;
   var zh=data.nameZh||'';
-  var zhSz=zh.length<=2?192:zh.length<=3?172:zh.length<=4?140:108;
-  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,56,nameAreaY+zhSz+8);
-  var enY=nameAreaY+zhSz+4;
-  if(data.nameEn&&data.nameEn.trim()){ctx.fillStyle=accentDark;ctx.font='bold 48px "Noto Serif TC",serif';enY+=64;ctx.fillText(data.nameEn.trim(),56,enY);}
-  if(!isPrimary&&data.parentNo){ctx.fillStyle=ferrari;ctx.font='28px "Noto Serif TC",serif';ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),56,enY+48);}
-  var footY=H-36;
-  ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif'; ctx.fillText('會員編號',56,footY-72);
-  ctx.fillStyle=accentDark; ctx.font='bold 56px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',56,footY-16);
+  var zhSz=zh.length<=2?200:zh.length<=3?178:zh.length<=4?148:112;
+  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,48,nameAreaY+zhSz+10);
+  var enY=nameAreaY+zhSz+10;
+  if(data.nameEn&&data.nameEn.trim()){ctx.fillStyle=accentDark;ctx.font='bold 46px "Noto Serif TC",serif';enY+=60;ctx.fillText(data.nameEn.trim(),48,enY);}
+  if(!isPrimary&&data.parentNo){ctx.fillStyle=ferrari;ctx.font='26px "Noto Serif TC",serif';ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),48,enY+48);}
+  // ── QR code (right side)
+  var qrSz=200,qrX=W-qrSz-56,qrY2=divY+30;
+  ctx.fillStyle='#fff'; ctx.fillRect(qrX-12,qrY2-12,qrSz+24,qrSz+24);
+  ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-12,qrY2-12,qrSz+24,qrSz+24);
+  try{var qr=qrcode(0,'M');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){if(qr.isDark(row,col))ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);}}}catch(e){console.warn('QR err',e);}
+  ctx.fillStyle='#aaa'; ctx.font='22px "Noto Serif TC",serif'; ctx.textAlign='center';
+  ctx.fillText('掃碼查看我的卡',qrX+qrSz/2,qrY2+qrSz+36); ctx.textAlign='left';
+  // ── Footer bar
+  var footBarY=H-140;
+  ctx.fillStyle=accentDark; ctx.globalAlpha=0.06; ctx.fillRect(0,footBarY,W,H-footBarY); ctx.globalAlpha=1;
+  ctx.strokeStyle=accentDark; ctx.globalAlpha=0.15; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,footBarY); ctx.lineTo(W,footBarY); ctx.stroke(); ctx.globalAlpha=1;
+  var footTextY=footBarY+46;
+  ctx.fillStyle='#999'; ctx.font='24px "Noto Serif TC",serif'; ctx.fillText('會員編號',48,footTextY);
+  ctx.fillStyle=accentDark; ctx.font='bold 60px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',48,footTextY+68);
   if(data.expiresAt){
     var expStr=data.expiresAt.slice(0,7).replace('-','/');
-    var expDisp2=expStr.slice(5)+' / '+expStr.slice(0,4);
-    ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif'; ctx.fillText('有效日期',560,footY-72);
-    ctx.fillStyle=accentDark; ctx.font='bold 28px "Space Grotesk",monospace'; ctx.fillText(expDisp2,280,footY-8);
+    var expDisp=expStr.slice(5)+' / '+expStr.slice(0,4);
+    ctx.fillStyle='#999'; ctx.font='24px "Noto Serif TC",serif'; ctx.fillText('有效期至',520,footTextY);
+    ctx.fillStyle=accentDark; ctx.font='bold 60px "Space Grotesk",monospace'; ctx.fillText(expDisp,520,footTextY+68);
   }
-  var qrSz=172,qrX=W-qrSz-48,qrY2=H-qrSz-32;
-  ctx.fillStyle='#fff'; ctx.fillRect(qrX-10,qrY2-10,qrSz+20,qrSz+20);
-  ctx.strokeStyle=accentMid2; ctx.lineWidth=2; ctx.strokeRect(qrX-5,qrY2-5,qrSz+10,qrSz+10);
-  try{var qr=qrcode(0,'M');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){if(qr.isDark(row,col))ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);}}}catch(e){console.warn('QR img err',e);}
   canvas.toBlob(function(blob){
     if(!blob)return;
     window._cardBlob=blob; window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
@@ -2167,6 +2146,7 @@ function showSuccess(data){
 function renderCardImage(data, tier) {
   var logoImg=new Image();
   logoImg.onload=function(){
+  // Canvas: 1360×860 @2x (displays as 680×430, credit-card ratio)
   var W=1360, H=860;
   var canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
@@ -2177,55 +2157,86 @@ function renderCardImage(data, tier) {
   var accentDark=isPrimary?forestDeep:ferrariDeep;
   var accentMid=isPrimary?forest:ferrari;
   var qrDark=isPrimary?forestDeep:'#a80000';
+  // ── Background gradient
   var bg=ctx.createLinearGradient(0,0,W,H);
   if(isPrimary){bg.addColorStop(0,'#FDFAF3');bg.addColorStop(1,'#F0EBD8');}
   else{bg.addColorStop(0,'#FFF8F8');bg.addColorStop(1,'#FFE8E8');}
   ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
-  ctx.save(); ctx.globalAlpha=0.06; ctx.fillStyle=accentDark;
-  ctx.font='bold 380px "Space Grotesk",monospace'; ctx.textAlign='right';
-  ctx.fillText('85',W+20,H+20); ctx.textAlign='left'; ctx.restore();
+  // ── Watermark "85" — centred, large, faint
+  ctx.save(); ctx.globalAlpha=0.07; ctx.fillStyle=accentDark;
+  ctx.font='bold 700px "Space Grotesk",monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('85',W*0.72,H*0.56); ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.restore();
+  // ── Top colour stripe (green left | red right)
   var stripeH=16;
   ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
-  var logoX=36,logoY=stripeH+16,logoW=320,logoH=128;
+  // ── Logo (top-left)
+  var logoX=40,logoY=stripeH+20,logoW=300,logoH=120;
   ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
+  // Vertical divider after logo
   ctx.strokeStyle=accentDark; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(logoX+logoW+28,logoY+8); ctx.lineTo(logoX+logoW+28,logoY+logoH-8); ctx.stroke();
-  var cardNameX=logoX+logoW+48;
+  ctx.beginPath(); ctx.moveTo(logoX+logoW+24,logoY+10); ctx.lineTo(logoX+logoW+24,logoY+logoH-10); ctx.stroke();
+  // Card type label (老有卡 / 家庭同行)
+  var cardNameX=logoX+logoW+44;
   ctx.fillStyle=accentDark;
-  if(isPrimary){ctx.font='bold 44px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+16);}
+  if(isPrimary){ctx.font='bold 46px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+16);}
   else{ctx.font='bold 38px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2-8);ctx.fillText('家庭同行',cardNameX,logoY+logoH/2+40);}
-  var badgeW=440,badgeH=72,badgeX=W-badgeW-56,badgeY=stripeH+28;
-  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=isPrimary?forest:ferrari; ctx.lineWidth=3;
+  // ── Badge (top-right)
+  var badgeW=420,badgeH=68,badgeX=W-badgeW-48,badgeY=stripeH+26;
+  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=accentMid; ctx.lineWidth=3;
   ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,8); ctx.fill(); ctx.stroke();
-  ctx.fillStyle=ferrari; ctx.font='bold 28px sans-serif'; ctx.fillText('◆',badgeX+20,badgeY+48);
-  ctx.fillStyle=accentDark; ctx.font='bold 34px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+60,badgeY+48);
-  ctx.fillStyle=ferrari; ctx.font='bold 32px "Noto Serif TC",serif'; ctx.textAlign='right';
-  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-56,badgeY+badgeH+44); ctx.textAlign='left';
-  var nameAreaY=420;
-  ctx.fillStyle='#aaa'; ctx.font='26px "Noto Serif TC",serif';
-  var lbl='會員姓名',lx=56;
-  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+12;}
+  ctx.fillStyle=ferrari; ctx.font='bold 26px sans-serif'; ctx.fillText('◆',badgeX+18,badgeY+45);
+  ctx.fillStyle=accentDark; ctx.font='bold 32px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+54,badgeY+45);
+  // Tier label (right-aligned, below badge)
+  ctx.fillStyle=ferrari; ctx.font='bold 30px "Noto Serif TC",serif'; ctx.textAlign='right';
+  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-48,badgeY+badgeH+42); ctx.textAlign='left';
+  // ── Horizontal divider line across card
+  var divY=stripeH+170;
+  ctx.strokeStyle=accentDark; ctx.globalAlpha=0.12; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(40,divY); ctx.lineTo(W-40,divY); ctx.stroke(); ctx.globalAlpha=1;
+  // ── Name area (left side, vertically centred)
+  var nameAreaY=divY+56;
+  ctx.fillStyle='#999'; ctx.font='26px "Noto Serif TC",serif';
+  var lbl='會員姓名',lx=48;
+  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+10;}
   ctx.fillStyle=accentDark;
   var zh=data.nameZh||'';
-  var zhSz=zh.length<=2?192:zh.length<=3?172:zh.length<=4?140:108;
-  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,56,nameAreaY+zhSz+8);
-  var enY=nameAreaY+zhSz+4;
-  if(data.nameEn&&data.nameEn.trim()){ctx.fillStyle=accentDark;ctx.font='bold 48px "Noto Serif TC",serif';enY+=64;ctx.fillText(data.nameEn.trim(),56,enY);}
-  if(!isPrimary&&data.parentNo){ctx.fillStyle=ferrari;ctx.font='28px "Noto Serif TC",serif';ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),56,enY+48);}
-  var footY=H-36;
-  ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif'; ctx.fillText('會員編號',56,footY-72);
-  ctx.fillStyle=accentDark; ctx.font='bold 56px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',56,footY-16);
+  var zhSz=zh.length<=2?200:zh.length<=3?178:zh.length<=4?148:112;
+  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,48,nameAreaY+zhSz+10);
+  var enY=nameAreaY+zhSz+10;
+  if(data.nameEn&&data.nameEn.trim()){
+    ctx.fillStyle=accentDark; ctx.font='bold 46px "Noto Serif TC",serif'; enY+=60;
+    ctx.fillText(data.nameEn.trim(),48,enY);
+  }
+  if(!isPrimary&&data.parentNo){
+    ctx.fillStyle=ferrari; ctx.font='26px "Noto Serif TC",serif';
+    ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),48,enY+48);
+  }
+  // ── QR code (right side, vertically centred in name area)
+  var qrSz=200,qrX=W-qrSz-56,qrY2=divY+30;
+  ctx.fillStyle='#fff'; ctx.fillRect(qrX-12,qrY2-12,qrSz+24,qrSz+24);
+  ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-12,qrY2-12,qrSz+24,qrSz+24);
+  try{var qr=qrcode(0,'M');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){if(qr.isDark(row,col))ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);}}}catch(e){console.warn('QR err',e);}
+  // QR label below
+  ctx.fillStyle='#aaa'; ctx.font='22px "Noto Serif TC",serif'; ctx.textAlign='center';
+  ctx.fillText('掃碼查看我的卡',qrX+qrSz/2,qrY2+qrSz+36); ctx.textAlign='left';
+  // ── Footer bar
+  var footBarY=H-140;
+  ctx.fillStyle=accentDark; ctx.globalAlpha=0.06; ctx.fillRect(0,footBarY,W,H-footBarY); ctx.globalAlpha=1;
+  ctx.strokeStyle=accentDark; ctx.globalAlpha=0.15; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,footBarY); ctx.lineTo(W,footBarY); ctx.stroke(); ctx.globalAlpha=1;
+  // Member number
+  var footTextY=footBarY+46;
+  ctx.fillStyle='#999'; ctx.font='24px "Noto Serif TC",serif'; ctx.fillText('會員編號',48,footTextY);
+  ctx.fillStyle=accentDark; ctx.font='bold 60px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',48,footTextY+68);
+  // Expiry date (right of member number, well clear of QR)
   if(data.expiresAt){
     var expStr=data.expiresAt.slice(0,7).replace('-','/');
     var expDisp=expStr.slice(5)+' / '+expStr.slice(0,4);
-    ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif'; ctx.fillText('有效日期',560,footY-72);
-    ctx.fillStyle=accentDark; ctx.font='bold 56px "Space Grotesk",monospace'; ctx.fillText(expDisp,560,footY-16);
+    ctx.fillStyle='#999'; ctx.font='24px "Noto Serif TC",serif'; ctx.fillText('有效期至',520,footTextY);
+    ctx.fillStyle=accentDark; ctx.font='bold 60px "Space Grotesk",monospace'; ctx.fillText(expDisp,520,footTextY+68);
   }
-  var qrSz=172,qrX=W-qrSz-48,qrY2=H-qrSz-32;
-  ctx.fillStyle='#fff'; ctx.fillRect(qrX-10,qrY2-10,qrSz+20,qrSz+20);
-  ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-10,qrY2-10,qrSz+20,qrSz+20);
-  try{var qr=qrcode(0,'M');qr.addData(location.origin+'/member/'+(data.memberNo||''));qr.make();var mc=qr.getModuleCount(),cell=Math.floor(qrSz/mc);ctx.fillStyle=qrDark;for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){if(qr.isDark(row,col))ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);}}}catch(e){console.warn('QR img err',e);}
+  // ── Convert → JPEG blob
   canvas.toBlob(function(blob){
     if(!blob)return;
     window._cardBlob=blob; window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
