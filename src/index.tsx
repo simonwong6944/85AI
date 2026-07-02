@@ -41,6 +41,7 @@ app.post('/api/members', async (c) => {
       district?: string; idPrefix?: string;
       parentPhone?: string; parentName?: string; parentNo?: string; relation?: string;
       roadshow?: string;
+      source?: string; referrerNo?: string; roadshowLocation?: string;
     }>()
 
     // Validate required fields
@@ -86,13 +87,23 @@ app.post('/api/members', async (c) => {
     const expires = expiryDate(3)
     const now = new Date().toISOString()
     const roadshow = body.roadshow || 'walk-in'
+    const source = body.source || 'walk-in'
+    const referrerNo = body.referrerNo?.trim() || ''
+    const roadshowLocation = body.roadshowLocation?.trim() || ''
+
+    // Validate referrer if provided
+    if (referrerNo) {
+      const ref = await db.prepare('SELECT member_no FROM members WHERE member_no = ?').bind(referrerNo).first()
+      if (!ref) return c.json({ ok: false, error: `介紹人會員編號 ${referrerNo} 不存在` }, 400)
+    }
 
     await db.prepare(`
       INSERT INTO members
         (member_no, tier, name_zh, phone, name_en, gender, birth_year,
          district, id_prefix, parent_no, parent_name, relation,
-         roadshow, kyc_status, role, expires_at, created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         roadshow, kyc_status, role, expires_at, created_at,
+         source, referrer_no, roadshow_location, status)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).bind(
       memberNo, body.tier || 'PRIMARY',
       body.nameZh.trim(), phoneClean,
@@ -101,7 +112,8 @@ app.post('/api/members', async (c) => {
       body.district || '', body.idPrefix || '',
       parentNo, parentName, body.relation || '',
       roadshow, 'PENDING', 'CoExplorery',
-      expires, now
+      expires, now,
+      source, referrerNo, roadshowLocation, 'ACTIVE'
     ).run()
 
     // Log roadshow entry
@@ -153,27 +165,55 @@ app.get('/api/members/:no', async (c) => {
 app.get('/api/admin/members', async (c) => {
   const db = c.env.DB
   const page = parseInt(c.req.query('page') || '1')
-  const limit = parseInt(c.req.query('limit') || '50')
+  const limit = Math.min(parseInt(c.req.query('limit') || '50'), 500)
   const tier = c.req.query('tier')
-  const roadshow = c.req.query('roadshow')
   const search = c.req.query('search')
+  const status = c.req.query('status')
+  const source = c.req.query('source')
+  const district = c.req.query('district')
+  const exportCsv = c.req.query('export') === 'csv'
   const offset = (page - 1) * limit
 
   let where = 'WHERE 1=1'
   const params: (string | number)[] = []
   if (tier) { where += ' AND tier = ?'; params.push(tier) }
-  if (roadshow) { where += ' AND roadshow = ?'; params.push(roadshow) }
+  if (status) { where += ' AND status = ?'; params.push(status) }
+  else { where += " AND status != 'DELETED'" }
+  if (source) { where += ' AND source = ?'; params.push(source) }
+  if (district) { where += ' AND district = ?'; params.push(district) }
   if (search) {
-    where += ' AND (name_zh LIKE ? OR member_no LIKE ? OR phone LIKE ?)'
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`)
+    where += ' AND (name_zh LIKE ? OR name_en LIKE ? OR member_no LIKE ? OR phone LIKE ?)'
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`)
   }
 
   const countRow = await db.prepare(
     `SELECT COUNT(*) as total FROM members ${where}`
   ).bind(...params).first<{ total: number }>()
 
+  // CSV export — return all matching rows
+  if (exportCsv) {
+    const rows = await db.prepare(
+      `SELECT member_no, tier, status, name_zh, name_en, phone, gender, birth_year,
+              district, role, kyc_status, source, referrer_no, roadshow, roadshow_location,
+              expires_at, created_at, notes, admin_notes
+       FROM members ${where} ORDER BY created_at DESC`
+    ).bind(...params).all()
+    const header = 'member_no,tier,status,name_zh,name_en,phone,gender,birth_year,district,role,kyc_status,source,referrer_no,roadshow,roadshow_location,expires_at,created_at'
+    const csv = header + '\n' + rows.results.map((m: any) =>
+      [m.member_no,m.tier,m.status,m.name_zh,m.name_en,m.phone,m.gender,m.birth_year,
+       m.district,m.role,m.kyc_status,m.source,m.referrer_no,m.roadshow,m.roadshow_location,
+       m.expires_at,m.created_at].map((v: any) => `"${(v||'').toString().replace(/"/g,'""')}"`).join(',')
+    ).join('\n')
+    return new Response(csv, { headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="members_${new Date().toISOString().slice(0,10)}.csv"`
+    }})
+  }
+
   const rows = await db.prepare(
-    `SELECT member_no, tier, name_zh, name_en, phone, role, kyc_status, roadshow, expires_at, created_at
+    `SELECT member_no, tier, status, name_zh, name_en, phone, gender, district,
+            role, kyc_status, source, referrer_no, roadshow, roadshow_location,
+            expires_at, created_at, notes, admin_notes
      FROM members ${where}
      ORDER BY created_at DESC LIMIT ? OFFSET ?`
   ).bind(...params, limit, offset).all()
@@ -189,15 +229,21 @@ app.get('/api/admin/members', async (c) => {
 // ─── API: Admin stats ─────────────────────────────────────────────────────────
 app.get('/api/admin/stats', async (c) => {
   const db = c.env.DB
-  const [total, primary, family, pending] = await Promise.all([
-    db.prepare('SELECT COUNT(*) as n FROM members').first<{ n: number }>(),
-    db.prepare("SELECT COUNT(*) as n FROM members WHERE tier='PRIMARY'").first<{ n: number }>(),
-    db.prepare("SELECT COUNT(*) as n FROM members WHERE tier='FAMILY'").first<{ n: number }>(),
-    db.prepare("SELECT COUNT(*) as n FROM members WHERE kyc_status='PENDING'").first<{ n: number }>(),
+  const [total, primary, family, pending, active, inactive, todayNew, monthNew] = await Promise.all([
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE status!='DELETED'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE tier='PRIMARY' AND status!='DELETED'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE tier='FAMILY' AND status!='DELETED'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE kyc_status='PENDING' AND status='ACTIVE'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE status='ACTIVE'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE status='INACTIVE'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE date(created_at)=date('now') AND status!='DELETED'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) as n FROM members WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now') AND status!='DELETED'").first<{ n: number }>(),
   ])
-  const roadshows = await db.prepare(
-    "SELECT roadshow, COUNT(*) as cnt FROM members WHERE roadshow != 'walk-in' GROUP BY roadshow ORDER BY cnt DESC"
-  ).all()
+  const [bySource, byDistrict, byMonth] = await Promise.all([
+    db.prepare("SELECT source, COUNT(*) as cnt FROM members WHERE status!='DELETED' GROUP BY source ORDER BY cnt DESC").all(),
+    db.prepare("SELECT district, COUNT(*) as cnt FROM members WHERE district!='' AND status!='DELETED' GROUP BY district ORDER BY cnt DESC LIMIT 10").all(),
+    db.prepare("SELECT strftime('%Y-%m',created_at) as month, COUNT(*) as cnt FROM members WHERE status!='DELETED' GROUP BY month ORDER BY month DESC LIMIT 12").all(),
+  ])
   return c.json({
     ok: true,
     stats: {
@@ -205,7 +251,13 @@ app.get('/api/admin/stats', async (c) => {
       primary: primary?.n ?? 0,
       family: family?.n ?? 0,
       pending: pending?.n ?? 0,
-      roadshows: roadshows.results
+      active: active?.n ?? 0,
+      inactive: inactive?.n ?? 0,
+      todayNew: todayNew?.n ?? 0,
+      monthNew: monthNew?.n ?? 0,
+      bySource: bySource.results,
+      byDistrict: byDistrict.results,
+      byMonth: byMonth.results
     }
   })
 })
@@ -214,15 +266,35 @@ app.get('/api/admin/stats', async (c) => {
 app.patch('/api/admin/members/:no', async (c) => {
   const no = c.req.param('no')
   const db = c.env.DB
-  const body = await c.req.json<{ kyc_status?: string; role?: string; notes?: string }>()
+  const body = await c.req.json<{
+    kyc_status?: string; role?: string; notes?: string; admin_notes?: string;
+    status?: string; name_zh?: string; name_en?: string; phone?: string;
+    gender?: string; birth_year?: number; district?: string;
+    source?: string; referrer_no?: string; roadshow_location?: string; expires_at?: string;
+  }>()
+  const allowed = ['kyc_status','role','notes','admin_notes','status',
+    'name_zh','name_en','phone','gender','birth_year','district',
+    'source','referrer_no','roadshow_location','expires_at']
   const fields: string[] = []
-  const vals: string[] = []
-  if (body.kyc_status) { fields.push('kyc_status = ?'); vals.push(body.kyc_status) }
-  if (body.role) { fields.push('role = ?'); vals.push(body.role) }
-  if (body.notes !== undefined) { fields.push('notes = ?'); vals.push(body.notes) }
+  const vals: any[] = []
+  for (const key of allowed) {
+    if (body[key as keyof typeof body] !== undefined) {
+      fields.push(`${key} = ?`)
+      vals.push(body[key as keyof typeof body])
+    }
+  }
   if (!fields.length) return c.json({ ok: false, error: 'Nothing to update' }, 400)
   await db.prepare(`UPDATE members SET ${fields.join(', ')} WHERE member_no = ?`)
     .bind(...vals, no).run()
+  return c.json({ ok: true })
+})
+
+// ─── API: Delete member (soft delete) ────────────────────────────────────────
+app.delete('/api/admin/members/:no', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  await db.prepare("UPDATE members SET status='DELETED' WHERE member_no = ?")
+    .bind(no).run()
   return c.json({ ok: true })
 })
 
@@ -1215,153 +1287,428 @@ async function shareCardToWA(){
 
 // ─── Admin HTML ───────────────────────────────────────────────────────────────
 function adminHtml() {
-  return htmlHead('後台管理', `<style>
-body{background:#f4f4f0;padding:0;}
-.topbar{background:var(--forest-deep);color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;}
-.topbar .logo{font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:2px;}
+  const srcLabels: Record<string,string> = {
+    'walk-in':'Walk-in','roadshow':'Roadshow','referral':'會員介紹',
+    'whatsapp':'WhatsApp','social':'社交媒體','institution':'機構轉介','online':'網上登記'
+  }
+  return htmlHead('會員後台管理', `<style>
+*{box-sizing:border-box}
+body{background:#f2f3f5;padding:0;font-size:14px;}
+/* topbar */
+.topbar{background:var(--forest-deep);color:#fff;padding:0 24px;display:flex;align-items:center;height:52px;gap:0;}
+.topbar .logo{font-family:"Noto Serif TC",serif;font-size:17px;font-weight:700;letter-spacing:2px;margin-right:32px;}
 .topbar .logo em{color:var(--ferrari);font-style:normal;}
-.wrap{max-width:1200px;margin:0 auto;padding:32px 24px;}
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
-.stat-card{background:#fff;padding:20px;border-left:4px solid var(--forest);}
-.stat-card.red{border-left-color:var(--ferrari);}
-.stat-card .n{font-family:"Space Grotesk",sans-serif;font-size:36px;font-weight:700;color:var(--forest-deep);}
-.stat-card.red .n{color:var(--ferrari);}
-.stat-card .lbl{font-size:12px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
-.filters{background:#fff;padding:16px 20px;margin-bottom:20px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;}
-.filters input,.filters select{padding:8px 12px;border:1px solid var(--line);font-size:13px;font-family:inherit;color:var(--ink);}
-.filters button{padding:8px 20px;background:var(--forest);color:#fff;border:0;font-size:13px;cursor:pointer;font-family:inherit;}
-.table-wrap{background:#fff;overflow-x:auto;}
+.nav-tabs{display:flex;height:100%;}
+.nav-tab{padding:0 18px;cursor:pointer;font-size:13px;display:flex;align-items:center;opacity:0.65;border-bottom:3px solid transparent;letter-spacing:1px;color:#fff;}
+.nav-tab.active{opacity:1;border-bottom-color:var(--ferrari);}
+.topbar-right{margin-left:auto;font-size:11px;opacity:0.5;}
+/* layout */
+.wrap{max-width:1280px;margin:0 auto;padding:24px;}
+.page{display:none}.page.active{display:block}
+/* stat cards */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+@media(max-width:900px){.stats-grid{grid-template-columns:1fr 1fr;}}
+.stat-card{background:#fff;padding:18px 20px;border-radius:6px;border-top:3px solid var(--forest);box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.stat-card.red{border-top-color:var(--ferrari);}
+.stat-card.blue{border-top-color:#1565C0;}
+.stat-card.amber{border-top-color:#E65100;}
+.stat-card .n{font-family:"Space Grotesk",sans-serif;font-size:32px;font-weight:700;color:var(--forest-deep);}
+.stat-card.red .n{color:var(--ferrari-deep);}
+.stat-card.blue .n{color:#1565C0;}
+.stat-card.amber .n{color:#E65100;}
+.stat-card .lbl{font-size:11px;color:#888;letter-spacing:2px;margin-top:4px;text-transform:uppercase;}
+.stat-card .sub{font-size:11px;color:#aaa;margin-top:2px;}
+/* charts row */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;}
+@media(max-width:768px){.charts-row{grid-template-columns:1fr;}}
+.chart-card{background:#fff;border-radius:6px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.chart-title{font-size:12px;font-weight:700;letter-spacing:2px;color:#555;text-transform:uppercase;margin-bottom:14px;}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;}
+.bar-label{width:80px;color:#666;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bar-track{flex:1;background:#f0f0f0;border-radius:3px;height:16px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;background:var(--forest);transition:width 0.4s;}
+.bar-fill.red{background:var(--ferrari);}
+.bar-val{width:30px;font-family:"Space Grotesk",sans-serif;font-weight:700;color:var(--forest-deep);}
+/* filters */
+.filter-bar{background:#fff;border-radius:6px;padding:14px 18px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.filter-bar input,.filter-bar select{padding:7px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;font-family:inherit;color:var(--ink);background:#fff;}
+.filter-bar input{flex:1;min-width:180px;}
+.btn{padding:7px 16px;border:0;border-radius:4px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:700;letter-spacing:0.5px;}
+.btn-green{background:var(--forest);color:#fff;}
+.btn-grey{background:#e0e0e0;color:#555;}
+.btn-red{background:var(--ferrari);color:#fff;}
+.btn-blue{background:#1565C0;color:#fff;}
+.btn-amber{background:#E65100;color:#fff;}
+/* table */
+.table-wrap{background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.table-meta{padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;}
+.table-meta .count{font-size:12px;color:#888;}
+.table-actions{display:flex;gap:8px;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
-th{background:var(--forest-deep);color:#fff;padding:10px 12px;text-align:left;font-family:"Noto Serif TC",serif;font-size:12px;letter-spacing:1px;white-space:nowrap;}
-td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--grey-1);white-space:nowrap;}
-tr:hover td{background:var(--forest-pale);}
-.badge{display:inline-block;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:1px;}
-.badge.primary{background:var(--forest-pale);color:var(--forest-deep);}
-.badge.family{background:var(--ferrari-pale);color:var(--ferrari-deep);}
-.badge.pending{background:#FFF3B0;color:#7a5a1a;}
-.badge.done{background:var(--forest-pale);color:var(--forest-deep);}
-.pagination{padding:16px;display:flex;gap:8px;justify-content:center;}
-.pagination button{padding:6px 14px;border:1px solid var(--line);background:#fff;cursor:pointer;font-family:inherit;font-size:13px;}
+th{background:#fafafa;color:#555;padding:9px 12px;text-align:left;font-size:11px;letter-spacing:1px;text-transform:uppercase;border-bottom:2px solid #eee;white-space:nowrap;}
+td{padding:10px 12px;border-bottom:1px solid #f5f5f5;color:#333;white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#f9fffe;}
+tr.inactive td{opacity:0.45;}
+/* badges */
+.badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:0.5px;}
+.badge-primary{background:#E8F5E9;color:#1B5E20;}
+.badge-family{background:#FFEBEE;color:#B71C1C;}
+.badge-active{background:#E8F5E9;color:#2E7D32;}
+.badge-inactive{background:#FFF3E0;color:#E65100;}
+.badge-deleted{background:#F5F5F5;color:#9E9E9E;}
+.badge-done{background:#E8F5E9;color:#2E7D32;}
+.badge-pending{background:#FFFDE7;color:#F57F17;}
+/* action buttons in table */
+.act-btn{padding:3px 8px;border:1px solid;border-radius:3px;font-size:11px;cursor:pointer;font-weight:700;background:#fff;margin-right:3px;}
+.act-edit{border-color:var(--forest);color:var(--forest);}
+.act-kyc{border-color:#1565C0;color:#1565C0;}
+.act-deact{border-color:var(--ferrari);color:var(--ferrari);}
+.act-react{border-color:#2E7D32;color:#2E7D32;}
+/* pagination */
+.pagination{padding:12px 16px;display:flex;gap:6px;justify-content:center;border-top:1px solid #f0f0f0;}
+.pagination button{padding:5px 12px;border:1px solid #ddd;background:#fff;cursor:pointer;font-family:inherit;font-size:12px;border-radius:3px;}
 .pagination button.active{background:var(--forest);color:#fff;border-color:var(--forest);}
-.search-count{font-size:12px;color:var(--grey-2);padding:8px 20px;}
-@media(max-width:768px){.stats-grid{grid-template-columns:1fr 1fr;}.filters{flex-direction:column;}}
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:none;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal{background:#fff;border-radius:8px;padding:28px 28px 20px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.2);}
+.modal h3{font-family:"Noto Serif TC",serif;font-size:18px;color:var(--forest-deep);margin-bottom:20px;font-weight:700;}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.modal-field{display:flex;flex-direction:column;gap:5px;}
+.modal-field.full{grid-column:1/-1;}
+.modal-field label{font-size:11px;font-weight:700;color:#888;letter-spacing:1px;text-transform:uppercase;}
+.modal-field input,.modal-field select,.modal-field textarea{padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;font-family:inherit;}
+.modal-field textarea{height:70px;resize:vertical;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;}
 </style>`) + `
 <body>
 <div class="topbar">
-  <div class="logo">CoEldery <em>85</em> · 後台管理</div>
-  <div style="font-size:12px;opacity:0.7;">admin.coeldery85.com</div>
+  <div class="logo">CoEldery <em>85</em></div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+    <div class="nav-tab" onclick="switchTab('members')">👥 會員管理</div>
+  </div>
+  <div class="topbar-right">coeldery85.com/membership/admin</div>
 </div>
+
 <div class="wrap">
-  <div class="stats-grid" id="statsGrid">
-    <div class="stat-card"><div class="n" id="sTotal">—</div><div class="lbl">總會員數</div></div>
-    <div class="stat-card"><div class="n" id="sPrimary">—</div><div class="lbl">主卡</div></div>
-    <div class="stat-card"><div class="n" id="sFamily">—</div><div class="lbl">家庭同行卡</div></div>
-    <div class="stat-card red"><div class="n" id="sPending">—</div><div class="lbl">待 KYC</div></div>
+
+  <!-- ── DASHBOARD PAGE ── -->
+  <div class="page active" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="n" id="sTotal">—</div><div class="lbl">總會員數</div><div class="sub" id="sActive">活躍：— / 停用：—</div></div>
+      <div class="stat-card"><div class="n" id="sPrimary">—</div><div class="lbl">主卡</div></div>
+      <div class="stat-card"><div class="n" id="sFamily">—</div><div class="lbl">家庭同行卡</div></div>
+      <div class="stat-card red"><div class="n" id="sPending">—</div><div class="lbl">待 KYC</div></div>
+      <div class="stat-card blue"><div class="n" id="sToday">—</div><div class="lbl">今日新增</div></div>
+      <div class="stat-card amber"><div class="n" id="sMonth">—</div><div class="lbl">本月新增</div></div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">📍 來源渠道分析</div>
+        <div id="chartSource"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🗺️ 地區分佈 Top 10</div>
+        <div id="chartDistrict"></div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:24px;">
+      <div class="chart-title">📈 每月新增會員趨勢（近12個月）</div>
+      <div id="chartMonth" style="display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:8px;"></div>
+    </div>
   </div>
 
-  <div class="filters">
-    <input id="search" type="text" placeholder="搜尋：姓名 / 會員編號 / 電話" style="flex:1;min-width:200px;">
-    <select id="filterTier">
-      <option value="">全部類型</option>
-      <option value="PRIMARY">主卡</option>
-      <option value="FAMILY">家庭同行</option>
-    </select>
-    <select id="filterKyc">
-      <option value="">全部 KYC</option>
-      <option value="PENDING">PENDING</option>
-      <option value="DONE">DONE</option>
-    </select>
-    <button onclick="loadMembers(1)">搜尋</button>
-    <button onclick="clearFilters()" style="background:var(--grey-3);">清除</button>
+  <!-- ── MEMBERS PAGE ── -->
+  <div class="page" id="page-members">
+    <div class="filter-bar">
+      <input id="search" type="text" placeholder="搜尋姓名 / 會員編號 / 電話…">
+      <select id="filterTier">
+        <option value="">全部類型</option>
+        <option value="PRIMARY">主卡</option>
+        <option value="FAMILY">家庭同行</option>
+      </select>
+      <select id="filterStatus">
+        <option value="">全部狀態</option>
+        <option value="ACTIVE">Active</option>
+        <option value="INACTIVE">Inactive</option>
+      </select>
+      <select id="filterSource">
+        <option value="">全部來源</option>
+        <option value="walk-in">Walk-in</option>
+        <option value="roadshow">Roadshow</option>
+        <option value="referral">會員介紹</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="social">社交媒體</option>
+        <option value="institution">機構轉介</option>
+        <option value="online">網上登記</option>
+      </select>
+      <button class="btn btn-green" onclick="loadMembers(1)">🔍 搜尋</button>
+      <button class="btn btn-grey" onclick="clearFilters()">清除</button>
+      <button class="btn btn-blue" onclick="exportCsv()" title="匯出 CSV">⬇ CSV</button>
+    </div>
+    <div class="table-wrap">
+      <div class="table-meta">
+        <span class="count" id="searchCount">載入中…</span>
+      </div>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr>
+          <th>會員編號</th><th>狀態</th><th>類型</th><th>中文姓名</th><th>電話</th>
+          <th>地區</th><th>角色</th><th>KYC</th><th>來源</th><th>介紹人</th>
+          <th>有效日期</th><th>登記時間</th><th>操作</th>
+        </tr></thead>
+        <tbody id="membersTbody"></tbody>
+      </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
   </div>
 
-  <div class="search-count" id="searchCount"></div>
+</div>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>會員編號</th><th>類型</th><th>中文姓名</th><th>電話</th>
-          <th>角色</th><th>KYC</th><th>Roadshow</th><th>有效日期</th><th>登記時間</th><th>操作</th>
-        </tr>
-      </thead>
-      <tbody id="membersTbody"></tbody>
-    </table>
+<!-- ── EDIT MODAL ── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>✏️ 編輯會員資料</h3>
+    <input type="hidden" id="editNo">
+    <div class="modal-grid">
+      <div class="modal-field"><label>中文姓名</label><input id="eNameZh"></div>
+      <div class="modal-field"><label>英文姓名</label><input id="eNameEn"></div>
+      <div class="modal-field"><label>電話</label><input id="ePhone"></div>
+      <div class="modal-field"><label>性別</label>
+        <select id="eGender"><option value="">—</option><option value="M">男 M</option><option value="F">女 F</option><option value="X">其他 X</option></select>
+      </div>
+      <div class="modal-field"><label>地區</label><input id="eDistrict"></div>
+      <div class="modal-field"><label>角色</label>
+        <select id="eRole">
+          <option value="CoExplorery">CoExplorery 探索者</option>
+          <option value="CoSupportery">CoSupportery 支持者</option>
+          <option value="CoOwnery">CoOwnery 同行者</option>
+          <option value="CoLeadery">CoLeadery 領航者</option>
+          <option value="CoLinkery">CoLinkery 連結者</option>
+        </select>
+      </div>
+      <div class="modal-field"><label>KYC 狀態</label>
+        <select id="eKyc"><option value="PENDING">PENDING</option><option value="DONE">DONE</option></select>
+      </div>
+      <div class="modal-field"><label>狀態</label>
+        <select id="eStatus"><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select>
+      </div>
+      <div class="modal-field"><label>來源渠道</label>
+        <select id="eSource">
+          <option value="walk-in">Walk-in</option>
+          <option value="roadshow">Roadshow</option>
+          <option value="referral">會員介紹</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="social">社交媒體</option>
+          <option value="institution">機構轉介</option>
+          <option value="online">網上登記</option>
+        </select>
+      </div>
+      <div class="modal-field"><label>介紹人會員編號</label><input id="eReferrer" placeholder="CE85-XXXXXX"></div>
+      <div class="modal-field"><label>有效日期</label><input id="eExpires" type="date"></div>
+      <div class="modal-field"><label>Roadshow 地點</label><input id="eRoadshowLoc"></div>
+      <div class="modal-field full"><label>會員備註（會員可見）</label><textarea id="eNotes"></textarea></div>
+      <div class="modal-field full"><label>內部備註（僅管理員）</label><textarea id="eAdminNotes"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-grey" onclick="closeModal()">取消</button>
+      <button class="btn btn-red" onclick="deleteMember()">🗑 刪除</button>
+      <button class="btn btn-green" onclick="saveEdit()">💾 儲存</button>
+    </div>
   </div>
-  <div class="pagination" id="pagination"></div>
 </div>
 
 <script>
-var currentPage = 1;
-var totalPages = 1;
+var currentPage=1, totalPages=1;
+var srcLabel={'walk-in':'Walk-in','roadshow':'Roadshow','referral':'會員介紹','whatsapp':'WhatsApp','social':'社交媒體','institution':'機構轉介','online':'網上登記'};
 
-async function loadStats(){
-  var r = await fetch('/api/admin/stats');
-  var d = await r.json();
-  if(d.ok){
-    document.getElementById('sTotal').textContent = d.stats.total;
-    document.getElementById('sPrimary').textContent = d.stats.primary;
-    document.getElementById('sFamily').textContent = d.stats.family;
-    document.getElementById('sPending').textContent = d.stats.pending;
-  }
+// ── Tab switching
+function switchTab(t){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+t).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if(t==='dashboard') loadStats();
+  if(t==='members') loadMembers(1);
 }
 
+// ── Stats + Charts
+async function loadStats(){
+  var r=await fetch('/api/admin/stats'); var d=await r.json(); if(!d.ok)return;
+  var s=d.stats;
+  document.getElementById('sTotal').textContent=s.total;
+  document.getElementById('sActive').textContent='活躍：'+s.active+' / 停用：'+s.inactive;
+  document.getElementById('sPrimary').textContent=s.primary;
+  document.getElementById('sFamily').textContent=s.family;
+  document.getElementById('sPending').textContent=s.pending;
+  document.getElementById('sToday').textContent=s.todayNew;
+  document.getElementById('sMonth').textContent=s.monthNew;
+  // Source bars
+  var max=Math.max(1,...(s.bySource||[]).map(x=>x.cnt));
+  document.getElementById('chartSource').innerHTML=(s.bySource||[]).map(x=>\`
+    <div class="bar-row">
+      <div class="bar-label">\${srcLabel[x.source]||x.source}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:\${Math.round(x.cnt/max*100)}%"></div></div>
+      <div class="bar-val">\${x.cnt}</div>
+    </div>\`).join('');
+  // District bars
+  var maxD=Math.max(1,...(s.byDistrict||[]).map(x=>x.cnt));
+  document.getElementById('chartDistrict').innerHTML=(s.byDistrict||[]).map(x=>\`
+    <div class="bar-row">
+      <div class="bar-label">\${x.district||'未填'}</div>
+      <div class="bar-track"><div class="bar-fill red" style="width:\${Math.round(x.cnt/maxD*100)}%"></div></div>
+      <div class="bar-val">\${x.cnt}</div>
+    </div>\`).join('');
+  // Monthly trend
+  var months=[...(s.byMonth||[])].reverse();
+  var maxM=Math.max(1,...months.map(x=>x.cnt));
+  document.getElementById('chartMonth').innerHTML=months.map(x=>{
+    var h=Math.round(x.cnt/maxM*100);
+    return \`<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:4px;">
+      <div style="font-size:10px;color:#aaa;font-family:'Space Grotesk',sans-serif;">\${x.cnt}</div>
+      <div style="width:100%;background:var(--forest);border-radius:3px 3px 0 0;height:\${h}px;"></div>
+      <div style="font-size:9px;color:#aaa;transform:rotate(-45deg);white-space:nowrap;">\${x.month}</div>
+    </div>\`;
+  }).join('');
+}
+
+// ── Members list
 async function loadMembers(page){
-  currentPage = page || 1;
-  var search = document.getElementById('search').value.trim();
-  var tier = document.getElementById('filterTier').value;
-  var kyc = document.getElementById('filterKyc').value;
-  var params = new URLSearchParams({page:currentPage,limit:50});
-  if(search) params.set('search',search);
-  if(tier) params.set('tier',tier);
-  if(kyc) params.set('kyc_status',kyc);
-  var r = await fetch('/api/admin/members?'+params.toString());
-  var d = await r.json();
-  if(!d.ok) return;
-  totalPages = Math.ceil(d.total/50)||1;
-  document.getElementById('searchCount').textContent = '共 '+d.total+' 筆記錄';
-  var tbody = document.getElementById('membersTbody');
-  tbody.innerHTML = d.members.map(m => \`
-    <tr>
-      <td><strong>\${m.member_no}</strong></td>
-      <td><span class="badge \${m.tier==='PRIMARY'?'primary':'family'}">\${m.tier==='PRIMARY'?'主卡':'家庭'}</span></td>
+  currentPage=page||1;
+  var p=new URLSearchParams({page:currentPage,limit:50});
+  var s=document.getElementById('search').value.trim();
+  var t=document.getElementById('filterTier').value;
+  var st=document.getElementById('filterStatus').value;
+  var src=document.getElementById('filterSource').value;
+  if(s)p.set('search',s); if(t)p.set('tier',t);
+  if(st)p.set('status',st); if(src)p.set('source',src);
+  var r=await fetch('/api/admin/members?'+p); var d=await r.json(); if(!d.ok)return;
+  totalPages=Math.ceil(d.total/50)||1;
+  document.getElementById('searchCount').textContent='共 '+d.total+' 筆記錄';
+  document.getElementById('membersTbody').innerHTML=d.members.map(m=>\`
+    <tr class="\${m.status==='INACTIVE'?'inactive':''}">
+      <td><a href="/membership/card/\${m.member_no}" target="_blank" style="color:var(--forest);font-weight:700;">\${m.member_no}</a></td>
+      <td><span class="badge badge-\${(m.status||'active').toLowerCase()}">\${m.status||'ACTIVE'}</span></td>
+      <td><span class="badge badge-\${m.tier==='PRIMARY'?'primary':'family'}">\${m.tier==='PRIMARY'?'主卡':'家庭'}</span></td>
       <td>\${m.name_zh}</td>
-      <td>\${m.phone}</td>
-      <td>\${m.role||'CoExplorery'}</td>
-      <td><span class="badge \${m.kyc_status==='DONE'?'done':'pending'}">\${m.kyc_status}</span></td>
-      <td>\${m.roadshow||'walk-in'}</td>
+      <td><a href="tel:+852\${m.phone}" style="color:inherit;">\${m.phone}</a></td>
+      <td>\${m.district||'—'}</td>
+      <td style="font-size:11px;">\${m.role||'CoExplorery'}</td>
+      <td><span class="badge badge-\${m.kyc_status==='DONE'?'done':'pending'}">\${m.kyc_status}</span></td>
+      <td style="font-size:11px;">\${srcLabel[m.source]||m.source||'—'}</td>
+      <td style="font-size:11px;">\${m.referrer_no||'—'}</td>
       <td>\${(m.expires_at||'').slice(0,10)}</td>
-      <td>\${(m.created_at||'').slice(0,16).replace('T',' ')}</td>
-      <td><button onclick="approveKyc('\${m.member_no}')" style="padding:4px 8px;background:var(--forest);color:#fff;border:0;cursor:pointer;font-size:11px;">KYC ✓</button></td>
-    </tr>
-  \`).join('');
+      <td style="font-size:11px;">\${(m.created_at||'').slice(0,16).replace('T',' ')}</td>
+      <td>
+        <button class="act-btn act-edit" onclick="openEdit(\${JSON.stringify(m).replace(/"/g,'&quot;')})">編輯</button>
+        \${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc(\''+m.member_no+'\')">KYC✓</button>':''}
+        \${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="toggleStatus(\''+m.member_no+'\',\'INACTIVE\')">停用</button>':
+          m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="toggleStatus(\''+m.member_no+'\',\'ACTIVE\')">啟用</button>':''}
+      </td>
+    </tr>\`).join('');
   renderPagination();
 }
 
 function renderPagination(){
-  var el = document.getElementById('pagination');
-  var pages = [];
-  for(var i=1;i<=totalPages;i++) pages.push(i);
-  el.innerHTML = pages.map(p => \`<button class="\${p===currentPage?'active':''}" onclick="loadMembers(\${p})">\${p}</button>\`).join('');
+  var el=document.getElementById('pagination');
+  var pages=[]; for(var i=1;i<=Math.min(totalPages,20);i++)pages.push(i);
+  el.innerHTML=pages.map(p=>\`<button class="\${p===currentPage?'active':''}" onclick="loadMembers(\${p})">\${p}</button>\`).join('');
 }
 
+// ── Actions
 async function approveKyc(no){
-  if(!confirm('確認標記 '+no+' 的 KYC 為 DONE？')) return;
+  if(!confirm('確認標記 '+no+' KYC 為 DONE？'))return;
   await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kyc_status:'DONE'})});
   loadMembers(currentPage);
+}
+async function toggleStatus(no,status){
+  var msg=status==='INACTIVE'?'確認停用會員 '+no+'？':'確認重新啟用 '+no+'？';
+  if(!confirm(msg))return;
+  await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+  loadMembers(currentPage);
+}
+
+// ── Edit modal
+function openEdit(m){
+  document.getElementById('editNo').value=m.member_no;
+  document.getElementById('eNameZh').value=m.name_zh||'';
+  document.getElementById('eNameEn').value=m.name_en||'';
+  document.getElementById('ePhone').value=m.phone||'';
+  document.getElementById('eGender').value=m.gender||'';
+  document.getElementById('eDistrict').value=m.district||'';
+  document.getElementById('eRole').value=m.role||'CoExplorery';
+  document.getElementById('eKyc').value=m.kyc_status||'PENDING';
+  document.getElementById('eStatus').value=m.status||'ACTIVE';
+  document.getElementById('eSource').value=m.source||'walk-in';
+  document.getElementById('eReferrer').value=m.referrer_no||'';
+  document.getElementById('eExpires').value=(m.expires_at||'').slice(0,10);
+  document.getElementById('eRoadshowLoc').value=m.roadshow_location||'';
+  document.getElementById('eNotes').value=m.notes||'';
+  document.getElementById('eAdminNotes').value=m.admin_notes||'';
+  document.getElementById('editModal').classList.add('show');
+}
+function closeModal(){ document.getElementById('editModal').classList.remove('show'); }
+document.getElementById('editModal').addEventListener('click',function(e){ if(e.target===this)closeModal(); });
+
+async function saveEdit(){
+  var no=document.getElementById('editNo').value;
+  var body={
+    name_zh:document.getElementById('eNameZh').value,
+    name_en:document.getElementById('eNameEn').value,
+    phone:document.getElementById('ePhone').value,
+    gender:document.getElementById('eGender').value,
+    district:document.getElementById('eDistrict').value,
+    role:document.getElementById('eRole').value,
+    kyc_status:document.getElementById('eKyc').value,
+    status:document.getElementById('eStatus').value,
+    source:document.getElementById('eSource').value,
+    referrer_no:document.getElementById('eReferrer').value,
+    expires_at:document.getElementById('eExpires').value,
+    roadshow_location:document.getElementById('eRoadshowLoc').value,
+    notes:document.getElementById('eNotes').value,
+    admin_notes:document.getElementById('eAdminNotes').value
+  };
+  var r=await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  var d=await r.json();
+  if(d.ok){closeModal();loadMembers(currentPage);}
+  else alert('儲存失敗：'+(d.error||'未知錯誤'));
+}
+
+async function deleteMember(){
+  var no=document.getElementById('editNo').value;
+  if(!confirm('⚠️ 確認永久刪除會員 '+no+'？\\n此操作不可復原，資料將被標記為 DELETED。'))return;
+  var r=await fetch('/api/admin/members/'+no,{method:'DELETE'});
+  var d=await r.json();
+  if(d.ok){closeModal();loadMembers(currentPage);}
+  else alert('刪除失敗');
 }
 
 function clearFilters(){
   document.getElementById('search').value='';
   document.getElementById('filterTier').value='';
-  document.getElementById('filterKyc').value='';
+  document.getElementById('filterStatus').value='';
+  document.getElementById('filterSource').value='';
   loadMembers(1);
+}
+
+function exportCsv(){
+  var p=new URLSearchParams({export:'csv',limit:9999});
+  var s=document.getElementById('search').value.trim();
+  var t=document.getElementById('filterTier').value;
+  var st=document.getElementById('filterStatus').value;
+  var src=document.getElementById('filterSource').value;
+  if(s)p.set('search',s); if(t)p.set('tier',t);
+  if(st)p.set('status',st); if(src)p.set('source',src);
+  window.open('/api/admin/members?'+p,'_blank');
 }
 
 document.getElementById('search').addEventListener('keydown',function(e){if(e.key==='Enter')loadMembers(1);});
 
+// Init: load dashboard
 loadStats();
-loadMembers(1);
 </script>
 </body></html>`
 }
