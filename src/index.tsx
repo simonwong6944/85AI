@@ -644,7 +644,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .medical-cta-sub{font-size:12px;color:#5C6BC0;line-height:1.5;}
 .medical-cta-arrow{font-size:20px;color:#1565C0;padding-right:14px;flex-shrink:0;transition:transform 0.2s;}
 .medical-cta-arrow.open{transform:rotate(180deg);}
-.medical-extra{display:none;padding:16px;background:#fff;}
+.medical-extra{display:block;padding:16px;background:#fff;}
 .medical-extra.show{display:block;}
 .medical-extra .notice{background:#FFF8E1;border-left:3px solid #F9A825;padding:10px 12px;font-size:12px;color:#5D4037;line-height:1.6;margin-bottom:16px;border-radius:0 4px 4px 0;}
 .medical-extra .field label{color:#1565C0;}
@@ -721,16 +721,16 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
           </div>
           <div class="mh-badge">✦ 免費</div>
         </div>
-        <div class="medical-cta" onclick="document.getElementById('applyMedical').click();toggleMedical(document.getElementById('applyMedical'))">
+        <div class="medical-cta" id="medCta" style="background:#C8D8FA" onclick="document.getElementById('applyMedical').click();toggleMedical(document.getElementById('applyMedical'))">
           <label onclick="event.preventDefault()">
             <div class="medical-cta-check">
-              <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)" onclick="event.stopPropagation()">
+              <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)" onclick="event.stopPropagation()" checked>
             </div>
             <div class="medical-cta-text">
-              <div class="medical-cta-main">✅ 點擊此處申請免費醫健卡</div>
+              <div class="medical-cta-main">✅ 已勾選申請免費醫健卡</div>
               <div class="medical-cta-sub">一次登記，同時擁有老有卡 + 醫健卡 · NGO 職員以 WhatsApp 聯絡辦理</div>
             </div>
-            <div class="medical-cta-arrow" id="medArrow">▼</div>
+            <div class="medical-cta-arrow open" id="medArrow">▼</div>
           </label>
         </div>
         <div class="medical-extra" id="medicalExtra">
@@ -831,7 +831,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </div>
 
       <button type="button" class="submit-btn" id="submitBtn" onclick="submitForm()">
-        立即登記
+        立即登記（兩卡同申）
       </button>
 
       <div class="footer-links">
