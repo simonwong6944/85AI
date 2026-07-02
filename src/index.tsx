@@ -599,7 +599,8 @@ function signupMainHtml() {
 body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .container{max-width:420px;margin:0 auto;}
 .brand-strip{display:flex;align-items:center;gap:12px;margin-bottom:24px;}
-.brand-strip .mark{width:44px;height:44px;background:var(--forest-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Noto Serif TC",serif;font-weight:900;font-size:18px;border-radius:6px;}
+.brand-strip .mark{width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.brand-strip .mark img{width:44px;height:44px;object-fit:contain;}
 .brand-strip .name .zh{font-family:"Noto Serif TC",serif;font-size:16px;color:var(--forest-deep);font-weight:700;letter-spacing:2px;line-height:1;}
 .brand-strip .name .en{font-size:11px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
 .header-card{background:linear-gradient(135deg,#0d3e12 0%,#1B5E20 100%);color:#fff;padding:24px 22px;border-radius:4px;margin-bottom:20px;position:relative;overflow:hidden;}
@@ -689,7 +690,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 <body>
 <div class="container">
   <div class="brand-strip">
-    <div class="mark">老</div>
+    <div class="mark"><img src="/static/logo-coeldery.png" alt="CoEldery 85"></div>
     <div class="name">
       <div class="zh">CoEldery 85 老有聯盟</div>
       <div class="en">COELDERY 85 · MEMBERSHIP</div>
@@ -741,14 +742,14 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
               <label for="medNameZh">中文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
               <span class="req">✽ 必填</span>
             </div>
-            <input id="medNameZh" type="text" placeholder="例：陳大文">
+            <input id="medNameZh" type="text" placeholder="例：陳大文" oninput="syncNameFromMedical()">
           </div>
           <div class="field">
             <div class="label-row">
               <label for="medNameEn">英文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
               <span class="req">✽ 必填</span>
             </div>
-            <input id="medNameEn" type="text" placeholder="例：CHAN TAI MAN" style="text-transform:uppercase;">
+            <input id="medNameEn" type="text" placeholder="例：CHAN TAI MAN" style="text-transform:uppercase;" oninput="syncNameFromMedical()">
             <div class="hint">請使用全大楷，與身份證英文姓名一致</div>
           </div>
           <div class="field">
@@ -769,16 +770,20 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </div>
 
       <div class="form-card">
-        <div class="step-note">
-          <strong>★ 必填資料</strong>：只需中文姓名同 WhatsApp 電話，30秒完成
-        </div>
-
         <div class="field">
           <div class="label-row">
             <label for="nameZh">中文姓名</label>
             <span class="req">✽ 必填</span>
           </div>
-          <input id="nameZh" type="text" placeholder="例：陳大文" autocomplete="name">
+          <input id="nameZh" type="text" placeholder="例：陳大文" autocomplete="name" oninput="syncNameFromMain()">
+        </div>
+
+        <div class="field">
+          <div class="label-row">
+            <label for="nameEn">英文姓名</label>
+            <span class="req">✽ 必填</span>
+          </div>
+          <input id="nameEn" type="text" placeholder="例：CHAN TAI MAN" autocomplete="name" style="text-transform:uppercase;" oninput="syncNameFromMain()">
         </div>
 
         <div class="field">
@@ -790,18 +795,8 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
           <div class="hint">只限香港 8 位電話號碼</div>
         </div>
 
-        <div class="section-divider">
-          選填資料
-          <span class="optnote">可以之後補填</span>
-        </div>
-
         <div class="field">
-          <div class="label-row"><label for="nameEn">英文姓名</label><span class="opt">選填</span></div>
-          <input id="nameEn" type="text" placeholder="例：CHAN TAI MAN" autocomplete="name" style="text-transform:uppercase;">
-        </div>
-
-        <div class="field">
-          <div class="label-row"><label>性別</label><span class="opt">選填</span></div>
+          <div class="label-row"><label>性別</label><span class="req">✽ 必填</span></div>
           <div class="gender-row">
             <button type="button" class="g-btn" data-v="M" onclick="setGender('M',this)">男 M</button>
             <button type="button" class="g-btn" data-v="F" onclick="setGender('F',this)">女 F</button>
@@ -810,13 +805,13 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
         </div>
 
         <div class="field">
-          <div class="label-row"><label for="birthYear">出生年份</label><span class="opt">選填</span></div>
+          <div class="label-row"><label for="birthYear">出生年份</label><span class="req">✽ 必填</span></div>
           <input id="birthYear" type="number" placeholder="例：1960" inputmode="numeric" min="1920" max="1972">
-          <div class="hint">主卡建議 1972 年或以前（55歲+）</div>
+          <div class="hint">請填寫 1972 年或以前（55歲或以上）</div>
         </div>
 
         <div class="field">
-          <div class="label-row"><label for="district">居住地區</label><span class="opt">選填</span></div>
+          <div class="label-row"><label for="district">居住地區</label><span class="req">✽ 必填</span></div>
           <select id="district">
             <option value="">— 請選擇 —</option>
             <option>中西區</option><option>灣仔</option><option>東區</option><option>南區</option>
@@ -912,6 +907,23 @@ function setGender(v, btn) {
   btn.classList.add('active');
 }
 
+function syncNameFromMain() {
+  // When user types in main form nameZh/nameEn, sync to medical card fields if medical is checked
+  if (!document.getElementById('applyMedical').checked) return;
+  var zh = document.getElementById('nameZh').value.trim();
+  var en = document.getElementById('nameEn').value.trim().toUpperCase();
+  if (zh) document.getElementById('medNameZh').value = zh;
+  if (en) document.getElementById('medNameEn').value = en;
+}
+
+function syncNameFromMedical() {
+  // When user types in medical card nameZh/nameEn, sync to main form fields
+  var zh = document.getElementById('medNameZh').value.trim();
+  var en = document.getElementById('medNameEn').value.trim().toUpperCase();
+  if (zh) document.getElementById('nameZh').value = zh;
+  if (en) document.getElementById('nameEn').value = en;
+}
+
 function toggleMedical(cb) {
   var extra = document.getElementById('medicalExtra');
   var arrow = document.getElementById('medArrow');
@@ -920,11 +932,11 @@ function toggleMedical(cb) {
     extra.classList.add('show');
     if(arrow) arrow.classList.add('open');
     if(cta) cta.style.background='#C8D8FA';
-    // Pre-fill from main form
+    // Pre-fill medical fields from main form
     var zh = document.getElementById('nameZh').value.trim();
     var en = document.getElementById('nameEn').value.trim().toUpperCase();
-    if (zh && !document.getElementById('medNameZh').value) document.getElementById('medNameZh').value = zh;
-    if (en && !document.getElementById('medNameEn').value) document.getElementById('medNameEn').value = en;
+    if (zh) document.getElementById('medNameZh').value = zh;
+    if (en) document.getElementById('medNameEn').value = en;
     document.getElementById('submitBtn').textContent = '立即登記（兩卡同申）';
     extra.scrollIntoView({behavior:'smooth', block:'nearest'});
   } else {
@@ -949,8 +961,16 @@ async function submitForm() {
   var consent = document.getElementById('consent').checked;
   var applyMedical = document.getElementById('applyMedical').checked;
 
+  var nameEn = document.getElementById('nameEn').value.trim().toUpperCase();
+  var birthYear = parseInt(document.getElementById('birthYear').value || '0');
+  var district = document.getElementById('district').value;
   if (!nameZh) { showErr('請填寫中文姓名'); return; }
+  if (!nameEn) { showErr('請填寫英文姓名（與身份證相同）'); return; }
   if (phone.length !== 8) { showErr('請填寫正確的 8 位香港電話'); return; }
+  if (!selectedGender) { showErr('請選擇性別'); return; }
+  if (!birthYear || birthYear > 1972) { showErr('請填寫出生年份（1972年或以前，即55歲或以上）'); return; }
+  if (birthYear < 1920) { showErr('請填寫正確的出生年份'); return; }
+  if (!district) { showErr('請選擇居住地區'); return; }
   if (!consent) { showErr('請同意私隱政策'); return; }
 
   // Validate medical card fields if opted in
@@ -980,10 +1000,10 @@ async function submitForm() {
         tier: 'PRIMARY',
         nameZh: nameZh,
         phone: phone,
-        nameEn: document.getElementById('nameEn').value.trim().toUpperCase(),
+        nameEn: nameEn,
         gender: selectedGender,
-        birthYear: document.getElementById('birthYear').value || '',
-        district: document.getElementById('district').value,
+        birthYear: birthYear.toString(),
+        district: district,
         roadshow: params.get('rs') || 'walk-in',
         applyMedical: applyMedical,
         medNameZh: medPayload?.medNameZh || '',
