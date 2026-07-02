@@ -259,12 +259,39 @@ app.get('/api/admin/stats', async (c) => {
     db.prepare("SELECT COUNT(*) as n FROM members WHERE date(created_at)=date('now')").first<{ n: number }>(),
     db.prepare("SELECT COUNT(*) as n FROM members WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now')").first<{ n: number }>(),
   ])
-  const [bySource, byDistrict, byMonth, byGender, medStats] = await Promise.all([
+  const [bySource, byDistrict, byMonth, byGender, medStats, byRoadshow, byReferrer] = await Promise.all([
     db.prepare("SELECT source, COUNT(*) as cnt FROM members GROUP BY source ORDER BY cnt DESC").all(),
     db.prepare("SELECT district, COUNT(*) as cnt FROM members WHERE district!='' GROUP BY district ORDER BY cnt DESC LIMIT 10").all(),
     db.prepare("SELECT strftime('%Y-%m',created_at) as month, COUNT(*) as cnt FROM members GROUP BY month ORDER BY month DESC LIMIT 12").all(),
     db.prepare("SELECT gender, COUNT(*) as cnt FROM members GROUP BY gender ORDER BY cnt DESC").all(),
     db.prepare("SELECT status, COUNT(*) as cnt FROM medical_card_applications GROUP BY status").all(),
+    // Roadshow/institution breakdown: group by roadshow code + location, show count + latest join date
+    db.prepare(`
+      SELECT roadshow,
+             roadshow_location,
+             source,
+             COUNT(*) as cnt,
+             MAX(created_at) as latest,
+             SUM(CASE WHEN date(created_at)=date('now') THEN 1 ELSE 0 END) as today_cnt
+      FROM members
+      WHERE roadshow != 'walk-in' AND roadshow != ''
+      GROUP BY roadshow
+      ORDER BY latest DESC
+      LIMIT 30
+    `).all(),
+    // Top referrers: members who referred the most others
+    db.prepare(`
+      SELECT r.referrer_no,
+             m.name_zh,
+             COUNT(*) as cnt,
+             MAX(r.created_at) as latest
+      FROM members r
+      LEFT JOIN members m ON m.member_no = r.referrer_no
+      WHERE r.referrer_no != '' AND r.referrer_no IS NOT NULL
+      GROUP BY r.referrer_no
+      ORDER BY cnt DESC
+      LIMIT 15
+    `).all(),
   ])
   return c.json({
     ok: true,
@@ -281,7 +308,9 @@ app.get('/api/admin/stats', async (c) => {
       byDistrict: byDistrict.results,
       byMonth: byMonth.results,
       byGender: byGender.results,
-      medStats: medStats.results
+      medStats: medStats.results,
+      byRoadshow: byRoadshow.results,
+      byReferrer: byReferrer.results,
     }
   })
 })
@@ -1835,6 +1864,28 @@ tr.inactive td{opacity:0.45;}
       <div class="chart-title">📈 每月新增會員趨勢（近12個月）</div>
       <div id="chartMonth" style="display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:8px;"></div>
     </div>
+
+    <!-- Roadshow / Source breakdown -->
+    <div class="chart-card" style="margin-bottom:24px;">
+      <div class="chart-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>🏪 Roadshow &amp; 機構場次登記摘要</span>
+        <span style="font-size:10px;font-weight:400;color:#aaa;letter-spacing:0;text-transform:none;">點擊場次可跳至會員列表篩選</span>
+      </div>
+      <div id="chartRoadshow">
+        <div style="color:#ccc;font-size:12px;padding:12px 0;">載入中…</div>
+      </div>
+    </div>
+
+    <!-- Referrer leaderboard -->
+    <div class="chart-card" style="margin-bottom:24px;">
+      <div class="chart-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>👤 介紹人排行榜 Top 15</span>
+        <span style="font-size:10px;font-weight:400;color:#aaa;letter-spacing:0;text-transform:none;">點擊介紹人可跳至會員列表篩選</span>
+      </div>
+      <div id="chartReferrer">
+        <div style="color:#ccc;font-size:12px;padding:12px 0;">載入中…</div>
+      </div>
+    </div>
   </div>
 
   <!-- ── MEMBERS PAGE ── -->
@@ -2445,6 +2496,124 @@ async function loadStats(){
       <div style="font-size:9px;color:#aaa;transform:rotate(-45deg);white-space:nowrap;">\${x.month}</div>
     </div>\`;
   }).join('');
+
+  // ── Roadshow / institution breakdown table
+  var rsData = s.byRoadshow || [];
+  var srcTagStyle = {
+    'roadshow':'background:#E8F5E9;color:#1B5E20;',
+    'institution':'background:#E3F2FD;color:#0D47A1;',
+    'online':'background:#F3E5F5;color:#4A148C;',
+    'referral':'background:#FFF3E0;color:#E65100;'
+  };
+  var srcTagLabel = {'roadshow':'Roadshow','institution':'機構','online':'網上','referral':'介紹'};
+  if(!rsData.length){
+    document.getElementById('chartRoadshow').innerHTML='<div style="color:#aaa;font-size:12px;padding:8px 0;">暫無 Roadshow / 機構場次記錄（透過 QR 連結登記後才會出現）</div>';
+  } else {
+    document.getElementById('chartRoadshow').innerHTML=\`
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="border-bottom:2px solid #eee;">
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;">場次代碼</th>
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">地點 / 名稱</th>
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">類型</th>
+          <th style="text-align:right;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">今日</th>
+          <th style="text-align:right;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">累計登記</th>
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">最新登記</th>
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">操作</th>
+        </tr></thead>
+        <tbody>
+        \${rsData.map(function(r){
+          var tagStyle = srcTagStyle[r.source]||'background:#f5f5f5;color:#666;';
+          var tagLabel = srcTagLabel[r.source]||r.source||'—';
+          var latestStr = (r.latest||'').slice(0,16).replace('T',' ');
+          var todayBadge = r.today_cnt > 0
+            ? \`<span style="background:#E8F5E9;color:#2E7D32;font-weight:700;padding:1px 6px;border-radius:8px;font-size:10px;">+\${r.today_cnt} 今日</span>\`
+            : '<span style="color:#ccc;font-size:11px;">—</span>';
+          return \`<tr style="border-bottom:1px solid #f5f5f5;" onmouseover="this.style.background='#f9fffe'" onmouseout="this.style.background=''">
+            <td style="padding:8px 10px;font-family:monospace;font-weight:700;font-size:11px;letter-spacing:1px;color:var(--forest-deep);">\${r.roadshow}</td>
+            <td style="padding:8px 10px;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\${r.roadshow_location||'—'}</td>
+            <td style="padding:8px 10px;"><span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;\${tagStyle}">\${tagLabel}</span></td>
+            <td style="padding:8px 10px;text-align:right;">\${todayBadge}</td>
+            <td style="padding:8px 10px;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--forest-deep);">\${r.cnt}</td>
+            <td style="padding:8px 10px;font-size:11px;color:#888;">\${latestStr}</td>
+            <td style="padding:8px 10px;">
+              <button class="act-btn act-edit" style="font-size:10px;" onclick="jumpToMembersRoadshow('\${r.roadshow}')">查看會員</button>
+            </td>
+          </tr>\`;
+        }).join('')}
+        </tbody>
+      </table>
+      </div>\`;
+  }
+
+  // ── Referrer leaderboard
+  var refData = s.byReferrer || [];
+  if(!refData.length){
+    document.getElementById('chartReferrer').innerHTML='<div style="color:#aaa;font-size:12px;padding:8px 0;">暫無介紹人記錄（透過 QR 介紹連結登記後才會出現）</div>';
+  } else {
+    var maxRef = Math.max(1, ...refData.map(function(r){ return r.cnt; }));
+    document.getElementById('chartReferrer').innerHTML=\`
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="border-bottom:2px solid #eee;">
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:28px;">#</th>
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">會員編號</th>
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">姓名</th>
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;min-width:160px;">介紹人數</th>
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">最新介紹</th>
+          <th style="text-align:left;padding:6px 10px;color:#888;font-size:10px;letter-spacing:1px;text-transform:uppercase;">操作</th>
+        </tr></thead>
+        <tbody>
+        \${refData.map(function(r, idx){
+          var pct = Math.round(r.cnt / maxRef * 100);
+          var medal = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'';
+          var latestStr = (r.latest||'').slice(0,10);
+          return \`<tr style="border-bottom:1px solid #f5f5f5;" onmouseover="this.style.background='#f9fffe'" onmouseout="this.style.background=''">
+            <td style="padding:8px 10px;font-size:13px;">\${medal||(idx+1)}</td>
+            <td style="padding:8px 10px;">
+              <a href="/membership/card/\${r.referrer_no}" target="_blank" style="color:var(--forest);font-weight:700;font-family:monospace;">\${r.referrer_no}</a>
+            </td>
+            <td style="padding:8px 10px;font-weight:600;">\${r.name_zh||'—'}</td>
+            <td style="padding:8px 10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="flex:1;background:#f0f0f0;border-radius:3px;height:12px;overflow:hidden;min-width:80px;">
+                  <div style="height:100%;background:var(--forest);border-radius:3px;width:\${pct}%;"></div>
+                </div>
+                <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:var(--forest-deep);min-width:24px;">\${r.cnt}</span>
+                <span style="font-size:10px;color:#aaa;">人</span>
+              </div>
+            </td>
+            <td style="padding:8px 10px;font-size:11px;color:#888;">\${latestStr}</td>
+            <td style="padding:8px 10px;">
+              <button class="act-btn act-edit" style="font-size:10px;" onclick="jumpToMembersReferrer('\${r.referrer_no}')">查看被介紹會員</button>
+            </td>
+          </tr>\`;
+        }).join('')}
+        </tbody>
+      </table>
+      </div>\`;
+  }
+}
+
+// ── Dashboard jump helpers
+function jumpToMembersRoadshow(rsCode){
+  // switch to members tab, set search to roadshow code, reload
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-tab').forEach(function(n){ n.classList.remove('active'); });
+  document.getElementById('page-members').classList.add('active');
+  document.querySelectorAll('.nav-tab')[1].classList.add('active');
+  document.getElementById('search').value = rsCode;
+  document.getElementById('filterSource').value = '';
+  loadMembers(1);
+}
+function jumpToMembersReferrer(refNo){
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-tab').forEach(function(n){ n.classList.remove('active'); });
+  document.getElementById('page-members').classList.add('active');
+  document.querySelectorAll('.nav-tab')[1].classList.add('active');
+  document.getElementById('search').value = refNo;
+  document.getElementById('filterSource').value = 'referral';
+  loadMembers(1);
 }
 
 // ── Members list
