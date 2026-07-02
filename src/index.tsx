@@ -653,8 +653,6 @@ function renderCardImage(data, tier) {
   // Real logo image: 1024×410 → draw at 160×64 with white bg pill
   var logoX=18, logoY=stripeH+8;
   var logoW=160, logoH=64;
-  ctx.fillStyle='#ffffff';
-  ctx.beginPath(); roundRect(ctx, logoX-4, logoY-4, logoW+8, logoH+8, 6); ctx.fill();
   ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
 
   // Vertical divider
@@ -786,7 +784,7 @@ function renderCardImage(data, tier) {
     if(cssCard){ cssCard.style.display='none'; }
   },'image/jpeg',0.95);
   }; // end logoImg.onload
-  logoImg.src = '/static/logo.jpg';
+  logoImg.src = '/static/logo.png';
 }
 
 // Helper: rounded rectangle path
@@ -1065,8 +1063,6 @@ function renderCardImage(data, tier) {
   ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
   var logoX=18,logoY=stripeH+8,logoW=160,logoH=64;
-  ctx.fillStyle='#ffffff';
-  ctx.beginPath(); roundRect(ctx,logoX-4,logoY-4,logoW+8,logoH+8,6); ctx.fill();
   ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
   ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
   ctx.beginPath(); ctx.moveTo(logoX+logoW+14,logoY+4); ctx.lineTo(logoX+logoW+14,logoY+logoH-4); ctx.stroke();
@@ -1114,7 +1110,7 @@ function renderCardImage(data, tier) {
     var cssCard=document.getElementById('genCard'); if(cssCard)cssCard.style.display='none';
   },'image/jpeg',0.95);
   }; // end logoImg.onload
-  logoImg.src='/static/logo.jpg';
+  logoImg.src='/static/logo.png';
 }
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
 function saveCardImage(){
@@ -1808,8 +1804,6 @@ function renderCardImage(data, tier) {
   ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
   var logoX=18,logoY=stripeH+8,logoW=160,logoH=64;
-  ctx.fillStyle='#ffffff';
-  ctx.beginPath(); roundRect(ctx,logoX-4,logoY-4,logoW+8,logoH+8,6); ctx.fill();
   ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
   ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
   ctx.beginPath(); ctx.moveTo(logoX+logoW+14,logoY+4); ctx.lineTo(logoX+logoW+14,logoY+logoH-4); ctx.stroke();
@@ -1856,7 +1850,7 @@ function renderCardImage(data, tier) {
     if(img){img.src=url; img.style.opacity='1';}
   },'image/jpeg',0.95);
   }; // end logoImg.onload
-  logoImg.src='/static/logo.jpg';
+  logoImg.src='/static/logo.png';
 }
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
 function saveCardImage(){
@@ -2194,8 +2188,6 @@ function renderCardImage(data, tier) {
   ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
   ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
   var logoX=18,logoY=stripeH+8,logoW=160,logoH=64;
-  ctx.fillStyle='#ffffff';
-  ctx.beginPath(); roundRect(ctx,logoX-4,logoY-4,logoW+8,logoH+8,6); ctx.fill();
   ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
   ctx.strokeStyle=accentDark; ctx.lineWidth=1.5;
   ctx.beginPath(); ctx.moveTo(logoX+logoW+14,logoY+4); ctx.lineTo(logoX+logoW+14,logoY+logoH-4); ctx.stroke();
@@ -2243,7 +2235,7 @@ function renderCardImage(data, tier) {
     var cssCard=document.getElementById('genCard'); if(cssCard)cssCard.style.display='none';
   },'image/jpeg',0.95);
   }; // end logoImg.onload
-  logoImg.src='/static/logo.jpg';
+  logoImg.src='/static/logo.png';
 }
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
 function saveCardImage(){
