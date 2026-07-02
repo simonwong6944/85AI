@@ -266,8 +266,8 @@ app.patch('/api/members/:no/profile', async (c) => {
 app.get('/', (c) => c.html(dashboardHtml()))
 
 // ─── Membership module: /membership/* ────────────────────────────────────────
-app.get('/membership',          (c) => c.redirect('/membership/login', 301))
-app.get('/membership/login',    (c) => c.html(loginHtml()))
+app.get('/membership',          (c) => c.html(homeHtml()))
+app.get('/membership/login',    (c) => c.html(homeHtml()))
 app.get('/membership/join',     (c) => c.html(signupMainHtml()))
 app.get('/membership/join-family', (c) => c.html(signupSubHtml()))
 app.get('/membership/admin',    (c) => c.html(adminHtml()))
@@ -286,7 +286,7 @@ app.get('/events',      (c) => c.html(comingSoonHtml('Events', '活動管理')))
 app.get('/volunteers',  (c) => c.html(comingSoonHtml('Volunteers', '義工管理')))
 
 // ─── Legacy redirects (old URLs → new URLs, keeps old links working) ──────────
-app.get('/login',       (c) => c.redirect('/membership/login', 301))
+app.get('/login',       (c) => c.redirect('/membership', 301))
 app.get('/join',        (c) => c.redirect('/membership/join', 301))
 app.get('/join-family', (c) => c.redirect('/membership/join-family', 301))
 app.get('/admin',       (c) => c.redirect('/membership/admin', 301))
