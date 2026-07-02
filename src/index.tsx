@@ -230,8 +230,9 @@ app.get('/api/admin/members', async (c) => {
   }
 
   const rows = await db.prepare(
-    `SELECT member_no, tier, status, name_zh, name_en, phone, gender, district,
-            role, kyc_status, source, referrer_no, roadshow, roadshow_location,
+    `SELECT member_no, tier, status, name_zh, name_en, phone, gender, birth_year,
+            district, id_prefix, role, kyc_status, source, referrer_no, roadshow,
+            roadshow_location, parent_no, parent_name, relation,
             expires_at, created_at, notes, admin_notes
      FROM members ${where}
      ORDER BY created_at DESC LIMIT ? OFFSET ?`
@@ -258,10 +259,12 @@ app.get('/api/admin/stats', async (c) => {
     db.prepare("SELECT COUNT(*) as n FROM members WHERE date(created_at)=date('now')").first<{ n: number }>(),
     db.prepare("SELECT COUNT(*) as n FROM members WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now')").first<{ n: number }>(),
   ])
-  const [bySource, byDistrict, byMonth] = await Promise.all([
+  const [bySource, byDistrict, byMonth, byGender, medStats] = await Promise.all([
     db.prepare("SELECT source, COUNT(*) as cnt FROM members GROUP BY source ORDER BY cnt DESC").all(),
     db.prepare("SELECT district, COUNT(*) as cnt FROM members WHERE district!='' GROUP BY district ORDER BY cnt DESC LIMIT 10").all(),
     db.prepare("SELECT strftime('%Y-%m',created_at) as month, COUNT(*) as cnt FROM members GROUP BY month ORDER BY month DESC LIMIT 12").all(),
+    db.prepare("SELECT gender, COUNT(*) as cnt FROM members GROUP BY gender ORDER BY cnt DESC").all(),
+    db.prepare("SELECT status, COUNT(*) as cnt FROM medical_card_applications GROUP BY status").all(),
   ])
   return c.json({
     ok: true,
@@ -276,7 +279,9 @@ app.get('/api/admin/stats', async (c) => {
       monthNew: monthNew?.n ?? 0,
       bySource: bySource.results,
       byDistrict: byDistrict.results,
-      byMonth: byMonth.results
+      byMonth: byMonth.results,
+      byGender: byGender.results,
+      medStats: medStats.results
     }
   })
 })
@@ -288,11 +293,12 @@ app.patch('/api/admin/members/:no', async (c) => {
   const body = await c.req.json<{
     kyc_status?: string; role?: string; notes?: string; admin_notes?: string;
     status?: string; name_zh?: string; name_en?: string; phone?: string;
-    gender?: string; birth_year?: number; district?: string;
-    source?: string; referrer_no?: string; roadshow_location?: string; expires_at?: string;
+    gender?: string; birth_year?: number | null; district?: string;
+    id_prefix?: string; source?: string; referrer_no?: string;
+    roadshow_location?: string; expires_at?: string;
   }>()
   const allowed = ['kyc_status','role','notes','admin_notes','status',
-    'name_zh','name_en','phone','gender','birth_year','district',
+    'name_zh','name_en','phone','gender','birth_year','id_prefix','district',
     'source','referrer_no','roadshow_location','expires_at']
   const fields: string[] = []
   const vals: any[] = []
@@ -410,8 +416,8 @@ app.patch('/api/members/:no/profile', async (c) => {
 app.get('/', (c) => c.html(dashboardHtml()))
 
 // ─── Membership module: /membership/* ────────────────────────────────────────
-app.get('/membership',          (c) => c.html(homeHtml()))
-app.get('/membership/login',    (c) => c.html(homeHtml()))
+app.get('/membership',          (c) => c.html(signupMainHtml()))
+app.get('/membership/login',    (c) => c.html(signupMainHtml()))
 app.get('/membership/join',     (c) => c.html(signupMainHtml()))
 app.get('/membership/join-family', (c) => c.html(signupSubHtml()))
 app.get('/membership/admin',    (c) => c.html(adminHtml()))
@@ -634,18 +640,18 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .medical-header .mh-title{font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:1px;}
 .medical-header .mh-sub{font-size:11px;opacity:0.85;margin-top:2px;letter-spacing:0.5px;}
 .medical-header .mh-badge{background:#FFD600;color:#1A237E;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:1px;white-space:nowrap;}
-.medical-cta{background:#E8F0FE;padding:0;cursor:pointer;border-bottom:1px solid #C5CAE9;transition:background 0.15s;}
-.medical-cta:hover{background:#D3E2FC;}
-.medical-cta label{display:flex;align-items:center;gap:0;cursor:pointer;width:100%;}
-.medical-cta-check{display:flex;align-items:center;justify-content:center;background:#1565C0;width:56px;height:64px;flex-shrink:0;}
-.medical-cta-check input[type=checkbox]{width:24px;height:24px;accent-color:#fff;cursor:pointer;}
+.medical-cta{background:#E8F0FE;border-bottom:1px solid #C5CAE9;transition:background 0.15s;}
+.medical-cta-label{display:flex;align-items:center;gap:0;cursor:pointer;width:100%;padding:0;}
+.medical-cta-check{display:flex;align-items:center;justify-content:center;background:#1565C0;width:56px;min-height:64px;flex-shrink:0;}
+.medical-cta-check input[type=checkbox]{width:24px;height:24px;accent-color:#fff;cursor:pointer;pointer-events:none;}
 .medical-cta-text{flex:1;padding:14px 14px 14px 16px;}
 .medical-cta-main{font-size:15px;color:#0D47A1;font-weight:700;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;margin-bottom:4px;}
 .medical-cta-sub{font-size:12px;color:#5C6BC0;line-height:1.5;}
 .medical-cta-arrow{font-size:20px;color:#1565C0;padding-right:14px;flex-shrink:0;transition:transform 0.2s;}
 .medical-cta-arrow.open{transform:rotate(180deg);}
 .medical-extra{display:none;padding:16px;background:#fff;}
-.medical-extra.show{display:block !important;}
+.medical-extra.show{display:block;}
+
 .medical-extra .notice{background:#FFF8E1;border-left:3px solid #F9A825;padding:10px 12px;font-size:12px;color:#5D4037;line-height:1.6;margin-bottom:16px;border-radius:0 4px 4px 0;}
 .medical-extra .field label{color:#1565C0;}
 .medical-extra .field input{border-color:#90CAF9;}
@@ -686,6 +692,30 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .wa-link{display:block;width:100%;padding:16px;background:var(--forest);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:12px;}
 .err-msg{background:var(--ferrari-pale);border:1px solid var(--ferrari);color:var(--ferrari-deep);padding:12px 16px;border-radius:4px;font-size:13px;margin-bottom:16px;display:none;}
 .err-msg.show{display:block;}
+/* ── Tab bar (Login / Register) ── */
+.tab-bar{display:grid;grid-template-columns:1fr 1fr;border-radius:6px 6px 0 0;overflow:hidden;margin-bottom:0;}
+.tab-btn{padding:14px 8px;text-align:center;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;border:none;background:var(--forest-pale);color:var(--forest-deep);transition:all 0.2s;}
+.tab-btn.active{background:var(--forest-deep);color:#fff;}
+.tab-section{display:none;}
+.tab-section.active{display:block;}
+/* ── Login panel ── */
+.login-panel{background:#fff;border-radius:0 0 6px 6px;padding:28px 22px;margin-bottom:16px;}
+.login-panel .field{margin-bottom:18px;}
+.login-panel .field label{font-family:"Noto Serif TC",serif;font-size:14px;color:var(--grey-1);font-weight:700;letter-spacing:1px;margin-bottom:7px;display:block;}
+.login-panel .field input{width:100%;padding:14px;border:2px solid var(--line);border-radius:4px;font-size:17px;font-family:inherit;color:var(--ink);background:#fff;transition:border 0.2s;box-sizing:border-box;}
+.login-panel .field input:focus{outline:0;border-color:var(--forest);}
+.login-panel .field .hint{font-size:11px;color:var(--grey-3);margin-top:5px;line-height:1.5;}
+.result-block{background:#E8F5E9;border:2px solid var(--forest);border-radius:6px;padding:20px;margin-top:16px;display:none;}
+.result-block.show{display:block;}
+.rb-name{font-family:"Noto Serif TC",serif;font-size:28px;font-weight:900;color:var(--forest-deep);}
+.rb-no{font-family:"Space Grotesk",monospace;font-size:14px;color:var(--grey-2);margin-bottom:14px;}
+.rb-go{display:block;width:100%;padding:15px;background:var(--forest-deep);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:8px;}
+.rb-family-title{font-family:"Noto Serif TC",serif;font-size:12px;color:var(--ferrari-deep);letter-spacing:2px;font-weight:700;margin:14px 0 8px;padding-top:12px;border-top:1px solid #c8e6c9;}
+.fc-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e0f0e0;}
+.fc-row:last-child{border-bottom:none;}
+.fc-row .fn{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;color:var(--ferrari-deep);}
+.fc-row .fno{font-size:11px;color:#aaa;}
+.fc-row a{padding:5px 12px;background:var(--ferrari);color:#fff;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;}
 </style>`) + `
 <body>
 <div class="container">
@@ -696,6 +726,40 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       <div class="en">COELDERY 85 · MEMBERSHIP</div>
     </div>
   </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar" id="mainTabBar">
+    <button class="tab-btn" id="tabLogin" onclick="switchTab('login')">🔐 會員登入</button>
+    <button class="tab-btn active" id="tabRegister" onclick="switchTab('register')">📝 首次登記</button>
+  </div>
+
+  <!-- LOGIN tab -->
+  <div class="tab-section" id="secLogin">
+    <div class="login-panel">
+      <div class="field">
+        <label for="loginPhone">你的 WhatsApp 電話</label>
+        <input id="loginPhone" type="tel" placeholder="例：91234567" inputmode="numeric" maxlength="8">
+        <div class="hint">輸入登記老有卡時使用的 8 位號碼</div>
+      </div>
+      <div class="err-msg" id="loginErrMsg"></div>
+      <button type="button" class="submit-btn" id="loginBtn" onclick="doLogin()">登入查看我的卡</button>
+      <div class="result-block" id="loginResult">
+        <div class="rb-name" id="rbName"></div>
+        <div class="rb-no" id="rbNo"></div>
+        <a id="rbGoBtn" href="#" class="rb-go">🪪 查看我的老有卡</a>
+        <div id="rbFamilyWrap" style="display:none;">
+          <div class="rb-family-title">◆ 名下家庭同行卡</div>
+          <div id="rbFamilyList"></div>
+        </div>
+      </div>
+      <div class="footer-links" style="margin-top:16px;">
+        <a href="/membership/join-family">為家人申請家庭同行卡 →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- REGISTER tab -->
+  <div class="tab-section active" id="secRegister">
 
   <!-- Form Section -->
   <div id="formSection">
@@ -721,17 +785,15 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
           </div>
           <div class="mh-badge">✦ 免費</div>
         </div>
-        <div class="medical-cta" id="medCta" onclick="toggleMedicalClick()">
-          <label onclick="event.preventDefault()">
-            <div class="medical-cta-check">
-              <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)" onclick="event.stopPropagation()">
-            </div>
-            <div class="medical-cta-text">
-              <div class="medical-cta-main" id="medCtaMain">點擊此處申請免費醫健卡（選擇性）</div>
-              <div class="medical-cta-sub">一次登記，同時擁有老有卡 + 醫健卡 · NGO 職員以 WhatsApp 聯絡辦理</div>
-            </div>
-            <div class="medical-cta-arrow" id="medArrow">▼</div>
-          </label>
+        <div class="medical-cta-label" id="medCta" style="cursor:pointer;" onclick="var cb=document.getElementById('applyMedical');cb.checked=!cb.checked;toggleMedical(cb);">
+          <div class="medical-cta-check">
+            <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)" onclick="event.stopPropagation();">
+          </div>
+          <div class="medical-cta-text">
+            <div class="medical-cta-main" id="medCtaMain">點擊申請免費醫健卡（可選）</div>
+            <div class="medical-cta-sub">一次登記，同時擁有老有卡 + 醫健卡 · NGO 職員以 WhatsApp 聯絡辦理</div>
+          </div>
+          <div class="medical-cta-arrow" id="medArrow">▼</div>
         </div>
         <div class="medical-extra" id="medicalExtra">
           <div class="notice">
@@ -831,7 +893,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </div>
 
       <button type="button" class="submit-btn" id="submitBtn" onclick="submitForm()">
-        立即登記（兩卡同申）
+        立即登記
       </button>
 
       <div class="footer-links">
@@ -893,13 +955,65 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 
     <div class="footer-links">
       <a id="myPageLink" href="#" style="color:var(--forest);font-weight:700;">🪪 查看我的會員頁</a><br>
-      <a href="/membership/login" style="color:var(--forest);">🔐 下次用電話登入</a><br>
-      <a href="/membership/join">重新登記</a> · <a href="/">返回首頁</a>
+      <a href="#" onclick="switchTab('login');window.scrollTo(0,0);return false;" style="color:var(--forest);">🔐 下次用電話登入</a><br>
+      <a href="/">返回首頁</a>
     </div>
   </div>
-</div>
+  </div><!-- /secRegister -->
+</div><!-- /container -->
 
 <script>
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(t) {
+  document.getElementById('secLogin').classList.toggle('active', t === 'login');
+  document.getElementById('secRegister').classList.toggle('active', t === 'register');
+  document.getElementById('tabLogin').classList.toggle('active', t === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', t === 'register');
+  document.getElementById('loginErrMsg').classList.remove('show');
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  document.getElementById('loginErrMsg').classList.remove('show');
+  var phone = document.getElementById('loginPhone').value.replace(/\D/g, '');
+  if (phone.length !== 8) { showLoginErr('請輸入正確的 8 位電話號碼'); return; }
+  var btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = '查詢中…';
+  try {
+    var res = await fetch('/api/members/lookup?phone=' + encodeURIComponent(phone));
+    var data = await res.json();
+    if (!data.ok) { showLoginErr('找不到此電話的會員記錄。如未登記，請切換至「首次登記」。'); btn.disabled = false; btn.textContent = '登入查看我的卡'; return; }
+    var m = data.member;
+    document.getElementById('rbName').textContent = m.name_zh;
+    document.getElementById('rbNo').textContent = m.member_no + ' · ' + (m.tier === 'PRIMARY' ? '長者主卡' : '家庭同行卡');
+    document.getElementById('rbGoBtn').href = '/membership/card/' + m.member_no;
+    document.getElementById('loginResult').classList.add('show');
+    btn.style.display = 'none';
+    document.getElementById('loginPhone').disabled = true;
+    if (m.tier === 'PRIMARY') {
+      var fr = await fetch('/api/members/' + encodeURIComponent(m.member_no) + '/family');
+      var fd = await fr.json();
+      if (fd.ok && fd.family && fd.family.length > 0) {
+        document.getElementById('rbFamilyList').innerHTML = fd.family.map(function(f) {
+          return '<div class="fc-row"><div><div class="fn">' + f.name_zh + '</div><div class="fno">' + f.member_no + '</div></div><a href="/membership/card/' + f.member_no + '">查看</a></div>';
+        }).join('');
+        document.getElementById('rbFamilyWrap').style.display = 'block';
+      }
+    }
+    window.scrollTo(0, 0);
+  } catch(e) { showLoginErr('網絡錯誤，請再試一次'); btn.disabled = false; btn.textContent = '登入查看我的卡'; }
+}
+function showLoginErr(msg) { var el = document.getElementById('loginErrMsg'); el.textContent = msg; el.classList.add('show'); }
+document.addEventListener('DOMContentLoaded', function() {
+  var lp = document.getElementById('loginPhone');
+  if (lp) lp.addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+  // if URL is /membership or /membership/login, default to login tab
+  if (location.pathname === '/membership' || location.pathname === '/membership/login' || location.pathname === '/membership/') {
+    switchTab('login');
+  }
+});
+
+// ── Register ──────────────────────────────────────────────────────────────────
 var selectedGender = '';
 function setGender(v, btn) {
   selectedGender = v;
@@ -922,13 +1036,6 @@ function syncNameFromMedical() {
   var en = document.getElementById('medNameEn').value.trim().toUpperCase();
   if (zh) document.getElementById('nameZh').value = zh;
   if (en) document.getElementById('nameEn').value = en;
-}
-
-function toggleMedicalClick() {
-  // Flip the checkbox, then call toggleMedical
-  var cb = document.getElementById('applyMedical');
-  cb.checked = !cb.checked;
-  toggleMedical(cb);
 }
 
 function toggleMedical(cb) {
@@ -1279,10 +1386,15 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
           <div class="label-row"><label for="nameEn">英文姓名</label><span style="color:var(--grey-3);font-size:11px;">選填</span></div>
           <input id="nameEn" type="text" placeholder="例：CHAN SIU MING" style="text-transform:uppercase;">
         </div>
-        <div class="field">
+        <div class="field" id="parentPhoneField">
           <div class="label-row"><label for="parentPhone">長輩的 WhatsApp 電話</label><span class="req">✽ 必填</span></div>
           <input id="parentPhone" type="tel" placeholder="長輩已登記的電話" inputmode="numeric" maxlength="8">
           <div class="hint">長輩需先持有主卡，才可申請家庭同行卡</div>
+        </div>
+        <div class="field" id="parentLinkedField" style="display:none;">
+          <div class="label-row"><label>已連結主卡</label></div>
+          <div id="parentLinkedInfo" style="padding:12px 14px;background:#f0f7f0;border:2px solid #4caf50;border-radius:4px;font-size:15px;font-weight:700;color:#2e7d32;">✅ 已連結</div>
+          <div class="hint">長輩的電話已自動填入，無需再輸入</div>
         </div>
         <div class="field">
           <div class="label-row"><label for="relation">你與長輩的關係</label><span style="color:var(--grey-3);font-size:11px;">選填</span></div>
@@ -1363,7 +1475,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       if (!d.ok || !d.member) return;
       var m = d.member;
       document.getElementById('linkedParentNo').value = m.member_no;
-      document.getElementById('parentLinkedInfo').textContent = m.name_zh + '　' + m.member_no;
+      document.getElementById('parentLinkedInfo').textContent = '✅ ' + m.name_zh + '　' + m.member_no + (m.phone ? '　📱 ' + m.phone : '');
       document.getElementById('parentPhoneField').style.display = 'none';
       document.getElementById('parentLinkedField').style.display = 'block';
       // Auto-fill primary member's phone into parentPhone field
@@ -1653,6 +1765,8 @@ tr.inactive td{opacity:0.45;}
       <div class="stat-card red"><div class="n" id="sPending">—</div><div class="lbl">待 KYC</div></div>
       <div class="stat-card blue"><div class="n" id="sToday">—</div><div class="lbl">今日新增</div></div>
       <div class="stat-card amber"><div class="n" id="sMonth">—</div><div class="lbl">本月新增</div></div>
+      <div class="stat-card blue"><div class="n" id="sMedPending">—</div><div class="lbl">醫健卡待送 NGO</div></div>
+      <div class="stat-card"><div class="n" id="sMedIssued">—</div><div class="lbl">醫健卡已發出</div></div>
     </div>
     <div class="charts-row">
       <div class="chart-card">
@@ -1662,6 +1776,16 @@ tr.inactive td{opacity:0.45;}
       <div class="chart-card">
         <div class="chart-title">🗺️ 地區分佈 Top 10</div>
         <div id="chartDistrict"></div>
+      </div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">⚧ 性別分佈</div>
+        <div id="chartGender"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🏥 醫健卡申請狀態</div>
+        <div id="chartMedical"></div>
       </div>
     </div>
     <div class="chart-card" style="margin-bottom:24px;">
@@ -1705,9 +1829,10 @@ tr.inactive td{opacity:0.45;}
       <div style="overflow-x:auto;">
       <table>
         <thead><tr>
-          <th>會員編號</th><th>狀態</th><th>類型</th><th>中文姓名</th><th>電話</th>
-          <th>地區</th><th>角色</th><th>KYC</th><th>來源</th><th>介紹人</th>
-          <th>有效日期</th><th>登記時間</th><th>操作</th>
+          <th>會員編號</th><th>狀態</th><th>類型</th><th>中文姓名</th><th>英文姓名</th>
+          <th>電話</th><th>性別</th><th>出生年</th><th>HKID頭4位</th>
+          <th>地區</th><th>角色</th><th>KYC</th><th>主卡/家庭卡</th>
+          <th>來源</th><th>介紹人</th><th>有效日期</th><th>登記時間</th><th>操作</th>
         </tr></thead>
         <tbody id="membersTbody"></tbody>
       </table>
@@ -1755,6 +1880,8 @@ tr.inactive td{opacity:0.45;}
       <div class="modal-field"><label>性別</label>
         <select id="eGender"><option value="">—</option><option value="M">男 M</option><option value="F">女 F</option><option value="X">其他 X</option></select>
       </div>
+      <div class="modal-field"><label>出生年份</label><input id="eBirthYear" type="number" placeholder="例：1950" min="1920" max="2010"></div>
+      <div class="modal-field"><label>身份證頭4位</label><input id="eIdPrefix" placeholder="例：K608" maxlength="4" style="text-transform:uppercase;letter-spacing:4px;font-size:16px;font-weight:700;"></div>
       <div class="modal-field"><label>地區</label><input id="eDistrict"></div>
       <div class="modal-field"><label>角色</label>
         <select id="eRole">
@@ -1783,6 +1910,7 @@ tr.inactive td{opacity:0.45;}
         </select>
       </div>
       <div class="modal-field"><label>介紹人會員編號</label><input id="eReferrer" placeholder="CE85-XXXXXX"></div>
+      <div class="modal-field" id="eParentField" style="display:none;"><label>主卡會員編號（唯讀）</label><input id="eParentNo" readonly style="background:#f5f5f5;color:#888;"></div>
       <div class="modal-field"><label>有效日期</label><input id="eExpires" type="date"></div>
       <div class="modal-field"><label>Roadshow 地點</label><input id="eRoadshowLoc"></div>
       <div class="modal-field full"><label>會員備註（會員可見）</label><textarea id="eNotes"></textarea></div>
@@ -1821,6 +1949,10 @@ async function loadStats(){
   document.getElementById('sPending').textContent=s.pending;
   document.getElementById('sToday').textContent=s.todayNew;
   document.getElementById('sMonth').textContent=s.monthNew;
+  // Medical stats cards
+  var medMap={}; (s.medStats||[]).forEach(function(x){medMap[x.status]=x.cnt;});
+  document.getElementById('sMedPending').textContent=(medMap['PENDING']||0)+(medMap['SENT']||0);
+  document.getElementById('sMedIssued').textContent=medMap['ISSUED']||0;
   // Source bars
   var max=Math.max(1,...(s.bySource||[]).map(x=>x.cnt));
   document.getElementById('chartSource').innerHTML=(s.bySource||[]).map(x=>\`
@@ -1835,6 +1967,28 @@ async function loadStats(){
     <div class="bar-row">
       <div class="bar-label">\${x.district||'未填'}</div>
       <div class="bar-track"><div class="bar-fill red" style="width:\${Math.round(x.cnt/maxD*100)}%"></div></div>
+      <div class="bar-val">\${x.cnt}</div>
+    </div>\`).join('');
+  // Gender bars
+  var gMap={'M':'男 M','F':'女 F','X':'其他','':'未填'};
+  var gColor={'M':'#1565C0','F':'#E65100','X':'#6A1B9A','':'#aaa'};
+  var maxG=Math.max(1,...(s.byGender||[]).map(x=>x.cnt));
+  document.getElementById('chartGender').innerHTML=(s.byGender||[]).map(x=>\`
+    <div class="bar-row">
+      <div class="bar-label">\${gMap[x.gender]||x.gender||'未填'}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:\${Math.round(x.cnt/maxG*100)}%;background:\${gColor[x.gender]||'#888'}"></div></div>
+      <div class="bar-val">\${x.cnt}</div>
+    </div>\`).join('');
+  // Medical status bars
+  var medLbl={'PENDING':'⏳ 待傳送','SENT':'📤 已傳送 NGO','ISSUED':'✅ 已發卡','DECLINED':'❌ 已拒絕'};
+  var medCol={'PENDING':'#F57F17','SENT':'#1565C0','ISSUED':'#2E7D32','DECLINED':'#B71C1C'};
+  var maxMed=Math.max(1,...(s.medStats||[]).map(x=>x.cnt));
+  document.getElementById('chartMedical').innerHTML=(s.medStats||[]).length===0
+    ? '<div style="color:#aaa;font-size:12px;padding:8px 0;">暫無醫健卡申請記錄</div>'
+    : (s.medStats||[]).map(x=>\`
+    <div class="bar-row">
+      <div class="bar-label" style="width:100px;">\${medLbl[x.status]||x.status}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:\${Math.round(x.cnt/maxMed*100)}%;background:\${medCol[x.status]||'#888'}"></div></div>
       <div class="bar-val">\${x.cnt}</div>
     </div>\`).join('');
   // Monthly trend
@@ -1864,27 +2018,43 @@ async function loadMembers(page){
   totalPages=Math.ceil(d.total/50)||1;
   document.getElementById('searchCount').textContent='共 '+d.total+' 筆記錄';
   window._members=d.members;
-  document.getElementById('membersTbody').innerHTML=d.members.map(function(m,i){ return \`
-    <tr class="\${m.status==='INACTIVE'?'inactive':''}">
+  document.getElementById('membersTbody').innerHTML=d.members.map(function(m,i){
+    var isPrimary=m.tier==='PRIMARY';
+    var familyInfo=isPrimary
+      ? \`<span style="cursor:pointer;color:var(--forest);font-weight:700;font-size:11px;" onclick="toggleFamily('\${m.member_no}',this)">＋ 查看家庭卡</span>\`
+      : (m.parent_no?\`<a href="/membership/card/\${m.parent_no}" target="_blank" style="color:var(--ferrari);font-size:11px;font-weight:700;">\${m.parent_no}</a>\`:'—');
+    return \`
+    <tr class="\${m.status==='INACTIVE'?'inactive':''}" id="row-\${m.member_no}">
       <td><a href="/membership/card/\${m.member_no}" target="_blank" style="color:var(--forest);font-weight:700;">\${m.member_no}</a></td>
       <td><span class="badge badge-\${(m.status||'active').toLowerCase()}">\${m.status||'ACTIVE'}</span></td>
-      <td><span class="badge badge-\${m.tier==='PRIMARY'?'primary':'family'}">\${m.tier==='PRIMARY'?'主卡':'家庭'}</span></td>
+      <td><span class="badge badge-\${isPrimary?'primary':'family'}">\${isPrimary?'主卡':'家庭'}</span></td>
       <td>\${m.name_zh}</td>
+      <td style="font-size:12px;">\${m.name_en||'—'}</td>
       <td><a href="tel:+852\${m.phone}" style="color:inherit;">\${m.phone}</a></td>
+      <td style="font-size:12px;">\${{'M':'男','F':'女','X':'其他'}[m.gender]||'—'}</td>
+      <td style="font-size:12px;">\${m.birth_year||'—'}</td>
+      <td style="font-family:monospace;font-weight:700;letter-spacing:2px;">\${m.id_prefix||'—'}</td>
       <td>\${m.district||'—'}</td>
-      <td style="font-size:11px;">\${m.role||'CoExplorery'}</td>
+      <td style="font-size:11px;">\${(m.role||'CoExplorery').replace('Co','').replace('ery','')}</td>
       <td><span class="badge badge-\${m.kyc_status==='DONE'?'done':'pending'}">\${m.kyc_status}</span></td>
+      <td>\${familyInfo}</td>
       <td style="font-size:11px;">\${srcLabel[m.source]||m.source||'—'}</td>
       <td style="font-size:11px;">\${m.referrer_no||'—'}</td>
       <td>\${(m.expires_at||'').slice(0,10)}</td>
       <td style="font-size:11px;">\${(m.created_at||'').slice(0,16).replace('T',' ')}</td>
       <td>
         <button class="act-btn act-edit" onclick="openEdit(\${i})">編輯</button>
-        \${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc('+i+')">KYC\u2713</button>':''}
-        \${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="deactivateMember('+i+')">\u505c\u7528</button>':
-          m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="reactivateMember('+i+')">\u555f\u7528</button>':''}
+        \${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc('+i+')">KYC✓</button>':''}
+        \${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="deactivateMember('+i+')">停用</button>':
+          m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="reactivateMember('+i+')">啟用</button>':''}
       </td>
-    </tr>\`;}).join('');
+    </tr>
+    <tr id="family-\${m.member_no}" style="display:none;background:#f9fff9;">
+      <td colspan="18" style="padding:0;">
+        <div id="family-content-\${m.member_no}" style="padding:8px 16px 12px 40px;border-left:3px solid var(--forest);"></div>
+      </td>
+    </tr>\`;
+  }).join('');
   renderPagination();
 }
 
@@ -1892,6 +2062,36 @@ function renderPagination(){
   var el=document.getElementById('pagination');
   var pages=[]; for(var i=1;i<=Math.min(totalPages,20);i++)pages.push(i);
   el.innerHTML=pages.map(p=>\`<button class="\${p===currentPage?'active':''}" onclick="loadMembers(\${p})">\${p}</button>\`).join('');
+}
+
+async function toggleFamily(parentNo, btn){
+  var row=document.getElementById('family-'+parentNo);
+  var content=document.getElementById('family-content-'+parentNo);
+  if(row.style.display!=='none'){
+    row.style.display='none';
+    btn.textContent='＋ 查看家庭卡';
+    return;
+  }
+  btn.textContent='載入中…';
+  var r=await fetch('/api/members/'+encodeURIComponent(parentNo)+'/family');
+  var d=await r.json();
+  if(!d.ok||!d.family||d.family.length===0){
+    content.innerHTML='<span style="color:#aaa;font-size:12px;">此主卡暫無家庭同行卡</span>';
+  } else {
+    content.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--forest);letter-spacing:1px;margin-bottom:6px;">家庭同行卡（'+d.family.length+'張）</div>'
+      +d.family.map(function(f){
+        return \`<div style="display:flex;gap:16px;align-items:center;padding:5px 0;border-bottom:1px solid #e8f5e9;font-size:12px;">
+          <a href="/membership/card/\${f.member_no}" target="_blank" style="color:var(--forest);font-weight:700;min-width:130px;">\${f.member_no}</a>
+          <span style="font-weight:700;min-width:80px;">\${f.name_zh}</span>
+          <span style="color:#888;min-width:120px;">\${f.name_en||''}</span>
+          <span style="color:#555;min-width:80px;">\${f.phone}</span>
+          <span class="badge badge-\${f.kyc_status==='DONE'?'done':'pending'}" style="font-size:10px;">\${f.kyc_status}</span>
+          <span style="color:#aaa;font-size:11px;">\${(f.created_at||'').slice(0,10)}</span>
+        </div>\`;
+      }).join('');
+  }
+  row.style.display='';
+  btn.textContent='－ 收起家庭卡';
 }
 
 // ── Actions
@@ -1922,6 +2122,8 @@ function openEdit(i){
   document.getElementById('eNameEn').value=m.name_en||'';
   document.getElementById('ePhone').value=m.phone||'';
   document.getElementById('eGender').value=m.gender||'';
+  document.getElementById('eBirthYear').value=m.birth_year||'';
+  document.getElementById('eIdPrefix').value=m.id_prefix||'';
   document.getElementById('eDistrict').value=m.district||'';
   document.getElementById('eRole').value=m.role||'CoExplorery';
   document.getElementById('eKyc').value=m.kyc_status||'PENDING';
@@ -1932,6 +2134,14 @@ function openEdit(i){
   document.getElementById('eRoadshowLoc').value=m.roadshow_location||'';
   document.getElementById('eNotes').value=m.notes||'';
   document.getElementById('eAdminNotes').value=m.admin_notes||'';
+  // show parent_no for FAMILY cards (read-only)
+  var parentField=document.getElementById('eParentField');
+  if(m.tier==='FAMILY'&&m.parent_no){
+    document.getElementById('eParentNo').value=m.parent_no;
+    parentField.style.display='';
+  } else {
+    parentField.style.display='none';
+  }
   document.getElementById('editModal').classList.add('show');
 }
 function closeModal(){ document.getElementById('editModal').classList.remove('show'); }
@@ -1939,11 +2149,14 @@ document.getElementById('editModal').addEventListener('click',function(e){ if(e.
 
 async function saveEdit(){
   var no=document.getElementById('editNo').value;
+  var byRaw=document.getElementById('eBirthYear').value;
   var body={
     name_zh:document.getElementById('eNameZh').value,
     name_en:document.getElementById('eNameEn').value,
     phone:document.getElementById('ePhone').value,
     gender:document.getElementById('eGender').value,
+    birth_year:byRaw?parseInt(byRaw):null,
+    id_prefix:document.getElementById('eIdPrefix').value.toUpperCase(),
     district:document.getElementById('eDistrict').value,
     role:document.getElementById('eRole').value,
     kyc_status:document.getElementById('eKyc').value,
