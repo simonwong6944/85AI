@@ -957,7 +957,7 @@ function showErr(msg) {
 async function submitForm() {
   document.getElementById('errMsg').classList.remove('show');
   var nameZh = document.getElementById('nameZh').value.trim();
-  var phone = document.getElementById('phone').value.replace(/\\D/g,'');
+  var phone = document.getElementById('phone').value.replace(/\D/g,'');
   var consent = document.getElementById('consent').checked;
   var applyMedical = document.getElementById('applyMedical').checked;
 
@@ -1356,6 +1356,11 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       document.getElementById('parentLinkedInfo').textContent = m.name_zh + '　' + m.member_no;
       document.getElementById('parentPhoneField').style.display = 'none';
       document.getElementById('parentLinkedField').style.display = 'block';
+      // Auto-fill primary member's phone into parentPhone field
+      if (m.phone) {
+        var parentPhoneInput = document.getElementById('parentPhone');
+        if (parentPhoneInput) parentPhoneInput.value = m.phone;
+      }
     })
     .catch(function(e){ console.warn('parent lookup failed', e); });
 })();
@@ -3134,7 +3139,7 @@ function showErr(msg){var el=document.getElementById('errMsg');el.textContent=ms
 
 async function doLogin(){
   document.getElementById('errMsg').classList.remove('show');
-  var phone=document.getElementById('phone').value.replace(/\\D/g,'');
+  var phone=document.getElementById('phone').value.replace(/\D/g,'');
   if(phone.length!==8){showErr('請輸入正確的 8 位電話號碼');return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true; btn.textContent='查詢中…';
