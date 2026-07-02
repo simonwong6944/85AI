@@ -233,8 +233,36 @@ function htmlHead(title: string, extra = '') {
 <title>${title} · CoEldery 85</title>
 <link rel="stylesheet" href="/shared.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Noto+Serif+TC:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="/vendor/qrcode-generator.min.js"></script>
-<script src="/vendor/qrcode-shim.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script>
+/* QRCode.toCanvas shim */
+window.QRCode = window.QRCode || {};
+window.QRCode.toCanvas = function(canvas, text, opts, cb) {
+  try {
+    var ec = (opts && opts.errorCorrectionLevel) ? opts.errorCorrectionLevel.charAt(0).toUpperCase() : 'H';
+    var qr = qrcode(0, ec);
+    qr.addData(text);
+    qr.make();
+    var mcount = qr.getModuleCount();
+    var margin = (opts && opts.margin !== undefined) ? opts.margin : 4;
+    var size = (opts && opts.width) ? opts.width : 128;
+    var cellSize = Math.max(1, Math.floor(size / (mcount + margin * 2)));
+    var actualSize = cellSize * (mcount + margin * 2);
+    canvas.width = actualSize; canvas.height = actualSize;
+    var ctx = canvas.getContext('2d');
+    var dark = (opts && opts.color && opts.color.dark) ? opts.color.dark : '#000000';
+    var light = (opts && opts.color && opts.color.light) ? opts.color.light : '#ffffff';
+    ctx.fillStyle = light; ctx.fillRect(0, 0, actualSize, actualSize);
+    ctx.fillStyle = dark;
+    for (var r = 0; r < mcount; r++) {
+      for (var c2 = 0; c2 < mcount; c2++) {
+        if (qr.isDark(r, c2)) ctx.fillRect((c2+margin)*cellSize, (r+margin)*cellSize, cellSize, cellSize);
+      }
+    }
+    if (typeof cb === 'function') cb(null);
+  } catch(e) { console.warn('QR shim error:', e); if (typeof cb === 'function') cb(e); }
+};
+</script>
 ${extra}
 </head>`
 }
@@ -505,7 +533,7 @@ function showSuccess(data) {
   document.getElementById('cardEn').textContent = data.nameEn || '';
   document.getElementById('cardNo').textContent = data.memberNo;
   var cardUrl = location.origin + '/member/' + data.memberNo;
-  QRCode.toCanvas(document.getElementById('cardQr'), cardUrl, {width:40,margin:0,color:{dark:'#0d3e12',light:'#ffffff'},errorCorrectionLevel:'H'});
+  try { QRCode.toCanvas(document.getElementById('cardQr'), cardUrl, {width:40,margin:0,color:{dark:'#0d3e12',light:'#ffffff'},errorCorrectionLevel:'H'}); } catch(e) { console.warn('QR error (non-fatal):', e); }
   var waMsg = encodeURIComponent('【CoEldery 85 老有聯盟】\\n您好，' + data.nameZh + '！\\n\\n✓ 您已成功登記成為會員\\n\\n會員編號：' + data.memberNo + '\\n有效日期：' + data.expiresAt + '\\n\\n感謝您加入我哋 · 一齊共同擁有！');
   document.getElementById('waLink').href = 'https://wa.me/?text=' + waMsg;
   document.getElementById('successSection').classList.add('show');
@@ -687,7 +715,7 @@ async function submitForm(){
     document.getElementById('cardEn').textContent=data.nameEn||'';
     document.getElementById('cardNo').textContent=data.memberNo;
     var cardUrl=location.origin+'/member/'+data.memberNo;
-    QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'});
+    try { QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'}); } catch(e) { console.warn('QR error (non-fatal):',e); }
     var waMsg=encodeURIComponent('【CoEldery 85 老有聯盟】家庭同行卡\\n\\n會員：'+data.nameZh+'\\n編號：'+data.memberNo+'\\n\\n感謝你嘅支持！');
     document.getElementById('waLink').href='https://wa.me/?text='+waMsg;
     document.getElementById('successSection').classList.add('show');
