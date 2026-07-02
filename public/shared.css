@@ -1,0 +1,27 @@
+/* CoEldery 85 - Shared Design System */
+:root{
+  --forest: #1B5E20;
+  --forest-deep: #0d3e12;
+  --forest-mid: #2d5016;
+  --forest-light: #4a7c2e;
+  --forest-pale: #E8F5E9;
+  --ferrari: #D40000;
+  --ferrari-deep: #a80000;
+  --ferrari-pale: #FFEBEE;
+  --cream: #FAF7F0;
+  --ink: #1a1a1a;
+  --grey-1: #333;
+  --grey-2: #666;
+  --grey-3: #999;
+  --grey-4: #ddd;
+  --line: #e5e5e5;
+  --gold: #B8935A;
+}
+*{ box-sizing: border-box; margin:0; padding:0; }
+html,body{
+  font-family: "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  color: var(--ink);
+  background: var(--cream);
+  -webkit-font-smoothing: antialiased;
+}
+.serif{ font-family: "Noto Serif TC","Songti TC","PMingLiU",serif; }
