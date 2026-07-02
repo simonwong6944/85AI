@@ -949,6 +949,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
         <a href="/join">← 我係長者，申請主卡</a>
       </div>
     </form>
+    <input type="hidden" id="linkedParentNo" value="">
   </div>
 
   <div class="success" id="successSection">
@@ -982,26 +983,51 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     </div>
 
     <button class="wa-link" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
-    <div class="footer-links"><a href="/join">← 返回主卡登記</a></div>
+    <div class="footer-links">
+      <a id="mySubPageLink" href="#" style="color:var(--ferrari-deep);font-weight:700;display:none;">🪪 查看我的會員頁</a>
+      <span id="mySubPageSep" style="display:none;"> &middot; </span>
+      <a href="/join">← 返回主卡登記</a>
+    </div>
   </div>
 </div>
 
 <script>
+// Auto-fill parent info from ?parent=CE85-XXXXXX URL param
+(function(){
+  var params = new URLSearchParams(location.search);
+  var parentMemberNo = params.get('parent');
+  if (!parentMemberNo) return;
+  fetch('/api/members/' + encodeURIComponent(parentMemberNo))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok || !d.member) return;
+      var m = d.member;
+      document.getElementById('linkedParentNo').value = m.member_no;
+      document.getElementById('parentLinkedInfo').textContent = m.name_zh + '　' + m.member_no;
+      document.getElementById('parentPhoneField').style.display = 'none';
+      document.getElementById('parentLinkedField').style.display = 'block';
+    })
+    .catch(function(e){ console.warn('parent lookup failed', e); });
+})();
+
 function showErr(msg){var el=document.getElementById('errMsg');el.textContent=msg;el.classList.add('show');el.scrollIntoView({behavior:'smooth'});}
 async function submitForm(){
   document.getElementById('errMsg').classList.remove('show');
   var nameZh=document.getElementById('nameZh').value.trim();
   var phone=document.getElementById('phone').value.replace(/\D/g,'');
+  var linkedParentNo=document.getElementById('linkedParentNo').value.trim();
   var parentPhone=document.getElementById('parentPhone').value.replace(/\D/g,'');
   if(!nameZh){showErr('請填寫中文姓名');return;}
   if(phone.length!==8){showErr('請填寫正確的 8 位電話');return;}
-  if(parentPhone.length!==8){showErr('請填寫長輩的 8 位電話');return;}
+  if(!linkedParentNo && parentPhone.length!==8){showErr('請填寫長輩的 8 位電話');return;}
   if(!document.getElementById('consent').checked){showErr('請同意私隱政策');return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.textContent='處理中…';
   var params=new URLSearchParams(location.search);
+  var payload={tier:'FAMILY',nameZh,phone,nameEn:document.getElementById('nameEn').value.trim().toUpperCase(),relation:document.getElementById('relation').value,roadshow:params.get('rs')||'walk-in'};
+  if(linkedParentNo){payload.parentNo=linkedParentNo;}else{payload.parentPhone=parentPhone;}
   try{
-    var res=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tier:'FAMILY',nameZh,phone,nameEn:document.getElementById('nameEn').value.trim().toUpperCase(),parentPhone,relation:document.getElementById('relation').value,roadshow:params.get('rs')||'walk-in'})});
+    var res=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var data=await res.json();
     if(!data.ok){showErr(data.error||'申請失敗，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';return;}
     document.getElementById('formSection').style.display='none';
@@ -1009,15 +1035,14 @@ async function submitForm(){
     document.getElementById('cardEn').textContent=data.nameEn||'';
     document.getElementById('cardNo').textContent=data.memberNo;
     var cardUrl=location.origin+'/member/'+data.memberNo;
-    try { QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'}); } catch(e) { console.warn('QR error (non-fatal):',e); }
+    try{QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'});}catch(e){console.warn('QR error (non-fatal):',e);}
     document.getElementById('successSection').classList.add('show');
     window.scrollTo(0,0);
-    // Show "view my member page" link
-    var mySubLink = document.getElementById('mySubPageLink');
-    var mySubSep = document.getElementById('mySubPageSep');
-    if(mySubLink){ mySubLink.href='/member/'+data.memberNo; mySubLink.style.display='inline'; }
-    if(mySubSep){ mySubSep.style.display='inline'; }
-    setTimeout(function(){ renderCardImage(data, 'FAMILY'); }, 100);
+    var mySubLink=document.getElementById('mySubPageLink');
+    var mySubSep=document.getElementById('mySubPageSep');
+    if(mySubLink){mySubLink.href='/member/'+data.memberNo;mySubLink.style.display='inline';}
+    if(mySubSep){mySubSep.style.display='inline';}
+    setTimeout(function(){renderCardImage(data,'FAMILY');},100);
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
 }
 
