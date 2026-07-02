@@ -627,15 +627,22 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .consent a{color:var(--forest);text-decoration:underline;}
 /* Medical card opt-in block */
 .medical-block{border:2px solid #1565C0;border-radius:6px;overflow:hidden;margin-bottom:20px;}
-.medical-header{background:#1565C0;color:#fff;padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;}
+.medical-header{background:linear-gradient(135deg,#1565C0 0%,#1976D2 100%);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;user-select:none;}
 .medical-header .mh-left{display:flex;align-items:center;gap:10px;}
-.medical-header .mh-icon{font-size:22px;line-height:1;}
+.medical-header .mh-icon{font-size:24px;line-height:1;}
 .medical-header .mh-title{font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:1px;}
 .medical-header .mh-sub{font-size:11px;opacity:0.85;margin-top:2px;letter-spacing:0.5px;}
-.medical-header .mh-badge{background:#fff;color:#1565C0;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:1px;white-space:nowrap;}
-.medical-toggle{background:#EEF2FF;padding:12px 16px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid #C5CAE9;}
-.medical-toggle input[type=checkbox]{width:20px;height:20px;margin-top:1px;flex-shrink:0;accent-color:#1565C0;}
-.medical-toggle label{font-size:13px;color:#1A237E;line-height:1.6;cursor:pointer;font-weight:600;}
+.medical-header .mh-badge{background:#FFD600;color:#1A237E;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:1px;white-space:nowrap;}
+.medical-cta{background:#E8F0FE;padding:0;cursor:pointer;border-bottom:1px solid #C5CAE9;transition:background 0.15s;}
+.medical-cta:hover{background:#D3E2FC;}
+.medical-cta label{display:flex;align-items:center;gap:0;cursor:pointer;width:100%;}
+.medical-cta-check{display:flex;align-items:center;justify-content:center;background:#1565C0;width:56px;height:64px;flex-shrink:0;}
+.medical-cta-check input[type=checkbox]{width:24px;height:24px;accent-color:#fff;cursor:pointer;}
+.medical-cta-text{flex:1;padding:14px 14px 14px 16px;}
+.medical-cta-main{font-size:15px;color:#0D47A1;font-weight:700;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;margin-bottom:4px;}
+.medical-cta-sub{font-size:12px;color:#5C6BC0;line-height:1.5;}
+.medical-cta-arrow{font-size:20px;color:#1565C0;padding-right:14px;flex-shrink:0;transition:transform 0.2s;}
+.medical-cta-arrow.open{transform:rotate(180deg);}
 .medical-extra{display:none;padding:16px;background:#fff;}
 .medical-extra.show{display:block;}
 .medical-extra .notice{background:#FFF8E1;border-left:3px solid #F9A825;padding:10px 12px;font-size:12px;color:#5D4037;line-height:1.6;margin-bottom:16px;border-radius:0 4px 4px 0;}
@@ -711,13 +718,18 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
               <div class="mh-sub">由合作 NGO 香港商貿慈善基金提供</div>
             </div>
           </div>
-          <div class="mh-badge">免費</div>
+          <div class="mh-badge">✦ 免費</div>
         </div>
-        <div class="medical-toggle">
-          <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)">
-          <label for="applyMedical">
-            我希望同時申請醫健卡（免費）<br>
-            <span style="font-size:11px;color:#5C6BC0;font-weight:400;">NGO 職員將會以電話或 WhatsApp 聯絡辦理手續，一次登記同時擁有兩張卡</span>
+        <div class="medical-cta" onclick="document.getElementById('applyMedical').click();toggleMedical(document.getElementById('applyMedical'))">
+          <label onclick="event.preventDefault()">
+            <div class="medical-cta-check">
+              <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)" onclick="event.stopPropagation()">
+            </div>
+            <div class="medical-cta-text">
+              <div class="medical-cta-main">✅ 點擊此處申請免費醫健卡</div>
+              <div class="medical-cta-sub">一次登記，同時擁有老有卡 + 醫健卡 · NGO 職員以 WhatsApp 聯絡辦理</div>
+            </div>
+            <div class="medical-cta-arrow" id="medArrow">▼</div>
           </label>
         </div>
         <div class="medical-extra" id="medicalExtra">
@@ -902,16 +914,23 @@ function setGender(v, btn) {
 
 function toggleMedical(cb) {
   var extra = document.getElementById('medicalExtra');
+  var arrow = document.getElementById('medArrow');
+  var cta = document.querySelector('.medical-cta');
   if (cb.checked) {
     extra.classList.add('show');
+    if(arrow) arrow.classList.add('open');
+    if(cta) cta.style.background='#C8D8FA';
     // Pre-fill from main form
     var zh = document.getElementById('nameZh').value.trim();
     var en = document.getElementById('nameEn').value.trim().toUpperCase();
     if (zh && !document.getElementById('medNameZh').value) document.getElementById('medNameZh').value = zh;
     if (en && !document.getElementById('medNameEn').value) document.getElementById('medNameEn').value = en;
     document.getElementById('submitBtn').textContent = '立即登記（兩卡同申）';
+    extra.scrollIntoView({behavior:'smooth', block:'nearest'});
   } else {
     extra.classList.remove('show');
+    if(arrow) arrow.classList.remove('open');
+    if(cta) cta.style.background='';
     document.getElementById('submitBtn').textContent = '立即登記';
   }
 }
