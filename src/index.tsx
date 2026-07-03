@@ -480,6 +480,17 @@ app.patch('/api/members/:no/profile', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Self-verify: member marks themselves as verified after sending WA ───────
+app.post('/api/members/:no/verify', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  const existing = await db.prepare('SELECT member_no, verified_at FROM members WHERE member_no = ?').bind(no).first<{ member_no: string; verified_at: string | null }>()
+  if (!existing) return c.json({ ok: false, error: '查無此會員' }, 404)
+  if (existing.verified_at) return c.json({ ok: true, alreadyVerified: true, verified_at: existing.verified_at })
+  await db.prepare(`UPDATE members SET verified_at = datetime('now') WHERE member_no = ?`).bind(no).run()
+  return c.json({ ok: true, alreadyVerified: false })
+})
+
 // ─── Root: 85 AI Technology Limited Dashboard ────────────────────────────────
 app.get('/', (c) => c.html(dashboardHtml()))
 
@@ -998,9 +1009,37 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </div>
     </div>
 
-    <!-- Card image preview (rendered canvas) -->
-    <div id="cardImgWrap" style="display:none;margin:0 auto 16px;max-width:340px;">
+    <!-- Card image preview (rendered canvas) — wraps both img + pending watermark overlay -->
+    <div id="cardImgWrap" style="display:none;margin:0 auto 0;max-width:340px;position:relative;">
       <img id="cardImg" style="width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.18);" alt="會員卡">
+      <!-- Pending verification watermark overlay -->
+      <div id="pendingWatermark" style="position:absolute;inset:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.38);pointer-events:none;">
+        <div style="color:#fff;font-size:17px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
+        <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">發送 WhatsApp 後即完成驗證</div>
+      </div>
+    </div>
+
+    <!-- WA Verification block — shown directly below card, BEFORE other action buttons -->
+    <div id="waVerifyBlock" style="display:none;margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px 14px 10px;">
+      <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">✅ 發 WhatsApp 完成身份驗證</div>
+      <!-- 訊息預覽 -->
+      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;"></div>
+      <!-- 主按鈕：點擊自動複製訊息並開啟 WhatsApp -->
+      <button onclick="openWaAndCopy()" id="waOpenBtn"
+        style="width:100%;background:#25D366;color:#fff;border:0;font-size:15px;font-weight:700;padding:14px 8px;border-radius:6px;cursor:pointer;text-align:center;margin-bottom:8px;display:block;">
+        💬 開啟 WhatsApp 發送驗證
+      </button>
+      <!-- 備用：純複製按鈕 -->
+      <button onclick="copyWaMsg()" id="waCopyBtn"
+        style="width:100%;background:#fff;color:#075E54;border:2px solid #075E54;font-size:13px;font-weight:700;padding:10px 6px;border-radius:6px;cursor:pointer;text-align:center;display:block;">
+        📋 只複製訊息（WA Business 用戶：複製後自行開啟 App 貼上）
+      </button>
+    </div>
+
+    <!-- Verified confirmation banner (shown after WA sent) -->
+    <div id="verifiedBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
+      <div style="font-size:14px;font-weight:700;color:#2E7D32;">✅ 驗證訊息已發送！</div>
+      <div style="font-size:12px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
     </div>
 
     <!-- Medical card notice (shown if applied) -->
@@ -1020,22 +1059,6 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     <button class="wa-link" id="waImgBtn" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">
       📱 WhatsApp 分享會員卡圖片
     </button>
-
-    <div id="waVerifyBlock" style="display:none;margin-top:12px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px 14px 10px;">
-      <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">✅ 發 WhatsApp 完成身份驗證</div>
-      <!-- 訊息預覽 -->
-      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;"></div>
-      <!-- 主按鈕：點擊自動複製訊息並開啟 WhatsApp -->
-      <button onclick="openWaAndCopy()" id="waOpenBtn"
-        style="width:100%;background:#25D366;color:#fff;border:0;font-size:15px;font-weight:700;padding:14px 8px;border-radius:6px;cursor:pointer;text-align:center;margin-bottom:8px;display:block;">
-        💬 開啟 WhatsApp 發送驗證
-      </button>
-      <!-- 備用：純複製按鈕 -->
-      <button onclick="copyWaMsg()" id="waCopyBtn"
-        style="width:100%;background:#fff;color:#075E54;border:2px solid #075E54;font-size:13px;font-weight:700;padding:10px 6px;border-radius:6px;cursor:pointer;text-align:center;display:block;">
-        📋 只複製訊息（WA Business 用戶：複製後自行開啟 App 貼上）
-      </button>
-    </div>
 
     <div class="footer-links">
       <a id="myPageLink" href="#" style="color:var(--forest);font-weight:700;">🪪 查看我的會員頁</a><br>
@@ -1250,7 +1273,9 @@ function showSuccess(data, appliedMedical) {
   var myLink = document.getElementById('myPageLink');
   if(myLink) myLink.href = '/membership/card/' + data.memberNo;
   window.scrollTo(0,0);
-  // Build card image after short delay (let DOM paint)
+  // Store member no globally for verify call
+  window._verifyMemberNo = data.memberNo;
+  // Build card image after short delay (let DOM paint) — watermark shown by default
   setTimeout(function(){ renderCardImage(data, 'PRIMARY'); }, 100);
   // Load admin WhatsApp and inject verification block
   fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
@@ -1267,25 +1292,36 @@ function showSuccess(data, appliedMedical) {
   }).catch(function(){});
 }
 
+function markVerified() {
+  // Hide watermark, hide WA block, show verified banner
+  var wm = document.getElementById('pendingWatermark');
+  var block = document.getElementById('waVerifyBlock');
+  var banner = document.getElementById('verifiedBanner');
+  if(wm) wm.style.display = 'none';
+  if(block) block.style.display = 'none';
+  if(banner) banner.style.display = 'block';
+  // Call verify API (fire-and-forget)
+  var no = window._verifyMemberNo;
+  if(no) fetch('/api/members/' + encodeURIComponent(no) + '/verify', {method:'POST'}).catch(function(){});
+}
+
 function openWaAndCopy(){
   var msg = window._waVerifyMsg || '';
   var num = window._waVerifyNum || '85291477341';
   var enc = window._waVerifyEnc || encodeURIComponent(msg);
-  // Copy to clipboard first (so WA Business users can paste)
+  var btn = document.getElementById('waOpenBtn');
   function doOpen(){
-    // Use whatsapp:// scheme — on iOS/Android this directly opens WA app selector if both installed
     window.location.href = 'whatsapp://send?phone=' + num + '&text=' + enc;
     // Fallback: if whatsapp:// didn't open after 2s, redirect to wa.me
     setTimeout(function(){
       window.location.href = 'https://wa.me/' + num + '?text=' + enc;
     }, 2000);
   }
-  var btn = document.getElementById('waOpenBtn');
+  // Mark as verified immediately (user intent = sent)
+  markVerified();
+  if(btn){ btn.textContent='✅ 訊息已複製，正在開啟 WhatsApp…'; btn.style.background='#1aaa55'; }
   if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(msg).then(function(){
-      if(btn){ btn.textContent='✅ 訊息已複製，正在開啟 WhatsApp…'; btn.style.background='#1aaa55'; }
-      doOpen();
-    }).catch(function(){ doOpen(); });
+    navigator.clipboard.writeText(msg).then(function(){ doOpen(); }).catch(function(){ doOpen(); });
   } else {
     _copyFallback2(msg);
     doOpen();
@@ -1600,9 +1636,37 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       </div>
     </div>
 
-    <!-- Rendered JPEG preview -->
-    <div id="cardImgWrap" style="display:none;margin:0 auto 16px;max-width:340px;">
+    <!-- Rendered JPEG preview — with pending watermark overlay -->
+    <div id="cardImgWrap" style="display:none;margin:0 auto 0;max-width:340px;position:relative;">
       <img id="cardImg" style="width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.18);" alt="家庭同行卡">
+      <!-- Pending verification watermark overlay -->
+      <div id="pendingWatermark" style="position:absolute;inset:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.38);pointer-events:none;">
+        <div style="color:#fff;font-size:17px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
+        <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">發送 WhatsApp 後即完成驗證</div>
+      </div>
+    </div>
+
+    <!-- WA Verification block — shown directly below card -->
+    <div id="waVerifyBlock" style="display:none;margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px 14px 10px;">
+      <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">✅ 發 WhatsApp 完成身份驗證</div>
+      <!-- 訊息預覽 -->
+      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;"></div>
+      <!-- 主按鈕 -->
+      <button onclick="openWaAndCopy()" id="waOpenBtn"
+        style="width:100%;background:#25D366;color:#fff;border:0;font-size:15px;font-weight:700;padding:14px 8px;border-radius:6px;cursor:pointer;text-align:center;margin-bottom:8px;display:block;">
+        💬 開啟 WhatsApp 發送驗證
+      </button>
+      <!-- 備用：純複製 -->
+      <button onclick="copyWaMsg()" id="waCopyBtn"
+        style="width:100%;background:#fff;color:#075E54;border:2px solid #075E54;font-size:13px;font-weight:700;padding:10px 6px;border-radius:6px;cursor:pointer;text-align:center;display:block;">
+        📋 只複製訊息（WA Business 用戶：複製後自行開啟 App 貼上）
+      </button>
+    </div>
+
+    <!-- Verified confirmation banner -->
+    <div id="verifiedBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
+      <div style="font-size:14px;font-weight:700;color:#2E7D32;">✅ 驗證訊息已發送！</div>
+      <div style="font-size:12px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
     </div>
 
     <div class="action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
@@ -1611,22 +1675,6 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     </div>
 
     <button class="wa-link" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
-
-    <div id="waVerifyBlock" style="display:none;margin-top:12px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px 14px 10px;">
-      <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">✅ 發 WhatsApp 完成身份驗證</div>
-      <!-- 訊息預覽 -->
-      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;"></div>
-      <!-- 主按鈕：點擊自動複製訊息並開啟 WhatsApp -->
-      <button onclick="openWaAndCopy()" id="waOpenBtn"
-        style="width:100%;background:#25D366;color:#fff;border:0;font-size:15px;font-weight:700;padding:14px 8px;border-radius:6px;cursor:pointer;text-align:center;margin-bottom:8px;display:block;">
-        💬 開啟 WhatsApp 發送驗證
-      </button>
-      <!-- 備用：純複製按鈕 -->
-      <button onclick="copyWaMsg()" id="waCopyBtn"
-        style="width:100%;background:#fff;color:#075E54;border:2px solid #075E54;font-size:13px;font-weight:700;padding:10px 6px;border-radius:6px;cursor:pointer;text-align:center;display:block;">
-        📋 只複製訊息（WA Business 用戶：複製後自行開啟 App 貼上）
-      </button>
-    </div>
 
     <div class="footer-links">
       <a id="mySubPageLink" href="#" style="color:var(--ferrari-deep);font-weight:700;display:none;">🪪 查看我的會員頁</a>
@@ -1701,6 +1749,8 @@ async function submitForm(){
     if(mySubLink){mySubLink.href='/membership/card/'+data.memberNo;mySubLink.style.display='inline';}
     if(mySubSep){mySubSep.style.display='inline';}
     setTimeout(function(){renderCardImage(data,'FAMILY');},100);
+    // Store member no for verify
+    window._verifyMemberNo=data.memberNo;
     // Load admin WhatsApp and inject verification block
     fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
       var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
@@ -1717,22 +1767,32 @@ async function submitForm(){
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
 }
 
+function markVerified(){
+  var wm=document.getElementById('pendingWatermark');
+  var block=document.getElementById('waVerifyBlock');
+  var banner=document.getElementById('verifiedBanner');
+  if(wm)wm.style.display='none';
+  if(block)block.style.display='none';
+  if(banner)banner.style.display='block';
+  var no=window._verifyMemberNo;
+  if(no)fetch('/api/members/'+encodeURIComponent(no)+'/verify',{method:'POST'}).catch(function(){});
+}
+
 function openWaAndCopy(){
   var msg=window._waVerifyMsg||'';
   var num=window._waVerifyNum||'85291477341';
   var enc=window._waVerifyEnc||encodeURIComponent(msg);
+  var btn=document.getElementById('waOpenBtn');
   function doOpen(){
     window.location.href='whatsapp://send?phone='+num+'&text='+enc;
     setTimeout(function(){
       window.location.href='https://wa.me/'+num+'?text='+enc;
     },2000);
   }
-  var btn=document.getElementById('waOpenBtn');
+  markVerified();
+  if(btn){btn.textContent='✅ 訊息已複製，正在開啟 WhatsApp…';btn.style.background='#1aaa55';}
   if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(msg).then(function(){
-      if(btn){btn.textContent='✅ 訊息已複製，正在開啟 WhatsApp…';btn.style.background='#1aaa55';}
-      doOpen();
-    }).catch(function(){doOpen();});
+    navigator.clipboard.writeText(msg).then(function(){doOpen();}).catch(function(){doOpen();});
   }else{
     _copyFallback2(msg);
     doOpen();
