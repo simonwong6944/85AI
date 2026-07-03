@@ -703,8 +703,8 @@ async function loadMembers(page){
         <button class="act-btn act-edit" onclick="openEdit(${i})">編輯</button>
         ${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc('+i+')">KYC✓</button>':''}
         ${!m.verified_at
-          ? '<button class="act-btn" style="background:#25D366;color:#fff;" onclick="adminVerify(\''+m.member_no+'\')">WA✓</button>'
-          : '<button class="act-btn" style="background:#e0e0e0;color:#555;font-size:10px;" onclick="adminUnverify(\''+m.member_no+'\')">取消驗證</button>'}
+          ? '<button class="act-btn" style="background:#25D366;color:#fff;" data-no="'+m.member_no+'" onclick="adminVerify(this.dataset.no)">WA✓</button>'
+          : '<button class="act-btn" style="background:#e0e0e0;color:#555;font-size:10px;" data-no="'+m.member_no+'" onclick="adminUnverify(this.dataset.no)">取消驗證</button>'}
         ${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="deactivateMember('+i+')">停用</button>':
           m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="reactivateMember('+i+')">啟用</button>':''}
       </td>
