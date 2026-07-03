@@ -683,7 +683,9 @@ async function loadMembers(page){
       <td><span class="badge badge-${m.kyc_status==='DONE'?'done':'pending'}">${m.kyc_status}</span></td>
       <td id="wa-cell-${m.member_no}">${m.verified_at
         ? '<span class="badge badge-done" title="'+m.verified_at.slice(0,16).replace('T',' ')+'">✅ 已驗證</span>'
-        : '<span class="badge badge-pending">⏳ 待驗證</span>'
+        : m.wa_clicked_at
+          ? '<span class="badge" style="background:#fff3e0;color:#e65100;border:1px solid #ffb74d;" title="用戶已點擊 '+m.wa_clicked_at.slice(0,16).replace('T',' ')+'">📱 待確認</span>'
+          : '<span class="badge badge-pending">⏳ 未操作</span>'
       }</td>
       <td id="grp-cell-${m.member_no}">${(function(){
         var badge=m.group_name

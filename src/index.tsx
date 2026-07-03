@@ -250,7 +250,7 @@ app.get('/api/admin/members', async (c) => {
     `SELECT m.member_no, m.tier, m.status, m.name_zh, m.name_en, m.phone, m.gender, m.birth_year,
             m.district, m.id_prefix, m.role, m.kyc_status, m.source, m.referrer_no, m.roadshow,
             m.roadshow_location, m.parent_no, m.parent_name, m.relation,
-            m.expires_at, m.created_at, m.notes, m.admin_notes, m.verified_at,
+            m.expires_at, m.created_at, m.notes, m.admin_notes, m.verified_at, m.wa_clicked_at,
             m.group_id, g.name as group_name, g.color as group_color
      FROM members m
      LEFT JOIN member_groups g ON g.id = m.group_id
@@ -487,6 +487,16 @@ app.patch('/api/members/:no/profile', async (c) => {
 })
 
 // ─── Self-verify: member marks themselves as verified after sending WA ───────
+// ─── User WA button click — records wa_clicked_at only, does NOT set verified_at
+app.post('/api/members/:no/wa-click', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  const existing = await db.prepare('SELECT member_no FROM members WHERE member_no = ?').bind(no).first()
+  if (!existing) return c.json({ ok: false, error: '查無此會員' }, 404)
+  await db.prepare(`UPDATE members SET wa_clicked_at = datetime('now') WHERE member_no = ? AND wa_clicked_at IS NULL`).bind(no).run()
+  return c.json({ ok: true })
+})
+
 app.post('/api/members/:no/verify', async (c) => {
   const no = c.req.param('no')
   const db = c.env.DB
@@ -1117,7 +1127,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       <!-- Pending verification watermark overlay -->
       <div id="pendingWatermark" style="position:absolute;inset:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.38);pointer-events:none;">
         <div style="color:#fff;font-size:17px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
-        <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">發送 WhatsApp 後即完成驗證</div>
+        <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
       </div>
     </div>
 
@@ -1129,6 +1139,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
         style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:15px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;">
         💬 WhatsApp 發送驗證訊息
       </button>
+      <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:13px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
     </div>
 
     <!-- Verified confirmation banner (shown after WA sent) -->
@@ -1238,20 +1249,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 });
-// visibilitychange: fires when user switches back from WA app (iOS bfcache / Android)
-document.addEventListener('visibilitychange', function() {
-  if(document.visibilityState === 'visible' && sessionStorage.getItem('waVerifyPending')) {
-    sessionStorage.removeItem('waVerifyPending');
-    setTimeout(markVerified, 500);
-  }
-});
-// pageshow: fires on bfcache restore (iOS Safari back gesture)
-window.addEventListener('pageshow', function(e) {
-  if(e.persisted && sessionStorage.getItem('waVerifyPending')) {
-    sessionStorage.removeItem('waVerifyPending');
-    setTimeout(markVerified, 500);
-  }
-});
+// visibilitychange / pageshow: no longer needed — markVerified fires via setTimeout in openWA()
 
 // ── Register ──────────────────────────────────────────────────────────────────
 var selectedGender = '';
@@ -1423,20 +1421,24 @@ function showSuccess(data, appliedMedical) {
     if(preview) preview.textContent = msgText;
   }).catch(function(){});
 
-  // On page load: if user already clicked WA in this session, auto-verify
-  if(sessionStorage.getItem('waVerifyPending') === window._verifyMemberNo) {
-    sessionStorage.removeItem('waVerifyPending');
-    setTimeout(markVerified, 400);
-  }
 }
 
 function openWA() {
   if(!window._waUrl) return;
-  // Save pending state — used by visibilitychange + pageshow to auto-verify on return
-  sessionStorage.setItem('waVerifyPending', window._verifyMemberNo || '');
+  if(window._waSent) return; // prevent double click
   window._waSent = true;
-  // Open WA via location.href (deep link)
+  // Disable button, show sending msg
+  var btn = document.getElementById('waVerifyBtn');
+  var sendingMsg = document.getElementById('waSendingMsg');
+  if(btn){ btn.disabled = true; btn.textContent = '📤 發送中...'; btn.style.background = '#a5d6a7'; }
+  if(sendingMsg) sendingMsg.style.display = 'block';
+  // Record click in DB (fire and forget)
+  var no = window._verifyMemberNo;
+  if(no) fetch('/api/members/' + encodeURIComponent(no) + '/wa-click', {method:'POST'}).catch(function(){});
+  // Open WA deep link
   window.location.href = window._waUrl;
+  // After 2.5s auto markVerified (regardless of whether WA opened)
+  setTimeout(markVerified, 2500);
 }
 
 function markVerified() {
@@ -1746,7 +1748,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       <!-- Pending verification watermark overlay -->
       <div id="pendingWatermark" style="position:absolute;inset:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.38);pointer-events:none;">
         <div style="color:#fff;font-size:17px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
-        <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">發送 WhatsApp 後即完成驗證</div>
+        <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
       </div>
     </div>
 
@@ -1758,6 +1760,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
         style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:15px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;">
         💬 WhatsApp 發送驗證訊息
       </button>
+      <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:13px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
     </div>
 
     <!-- Verified confirmation banner -->
@@ -1867,19 +1870,21 @@ async function submitForm(){
       if(block)block.style.display='block';
       if(preview)preview.textContent=msgText;
     }).catch(function(){});
-    // On page load: if user already clicked WA in this session, auto-verify
-    if(sessionStorage.getItem('waVerifyPending')===data.memberNo){
-      sessionStorage.removeItem('waVerifyPending');
-      setTimeout(markVerified,400);
-    }
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
 }
 
 function openWA(){
   if(!window._waUrl)return;
-  sessionStorage.setItem('waVerifyPending', window._verifyMemberNo||'');
+  if(window._waSent)return;
   window._waSent=true;
+  var btn=document.getElementById('waVerifyBtn');
+  var sendingMsg=document.getElementById('waSendingMsg');
+  if(btn){btn.disabled=true;btn.textContent='📤 發送中...';btn.style.background='#a5d6a7';}
+  if(sendingMsg)sendingMsg.style.display='block';
+  var no=window._verifyMemberNo;
+  if(no)fetch('/api/members/'+encodeURIComponent(no)+'/wa-click',{method:'POST'}).catch(function(){});
   window.location.href=window._waUrl;
+  setTimeout(markVerified,2500);
 }
 
 function markVerified(){
@@ -1925,20 +1930,7 @@ document.addEventListener('DOMContentLoaded',function(){
     }
   }
 });
-// visibilitychange for family card: user switches back from WA app
-document.addEventListener('visibilitychange', function() {
-  if(document.visibilityState==='visible' && sessionStorage.getItem('waVerifyPending')) {
-    sessionStorage.removeItem('waVerifyPending');
-    setTimeout(markVerified, 500);
-  }
-});
-// pageshow for family card: iOS bfcache restore
-window.addEventListener('pageshow', function(e) {
-  if(e.persisted && sessionStorage.getItem('waVerifyPending')) {
-    sessionStorage.removeItem('waVerifyPending');
-    setTimeout(markVerified, 500);
-  }
-});
+// visibilitychange / pageshow: no longer needed — markVerified fires via setTimeout in openWA()
 
 function renderCardImage(data, tier) {
   var logoImg=new Image();
@@ -2315,7 +2307,7 @@ tr.inactive td{opacity:0.45;}
         <thead><tr>
           <th>會員編號</th><th>狀態</th><th>類型</th><th>中文姓名</th><th>英文姓名</th>
           <th>電話</th><th>性別</th><th>出生年</th><th>HKID頭4位</th>
-          <th>地區</th><th>角色</th><th>KYC</th><th>WA驗證</th><th>群組</th><th>主卡/家庭卡</th>
+          <th>地區</th><th>角色</th><th>KYC</th><th>WA狀態</th><th>群組</th><th>主卡/家庭卡</th>
           <th>來源</th><th>介紹人</th><th>有效日期</th><th>登記時間</th><th>操作</th>
         </tr></thead>
         <tbody id="membersTbody"></tbody>
