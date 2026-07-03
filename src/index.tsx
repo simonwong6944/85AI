@@ -37,7 +37,7 @@ function expiryDate(years = 3): string {
 function validateHKPhone(phone: string): { ok: boolean; error?: string } {
   const p = phone.replace(/\D/g, '')
   if (p.length !== 8) return { ok: false, error: '請填寫正確的 8 位香港電話號碼' }
-  if (!/^[23569]/.test(p)) return { ok: false, error: '電話號碼格式不正確（香港號碼以 2、3、5、6 或 9 開頭）' }
+  if (!/^[2-9]/.test(p)) return { ok: false, error: '電話號碼格式不正確（香港號碼以 2–9 開頭，1 除外）' }
   // Reject obvious fakes: all same digit, sequential
   if (/^(\d)\1{7}$/.test(p)) return { ok: false, error: '請填寫真實的電話號碼' }
   if (p === '12345678' || p === '87654321' || p === '11223344') return { ok: false, error: '請填寫真實的電話號碼' }
@@ -1039,7 +1039,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 // ── HK Phone validator (frontend mirror of backend validateHKPhone) ───────────
 function validateHKPhone(p) {
   if (p.length !== 8) return '請填寫正確的 8 位香港電話號碼';
-  if (!/^[23569]/.test(p)) return '電話號碼格式不正確（香港號碼以 2、3、5、6 或 9 開頭）';
+  if (!/^[2-9]/.test(p)) return '電話號碼格式不正確（香港號碼以 2–9 開頭，1 除外）';
   if(new Set(p.split('')).size===1) return '請填寫真實的電話號碼';
   if (p === '12345678' || p === '87654321' || p === '11223344') return '請填寫真實的電話號碼';
   return null; // ok
@@ -1591,7 +1591,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 function showErr(msg){var el=document.getElementById('errMsg');el.textContent=msg;el.classList.add('show');el.scrollIntoView({behavior:'smooth'});}
 function validateHKPhone(p){
   if(p.length!==8)return '請填寫正確的 8 位香港電話號碼';
-  if(!/^[23569]/.test(p))return '電話號碼格式不正確（香港號碼以 2、3、5、6 或 9 開頭）';
+  if(!/^[2-9]/.test(p))return '電話號碼格式不正確（香港號碼以 2–9 開頭，1 除外）';
   if(new Set(p.split('')).size===1)return '請填寫真實的電話號碼';
   if(p==='12345678'||p==='87654321'||p==='11223344')return '請填寫真實的電話號碼';
   return null;
@@ -2967,10 +2967,16 @@ document.getElementById('editModal').addEventListener('click',function(e){ if(e.
 async function saveEdit(){
   var no=document.getElementById('editNo').value;
   var byRaw=document.getElementById('eBirthYear').value;
+  // Validate phone if changed
+  var rawPhone=document.getElementById('ePhone').value.replace(/\D/g,'');
+  if(rawPhone){
+    var pErr=validateHKPhone(rawPhone);
+    if(pErr){alert('電話號碼有誤：'+pErr);return;}
+  }
   var body={
     name_zh:document.getElementById('eNameZh').value,
     name_en:document.getElementById('eNameEn').value,
-    phone:document.getElementById('ePhone').value,
+    phone:rawPhone||document.getElementById('ePhone').value,
     gender:document.getElementById('eGender').value,
     birth_year:byRaw?parseInt(byRaw):null,
     id_prefix:document.getElementById('eIdPrefix').value.toUpperCase(),
@@ -3887,7 +3893,7 @@ function switchTab(t){
 }
 function validateHKPhone(p){
   if(p.length!==8)return '請填寫正確的 8 位香港電話號碼';
-  if(!/^[23569]/.test(p))return '電話號碼格式不正確（香港號碼以 2、3、5、6 或 9 開頭）';
+  if(!/^[2-9]/.test(p))return '電話號碼格式不正確（香港號碼以 2–9 開頭，1 除外）';
   if(new Set(p.split('')).size===1)return '請填寫真實的電話號碼';
   if(p==='12345678'||p==='87654321'||p==='11223344')return '請填寫真實的電話號碼';
   return null;
