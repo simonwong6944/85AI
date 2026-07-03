@@ -1064,7 +1064,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 
     <div class="action-row">
       <button class="action-btn" id="saveImgBtn" onclick="saveCardImage()">💾 儲存卡圖</button>
-      <button class="action-btn red" onclick="window.location.href='/membership/join-family'">家人申請</button>
+      <button class="action-btn red" onclick="window.location.href='/membership/join-family?parent='+(window._verifyMemberNo||'')">家人申請</button>
     </div>
 
     <button class="wa-link" id="waImgBtn" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">
@@ -1138,6 +1138,21 @@ document.addEventListener('DOMContentLoaded', function() {
   // if URL is /membership or /membership/login, default to login tab
   if (location.pathname === '/membership' || location.pathname === '/membership/login' || location.pathname === '/membership/') {
     switchTab('login');
+  }
+  // Restore success page after WA redirect
+  if(location.pathname === '/membership/join') {
+    var saved = sessionStorage.getItem('successData');
+    var waVerifyPending = sessionStorage.getItem('waVerifyPending');
+    if(saved && waVerifyPending) {
+      try {
+        var data = JSON.parse(saved);
+        var med = sessionStorage.getItem('appliedMedical') === '1';
+        sessionStorage.removeItem('waVerifyPending');
+        showSuccess(data, med);
+        // Auto mark verified since user already sent WA message
+        setTimeout(markVerified, 600);
+      } catch(e) {}
+    }
   }
 });
 
@@ -1286,6 +1301,9 @@ function showSuccess(data, appliedMedical) {
   window.scrollTo(0,0);
   // Store member no globally for verify call
   window._verifyMemberNo = data.memberNo;
+  // Save to sessionStorage so WA redirect + return can restore this page
+  sessionStorage.setItem('successData', JSON.stringify(data));
+  sessionStorage.setItem('appliedMedical', appliedMedical ? '1' : '0');
   // Build card image after short delay (let DOM paint) — watermark shown by default
   setTimeout(function(){ renderCardImage(data, 'PRIMARY'); }, 100);
   // Load admin WhatsApp and inject verification block
@@ -1315,24 +1333,25 @@ function showSuccess(data, appliedMedical) {
     if(preview) preview.textContent = msgText;
   }).catch(function(){});
 
-  // Listen for user returning from WA — auto mark verified
-  document.addEventListener('visibilitychange', function _onReturn() {
-    if(document.visibilityState === 'visible' && window._waLaunched) {
-      window._waLaunched = false;
-      document.removeEventListener('visibilitychange', _onReturn);
-      markVerified();
-    }
-  });
+  // On page load: if user already clicked WA in this session, auto-verify
+  if(sessionStorage.getItem('waVerifyPending') === window._verifyMemberNo) {
+    sessionStorage.removeItem('waVerifyPending');
+    setTimeout(markVerified, 400);
+  }
 }
 
 function openWA() {
   if(!window._waUrl) return;
-  window._waLaunched = true;
-  // Use location.href for deep links (intent:// / whatsapp://) — window.open blocks them on mobile
+  // Save pending state before leaving — works for both location.href and window.open
+  sessionStorage.setItem('waVerifyPending', window._verifyMemberNo || '');
+  // Use location.href so deep links (whatsapp:// / intent://) work on mobile.
+  // User will return to this page via browser back or switching tabs.
   window.location.href = window._waUrl;
 }
 
 function markVerified() {
+  if(window._verifyDone) return;
+  window._verifyDone = true;
   var wm = document.getElementById('pendingWatermark');
   var block = document.getElementById('waVerifyBlock');
   var banner = document.getElementById('verifiedBanner');
@@ -1739,6 +1758,9 @@ async function submitForm(){
     setTimeout(function(){renderCardImage(data,'FAMILY');},100);
     // Store member no for verify
     window._verifyMemberNo=data.memberNo;
+    // Save to sessionStorage so WA redirect + return can restore this page
+    sessionStorage.setItem('successData', JSON.stringify(data));
+    sessionStorage.setItem('successTier', 'FAMILY');
     // Load admin WhatsApp and inject verification block
     fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
       var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
@@ -1761,24 +1783,23 @@ async function submitForm(){
       if(block)block.style.display='block';
       if(preview)preview.textContent=msgText;
     }).catch(function(){});
-    // Listen for user returning from WA — auto mark verified
-    document.addEventListener('visibilitychange',function _onReturn(){
-      if(document.visibilityState==='visible'&&window._waLaunched){
-        window._waLaunched=false;
-        document.removeEventListener('visibilitychange',_onReturn);
-        markVerified();
-      }
-    });
+    // On page load: if user already clicked WA in this session, auto-verify
+    if(sessionStorage.getItem('waVerifyPending')===data.memberNo){
+      sessionStorage.removeItem('waVerifyPending');
+      setTimeout(markVerified,400);
+    }
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
 }
 
 function openWA(){
   if(!window._waUrl)return;
-  window._waLaunched=true;
+  sessionStorage.setItem('waVerifyPending', window._verifyMemberNo||'');
   window.location.href=window._waUrl;
 }
 
 function markVerified(){
+  if(window._verifyDone)return;
+  window._verifyDone=true;
   var wm=document.getElementById('pendingWatermark');
   var block=document.getElementById('waVerifyBlock');
   var banner=document.getElementById('verifiedBanner');
@@ -1788,6 +1809,37 @@ function markVerified(){
   var no=window._verifyMemberNo;
   if(no)fetch('/api/members/'+encodeURIComponent(no)+'/verify',{method:'POST'}).catch(function(){});
 }
+
+// Restore success page after WA redirect (family card)
+document.addEventListener('DOMContentLoaded',function(){
+  if(location.pathname==='/membership/join-family'){
+    var saved=sessionStorage.getItem('successData');
+    var waVerifyPending=sessionStorage.getItem('waVerifyPending');
+    var tier=sessionStorage.getItem('successTier');
+    if(saved&&waVerifyPending&&tier==='FAMILY'){
+      try{
+        var data=JSON.parse(saved);
+        sessionStorage.removeItem('waVerifyPending');
+        // Restore success UI
+        document.getElementById('formSection').style.display='none';
+        document.getElementById('cardZh').textContent=data.nameZh;
+        document.getElementById('cardEn').textContent=data.nameEn||'';
+        document.getElementById('cardNo').textContent=data.memberNo;
+        var cardUrl=location.origin+'/membership/card/'+data.memberNo;
+        try{QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'});}catch(e){}
+        document.getElementById('successSection').classList.add('show');
+        var mySubLink=document.getElementById('mySubPageLink');
+        var mySubSep=document.getElementById('mySubPageSep');
+        if(mySubLink){mySubLink.href='/membership/card/'+data.memberNo;mySubLink.style.display='inline';}
+        if(mySubSep){mySubSep.style.display='inline';}
+        window._verifyMemberNo=data.memberNo;
+        window.scrollTo(0,0);
+        setTimeout(function(){renderCardImage(data,'FAMILY');},100);
+        setTimeout(markVerified,600);
+      }catch(e){}
+    }
+  }
+});
 
 function renderCardImage(data, tier) {
   var logoImg=new Image();
@@ -4030,7 +4082,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
       <button class="action-btn" onclick="saveCardImage()">💾 儲存卡圖</button>
-      <button class="action-btn red" onclick="window.location.href='/membership/join-family'">家人申請</button>
+      <button class="action-btn red" onclick="window.location.href='/membership/join-family?parent='+encodeURIComponent(window._memberNo||'')">家人申請</button>
     </div>
     <button class="wa-link" id="waImgBtn" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
     <div class="footer-links">
@@ -4138,6 +4190,7 @@ function showSuccess(data){
   try{QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:38,margin:0,color:{dark:'#0d3e12',light:'#ffffff'},errorCorrectionLevel:'H'});}catch(e){console.warn('QR:',e);}
   var myLink=document.getElementById('myPageLink');
   if(myLink)myLink.href='/membership/card/'+data.memberNo;
+  window._memberNo = data.memberNo;
   window.scrollTo(0,0);
   setTimeout(function(){renderCardImage(data,'PRIMARY');},200);
 }
