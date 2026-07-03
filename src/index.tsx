@@ -3288,7 +3288,7 @@ async function loadMembers(page){
       <td>\${m.name_zh}</td>
       <td style="font-size:12px;">\${m.name_en||'—'}</td>
       <td><a href="tel:+852\${m.phone}" style="color:inherit;">\${m.phone}</a></td>
-      <td style="font-size:12px;">\${{'M':'男','F':'女','X':'其他'}[m.gender]||'—'}</td>
+      <td style="font-size:12px;">\${m.gender==='M'?'男':m.gender==='F'?'女':m.gender==='X'?'其他':'—'}</td>
       <td style="font-size:12px;">\${m.birth_year||'—'}</td>
       <td style="font-family:monospace;font-weight:700;letter-spacing:2px;">\${m.id_prefix||'—'}</td>
       <td>\${m.district||'—'}</td>
