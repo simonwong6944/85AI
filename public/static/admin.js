@@ -692,7 +692,7 @@ async function loadMembers(page){
           ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;color:#fff;background:'+(m.group_color||'#4caf50')+'">'+m.group_name+'</span> '
           : '<span style="color:#bbb;font-size:11px;">未分群</span> ';
         var opts='<option value="">— 移除群組 —</option>'+(_groups||[]).map(function(g){return '<option value="'+g.id+'"'+(m.group_id===g.id?' selected':'')+'>'+g.name+'</option>';}).join('');
-        return badge+'<select style="font-size:10px;padding:1px 2px;max-width:90px;" onchange="assignGroup('+JSON.stringify(m.member_no)+',this.value)"><option value="">指派群組…</option>'+opts+'</select>';
+        return badge+'<select style="font-size:10px;padding:1px 2px;max-width:90px;" data-no="'+m.member_no+'" onchange="assignGroup(this.dataset.no,this.value)"><option value="">指派群組…</option>'+opts+'</select>';
       })()}</td>
       <td>${familyInfo}</td>
       <td style="font-size:11px;">${srcLabel[m.source]||m.source||'—'}</td>
@@ -703,8 +703,8 @@ async function loadMembers(page){
         <button class="act-btn act-edit" onclick="openEdit(${i})">編輯</button>
         ${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc('+i+')">KYC✓</button>':''}
         ${!m.verified_at
-          ? '<button class="act-btn" style="background:#25D366;color:#fff;" data-no="'+m.member_no+'" onclick="adminVerify(this.dataset.no)">WA✓</button>'
-          : '<button class="act-btn" style="background:#e0e0e0;color:#555;font-size:10px;" data-no="'+m.member_no+'" onclick="adminUnverify(this.dataset.no)">取消驗證</button>'}
+          ? `<button class="act-btn" style="background:#25D366;color:#fff;" onclick="adminVerify('${m.member_no}')">WA✓</button>`
+          : `<button class="act-btn" style="background:#e0e0e0;color:#555;font-size:10px;" onclick="adminUnverify('${m.member_no}')">取消驗證</button>`}
         ${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="deactivateMember('+i+')">停用</button>':
           m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="reactivateMember('+i+')">啟用</button>':''}
       </td>
