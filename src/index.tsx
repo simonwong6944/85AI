@@ -3064,8 +3064,9 @@ async function loadMembers(page){
       <td>
         <button class="act-btn act-edit" onclick="openEdit(\${i})">編輯</button>
         \${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc('+i+')">KYC✓</button>':''}
-        \${!m.verified_at?'<button class="act-btn" style="background:#25D366;color:#fff;" onclick="adminVerify(\''+m.member_no+'\')">WA✓</button>':
-          '<button class="act-btn" style="background:#e0e0e0;color:#555;font-size:10px;" onclick="adminUnverify(\''+m.member_no+'\')">取消驗證</button>'}
+        \${!m.verified_at
+          ? '<button class="act-btn" style="background:#25D366;color:#fff;" onclick="adminVerify(' + JSON.stringify(m.member_no) + ')">WA✓</button>'
+          : '<button class="act-btn" style="background:#e0e0e0;color:#555;font-size:10px;" onclick="adminUnverify(' + JSON.stringify(m.member_no) + ')">取消驗證</button>'}
         \${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="deactivateMember('+i+')">停用</button>':
           m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="reactivateMember('+i+')">啟用</button>':''}
       </td>
