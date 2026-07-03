@@ -31,6 +31,19 @@ function expiryDate(years = 3): string {
   return d.toISOString().slice(0, 10)
 }
 
+// ─── HK phone validator ───────────────────────────────────────────────────────
+// Valid HK numbers: mobile 5/6/9xxxxxxx, landline 2/3xxxxxxx
+// Rejects obvious fakes: 00000000, 11111111, 12345678, 99999999, etc.
+function validateHKPhone(phone: string): { ok: boolean; error?: string } {
+  const p = phone.replace(/\D/g, '')
+  if (p.length !== 8) return { ok: false, error: '請填寫正確的 8 位香港電話號碼' }
+  if (!/^[23569]/.test(p)) return { ok: false, error: '電話號碼格式不正確（香港號碼以 2、3、5、6 或 9 開頭）' }
+  // Reject obvious fakes: all same digit, sequential
+  if (/^(\d)\1{7}$/.test(p)) return { ok: false, error: '請填寫真實的電話號碼' }
+  if (p === '12345678' || p === '87654321' || p === '11223344') return { ok: false, error: '請填寫真實的電話號碼' }
+  return { ok: true }
+}
+
 // ─── API: Register member ─────────────────────────────────────────────────────
 app.post('/api/members', async (c) => {
   const db = c.env.DB
@@ -49,7 +62,8 @@ app.post('/api/members', async (c) => {
     if (!body.nameZh?.trim()) return c.json({ ok: false, error: '請填寫中文姓名' }, 400)
     if (!body.phone?.trim()) return c.json({ ok: false, error: '請填寫 WhatsApp 電話' }, 400)
     const phoneClean = body.phone.replace(/\D/g, '')
-    if (phoneClean.length < 8) return c.json({ ok: false, error: '電話號碼格式不正確' }, 400)
+    const phoneCheck = validateHKPhone(phoneClean)
+    if (!phoneCheck.ok) return c.json({ ok: false, error: phoneCheck.error }, 400)
 
     // Check duplicate phone for same tier
     const existing = await db.prepare(
@@ -313,6 +327,31 @@ app.get('/api/admin/stats', async (c) => {
       byReferrer: byReferrer.results,
     }
   })
+})
+
+// ─── API: Settings (admin) ────────────────────────────────────────────────────
+app.get('/api/admin/settings', async (c) => {
+  const db = c.env.DB
+  try {
+    const rows = await db.prepare('SELECT key, value FROM settings').all<{ key: string; value: string }>()
+    const settings: Record<string, string> = {}
+    for (const r of rows.results) settings[r.key] = r.value
+    return c.json({ ok: true, settings })
+  } catch {
+    return c.json({ ok: false, error: 'Failed to load settings' }, 500)
+  }
+})
+
+app.put('/api/admin/settings/:key', async (c) => {
+  const key = c.req.param('key')
+  const db = c.env.DB
+  const { value } = await c.req.json<{ value: string }>()
+  if (value === undefined || value === null) return c.json({ ok: false, error: 'Missing value' }, 400)
+  await db.prepare(
+    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`
+  ).bind(key, value).run()
+  return c.json({ ok: true })
 })
 
 // ─── API: Update member (admin) ───────────────────────────────────────────────
@@ -982,6 +1021,11 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       📱 WhatsApp 分享會員卡圖片
     </button>
 
+    <a id="waVerifyBtn" href="#" target="_blank" rel="noopener" style="display:none;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:15px;font-weight:700;padding:15px 16px;border-radius:6px;text-decoration:none;align-items:center;justify-content:center;gap:8px;margin-top:10px;text-align:center;">
+      ✅ 點此發 WhatsApp 完成驗證
+    </a>
+    <div style="font-size:11px;color:#888;text-align:center;margin-top:4px;margin-bottom:8px;">向管理員發送 WhatsApp，同時儲存我們的號碼，完成驗證</div>
+
     <div class="footer-links">
       <a id="myPageLink" href="#" style="color:var(--forest);font-weight:700;">🪪 查看我的會員頁</a><br>
       <a href="#" onclick="switchTab('login');window.scrollTo(0,0);return false;" style="color:var(--forest);">🔐 下次用電話登入</a><br>
@@ -992,6 +1036,15 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 </div><!-- /container -->
 
 <script>
+// ── HK Phone validator (frontend mirror of backend validateHKPhone) ───────────
+function validateHKPhone(p) {
+  if (p.length !== 8) return '請填寫正確的 8 位香港電話號碼';
+  if (!/^[23569]/.test(p)) return '電話號碼格式不正確（香港號碼以 2、3、5、6 或 9 開頭）';
+  if(new Set(p.split('')).size===1) return '請填寫真實的電話號碼';
+  if (p === '12345678' || p === '87654321' || p === '11223344') return '請填寫真實的電話號碼';
+  return null; // ok
+}
+
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(t) {
   document.getElementById('secLogin').classList.toggle('active', t === 'login');
@@ -1005,7 +1058,8 @@ function switchTab(t) {
 async function doLogin() {
   document.getElementById('loginErrMsg').classList.remove('show');
   var phone = document.getElementById('loginPhone').value.replace(/\D/g, '');
-  if (phone.length !== 8) { showLoginErr('請輸入正確的 8 位電話號碼'); return; }
+  var phoneErr = validateHKPhone(phone);
+  if (phoneErr) { showLoginErr(phoneErr); return; }
   var btn = document.getElementById('loginBtn');
   btn.disabled = true; btn.textContent = '查詢中…';
   try {
@@ -1112,7 +1166,8 @@ async function submitForm() {
   var district = document.getElementById('district').value;
   if (!nameZh) { showErr('請填寫中文姓名'); return; }
   if (!nameEn) { showErr('請填寫英文姓名（與身份證相同）'); return; }
-  if (phone.length !== 8) { showErr('請填寫正確的 8 位香港電話'); return; }
+  var phoneErr = validateHKPhone(phone);
+  if (phoneErr) { showErr(phoneErr); return; }
   if (!selectedGender) { showErr('請選擇性別'); return; }
   if (!birthYear || birthYear > 1972) { showErr('請填寫出生年份（1972年或以前，即55歲或以上）'); return; }
   if (birthYear < 1920) { showErr('請填寫正確的出生年份'); return; }
@@ -1186,6 +1241,14 @@ function showSuccess(data, appliedMedical) {
   window.scrollTo(0,0);
   // Build card image after short delay (let DOM paint)
   setTimeout(function(){ renderCardImage(data, 'PRIMARY'); }, 100);
+  // Load admin WhatsApp and inject verification button
+  fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
+    var waNum = (s.settings && s.settings.admin_whatsapp) ? s.settings.admin_whatsapp : '85291477341';
+    var msg = encodeURIComponent('你好，我剛登記了老有卡，會員編號：' + data.memberNo + '，請幫我確認。');
+    var waUrl = 'https://wa.me/' + waNum + '?text=' + msg;
+    var waBtn = document.getElementById('waVerifyBtn');
+    if(waBtn){ waBtn.href = waUrl; waBtn.style.display = 'flex'; }
+  }).catch(function(){});
 }
 
 // ── Draw member card onto an off-screen canvas — design-matched ───────────────
@@ -1487,6 +1550,12 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     </div>
 
     <button class="wa-link" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
+
+    <a id="waVerifyBtn" href="#" target="_blank" rel="noopener" style="display:none;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:15px;font-weight:700;padding:15px 16px;border-radius:6px;text-decoration:none;align-items:center;justify-content:center;gap:8px;margin-top:10px;text-align:center;">
+      ✅ 點此發 WhatsApp 完成驗證
+    </a>
+    <div id="waVerifyHint" style="display:none;font-size:11px;color:#888;text-align:center;margin-top:4px;margin-bottom:8px;">向管理員發送 WhatsApp，同時儲存我們的號碼，完成驗證</div>
+
     <div class="footer-links">
       <a id="mySubPageLink" href="#" style="color:var(--ferrari-deep);font-weight:700;display:none;">🪪 查看我的會員頁</a>
       <span id="mySubPageSep" style="display:none;"> &middot; </span>
@@ -1520,6 +1589,13 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 })();
 
 function showErr(msg){var el=document.getElementById('errMsg');el.textContent=msg;el.classList.add('show');el.scrollIntoView({behavior:'smooth'});}
+function validateHKPhone(p){
+  if(p.length!==8)return '請填寫正確的 8 位香港電話號碼';
+  if(!/^[23569]/.test(p))return '電話號碼格式不正確（香港號碼以 2、3、5、6 或 9 開頭）';
+  if(new Set(p.split('')).size===1)return '請填寫真實的電話號碼';
+  if(p==='12345678'||p==='87654321'||p==='11223344')return '請填寫真實的電話號碼';
+  return null;
+}
 async function submitForm(){
   document.getElementById('errMsg').classList.remove('show');
   var nameZh=document.getElementById('nameZh').value.trim();
@@ -1527,8 +1603,9 @@ async function submitForm(){
   var linkedParentNo=document.getElementById('linkedParentNo').value.trim();
   var parentPhone=document.getElementById('parentPhone').value.replace(/\D/g,'');
   if(!nameZh){showErr('請填寫中文姓名');return;}
-  if(phone.length!==8){showErr('請填寫正確的 8 位電話');return;}
-  if(!linkedParentNo && parentPhone.length!==8){showErr('請填寫長輩的 8 位電話');return;}
+  var phoneErr=validateHKPhone(phone);
+  if(phoneErr){showErr(phoneErr);return;}
+  if(!linkedParentNo){var ppErr=validateHKPhone(parentPhone);if(ppErr){showErr('長輩電話：'+ppErr);return;}}
   if(!document.getElementById('consent').checked){showErr('請同意私隱政策');return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.textContent='處理中…';
@@ -1552,6 +1629,16 @@ async function submitForm(){
     if(mySubLink){mySubLink.href='/membership/card/'+data.memberNo;mySubLink.style.display='inline';}
     if(mySubSep){mySubSep.style.display='inline';}
     setTimeout(function(){renderCardImage(data,'FAMILY');},100);
+    // Load admin WhatsApp and inject verification button
+    fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
+      var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
+      var msg=encodeURIComponent('你好，我剛登記了老有卡家庭同行卡，會員編號：'+data.memberNo+'，請幫我確認。');
+      var waUrl='https://wa.me/'+waNum+'?text='+msg;
+      var waBtn=document.getElementById('waVerifyBtn');
+      var waHint=document.getElementById('waVerifyHint');
+      if(waBtn){waBtn.href=waUrl;waBtn.style.display='flex';}
+      if(waHint){waHint.style.display='block';}
+    }).catch(function(){});
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
 }
 
@@ -1822,6 +1909,7 @@ tr.inactive td{opacity:0.45;}
     <div class="nav-tab" onclick="switchTab('members',this)">👥 會員管理</div>
     <div class="nav-tab" onclick="switchTab('medical',this)">🏥 醫健卡申請</div>
     <div class="nav-tab" onclick="switchTab('qrgen',this)">🔗 QR 連結</div>
+    <div class="nav-tab" onclick="switchTab('settings',this)">⚙️ 設定</div>
   </div>
   <div class="topbar-right">coeldery85.com/membership/admin</div>
 </div>
@@ -2092,6 +2180,52 @@ tr.inactive td{opacity:0.45;}
     </div>
   </div>
 
+  <!-- ── SETTINGS PAGE ── -->
+  <div class="page" id="page-settings">
+    <div style="max-width:560px;margin:0 auto;">
+      <div style="background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,0.07);padding:28px 24px;margin-bottom:24px;">
+        <h2 style="font-size:16px;font-weight:700;margin:0 0 20px;color:#222;letter-spacing:1px;">⚙️ 系統設定</h2>
+
+        <!-- WhatsApp Admin Number -->
+        <div style="margin-bottom:24px;">
+          <label style="display:block;font-size:12px;font-weight:700;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">
+            📱 WhatsApp 管理員號碼
+          </label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="settingWaNum" type="tel" maxlength="15" placeholder="例：85291477341"
+              style="flex:1;border:1px solid #ddd;border-radius:5px;padding:10px 12px;font-size:14px;font-family:monospace;letter-spacing:1px;"
+              oninput="settingsDirty()">
+            <button onclick="saveWaNum()" id="saveWaBtn"
+              style="background:#25D366;color:#fff;border:0;border-radius:5px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">
+              儲存
+            </button>
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:6px;line-height:1.6;">
+            包含國家碼，例如香港號碼 91477341 填入 <strong>85291477341</strong><br>
+            會員登記成功後，WhatsApp 驗證按鈕會連到這個號碼。
+          </div>
+          <div id="settingWaStatus" style="margin-top:8px;font-size:12px;font-weight:700;display:none;"></div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #f0f0f0;margin:20px 0;">
+
+        <!-- Preview -->
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">👁 預覽驗證訊息</div>
+          <div style="background:#f5f5f5;border-radius:6px;padding:12px 14px;font-size:13px;color:#333;line-height:1.7;" id="settingPreview">
+            —
+          </div>
+          <div style="margin-top:10px;">
+            <a id="settingTestLink" href="#" target="_blank" rel="noopener"
+              style="display:inline-block;background:#25D366;color:#fff;padding:9px 16px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:700;">
+              📲 測試發送 WhatsApp
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ── EDIT MODAL ── -->
@@ -2163,6 +2297,7 @@ function switchTab(t, el){
   if(t==='members') loadMembers(1);
   if(t==='medical') loadMedical();
   if(t==='qrgen'){ updateQr(); loadQrLinks(); }
+  if(t==='settings') loadSettings();
 }
 
 // ── QR Generator
@@ -2430,6 +2565,76 @@ function deleteQrLink(i){
   _qrLinks.splice(i,1);
   try{ localStorage.setItem('coeldery85_qr_links', JSON.stringify(_qrLinks)); }catch(e){}
   renderQrLinks();
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+var _settingsDirty = false;
+
+async function loadSettings(){
+  _settingsDirty = false;
+  var saveBtn = document.getElementById('saveWaBtn');
+  if(saveBtn){ saveBtn.style.background='#25D366'; saveBtn.textContent='儲存'; }
+  try{
+    var r = await fetch('/api/admin/settings');
+    var d = await r.json();
+    if(!d.ok) return;
+    var waNum = (d.settings && d.settings.admin_whatsapp) || '85291477341';
+    document.getElementById('settingWaNum').value = waNum;
+    updateSettingsPreview(waNum);
+  }catch(e){ console.warn('Settings load error',e); }
+}
+
+function settingsDirty(){
+  _settingsDirty = true;
+  var saveBtn = document.getElementById('saveWaBtn');
+  if(saveBtn){ saveBtn.style.background='#1a8a45'; }
+  var waNum = document.getElementById('settingWaNum').value.replace(/\D/g,'');
+  updateSettingsPreview(waNum);
+}
+
+function updateSettingsPreview(waNum){
+  var preview = document.getElementById('settingPreview');
+  var testLink = document.getElementById('settingTestLink');
+  var sampleNo = 'CE85-000001';
+  var msg = '你好，我剛登記了老有卡，會員編號：' + sampleNo + '，請幫我確認。';
+  if(preview) preview.textContent = msg;
+  if(testLink){
+    var url = 'https://wa.me/' + (waNum||'85291477341') + '?text=' + encodeURIComponent(msg);
+    testLink.href = url;
+  }
+}
+
+async function saveWaNum(){
+  var raw = document.getElementById('settingWaNum').value.replace(/\D/g,'');
+  if(!raw || raw.length < 8){ showSettingStatus('❌ 請輸入正確的電話號碼（含國碼）', '#c00'); return; }
+  var saveBtn = document.getElementById('saveWaBtn');
+  saveBtn.disabled=true; saveBtn.textContent='儲存中…';
+  try{
+    var r = await fetch('/api/admin/settings/admin_whatsapp', {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ value: raw })
+    });
+    var d = await r.json();
+    if(d.ok){
+      _settingsDirty = false;
+      saveBtn.style.background='#25D366'; saveBtn.textContent='儲存';
+      document.getElementById('settingWaNum').value = raw;
+      updateSettingsPreview(raw);
+      showSettingStatus('✅ 已儲存！WhatsApp 號碼：' + raw, '#2E7D32');
+    } else {
+      showSettingStatus('❌ 儲存失敗：' + (d.error||'未知錯誤'), '#c00');
+    }
+  }catch(e){ showSettingStatus('❌ 網絡錯誤，請再試', '#c00'); }
+  finally{ saveBtn.disabled=false; saveBtn.textContent='儲存'; }
+}
+
+function showSettingStatus(msg, color){
+  var el = document.getElementById('settingWaStatus');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = color || '#333';
+  el.style.display = 'block';
+  setTimeout(function(){ el.style.display='none'; }, 4000);
 }
 
 // ── Stats + Charts
@@ -3680,12 +3885,20 @@ function switchTab(t){
   document.getElementById('tabRegister').classList.toggle('active',t==='register');
   document.getElementById('errMsg').classList.remove('show');
 }
+function validateHKPhone(p){
+  if(p.length!==8)return '請填寫正確的 8 位香港電話號碼';
+  if(!/^[23569]/.test(p))return '電話號碼格式不正確（香港號碼以 2、3、5、6 或 9 開頭）';
+  if(new Set(p.split('')).size===1)return '請填寫真實的電話號碼';
+  if(p==='12345678'||p==='87654321'||p==='11223344')return '請填寫真實的電話號碼';
+  return null;
+}
 
 // ── LOGIN ────────────────────────────────────────────────────────────────────
 async function doLogin(){
   document.getElementById('errMsg').classList.remove('show');
   var phone=document.getElementById('loginPhone').value.replace(/\D/g,'');
-  if(phone.length!==8){showErr('請輸入正確的 8 位電話號碼');return;}
+  var phoneErr=validateHKPhone(phone);
+  if(phoneErr){showErr(phoneErr);return;}
   var btn=document.getElementById('loginBtn');
   btn.disabled=true;btn.textContent='查詢中…';
   try{
@@ -3720,7 +3933,8 @@ async function doRegister(){
   var nameZh=document.getElementById('nameZh').value.trim();
   var phone=document.getElementById('phone').value.replace(/\D/g,'');
   if(!nameZh){showErr('請填寫中文姓名');return;}
-  if(phone.length!==8){showErr('請填寫正確的 8 位香港電話');return;}
+  var phoneErr=validateHKPhone(phone);
+  if(phoneErr){showErr(phoneErr);return;}
   if(!document.getElementById('consent').checked){showErr('請同意私隱政策');return;}
   var btn=document.getElementById('registerBtn');
   btn.disabled=true;btn.textContent='登記中…';
