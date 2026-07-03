@@ -1223,7 +1223,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (location.pathname === '/membership' || location.pathname === '/membership/login' || location.pathname === '/membership/') {
     switchTab('login');
   }
-  // Restore success page after WA redirect
+  // Restore success page after WA redirect (page full reload — rare on iOS)
   if(location.pathname === '/membership/join') {
     var saved = sessionStorage.getItem('successData');
     var waVerifyPending = sessionStorage.getItem('waVerifyPending');
@@ -1233,10 +1233,23 @@ document.addEventListener('DOMContentLoaded', function() {
         var med = sessionStorage.getItem('appliedMedical') === '1';
         sessionStorage.removeItem('waVerifyPending');
         showSuccess(data, med);
-        // Auto mark verified since user already sent WA message
         setTimeout(markVerified, 600);
       } catch(e) {}
     }
+  }
+});
+// visibilitychange: fires when user switches back from WA app (iOS bfcache / Android)
+document.addEventListener('visibilitychange', function() {
+  if(document.visibilityState === 'visible' && sessionStorage.getItem('waVerifyPending')) {
+    sessionStorage.removeItem('waVerifyPending');
+    setTimeout(markVerified, 500);
+  }
+});
+// pageshow: fires on bfcache restore (iOS Safari back gesture)
+window.addEventListener('pageshow', function(e) {
+  if(e.persisted && sessionStorage.getItem('waVerifyPending')) {
+    sessionStorage.removeItem('waVerifyPending');
+    setTimeout(markVerified, 500);
   }
 });
 
@@ -1396,20 +1409,13 @@ function showSuccess(data, appliedMedical) {
     var msgText = '你好，我剛登記了老有卡，會員編號：' + data.memberNo + '，請幫我確認。';
     var msgEnc = encodeURIComponent(msgText);
     // Build deep link URLs for direct WA app launch (bypass wa.me interstitial page)
-    var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    var isAndroid = /android/i.test(navigator.userAgent);
     var phoneDigits = waNum.replace(/\D/g,'');
-    var waUrl;
-    if(isIOS) {
-      // iOS: whatsapp:// deep link directly opens WA app
-      waUrl = 'whatsapp://send?phone=' + phoneDigits + '&text=' + msgEnc;
-    } else if(isAndroid) {
-      // Android: intent:// bypasses the wa.me browser interstitial page
-      waUrl = 'intent://send/' + phoneDigits + '#Intent;scheme=smsto;package=com.whatsapp;action=android.intent.action.SENDTO;S.sms_body=' + msgEnc + ';end';
-    } else {
-      // Desktop fallback: wa.me link
-      waUrl = 'https://wa.me/' + phoneDigits + '?text=' + msgEnc;
-    }
+    // Use whatsapp:// on all mobile (works on both iOS and Android)
+    // Desktop fallback: wa.me link
+    var isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
+    var waUrl = isMobile
+      ? 'whatsapp://send?phone=' + phoneDigits + '&text=' + msgEnc
+      : 'https://wa.me/' + phoneDigits + '?text=' + msgEnc;
     window._waUrl = waUrl;
     var block = document.getElementById('waVerifyBlock');
     var preview = document.getElementById('waVerifyMsgPreview');
@@ -1426,10 +1432,10 @@ function showSuccess(data, appliedMedical) {
 
 function openWA() {
   if(!window._waUrl) return;
-  // Save pending state before leaving — works for both location.href and window.open
+  // Save pending state — used by visibilitychange + pageshow to auto-verify on return
   sessionStorage.setItem('waVerifyPending', window._verifyMemberNo || '');
-  // Use location.href so deep links (whatsapp:// / intent://) work on mobile.
-  // User will return to this page via browser back or switching tabs.
+  window._waSent = true;
+  // Open WA via location.href (deep link)
   window.location.href = window._waUrl;
 }
 
@@ -1850,17 +1856,11 @@ async function submitForm(){
       var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
       var msgText='你好，我剛登記了老有卡家庭同行卡，會員編號：'+data.memberNo+'，請幫我確認。';
       var msgEnc=encodeURIComponent(msgText);
-      var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
-      var isAndroid=/android/i.test(navigator.userAgent);
       var phoneDigits=waNum.replace(/\D/g,'');
-      var waUrl;
-      if(isIOS){
-        waUrl='whatsapp://send?phone='+phoneDigits+'&text='+msgEnc;
-      }else if(isAndroid){
-        waUrl='intent://send/'+phoneDigits+'#Intent;scheme=smsto;package=com.whatsapp;action=android.intent.action.SENDTO;S.sms_body='+msgEnc+';end';
-      }else{
-        waUrl='https://wa.me/'+phoneDigits+'?text='+msgEnc;
-      }
+      var isMobile=/iphone|ipad|ipod|android/i.test(navigator.userAgent);
+      var waUrl=isMobile
+        ?'whatsapp://send?phone='+phoneDigits+'&text='+msgEnc
+        :'https://wa.me/'+phoneDigits+'?text='+msgEnc;
       window._waUrl=waUrl;
       var block=document.getElementById('waVerifyBlock');
       var preview=document.getElementById('waVerifyMsgPreview');
@@ -1878,6 +1878,7 @@ async function submitForm(){
 function openWA(){
   if(!window._waUrl)return;
   sessionStorage.setItem('waVerifyPending', window._verifyMemberNo||'');
+  window._waSent=true;
   window.location.href=window._waUrl;
 }
 
@@ -1922,6 +1923,20 @@ document.addEventListener('DOMContentLoaded',function(){
         setTimeout(markVerified,600);
       }catch(e){}
     }
+  }
+});
+// visibilitychange for family card: user switches back from WA app
+document.addEventListener('visibilitychange', function() {
+  if(document.visibilityState==='visible' && sessionStorage.getItem('waVerifyPending')) {
+    sessionStorage.removeItem('waVerifyPending');
+    setTimeout(markVerified, 500);
+  }
+});
+// pageshow for family card: iOS bfcache restore
+window.addEventListener('pageshow', function(e) {
+  if(e.persisted && sessionStorage.getItem('waVerifyPending')) {
+    sessionStorage.removeItem('waVerifyPending');
+    setTimeout(markVerified, 500);
   }
 });
 
