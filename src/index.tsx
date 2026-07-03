@@ -1135,14 +1135,25 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     <div id="waVerifyBlock" style="display:none;margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px;">
       <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
       <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
+      <!-- Button 1: Normal WhatsApp — real flow, visibilitychange triggers markVerified on return -->
       <button id="waVerifyBtn" onclick="openWA()"
-        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:15px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;">
-        💬 WhatsApp 發送驗證訊息
+        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:14px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;">
+        💬 我有 WhatsApp — 發送驗證訊息
+      </button>
+      <!-- Button 2: WA Business — fake 2.5s flow, records wa_clicked_at only -->
+      <button id="waBizBtn" onclick="openWABiz()"
+        style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:14px;font-weight:700;padding:12px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;">
+        📱 我用 WhatsApp Business
       </button>
       <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:13px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
     </div>
 
-    <!-- Verified confirmation banner (shown after WA sent) -->
+    <!-- Banner A: normal WA sent — watermark stays, waiting for admin confirm -->
+    <div id="waSentBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
+      <div style="font-size:14px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發出！</div>
+      <div style="font-size:12px;color:#388E3C;margin-top:4px;">請在 WhatsApp 中發送訊息給我們，Admin 確認後會籍即生效。</div>
+    </div>
+    <!-- Banner B: WA Biz fake complete — watermark hidden -->
     <div id="verifiedBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
       <div style="font-size:14px;font-weight:700;color:#2E7D32;">✅ 驗證訊息已發送！</div>
       <div style="font-size:12px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
@@ -1234,7 +1245,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (location.pathname === '/membership' || location.pathname === '/membership/login' || location.pathname === '/membership/') {
     switchTab('login');
   }
-  // Restore success page after WA redirect (page full reload — rare on iOS)
+  // Restore success page after WA redirect (page full reload — rare on iOS bfcache miss)
   if(location.pathname === '/membership/join') {
     var saved = sessionStorage.getItem('successData');
     var waVerifyPending = sessionStorage.getItem('waVerifyPending');
@@ -1244,12 +1255,17 @@ document.addEventListener('DOMContentLoaded', function() {
         var med = sessionStorage.getItem('appliedMedical') === '1';
         sessionStorage.removeItem('waVerifyPending');
         showSuccess(data, med);
-        setTimeout(markVerified, 600);
+        // Full reload after normal WA: show "sent" banner, keep watermark
+        setTimeout(function(){
+          var block = document.getElementById('waVerifyBlock');
+          var banner = document.getElementById('waSentBanner');
+          if(block) block.style.display = 'none';
+          if(banner) banner.style.display = 'block';
+        }, 600);
       } catch(e) {}
     }
   }
 });
-// visibilitychange / pageshow: no longer needed — markVerified fires via setTimeout in openWA()
 
 // ── Register ──────────────────────────────────────────────────────────────────
 var selectedGender = '';
@@ -1423,35 +1439,75 @@ function showSuccess(data, appliedMedical) {
 
 }
 
+// ── Button 1: Normal WhatsApp — open WA, wait for user to return via visibilitychange/pageshow ──
 function openWA() {
   if(!window._waUrl) return;
   if(window._waSent) return; // prevent double click
   window._waSent = true;
-  // Disable button, show sending msg
   var btn = document.getElementById('waVerifyBtn');
+  var bizBtn = document.getElementById('waBizBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '📤 正在開啟 WhatsApp...'; btn.style.background = '#a5d6a7'; }
+  if(bizBtn){ bizBtn.disabled = true; bizBtn.style.opacity = '0.4'; }
+  // Save pending state so restore works if page fully reloads
+  sessionStorage.setItem('waVerifyPending', '1');
+  // Open WA deep link — user leaves page here
+  window.location.href = window._waUrl;
+  // visibilitychange: fires when user switches back (Android / desktop)
+  document.addEventListener('visibilitychange', function onVis() {
+    if(document.visibilityState === 'visible') {
+      document.removeEventListener('visibilitychange', onVis);
+      markWASent();
+    }
+  });
+  // pageshow: fires on iOS bfcache restore when user returns from WA
+  window.addEventListener('pageshow', function onPS(e) {
+    window.removeEventListener('pageshow', onPS);
+    markWASent();
+  });
+}
+
+// Called when user returns to page after normal WA — watermark stays, show "sent" banner
+function markWASent() {
+  if(window._waSentDone) return;
+  window._waSentDone = true;
+  sessionStorage.removeItem('waVerifyPending');
+  var block = document.getElementById('waVerifyBlock');
+  var banner = document.getElementById('waSentBanner');
+  if(block) block.style.display = 'none';
+  if(banner) banner.style.display = 'block';
+  // Watermark stays — admin must manually confirm verified_at
+}
+
+// ── Button 2: WA Business — fake 2.5s flow, records wa_clicked_at, hides watermark ──
+function openWABiz() {
+  if(window._waBizSent) return; // prevent double click
+  window._waBizSent = true;
+  var bizBtn = document.getElementById('waBizBtn');
+  var waBtn = document.getElementById('waVerifyBtn');
   var sendingMsg = document.getElementById('waSendingMsg');
-  if(btn){ btn.disabled = true; btn.textContent = '📤 發送中...'; btn.style.background = '#a5d6a7'; }
+  if(bizBtn){ bizBtn.disabled = true; bizBtn.textContent = '📤 發送中...'; bizBtn.style.background = '#c8e6c9'; bizBtn.style.color = '#2E7D32'; }
+  if(waBtn){ waBtn.disabled = true; waBtn.style.opacity = '0.4'; }
   if(sendingMsg) sendingMsg.style.display = 'block';
   // Record click in DB (fire and forget)
   var no = window._verifyMemberNo;
   if(no) fetch('/api/members/' + encodeURIComponent(no) + '/wa-click', {method:'POST'}).catch(function(){});
-  // Open WA deep link
-  window.location.href = window._waUrl;
-  // After 2.5s auto markVerified (regardless of whether WA opened)
+  // 2.5s fake process then show complete
   setTimeout(markVerified, 2500);
 }
 
+// Called after WA Biz fake flow — hides watermark, shows verified banner
 function markVerified() {
   if(window._verifyDone) return;
   window._verifyDone = true;
   var wm = document.getElementById('pendingWatermark');
   var block = document.getElementById('waVerifyBlock');
+  var sendingMsg = document.getElementById('waSendingMsg');
   var banner = document.getElementById('verifiedBanner');
   if(wm) wm.style.display = 'none';
   if(block) block.style.display = 'none';
+  if(sendingMsg) sendingMsg.style.display = 'none';
   if(banner) banner.style.display = 'block';
-  var no = window._verifyMemberNo;
-  if(no) fetch('/api/members/' + encodeURIComponent(no) + '/verify', {method:'POST'}).catch(function(){});
+  // Do NOT call /verify — admin must manually confirm via admin panel
 }
 
 // ── Draw member card onto an off-screen canvas — design-matched ───────────────
@@ -1756,14 +1812,25 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     <div id="waVerifyBlock" style="display:none;margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px;">
       <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
       <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
+      <!-- Button 1: Normal WhatsApp — real flow -->
       <button id="waVerifyBtn" onclick="openWA()"
-        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:15px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;">
-        💬 WhatsApp 發送驗證訊息
+        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:14px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;">
+        💬 我有 WhatsApp — 發送驗證訊息
+      </button>
+      <!-- Button 2: WA Business — fake 2.5s flow -->
+      <button id="waBizBtn" onclick="openWABiz()"
+        style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:14px;font-weight:700;padding:12px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;">
+        📱 我用 WhatsApp Business
       </button>
       <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:13px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
     </div>
 
-    <!-- Verified confirmation banner -->
+    <!-- Banner A: normal WA sent — watermark stays -->
+    <div id="waSentBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
+      <div style="font-size:14px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發出！</div>
+      <div style="font-size:12px;color:#388E3C;margin-top:4px;">請在 WhatsApp 中發送訊息給我們，Admin 確認後會籍即生效。</div>
+    </div>
+    <!-- Banner B: WA Biz fake complete — watermark hidden -->
     <div id="verifiedBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
       <div style="font-size:14px;font-weight:700;color:#2E7D32;">✅ 驗證訊息已發送！</div>
       <div style="font-size:12px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
@@ -1873,34 +1940,72 @@ async function submitForm(){
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
 }
 
+// ── Button 1: Normal WhatsApp — open WA, visibilitychange/pageshow triggers markWASent on return ──
 function openWA(){
   if(!window._waUrl)return;
   if(window._waSent)return;
   window._waSent=true;
   var btn=document.getElementById('waVerifyBtn');
+  var bizBtn=document.getElementById('waBizBtn');
+  if(btn){btn.disabled=true;btn.textContent='📤 正在開啟 WhatsApp...';btn.style.background='#a5d6a7';}
+  if(bizBtn){bizBtn.disabled=true;bizBtn.style.opacity='0.4';}
+  sessionStorage.setItem('waVerifyPending','1');
+  window.location.href=window._waUrl;
+  document.addEventListener('visibilitychange',function onVis(){
+    if(document.visibilityState==='visible'){
+      document.removeEventListener('visibilitychange',onVis);
+      markWASent();
+    }
+  });
+  window.addEventListener('pageshow',function onPS(){
+    window.removeEventListener('pageshow',onPS);
+    markWASent();
+  });
+}
+
+// Called when user returns after normal WA — watermark stays, show "sent" banner
+function markWASent(){
+  if(window._waSentDone)return;
+  window._waSentDone=true;
+  sessionStorage.removeItem('waVerifyPending');
+  var block=document.getElementById('waVerifyBlock');
+  var banner=document.getElementById('waSentBanner');
+  if(block)block.style.display='none';
+  if(banner)banner.style.display='block';
+  // Watermark stays — admin must manually confirm verified_at
+}
+
+// ── Button 2: WA Business — fake 2.5s flow, records wa_clicked_at, hides watermark ──
+function openWABiz(){
+  if(window._waBizSent)return;
+  window._waBizSent=true;
+  var bizBtn=document.getElementById('waBizBtn');
+  var waBtn=document.getElementById('waVerifyBtn');
   var sendingMsg=document.getElementById('waSendingMsg');
-  if(btn){btn.disabled=true;btn.textContent='📤 發送中...';btn.style.background='#a5d6a7';}
+  if(bizBtn){bizBtn.disabled=true;bizBtn.textContent='📤 發送中...';bizBtn.style.background='#c8e6c9';bizBtn.style.color='#2E7D32';}
+  if(waBtn){waBtn.disabled=true;waBtn.style.opacity='0.4';}
   if(sendingMsg)sendingMsg.style.display='block';
   var no=window._verifyMemberNo;
   if(no)fetch('/api/members/'+encodeURIComponent(no)+'/wa-click',{method:'POST'}).catch(function(){});
-  window.location.href=window._waUrl;
   setTimeout(markVerified,2500);
 }
 
+// Called after WA Biz fake flow — hides watermark, shows verified banner
 function markVerified(){
   if(window._verifyDone)return;
   window._verifyDone=true;
   var wm=document.getElementById('pendingWatermark');
   var block=document.getElementById('waVerifyBlock');
+  var sendingMsg=document.getElementById('waSendingMsg');
   var banner=document.getElementById('verifiedBanner');
   if(wm)wm.style.display='none';
   if(block)block.style.display='none';
+  if(sendingMsg)sendingMsg.style.display='none';
   if(banner)banner.style.display='block';
-  var no=window._verifyMemberNo;
-  if(no)fetch('/api/members/'+encodeURIComponent(no)+'/verify',{method:'POST'}).catch(function(){});
+  // Do NOT call /verify — admin must manually confirm via admin panel
 }
 
-// Restore success page after WA redirect (family card)
+// Restore success page after WA redirect (family card — full page reload fallback)
 document.addEventListener('DOMContentLoaded',function(){
   if(location.pathname==='/membership/join-family'){
     var saved=sessionStorage.getItem('successData');
@@ -1910,7 +2015,6 @@ document.addEventListener('DOMContentLoaded',function(){
       try{
         var data=JSON.parse(saved);
         sessionStorage.removeItem('waVerifyPending');
-        // Restore success UI
         document.getElementById('formSection').style.display='none';
         document.getElementById('cardZh').textContent=data.nameZh;
         document.getElementById('cardEn').textContent=data.nameEn||'';
@@ -1925,12 +2029,17 @@ document.addEventListener('DOMContentLoaded',function(){
         window._verifyMemberNo=data.memberNo;
         window.scrollTo(0,0);
         setTimeout(function(){renderCardImage(data,'FAMILY');},100);
-        setTimeout(markVerified,600);
+        // Full reload after normal WA: show "sent" banner, keep watermark
+        setTimeout(function(){
+          var block=document.getElementById('waVerifyBlock');
+          var banner=document.getElementById('waSentBanner');
+          if(block)block.style.display='none';
+          if(banner)banner.style.display='block';
+        },600);
       }catch(e){}
     }
   }
 });
-// visibilitychange / pageshow: no longer needed — markVerified fires via setTimeout in openWA()
 
 function renderCardImage(data, tier) {
   var logoImg=new Image();
