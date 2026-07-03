@@ -275,7 +275,7 @@ function copyQrLinkUrl(i){
 }
 
 function deleteQrLink(i){
-  if(!confirm('確認刪除此連結記錄？')) return;
+
   _qrLinks.splice(i,1);
   try{ localStorage.setItem('coeldery85_qr_links', JSON.stringify(_qrLinks)); }catch(e){}
   renderQrLinks();
@@ -404,7 +404,7 @@ async function addGroup(){
   }
 }
 async function deleteGroup(id, name){
-  if(!confirm('確定刪除群組「'+name+'」？\n此群組下的會員將變為未分配。')) return;
+
   var r = await fetch('/api/admin/groups/'+id,{method:'DELETE'});
   var d = await r.json();
   if(d.ok){ loadGroups(); loadMembers(currentPage); }
@@ -757,33 +757,31 @@ async function toggleFamily(parentNo, btn){
 // ── Actions
 async function approveKyc(i){
   var no=window._members[i].member_no;
-  if(!confirm('確認標記 '+no+' KYC 為 DONE？'))return;
+
   await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kyc_status:'DONE'})});
   loadMembers(currentPage);
 }
 async function adminVerify(no){
-  if(!confirm('確認手動標記 '+no+' WA 驗證完成？'))return;
   var r=await fetch('/api/admin/members/'+encodeURIComponent(no)+'/verify',{method:'POST'});
   var d=await r.json();
   if(d.ok){ loadMembers(currentPage); }
-  else{ alert('操作失敗：'+(d.error||'未知錯誤')); }
+  else{ console.error('adminVerify failed:',d.error); }
 }
 async function adminUnverify(no){
-  if(!confirm('確認取消 '+no+' 的 WA 驗證？'))return;
   var r=await fetch('/api/admin/members/'+encodeURIComponent(no)+'/verify',{method:'DELETE'});
   var d=await r.json();
   if(d.ok){ loadMembers(currentPage); }
-  else{ alert('操作失敗：'+(d.error||'未知錯誤')); }
+  else{ console.error('adminUnverify failed:',d.error); }
 }
 async function deactivateMember(i){
   var no=window._members[i].member_no;
-  if(!confirm('確認停用會員 '+no+'？'))return;
+
   await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'INACTIVE'})});
   loadMembers(currentPage);
 }
 async function reactivateMember(i){
   var no=window._members[i].member_no;
-  if(!confirm('確認重新啟用 '+no+'？'))return;
+
   await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'ACTIVE'})});
   loadMembers(currentPage);
 }
@@ -912,14 +910,14 @@ async function loadMedical(){
 
 async function markMedSent(i){
   var m=window._medical[i];
-  if(!confirm('確認已將申請 #'+m.id+' ('+m.name_zh_full+') 資料傳送給 NGO？'))return;
+
   var now=new Date().toISOString().slice(0,19).replace('T',' ');
   await fetch('/api/admin/medical/'+m.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'SENT',sent_at:now})});
   loadMedical();
 }
 async function markMedIssued(i){
   var m=window._medical[i];
-  if(!confirm('確認 #'+m.id+' ('+m.name_zh_full+') 醫健卡已成功發出？'))return;
+
   await fetch('/api/admin/medical/'+m.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'ISSUED'})});
   loadMedical();
 }
