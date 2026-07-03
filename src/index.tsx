@@ -1021,19 +1021,25 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       📱 WhatsApp 分享會員卡圖片
     </button>
 
-    <div id="waVerifyBlock" style="display:none;margin-top:10px;">
-      <div style="font-size:12px;font-weight:700;color:#555;text-align:center;letter-spacing:1px;margin-bottom:8px;">📲 發 WhatsApp 完成驗證</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div id="waVerifyBlock" style="display:none;margin-top:12px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px 14px 10px;">
+      <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">✅ 發 WhatsApp 完成身份驗證</div>
+      <!-- 訊息預覽 -->
+      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;"></div>
+      <!-- 按鈕列 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <a id="waVerifyBtnStd" href="#" target="_blank" rel="noopener"
-          style="background:#25D366;color:#fff;font-size:13px;font-weight:700;padding:13px 8px;border-radius:6px;text-decoration:none;text-align:center;display:block;">
-          💬 WhatsApp
+          style="background:#25D366;color:#fff;font-size:13px;font-weight:700;padding:12px 6px;border-radius:6px;text-decoration:none;text-align:center;display:block;">
+          💬 標準 WhatsApp
         </a>
-        <a id="waVerifyBtnBiz" href="#" rel="noopener"
-          style="background:#075E54;color:#fff;font-size:13px;font-weight:700;padding:13px 8px;border-radius:6px;text-decoration:none;text-align:center;display:block;">
-          🏢 WA Business
-        </a>
+        <button onclick="copyWaMsg()" id="waCopyBtn"
+          style="background:#fff;color:#075E54;border:2px solid #075E54;font-size:13px;font-weight:700;padding:12px 6px;border-radius:6px;cursor:pointer;text-align:center;display:block;width:100%;">
+          📋 複製訊息
+        </button>
       </div>
-      <div style="font-size:10px;color:#aaa;text-align:center;margin-top:5px;">向管理員發送訊息驗證身份，同時儲存號碼</div>
+      <div style="font-size:10px;color:#888;text-align:center;line-height:1.6;">
+        標準 WhatsApp 可直接發送 &middot;
+        用 <strong>WA Business</strong> 請先「複製訊息」，自行開啟应用後貼上
+      </div>
     </div>
 
     <div class="footer-links">
@@ -1251,20 +1257,40 @@ function showSuccess(data, appliedMedical) {
   window.scrollTo(0,0);
   // Build card image after short delay (let DOM paint)
   setTimeout(function(){ renderCardImage(data, 'PRIMARY'); }, 100);
-  // Load admin WhatsApp and inject verification buttons (standard + business)
+  // Load admin WhatsApp and inject verification block
   fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
     var waNum = (s.settings && s.settings.admin_whatsapp) ? s.settings.admin_whatsapp : '85291477341';
     var msgText = '你好，我剛登記了老有卡，會員編號：' + data.memberNo + '，請幫我確認。';
     var msgEnc = encodeURIComponent(msgText);
     var stdUrl = 'https://wa.me/' + waNum + '?text=' + msgEnc;
-    var bizUrl = 'whatsapp://send?phone=' + waNum + '&text=' + msgEnc;
+    window._waVerifyMsg = msgText;  // store for copyWaMsg()
     var block = document.getElementById('waVerifyBlock');
+    var preview = document.getElementById('waVerifyMsgPreview');
     var btnStd = document.getElementById('waVerifyBtnStd');
-    var btnBiz = document.getElementById('waVerifyBtnBiz');
     if(block) block.style.display = 'block';
+    if(preview) preview.textContent = msgText;
     if(btnStd) btnStd.href = stdUrl;
-    if(btnBiz) btnBiz.href = bizUrl;
   }).catch(function(){});
+}
+
+function copyWaMsg(){
+  var msg = window._waVerifyMsg || '';
+  if(!msg) return;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(msg).then(function(){
+      var btn = document.getElementById('waCopyBtn');
+      if(btn){ btn.textContent='✅ 已複製！'; btn.style.background='#e8f5e9'; btn.style.color='#2E7D32'; setTimeout(function(){ btn.textContent='📋 複製訊息'; btn.style.background=''; btn.style.color='#075E54'; },2500); }
+    }).catch(function(){ _copyFallback(msg); });
+  } else { _copyFallback(msg); }
+}
+function _copyFallback(msg){
+  var ta = document.createElement('textarea');
+  ta.value = msg; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ document.execCommand('copy'); } catch(e){}
+  document.body.removeChild(ta);
+  var btn = document.getElementById('waCopyBtn');
+  if(btn){ btn.textContent='✅ 已複製！'; setTimeout(function(){ btn.textContent='📋 複製訊息'; },2500); }
 }
 
 // ── Draw member card onto an off-screen canvas — design-matched ───────────────
@@ -1567,19 +1593,23 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 
     <button class="wa-link" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
 
-    <div id="waVerifyBlock" style="display:none;margin-top:10px;">
-      <div style="font-size:12px;font-weight:700;color:#555;text-align:center;letter-spacing:1px;margin-bottom:8px;">📲 發 WhatsApp 完成驗證</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div id="waVerifyBlock" style="display:none;margin-top:12px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px 14px 10px;">
+      <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">✅ 發 WhatsApp 完成身份驗證</div>
+      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <a id="waVerifyBtnStd" href="#" target="_blank" rel="noopener"
-          style="background:#25D366;color:#fff;font-size:13px;font-weight:700;padding:13px 8px;border-radius:6px;text-decoration:none;text-align:center;display:block;">
-          💬 WhatsApp
+          style="background:#25D366;color:#fff;font-size:13px;font-weight:700;padding:12px 6px;border-radius:6px;text-decoration:none;text-align:center;display:block;">
+          💬 標準 WhatsApp
         </a>
-        <a id="waVerifyBtnBiz" href="#" rel="noopener"
-          style="background:#075E54;color:#fff;font-size:13px;font-weight:700;padding:13px 8px;border-radius:6px;text-decoration:none;text-align:center;display:block;">
-          🏢 WA Business
-        </a>
+        <button onclick="copyWaMsg()" id="waCopyBtn"
+          style="background:#fff;color:#075E54;border:2px solid #075E54;font-size:13px;font-weight:700;padding:12px 6px;border-radius:6px;cursor:pointer;text-align:center;display:block;width:100%;">
+          📋 複製訊息
+        </button>
       </div>
-      <div style="font-size:10px;color:#aaa;text-align:center;margin-top:5px;">向管理員發送訊息驗證身份，同時儲存號碼</div>
+      <div style="font-size:10px;color:#888;text-align:center;line-height:1.6;">
+        標準 WhatsApp 可直接發送 &middot;
+        用 <strong>WA Business</strong> 請先「複製訊息」，自行開啟应用後貼上
+      </div>
     </div>
 
     <div class="footer-links">
@@ -1655,21 +1685,41 @@ async function submitForm(){
     if(mySubLink){mySubLink.href='/membership/card/'+data.memberNo;mySubLink.style.display='inline';}
     if(mySubSep){mySubSep.style.display='inline';}
     setTimeout(function(){renderCardImage(data,'FAMILY');},100);
-    // Load admin WhatsApp and inject verification buttons (standard + business)
+    // Load admin WhatsApp and inject verification block
     fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
       var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
       var msgText='你好，我剛登記了老有卡家庭同行卡，會員編號：'+data.memberNo+'，請幫我確認。';
       var msgEnc=encodeURIComponent(msgText);
       var stdUrl='https://wa.me/'+waNum+'?text='+msgEnc;
-      var bizUrl='whatsapp://send?phone='+waNum+'&text='+msgEnc;
+      window._waVerifyMsg=msgText;
       var block=document.getElementById('waVerifyBlock');
+      var preview=document.getElementById('waVerifyMsgPreview');
       var btnStd=document.getElementById('waVerifyBtnStd');
-      var btnBiz=document.getElementById('waVerifyBtnBiz');
       if(block)block.style.display='block';
+      if(preview)preview.textContent=msgText;
       if(btnStd)btnStd.href=stdUrl;
-      if(btnBiz)btnBiz.href=bizUrl;
     }).catch(function(){});
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
+}
+
+function copyWaMsg(){
+  var msg=window._waVerifyMsg||'';
+  if(!msg)return;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(msg).then(function(){
+      var btn=document.getElementById('waCopyBtn');
+      if(btn){btn.textContent='✅ 已複製！';btn.style.background='#e8f5e9';btn.style.color='#2E7D32';setTimeout(function(){btn.textContent='📋 複製訊息';btn.style.background='';btn.style.color='#075E54';},2500);}
+    }).catch(function(){_copyFallback(msg);});
+  }else{_copyFallback(msg);}
+}
+function _copyFallback(msg){
+  var ta=document.createElement('textarea');
+  ta.value=msg;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+  var btn=document.getElementById('waCopyBtn');
+  if(btn){btn.textContent='✅ 已複製！';setTimeout(function(){btn.textContent='📋 複製訊息';},2500);}
 }
 
 function renderCardImage(data, tier) {
@@ -2248,13 +2298,14 @@ tr.inactive td{opacity:0.45;}
           <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <a id="settingTestLinkStd" href="#" target="_blank" rel="noopener"
               style="display:block;background:#25D366;color:#fff;padding:9px 10px;border-radius:5px;text-decoration:none;font-size:12px;font-weight:700;text-align:center;">
-              📲 測試 WhatsApp
+              📲 開啟 WhatsApp
             </a>
-            <a id="settingTestLinkBiz" href="#" rel="noopener"
-              style="display:block;background:#075E54;color:#fff;padding:9px 10px;border-radius:5px;text-decoration:none;font-size:12px;font-weight:700;text-align:center;">
-              🏢 測試 WA Business
-            </a>
+            <button onclick="copySettingsTestMsg()" id="settingCopyBtn"
+              style="background:#fff;color:#075E54;border:2px solid #075E54;padding:9px 10px;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;width:100%;">
+              📋 複製訊息 (WA Biz)
+            </button>
           </div>
+          <div style="font-size:10px;color:#aaa;margin-top:5px;text-align:center;">WA Business 用戶：複製訊息後自行開啟 App 貼上</div>
         </div>
       </div>
     </div>
@@ -2629,14 +2680,22 @@ function settingsDirty(){
 function updateSettingsPreview(waNum){
   var preview = document.getElementById('settingPreview');
   var testLinkStd = document.getElementById('settingTestLinkStd');
-  var testLinkBiz = document.getElementById('settingTestLinkBiz');
   var sampleNo = 'CE85-000001';
   var msg = '你好，我剛登記了老有卡，會員編號：' + sampleNo + '，請幫我確認。';
   var enc = encodeURIComponent(msg);
   var num = waNum || '85291477341';
+  window._settingsTestMsg = msg;
   if(preview) preview.textContent = msg;
   if(testLinkStd) testLinkStd.href = 'https://wa.me/' + num + '?text=' + enc;
-  if(testLinkBiz) testLinkBiz.href = 'whatsapp://send?phone=' + num + '&text=' + enc;
+}
+function copySettingsTestMsg(){
+  var msg = window._settingsTestMsg || '你好，我剛登記了老有卡，會員編號：CE85-000001，請幫我確認。';
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(msg).then(function(){
+      var btn = document.getElementById('settingCopyBtn');
+      if(btn){ btn.textContent='✅ 已複製！'; setTimeout(function(){ btn.textContent='📋 複製訊息 (WA Biz)'; },2000); }
+    }).catch(function(){});
+  }
 }
 
 async function saveWaNum(){
