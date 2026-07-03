@@ -207,20 +207,22 @@ app.get('/api/admin/members', async (c) => {
   const exportCsv = c.req.query('export') === 'csv'
   const offset = (page - 1) * limit
 
+  const groupFilter = c.req.query('group_id')
   let where = 'WHERE 1=1'
   const params: (string | number)[] = []
-  if (tier) { where += ' AND tier = ?'; params.push(tier) }
-  if (status) { where += ' AND status = ?'; params.push(status) }
-  // no-op: deletion disabled by policy, all records visible
-  if (source) { where += ' AND source = ?'; params.push(source) }
-  if (district) { where += ' AND district = ?'; params.push(district) }
+  if (tier) { where += ' AND m.tier = ?'; params.push(tier) }
+  if (status) { where += ' AND m.status = ?'; params.push(status) }
+  if (source) { where += ' AND m.source = ?'; params.push(source) }
+  if (district) { where += ' AND m.district = ?'; params.push(district) }
+  if (groupFilter === 'none') { where += ' AND m.group_id IS NULL' }
+  else if (groupFilter) { where += ' AND m.group_id = ?'; params.push(groupFilter) }
   if (search) {
-    where += ' AND (name_zh LIKE ? OR name_en LIKE ? OR member_no LIKE ? OR phone LIKE ?)'
+    where += ' AND (m.name_zh LIKE ? OR m.name_en LIKE ? OR m.member_no LIKE ? OR m.phone LIKE ?)'
     params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`)
   }
 
   const countRow = await db.prepare(
-    `SELECT COUNT(*) as total FROM members ${where}`
+    `SELECT COUNT(*) as total FROM members m ${where}`
   ).bind(...params).first<{ total: number }>()
 
   // CSV export — return all matching rows
@@ -244,12 +246,15 @@ app.get('/api/admin/members', async (c) => {
   }
 
   const rows = await db.prepare(
-    `SELECT member_no, tier, status, name_zh, name_en, phone, gender, birth_year,
-            district, id_prefix, role, kyc_status, source, referrer_no, roadshow,
-            roadshow_location, parent_no, parent_name, relation,
-            expires_at, created_at, notes, admin_notes, verified_at
-     FROM members ${where}
-     ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    `SELECT m.member_no, m.tier, m.status, m.name_zh, m.name_en, m.phone, m.gender, m.birth_year,
+            m.district, m.id_prefix, m.role, m.kyc_status, m.source, m.referrer_no, m.roadshow,
+            m.roadshow_location, m.parent_no, m.parent_name, m.relation,
+            m.expires_at, m.created_at, m.notes, m.admin_notes, m.verified_at,
+            m.group_id, g.name as group_name, g.color as group_color
+     FROM members m
+     LEFT JOIN member_groups g ON g.id = m.group_id
+     ${where}
+     ORDER BY m.created_at DESC LIMIT ? OFFSET ?`
   ).bind(...params, limit, offset).all()
 
   return c.json({
@@ -507,6 +512,84 @@ app.delete('/api/admin/members/:no/verify', async (c) => {
   const db = c.env.DB
   await db.prepare(`UPDATE members SET verified_at = NULL WHERE member_no = ?`).bind(no).run()
   return c.json({ ok: true })
+})
+
+// ─── Groups API ──────────────────────────────────────────────────────────────
+app.get('/api/admin/groups', async (c) => {
+  const db = c.env.DB
+  const rows = await db.prepare(
+    `SELECT g.id, g.name, g.description, g.color, g.created_at,
+            COUNT(m.id) as member_count
+     FROM member_groups g
+     LEFT JOIN members m ON m.group_id = g.id
+     GROUP BY g.id ORDER BY g.name ASC`
+  ).all()
+  return c.json({ ok: true, groups: rows.results })
+})
+
+app.post('/api/admin/groups', async (c) => {
+  const db = c.env.DB
+  const { name, description, color } = await c.req.json()
+  if (!name || !name.trim()) return c.json({ ok: false, error: '群組名稱不能為空' }, 400)
+  try {
+    const result = await db.prepare(
+      `INSERT INTO member_groups (name, description, color) VALUES (?, ?, ?)`
+    ).bind(name.trim(), description || '', color || '#4caf50').run()
+    return c.json({ ok: true, id: result.meta.last_row_id })
+  } catch (e: any) {
+    if (e.message?.includes('UNIQUE')) return c.json({ ok: false, error: '此群組名稱已存在' }, 409)
+    return c.json({ ok: false, error: '建立失敗' }, 500)
+  }
+})
+
+app.put('/api/admin/groups/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const { name, description, color } = await c.req.json()
+  if (!name || !name.trim()) return c.json({ ok: false, error: '群組名稱不能為空' }, 400)
+  try {
+    await db.prepare(
+      `UPDATE member_groups SET name=?, description=?, color=? WHERE id=?`
+    ).bind(name.trim(), description || '', color || '#4caf50', id).run()
+    return c.json({ ok: true })
+  } catch (e: any) {
+    if (e.message?.includes('UNIQUE')) return c.json({ ok: false, error: '此群組名稱已存在' }, 409)
+    return c.json({ ok: false, error: '更新失敗' }, 500)
+  }
+})
+
+app.delete('/api/admin/groups/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  // Unassign members first
+  await db.prepare(`UPDATE members SET group_id = NULL WHERE group_id = ?`).bind(id).run()
+  await db.prepare(`DELETE FROM member_groups WHERE id = ?`).bind(id).run()
+  return c.json({ ok: true })
+})
+
+app.patch('/api/admin/members/:no/group', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  const { group_id } = await c.req.json()
+  await db.prepare(`UPDATE members SET group_id = ? WHERE member_no = ?`)
+    .bind(group_id || null, no).run()
+  return c.json({ ok: true })
+})
+
+// Source statistics API
+app.get('/api/admin/source-stats', async (c) => {
+  const db = c.env.DB
+  const rows = await db.prepare(`
+    SELECT source, roadshow_location, roadshow,
+           COUNT(*) as total,
+           SUM(CASE WHEN tier='PRIMARY' THEN 1 ELSE 0 END) as primary_count,
+           SUM(CASE WHEN tier='FAMILY' THEN 1 ELSE 0 END) as family_count,
+           MIN(created_at) as first_at, MAX(created_at) as last_at
+    FROM members
+    GROUP BY source, roadshow_location, roadshow
+    ORDER BY total DESC
+  `).all()
+  return c.json({ ok: true, stats: rows.results })
 })
 
 // ─── Root: 85 AI Technology Limited Dashboard ────────────────────────────────
@@ -2199,6 +2282,10 @@ tr.inactive td{opacity:0.45;}
         <option value="institution">機構轉介</option>
         <option value="online">網上登記</option>
       </select>
+      <select id="filterGroup">
+        <option value="">— 所有群組 —</option>
+        <option value="none">未分配群組</option>
+      </select>
       <button class="btn btn-green" onclick="loadMembers(1)">🔍 搜尋</button>
       <button class="btn btn-grey" onclick="clearFilters()">清除</button>
       <button class="btn btn-blue" onclick="exportCsv()" title="匯出 CSV">⬇ CSV</button>
@@ -2212,7 +2299,7 @@ tr.inactive td{opacity:0.45;}
         <thead><tr>
           <th>會員編號</th><th>狀態</th><th>類型</th><th>中文姓名</th><th>英文姓名</th>
           <th>電話</th><th>性別</th><th>出生年</th><th>HKID頭4位</th>
-          <th>地區</th><th>角色</th><th>KYC</th><th>WA驗證</th><th>主卡/家庭卡</th>
+          <th>地區</th><th>角色</th><th>KYC</th><th>WA驗證</th><th>群組</th><th>主卡/家庭卡</th>
           <th>來源</th><th>介紹人</th><th>有效日期</th><th>登記時間</th><th>操作</th>
         </tr></thead>
         <tbody id="membersTbody"></tbody>
@@ -2422,6 +2509,47 @@ tr.inactive td{opacity:0.45;}
           </div>
         </div>
       </div>
+
+      <!-- 群組管理 -->
+      <div style="background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,0.07);padding:28px 24px;margin-bottom:24px;">
+        <h2 style="font-size:16px;font-weight:700;margin:0 0 4px;color:#222;letter-spacing:1px;">🏷️ 會員群組管理</h2>
+        <p style="font-size:12px;color:#888;margin:0 0 20px;">建立自訂群組，在會員管理頁分配給會員。</p>
+
+        <!-- New group form -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <input id="newGroupName" type="text" placeholder="群組名稱（如：VIP、葵青社區）" maxlength="30"
+            style="flex:1;min-width:160px;border:1px solid #ddd;border-radius:5px;padding:9px 12px;font-size:13px;"
+            onkeydown="if(event.key==='Enter')addGroup()">
+          <input id="newGroupDesc" type="text" placeholder="說明（選填）" maxlength="60"
+            style="flex:1;min-width:120px;border:1px solid #ddd;border-radius:5px;padding:9px 12px;font-size:13px;">
+          <input id="newGroupColor" type="color" value="#4caf50" title="群組顏色"
+            style="width:40px;height:38px;border:1px solid #ddd;border-radius:5px;cursor:pointer;padding:2px;">
+          <button onclick="addGroup()"
+            style="background:var(--forest);color:#fff;border:0;border-radius:5px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            ＋ 新增群組
+          </button>
+        </div>
+        <div id="groupsStatus" style="font-size:12px;font-weight:700;margin-bottom:12px;display:none;"></div>
+
+        <!-- Groups list -->
+        <div id="groupsList" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="color:#aaa;font-size:13px;text-align:center;padding:20px;">載入中…</div>
+        </div>
+      </div>
+
+      <!-- 來源統計 -->
+      <div style="background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,0.07);padding:28px 24px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div>
+            <h2 style="font-size:16px;font-weight:700;margin:0 0 4px;color:#222;letter-spacing:1px;">📊 QR / 來源登記統計</h2>
+            <p style="font-size:12px;color:#888;margin:0;">每個 QR Code 來源的登記人數</p>
+          </div>
+          <button onclick="loadSourceStats()" style="background:#f5f5f5;border:1px solid #ddd;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer;">🔄 重新整理</button>
+        </div>
+        <div id="sourceStatsList">
+          <div style="color:#aaa;font-size:13px;text-align:center;padding:20px;">載入中…</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2496,7 +2624,7 @@ function switchTab(t, el){
   if(t==='members') loadMembers(1);
   if(t==='medical') loadMedical();
   if(t==='qrgen'){ updateQr(); loadQrLinks(); }
-  if(t==='settings') loadSettings();
+  if(t==='settings'){ loadSettings(); loadGroups(); loadSourceStats(); }
 }
 
 // ── QR Generator
@@ -2835,6 +2963,118 @@ function showSettingStatus(msg, color){
   setTimeout(function(){ el.style.display='none'; }, 4000);
 }
 
+// ── Groups management
+var _groups = [];
+async function loadGroups(){
+  var r = await fetch('/api/admin/groups');
+  var d = await r.json();
+  if(!d.ok) return;
+  _groups = d.groups || [];
+  renderGroupsList();
+  renderGroupFilter(); // update members filter dropdown
+}
+function renderGroupsList(){
+  var el = document.getElementById('groupsList');
+  if(!el) return;
+  if(!_groups.length){
+    el.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:20px;">尚未建立任何群組</div>';
+    return;
+  }
+  el.innerHTML = _groups.map(function(g){
+    return \`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f9f9f9;border-radius:7px;border:1px solid #eee;">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:\${g.color};flex-shrink:0;"></span>
+      <span style="font-weight:700;font-size:13px;flex:1;">\${g.name}</span>
+      <span style="font-size:11px;color:#888;flex:1;">\${g.description||''}</span>
+      <span style="font-size:11px;color:#555;background:#eee;padding:2px 8px;border-radius:10px;">\${g.member_count} 人</span>
+      <button onclick="deleteGroup(\${g.id},'\${g.name}')" style="background:#ffebee;color:#c62828;border:0;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">刪除</button>
+    </div>\`;
+  }).join('');
+}
+function renderGroupFilter(){
+  // Update the group filter dropdown in members tab
+  var sel = document.getElementById('filterGroup');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">— 所有群組 —</option><option value="none">未分配群組</option>' +
+    _groups.map(function(g){ return \`<option value="\${g.id}">\${g.name}</option>\`; }).join('');
+}
+async function addGroup(){
+  var name = document.getElementById('newGroupName').value.trim();
+  var desc = document.getElementById('newGroupDesc').value.trim();
+  var color = document.getElementById('newGroupColor').value;
+  if(!name){ alert('請輸入群組名稱'); return; }
+  var r = await fetch('/api/admin/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,description:desc,color})});
+  var d = await r.json();
+  if(d.ok){
+    document.getElementById('newGroupName').value='';
+    document.getElementById('newGroupDesc').value='';
+    document.getElementById('groupsStatus').textContent='✅ 群組「'+name+'」已建立';
+    document.getElementById('groupsStatus').style.color='#2E7D32';
+    document.getElementById('groupsStatus').style.display='block';
+    setTimeout(function(){document.getElementById('groupsStatus').style.display='none';},3000);
+    loadGroups();
+  } else {
+    alert('建立失敗：'+(d.error||'未知錯誤'));
+  }
+}
+async function deleteGroup(id, name){
+  if(!confirm('確定刪除群組「'+name+'」？\n此群組下的會員將變為未分配。')) return;
+  var r = await fetch('/api/admin/groups/'+id,{method:'DELETE'});
+  var d = await r.json();
+  if(d.ok){ loadGroups(); loadMembers(currentPage); }
+  else { alert('刪除失敗'); }
+}
+
+// ── Assign group to member
+async function assignGroup(memberNo, groupId){
+  var body = groupId ? {group_id: parseInt(groupId)} : {group_id: null};
+  var r = await fetch('/api/admin/members/'+encodeURIComponent(memberNo)+'/group',{
+    method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+  });
+  var d = await r.json();
+  if(d.ok){ loadMembers(currentPage); }
+  else { alert('指派失敗：'+(d.error||'未知錯誤')); }
+}
+
+// ── Source stats
+async function loadSourceStats(){
+  var r = await fetch('/api/admin/source-stats');
+  var d = await r.json();
+  if(!d.ok) return;
+  var el = document.getElementById('sourceStatsList');
+  if(!el) return;
+  var srcLabel = {'walk-in':'Walk-in 直接','roadshow':'Roadshow 推廣','referral':'會員介紹','whatsapp':'WhatsApp','social':'社交媒體','institution':'機構轉介','online':'網上登記'};
+  if(!d.stats.length){
+    el.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:20px;">暫無數據</div>';
+    return;
+  }
+  el.innerHTML = \`<table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="background:#f5f5f5;">
+      <th style="text-align:left;padding:8px 10px;font-weight:700;">來源</th>
+      <th style="text-align:left;padding:8px 10px;font-weight:700;">地點/名稱</th>
+      <th style="text-align:center;padding:8px 10px;font-weight:700;">總計</th>
+      <th style="text-align:center;padding:8px 10px;font-weight:700;">主卡</th>
+      <th style="text-align:center;padding:8px 10px;font-weight:700;">家庭</th>
+      <th style="text-align:center;padding:8px 10px;font-weight:700;">首次</th>
+      <th style="text-align:center;padding:8px 10px;font-weight:700;">最近</th>
+    </tr></thead>
+    <tbody>\${d.stats.map(function(s){
+      var srcName = srcLabel[s.source]||s.source;
+      var loc = s.roadshow_location || s.roadshow || '—';
+      var firstAt = (s.first_at||'').slice(0,10);
+      var lastAt = (s.last_at||'').slice(0,10);
+      return \`<tr style="border-top:1px solid #f0f0f0;">
+        <td style="padding:8px 10px;">\${srcName}</td>
+        <td style="padding:8px 10px;font-weight:600;color:#333;">\${loc}</td>
+        <td style="padding:8px 10px;text-align:center;font-weight:700;color:var(--forest);">\${s.total}</td>
+        <td style="padding:8px 10px;text-align:center;color:#555;">\${s.primary_count}</td>
+        <td style="padding:8px 10px;text-align:center;color:#555;">\${s.family_count}</td>
+        <td style="padding:8px 10px;text-align:center;font-size:11px;color:#888;">\${firstAt}</td>
+        <td style="padding:8px 10px;text-align:center;font-size:11px;color:#888;">\${lastAt}</td>
+      </tr>\`;
+    }).join('')}</tbody>
+  </table>\`;
+}
+
 // ── Stats + Charts
 async function loadStats(){
   var r=await fetch('/api/admin/stats'); var d=await r.json(); if(!d.ok)return;
@@ -3027,8 +3267,10 @@ async function loadMembers(page){
   var t=document.getElementById('filterTier').value;
   var st=document.getElementById('filterStatus').value;
   var src=document.getElementById('filterSource').value;
+  var grp=document.getElementById('filterGroup').value;
   if(s)p.set('search',s); if(t)p.set('tier',t);
   if(st)p.set('status',st); if(src)p.set('source',src);
+  if(grp)p.set('group_id',grp);
   var r=await fetch('/api/admin/members?'+p); var d=await r.json(); if(!d.ok)return;
   totalPages=Math.ceil(d.total/50)||1;
   document.getElementById('searchCount').textContent='共 '+d.total+' 筆記錄';
@@ -3056,6 +3298,13 @@ async function loadMembers(page){
         ? '<span class="badge badge-done" title="'+m.verified_at.slice(0,16).replace('T',' ')+'">✅ 已驗證</span>'
         : '<span class="badge badge-pending">⏳ 待驗證</span>'
       }</td>
+      <td id="grp-cell-\${m.member_no}">\${(function(){
+        var badge=m.group_name
+          ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;color:#fff;background:'+(m.group_color||'#4caf50')+'">'+m.group_name+'</span> '
+          : '<span style="color:#bbb;font-size:11px;">未分群</span> ';
+        var opts='<option value="">— 移除群組 —</option>'+(_groups||[]).map(function(g){return '<option value="'+g.id+'"'+(m.group_id===g.id?' selected':'')+'>'+g.name+'</option>';}).join('');
+        return badge+'<select style="font-size:10px;padding:1px 2px;max-width:90px;" onchange="assignGroup('+JSON.stringify(m.member_no)+',this.value)"><option value="">指派群組…</option>'+opts+'</select>';
+      })()}</td>
       <td>\${familyInfo}</td>
       <td style="font-size:11px;">\${srcLabel[m.source]||m.source||'—'}</td>
       <td style="font-size:11px;">\${m.referrer_no||'—'}</td>
@@ -3072,7 +3321,7 @@ async function loadMembers(page){
       </td>
     </tr>
     <tr id="family-\${m.member_no}" style="display:none;background:#f9fff9;">
-      <td colspan="19" style="padding:0;">
+      <td colspan="20" style="padding:0;">
         <div id="family-content-\${m.member_no}" style="padding:8px 16px 12px 40px;border-left:3px solid var(--forest);"></div>
       </td>
     </tr>\`;
@@ -3223,6 +3472,7 @@ function clearFilters(){
   document.getElementById('filterTier').value='';
   document.getElementById('filterStatus').value='';
   document.getElementById('filterSource').value='';
+  document.getElementById('filterGroup').value='';
   loadMembers(1);
 }
 
@@ -3232,8 +3482,10 @@ function exportCsv(){
   var t=document.getElementById('filterTier').value;
   var st=document.getElementById('filterStatus').value;
   var src=document.getElementById('filterSource').value;
+  var grp=document.getElementById('filterGroup').value;
   if(s)p.set('search',s); if(t)p.set('tier',t);
   if(st)p.set('status',st); if(src)p.set('source',src);
+  if(grp)p.set('group_id',grp);
   window.open('/api/admin/members?'+p,'_blank');
 }
 
