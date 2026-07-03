@@ -388,6 +388,14 @@ app.patch('/api/admin/members/:no', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Admin manual unverify — MUST be before the generic :no DELETE route ────
+app.delete('/api/admin/members/:no/verify', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  await db.prepare(`UPDATE members SET verified_at = NULL WHERE member_no = ?`).bind(no).run()
+  return c.json({ ok: true })
+})
+
 // ─── API: Delete member — DISABLED (no data deletion policy) ────────────────
 app.delete('/api/admin/members/:no', (c) => {
   return c.json({ ok: false, error: '系統政策：不允許刪除會員資料。如需停用請使用 PATCH status=INACTIVE。' }, 403)
@@ -514,14 +522,6 @@ app.post('/api/admin/members/:no/verify', async (c) => {
   const existing = await db.prepare('SELECT member_no FROM members WHERE member_no = ?').bind(no).first()
   if (!existing) return c.json({ ok: false, error: '查無此會員' }, 404)
   await db.prepare(`UPDATE members SET verified_at = datetime('now') WHERE member_no = ?`).bind(no).run()
-  return c.json({ ok: true })
-})
-
-// ─── Admin manual unverify ────────────────────────────────────────────────────
-app.delete('/api/admin/members/:no/verify', async (c) => {
-  const no = c.req.param('no')
-  const db = c.env.DB
-  await db.prepare(`UPDATE members SET verified_at = NULL WHERE member_no = ?`).bind(no).run()
   return c.json({ ok: true })
 })
 
