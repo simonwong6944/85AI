@@ -1255,12 +1255,16 @@ document.addEventListener('DOMContentLoaded', function() {
         var med = sessionStorage.getItem('appliedMedical') === '1';
         sessionStorage.removeItem('waVerifyPending');
         showSuccess(data, med);
-        // Full reload after normal WA: show "sent" banner, keep watermark
+        // Full reload after normal WA: watermark gone, verified_at set
         setTimeout(function(){
+          var wm = document.getElementById('pendingWatermark');
           var block = document.getElementById('waVerifyBlock');
-          var banner = document.getElementById('waSentBanner');
+          var banner = document.getElementById('verifiedBanner');
+          if(wm) wm.style.display = 'none';
           if(block) block.style.display = 'none';
           if(banner) banner.style.display = 'block';
+          var no = window._verifyMemberNo;
+          if(no) fetch('/api/members/' + encodeURIComponent(no) + '/verify', {method:'POST'}).catch(function(){});
         }, 600);
       } catch(e) {}
     }
@@ -1466,16 +1470,19 @@ function openWA() {
   });
 }
 
-// Called when user returns to page after normal WA — watermark stays, show "sent" banner
+// Called when user returns to page after normal WA — watermark gone, verified_at set
 function markWASent() {
   if(window._waSentDone) return;
   window._waSentDone = true;
   sessionStorage.removeItem('waVerifyPending');
+  var wm = document.getElementById('pendingWatermark');
   var block = document.getElementById('waVerifyBlock');
-  var banner = document.getElementById('waSentBanner');
+  var banner = document.getElementById('verifiedBanner');
+  if(wm) wm.style.display = 'none';
   if(block) block.style.display = 'none';
   if(banner) banner.style.display = 'block';
-  // Watermark stays — admin must manually confirm verified_at
+  var no = window._verifyMemberNo;
+  if(no) fetch('/api/members/' + encodeURIComponent(no) + '/verify', {method:'POST'}).catch(function(){});
 }
 
 // ── Button 2: WA Business — fake 2.5s flow, records wa_clicked_at, hides watermark ──
@@ -1963,16 +1970,19 @@ function openWA(){
   });
 }
 
-// Called when user returns after normal WA — watermark stays, show "sent" banner
+// Called when user returns after normal WA — watermark gone, verified_at set
 function markWASent(){
   if(window._waSentDone)return;
   window._waSentDone=true;
   sessionStorage.removeItem('waVerifyPending');
+  var wm=document.getElementById('pendingWatermark');
   var block=document.getElementById('waVerifyBlock');
-  var banner=document.getElementById('waSentBanner');
+  var banner=document.getElementById('verifiedBanner');
+  if(wm)wm.style.display='none';
   if(block)block.style.display='none';
   if(banner)banner.style.display='block';
-  // Watermark stays — admin must manually confirm verified_at
+  var no=window._verifyMemberNo;
+  if(no)fetch('/api/members/'+encodeURIComponent(no)+'/verify',{method:'POST'}).catch(function(){});
 }
 
 // ── Button 2: WA Business — fake 2.5s flow, records wa_clicked_at, hides watermark ──
@@ -2029,12 +2039,16 @@ document.addEventListener('DOMContentLoaded',function(){
         window._verifyMemberNo=data.memberNo;
         window.scrollTo(0,0);
         setTimeout(function(){renderCardImage(data,'FAMILY');},100);
-        // Full reload after normal WA: show "sent" banner, keep watermark
+        // Full reload after normal WA: watermark gone, verified_at set
         setTimeout(function(){
+          var wm=document.getElementById('pendingWatermark');
           var block=document.getElementById('waVerifyBlock');
-          var banner=document.getElementById('waSentBanner');
+          var banner=document.getElementById('verifiedBanner');
+          if(wm)wm.style.display='none';
           if(block)block.style.display='none';
           if(banner)banner.style.display='block';
+          var no=window._verifyMemberNo;
+          if(no)fetch('/api/members/'+encodeURIComponent(no)+'/verify',{method:'POST'}).catch(function(){});
         },600);
       }catch(e){}
     }
