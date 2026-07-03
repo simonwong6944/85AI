@@ -1041,10 +1041,10 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     <div id="waVerifyBlock" style="display:none;margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px;">
       <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
       <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
-      <a id="waVerifyLink" href="#" onclick="markVerified()" target="_blank" rel="noopener"
-        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:15px 8px;border-radius:8px;text-decoration:none;text-align:center;">
+      <button id="waVerifyBtn" onclick="openWA()"
+        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:15px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;">
         💬 WhatsApp 發送驗證訊息
-      </a>
+      </button>
     </div>
 
     <!-- Verified confirmation banner (shown after WA sent) -->
@@ -1293,14 +1293,43 @@ function showSuccess(data, appliedMedical) {
     var waNum = (s.settings && s.settings.admin_whatsapp) ? s.settings.admin_whatsapp : '85291477341';
     var msgText = '你好，我剛登記了老有卡，會員編號：' + data.memberNo + '，請幫我確認。';
     var msgEnc = encodeURIComponent(msgText);
-    var waUrl = 'https://wa.me/' + waNum + '?text=' + msgEnc;
+    // Build deep link URLs for direct WA app launch (bypass wa.me interstitial page)
+    var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    var isAndroid = /android/i.test(navigator.userAgent);
+    var phoneDigits = waNum.replace(/\D/g,'');
+    var waUrl;
+    if(isIOS) {
+      // iOS: whatsapp:// deep link directly opens WA app
+      waUrl = 'whatsapp://send?phone=' + phoneDigits + '&text=' + msgEnc;
+    } else if(isAndroid) {
+      // Android: intent:// bypasses the wa.me browser interstitial page
+      waUrl = 'intent://send/' + phoneDigits + '#Intent;scheme=smsto;package=com.whatsapp;action=android.intent.action.SENDTO;S.sms_body=' + msgEnc + ';end';
+    } else {
+      // Desktop fallback: wa.me link
+      waUrl = 'https://wa.me/' + phoneDigits + '?text=' + msgEnc;
+    }
+    window._waUrl = waUrl;
     var block = document.getElementById('waVerifyBlock');
     var preview = document.getElementById('waVerifyMsgPreview');
-    var link = document.getElementById('waVerifyLink');
     if(block) block.style.display = 'block';
     if(preview) preview.textContent = msgText;
-    if(link) link.href = waUrl;
   }).catch(function(){});
+
+  // Listen for user returning from WA — auto mark verified
+  document.addEventListener('visibilitychange', function _onReturn() {
+    if(document.visibilityState === 'visible' && window._waLaunched) {
+      window._waLaunched = false;
+      document.removeEventListener('visibilitychange', _onReturn);
+      markVerified();
+    }
+  });
+}
+
+function openWA() {
+  if(!window._waUrl) return;
+  window._waLaunched = true;
+  // Use location.href for deep links (intent:// / whatsapp://) — window.open blocks them on mobile
+  window.location.href = window._waUrl;
 }
 
 function markVerified() {
@@ -1616,10 +1645,10 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     <div id="waVerifyBlock" style="display:none;margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px;">
       <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
       <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
-      <a id="waVerifyLink" href="#" onclick="markVerified()" target="_blank" rel="noopener"
-        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:15px 8px;border-radius:8px;text-decoration:none;text-align:center;">
+      <button id="waVerifyBtn" onclick="openWA()"
+        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:15px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;">
         💬 WhatsApp 發送驗證訊息
-      </a>
+      </button>
     </div>
 
     <!-- Verified confirmation banner -->
@@ -1715,15 +1744,38 @@ async function submitForm(){
       var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
       var msgText='你好，我剛登記了老有卡家庭同行卡，會員編號：'+data.memberNo+'，請幫我確認。';
       var msgEnc=encodeURIComponent(msgText);
-      var waUrl='https://wa.me/'+waNum+'?text='+msgEnc;
+      var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+      var isAndroid=/android/i.test(navigator.userAgent);
+      var phoneDigits=waNum.replace(/\D/g,'');
+      var waUrl;
+      if(isIOS){
+        waUrl='whatsapp://send?phone='+phoneDigits+'&text='+msgEnc;
+      }else if(isAndroid){
+        waUrl='intent://send/'+phoneDigits+'#Intent;scheme=smsto;package=com.whatsapp;action=android.intent.action.SENDTO;S.sms_body='+msgEnc+';end';
+      }else{
+        waUrl='https://wa.me/'+phoneDigits+'?text='+msgEnc;
+      }
+      window._waUrl=waUrl;
       var block=document.getElementById('waVerifyBlock');
       var preview=document.getElementById('waVerifyMsgPreview');
-      var link=document.getElementById('waVerifyLink');
       if(block)block.style.display='block';
       if(preview)preview.textContent=msgText;
-      if(link)link.href=waUrl;
     }).catch(function(){});
+    // Listen for user returning from WA — auto mark verified
+    document.addEventListener('visibilitychange',function _onReturn(){
+      if(document.visibilityState==='visible'&&window._waLaunched){
+        window._waLaunched=false;
+        document.removeEventListener('visibilitychange',_onReturn);
+        markVerified();
+      }
+    });
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
+}
+
+function openWA(){
+  if(!window._waUrl)return;
+  window._waLaunched=true;
+  window.location.href=window._waUrl;
 }
 
 function markVerified(){
