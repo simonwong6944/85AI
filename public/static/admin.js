@@ -761,17 +761,41 @@ async function approveKyc(i){
   await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kyc_status:'DONE'})});
   loadMembers(currentPage);
 }
-async function adminVerify(no){
-  var r=await fetch('/api/admin/members/'+encodeURIComponent(no)+'/verify',{method:'POST'});
-  var d=await r.json();
-  if(d.ok){ loadMembers(currentPage); }
-  else{ console.error('adminVerify failed:',d.error); }
+function adminVerify(no){
+  var btn=event&&event.target;
+  if(btn){ btn.disabled=true; btn.textContent='處理中…'; }
+  fetch('/api/admin/members/'+encodeURIComponent(no)+'/verify',{method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.ok){
+        loadMembers(currentPage);
+      } else {
+        alert('驗證失敗：'+(d.error||'未知錯誤'));
+        if(btn){ btn.disabled=false; btn.textContent='WA✓'; }
+      }
+    })
+    .catch(function(e){
+      alert('網絡錯誤：'+e.message);
+      if(btn){ btn.disabled=false; btn.textContent='WA✓'; }
+    });
 }
-async function adminUnverify(no){
-  var r=await fetch('/api/admin/members/'+encodeURIComponent(no)+'/verify',{method:'DELETE'});
-  var d=await r.json();
-  if(d.ok){ loadMembers(currentPage); }
-  else{ console.error('adminUnverify failed:',d.error); }
+function adminUnverify(no){
+  var btn=event&&event.target;
+  if(btn){ btn.disabled=true; btn.textContent='處理中…'; }
+  fetch('/api/admin/members/'+encodeURIComponent(no)+'/verify',{method:'DELETE'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.ok){
+        loadMembers(currentPage);
+      } else {
+        alert('取消驗證失敗：'+(d.error||'未知錯誤'));
+        if(btn){ btn.disabled=false; btn.textContent='取消驗證'; }
+      }
+    })
+    .catch(function(e){
+      alert('網絡錯誤：'+e.message);
+      if(btn){ btn.disabled=false; btn.textContent='取消驗證'; }
+    });
 }
 async function deactivateMember(i){
   var no=window._members[i].member_no;
