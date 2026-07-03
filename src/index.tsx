@@ -247,7 +247,7 @@ app.get('/api/admin/members', async (c) => {
     `SELECT member_no, tier, status, name_zh, name_en, phone, gender, birth_year,
             district, id_prefix, role, kyc_status, source, referrer_no, roadshow,
             roadshow_location, parent_no, parent_name, relation,
-            expires_at, created_at, notes, admin_notes
+            expires_at, created_at, notes, admin_notes, verified_at
      FROM members ${where}
      ORDER BY created_at DESC LIMIT ? OFFSET ?`
   ).bind(...params, limit, offset).all()
@@ -489,6 +489,24 @@ app.post('/api/members/:no/verify', async (c) => {
   if (existing.verified_at) return c.json({ ok: true, alreadyVerified: true, verified_at: existing.verified_at })
   await db.prepare(`UPDATE members SET verified_at = datetime('now') WHERE member_no = ?`).bind(no).run()
   return c.json({ ok: true, alreadyVerified: false })
+})
+
+// ─── Admin manual verify ──────────────────────────────────────────────────────
+app.post('/api/admin/members/:no/verify', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  const existing = await db.prepare('SELECT member_no FROM members WHERE member_no = ?').bind(no).first()
+  if (!existing) return c.json({ ok: false, error: '查無此會員' }, 404)
+  await db.prepare(`UPDATE members SET verified_at = datetime('now') WHERE member_no = ?`).bind(no).run()
+  return c.json({ ok: true })
+})
+
+// ─── Admin manual unverify ────────────────────────────────────────────────────
+app.delete('/api/admin/members/:no/verify', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  await db.prepare(`UPDATE members SET verified_at = NULL WHERE member_no = ?`).bind(no).run()
+  return c.json({ ok: true })
 })
 
 // ─── Root: 85 AI Technology Limited Dashboard ────────────────────────────────
@@ -2190,7 +2208,7 @@ tr.inactive td{opacity:0.45;}
         <thead><tr>
           <th>會員編號</th><th>狀態</th><th>類型</th><th>中文姓名</th><th>英文姓名</th>
           <th>電話</th><th>性別</th><th>出生年</th><th>HKID頭4位</th>
-          <th>地區</th><th>角色</th><th>KYC</th><th>主卡/家庭卡</th>
+          <th>地區</th><th>角色</th><th>KYC</th><th>WA驗證</th><th>主卡/家庭卡</th>
           <th>來源</th><th>介紹人</th><th>有效日期</th><th>登記時間</th><th>操作</th>
         </tr></thead>
         <tbody id="membersTbody"></tbody>
@@ -3057,6 +3075,10 @@ async function loadMembers(page){
       <td>\${m.district||'—'}</td>
       <td style="font-size:11px;">\${(m.role||'CoExplorery').replace('Co','').replace('ery','')}</td>
       <td><span class="badge badge-\${m.kyc_status==='DONE'?'done':'pending'}">\${m.kyc_status}</span></td>
+      <td id="wa-cell-\${m.member_no}">\${m.verified_at
+        ? '<span class="badge badge-done" title="'+m.verified_at.slice(0,16).replace('T',' ')+'">✅ 已驗證</span>'
+        : '<span class="badge badge-pending">⏳ 待驗證</span>'
+      }</td>
       <td>\${familyInfo}</td>
       <td style="font-size:11px;">\${srcLabel[m.source]||m.source||'—'}</td>
       <td style="font-size:11px;">\${m.referrer_no||'—'}</td>
@@ -3065,12 +3087,14 @@ async function loadMembers(page){
       <td>
         <button class="act-btn act-edit" onclick="openEdit(\${i})">編輯</button>
         \${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc('+i+')">KYC✓</button>':''}
+        \${!m.verified_at?'<button class="act-btn" style="background:#25D366;color:#fff;" onclick="adminVerify(\''+m.member_no+'\')">WA✓</button>':
+          '<button class="act-btn" style="background:#e0e0e0;color:#555;font-size:10px;" onclick="adminUnverify(\''+m.member_no+'\')">取消驗證</button>'}
         \${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="deactivateMember('+i+')">停用</button>':
           m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="reactivateMember('+i+')">啟用</button>':''}
       </td>
     </tr>
     <tr id="family-\${m.member_no}" style="display:none;background:#f9fff9;">
-      <td colspan="18" style="padding:0;">
+      <td colspan="19" style="padding:0;">
         <div id="family-content-\${m.member_no}" style="padding:8px 16px 12px 40px;border-left:3px solid var(--forest);"></div>
       </td>
     </tr>\`;
@@ -3120,6 +3144,20 @@ async function approveKyc(i){
   if(!confirm('確認標記 '+no+' KYC 為 DONE？'))return;
   await fetch('/api/admin/members/'+no,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kyc_status:'DONE'})});
   loadMembers(currentPage);
+}
+async function adminVerify(no){
+  if(!confirm('確認手動標記 '+no+' WA 驗證完成？'))return;
+  var r=await fetch('/api/admin/members/'+encodeURIComponent(no)+'/verify',{method:'POST'});
+  var d=await r.json();
+  if(d.ok){ loadMembers(currentPage); }
+  else{ alert('操作失敗：'+(d.error||'未知錯誤')); }
+}
+async function adminUnverify(no){
+  if(!confirm('確認取消 '+no+' 的 WA 驗證？'))return;
+  var r=await fetch('/api/admin/members/'+encodeURIComponent(no)+'/verify',{method:'DELETE'});
+  var d=await r.json();
+  if(d.ok){ loadMembers(currentPage); }
+  else{ alert('操作失敗：'+(d.error||'未知錯誤')); }
 }
 async function deactivateMember(i){
   var no=window._members[i].member_no;
