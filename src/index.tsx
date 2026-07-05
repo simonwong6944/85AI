@@ -780,6 +780,84 @@ app.delete('/api/admin/roadshows/:id', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Products API (Batch 3) ──────────────────────────────────────────────────
+
+// 列出產品（可搜尋 / 篩分類 / 篩狀態）
+app.get('/api/admin/products', async (c) => {
+  try {
+    const search = (c.req.query('search') || '').trim()
+    const category = (c.req.query('category') || '').trim()
+    const status = (c.req.query('status') || '').trim() // active / inactive / ''
+    let sql = 'SELECT * FROM products WHERE 1=1'
+    const binds: any[] = []
+    if (search) {
+      sql += ' AND (name_zh LIKE ? OR name_en LIKE ? OR brand LIKE ? OR sku LIKE ?)'
+      const kw = `%${search}%`; binds.push(kw, kw, kw, kw)
+    }
+    if (category) { sql += ' AND category = ?'; binds.push(category) }
+    if (status === 'active') sql += ' AND active = 1'
+    if (status === 'inactive') sql += ' AND active = 0'
+    sql += ' ORDER BY active DESC, id DESC'
+    const { results } = await c.env.DB.prepare(sql).bind(...binds).all()
+    return c.json({ ok: true, products: results || [] })
+  } catch (err) { console.error(err); return c.json({ ok: false, error: '讀取產品失敗' }, 500) }
+})
+
+// 取分類清單（給下拉選單用）
+app.get('/api/admin/products/categories', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(
+      "SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != '' ORDER BY category"
+    ).all()
+    return c.json({ ok: true, categories: (results || []).map((r: any) => r.category) })
+  } catch (err) { console.error(err); return c.json({ ok: false, error: '讀取分類失敗' }, 500) }
+})
+
+// 取單一產品
+app.get('/api/admin/products/:id', async (c) => {
+  try {
+    const p = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(c.req.param('id')).first()
+    if (!p) return c.json({ ok: false, error: '找不到產品' }, 404)
+    return c.json({ ok: true, product: p })
+  } catch (err) { console.error(err); return c.json({ ok: false, error: '讀取失敗' }, 500) }
+})
+
+// 新增產品
+app.post('/api/admin/products', async (c) => {
+  try {
+    const b = await c.req.json()
+    if (!b.name_zh || !b.name_en) return c.json({ ok: false, error: '中英文名稱必填' }, 400)
+    const r = await c.env.DB.prepare(
+      `INSERT INTO products (name_zh, name_en, brand, sku, category, unit, cost, price, description, photo_url, active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+    ).bind(
+      b.name_zh, b.name_en, b.brand || '', b.sku || '', b.category || '', b.unit || '',
+      Number(b.cost) || 0, Number(b.price) || 0, b.description || '', b.photo_url || ''
+    ).run()
+    return c.json({ ok: true, id: r.meta.last_row_id })
+  } catch (err) { console.error(err); return c.json({ ok: false, error: '新增產品失敗' }, 500) }
+})
+
+// 更新產品
+app.patch('/api/admin/products/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const b = await c.req.json()
+    const fields: string[] = []; const binds: any[] = []
+    const allow = ['name_zh','name_en','brand','sku','category','unit','cost','price','description','photo_url','active']
+    for (const k of allow) {
+      if (k in b) {
+        fields.push(`${k} = ?`)
+        binds.push((k === 'cost' || k === 'price') ? (Number(b[k]) || 0) : (k === 'active' ? (b[k] ? 1 : 0) : b[k]))
+      }
+    }
+    if (!fields.length) return c.json({ ok: false, error: '沒有可更新欄位' }, 400)
+    binds.push(id)
+    await c.env.DB.prepare(`UPDATE products SET ${fields.join(', ')} WHERE id = ?`).bind(...binds).run()
+    return c.json({ ok: true })
+  } catch (err) { console.error(err); return c.json({ ok: false, error: '更新產品失敗' }, 500) }
+})
+
 // Source statistics API
 app.get('/api/admin/source-stats', async (c) => {
   const db = c.env.DB
@@ -4259,6 +4337,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="nav-item active" onclick="switchMod('mod-roadshow')">
         <i class="fas fa-map-marker-alt"></i> Roadshow 管理
       </div>
+      <div class="nav-item" onclick="switchMod('mod-products')">
+        <i class="fas fa-box"></i> 產品管理
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doAdminLogout()">
@@ -4438,6 +4519,60 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- Products Module (Batch 3) -->
+<div id="mod-products" class="mod-page">
+  <div class="rs-header">
+    <div>
+      <h3 style="font-size:16px;font-weight:700;color:#111827">產品主庫</h3>
+      <p style="font-size:12px;color:#6B7280;margin-top:2px" id="prod-count-label"></p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateProduct()">
+      <i class="fas fa-plus"></i> 新增產品
+    </button>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="prod-search" placeholder="搜尋名稱／品牌／SKU..." oninput="loadProducts()" style="flex:1;min-width:200px">
+    <select id="prod-category-filter" onchange="loadProducts()" style="min-width:120px">
+      <option value="">全部分類</option>
+    </select>
+    <select id="prod-status-filter" onchange="loadProducts()" style="min-width:120px">
+      <option value="active">使用中</option>
+      <option value="">全部</option>
+      <option value="inactive">已停用</option>
+    </select>
+  </div>
+  <div class="store-grid" id="prod-grid"></div>
+</div>
+
+<!-- Product Create/Edit Modal -->
+<div class="modal-overlay" id="modal-product">
+  <div class="modal">
+    <h3 id="prod-modal-title"><i class="fas fa-box" style="margin-right:8px;color:var(--brand)"></i>新增產品</h3>
+    <input type="hidden" id="prod-id">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field"><label>中文名稱 <span style="color:#EF4444">*</span></label><input type="text" id="prod-name-zh"></div>
+      <div class="form-field"><label>英文名稱 <span style="color:#EF4444">*</span></label><input type="text" id="prod-name-en"></div>
+      <div class="form-field"><label>品牌／供應商</label><input type="text" id="prod-brand"></div>
+      <div class="form-field"><label>分類</label><input type="text" id="prod-category" placeholder="醬料／飲品／紙品…"></div>
+      <div class="form-field"><label>SKU 貨號</label><input type="text" id="prod-sku"></div>
+      <div class="form-field"><label>單位</label><input type="text" id="prod-unit" placeholder="支／包／盒"></div>
+      <div class="form-field"><label>成本價 (HK$)</label><input type="number" id="prod-cost" step="0.1" min="0"></div>
+      <div class="form-field"><label>建議售價 (HK$)</label><input type="number" id="prod-price" step="0.1" min="0"></div>
+    </div>
+    <div class="form-field"><label>相片連結 (URL)</label><input type="text" id="prod-photo" placeholder="https://..."></div>
+    <div class="form-field"><label>產品描述</label><textarea id="prod-desc" rows="2" style="resize:vertical"></textarea></div>
+    <div class="form-field" id="prod-active-field" style="display:none">
+      <label>狀態</label>
+      <select id="prod-active"><option value="1">使用中</option><option value="0">已停用</option></select>
+    </div>
+    <div id="prod-modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-product')">取消</button>
+      <button class="btn btn-primary" onclick="submitProduct()"><i class="fas fa-save"></i> 儲存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── State ──
 var allStores = [];
@@ -4498,7 +4633,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -4506,6 +4641,7 @@ function switchMod(id){
     _membershipFrameLoaded = true;
   }
   document.querySelector('.page-area').style.padding = (id==='mod-membership') ? '10px' : '24px';
+  if(id==='mod-products'){ loadProductCategories(); loadProducts(); }
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
@@ -4750,6 +4886,105 @@ window.addEventListener('load', function(){
     window.loadStoreDropdown();
   }
 });
+
+// ── Products (Batch 3) ──
+function loadProductCategories(){
+  fetch('/api/admin/products/categories').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    var sel = document.getElementById('prod-category-filter');
+    sel.innerHTML = '<option value="">全部分類</option>';
+    d.categories.forEach(function(cat){ sel.innerHTML += '<option value="'+esc(cat)+'">'+esc(cat)+'</option>'; });
+  });
+}
+function loadProducts(){
+  var params = new URLSearchParams();
+  var s = document.getElementById('prod-search').value.trim();
+  var cat = document.getElementById('prod-category-filter').value;
+  var st = document.getElementById('prod-status-filter').value;
+  if(s) params.set('search', s);
+  if(cat) params.set('category', cat);
+  if(st) params.set('status', st);
+  fetch('/api/admin/products?'+params.toString()).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    var grid = document.getElementById('prod-grid');
+    document.getElementById('prod-count-label').textContent = '共 '+d.products.length+' 件產品';
+    if(!d.products.length){
+      grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:#9CA3AF"><i class="fas fa-box-open" style="font-size:28px;margin-bottom:10px;display:block"></i>尚無產品，點右上角新增</div>';
+      return;
+    }
+    grid.innerHTML = d.products.map(function(p){
+      var img = p.photo_url
+        ? '<img src="'+esc(p.photo_url)+'" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;" onerror="this.style.display=\'none\'">'
+        : '<div style="width:100%;height:120px;background:#F3F4F6;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;color:#D1D5DB;"><i class="fas fa-image" style="font-size:28px"></i></div>';
+      var inactive = p.active ? '' : '<span style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;">已停用</span>';
+      return '<div class="store-card" style="cursor:pointer" onclick="openEditProduct('+p.id+')">'+
+        img+
+        '<div class="store-card-name">'+esc(p.name_zh)+inactive+'</div>'+
+        '<div style="font-size:11px;color:#6B7280;margin-bottom:4px">'+esc(p.name_en||'')+'</div>'+
+        (p.brand?'<div class="store-card-dist"><i class="fas fa-tag" style="margin-right:4px;color:#9CA3AF"></i>'+esc(p.brand)+'</div>':'')+
+        '<div style="margin-top:6px;font-size:13px;"><span style="font-weight:700;color:var(--brand)">$'+(p.price||0)+'</span>'+
+        (p.cost?'<span style="font-size:11px;color:#9CA3AF;margin-left:6px">成本 $'+p.cost+'</span>':'')+'</div>'+
+      '</div>';
+    }).join('');
+  }).catch(function(e){console.error('loadProducts',e);});
+}
+function openCreateProduct(){
+  document.getElementById('prod-modal-title').innerHTML='<i class="fas fa-box" style="margin-right:8px;color:var(--brand)"></i>新增產品';
+  document.getElementById('prod-id').value='';
+  ['prod-name-zh','prod-name-en','prod-brand','prod-category','prod-sku','prod-unit','prod-cost','prod-price','prod-photo','prod-desc'].forEach(function(f){document.getElementById(f).value='';});
+  document.getElementById('prod-active-field').style.display='none';
+  document.getElementById('prod-modal-err').style.display='none';
+  document.getElementById('modal-product').classList.add('open');
+}
+function openEditProduct(id){
+  fetch('/api/admin/products/'+id).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){alert(d.error||'讀取失敗');return;}
+    var p = d.product;
+    document.getElementById('prod-modal-title').innerHTML='<i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯產品';
+    document.getElementById('prod-id').value=p.id;
+    document.getElementById('prod-name-zh').value=p.name_zh||'';
+    document.getElementById('prod-name-en').value=p.name_en||'';
+    document.getElementById('prod-brand').value=p.brand||'';
+    document.getElementById('prod-category').value=p.category||'';
+    document.getElementById('prod-sku').value=p.sku||'';
+    document.getElementById('prod-unit').value=p.unit||'';
+    document.getElementById('prod-cost').value=p.cost||'';
+    document.getElementById('prod-price').value=p.price||'';
+    document.getElementById('prod-photo').value=p.photo_url||'';
+    document.getElementById('prod-desc').value=p.description||'';
+    document.getElementById('prod-active').value=String(p.active);
+    document.getElementById('prod-active-field').style.display='';
+    document.getElementById('prod-modal-err').style.display='none';
+    document.getElementById('modal-product').classList.add('open');
+  });
+}
+function submitProduct(){
+  var id = document.getElementById('prod-id').value;
+  var body = {
+    name_zh: document.getElementById('prod-name-zh').value.trim(),
+    name_en: document.getElementById('prod-name-en').value.trim(),
+    brand: document.getElementById('prod-brand').value.trim(),
+    category: document.getElementById('prod-category').value.trim(),
+    sku: document.getElementById('prod-sku').value.trim(),
+    unit: document.getElementById('prod-unit').value.trim(),
+    cost: document.getElementById('prod-cost').value,
+    price: document.getElementById('prod-price').value,
+    photo_url: document.getElementById('prod-photo').value.trim(),
+    description: document.getElementById('prod-desc').value.trim()
+  };
+  var errEl = document.getElementById('prod-modal-err');
+  if(!body.name_zh || !body.name_en){errEl.textContent='中英文名稱必填';errEl.style.display='';return;}
+  if(id) body.active = document.getElementById('prod-active').value;
+  errEl.style.display='none';
+  var url = id ? '/api/admin/products/'+id : '/api/admin/products';
+  var method = id ? 'PATCH' : 'POST';
+  fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-product');loadProductCategories();loadProducts();}
+      else{errEl.textContent=d.error||'儲存失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
 </script>
 </body>
 </html>`
