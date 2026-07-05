@@ -234,7 +234,7 @@ app.get('/api/admin/members', async (c) => {
       `SELECT member_no, tier, status, name_zh, name_en, phone, gender, birth_year,
               district, role, kyc_status, source, referrer_no, roadshow, roadshow_location,
               expires_at, created_at, notes, admin_notes
-       FROM members ${where} ORDER BY created_at DESC`
+       FROM members m ${where} ORDER BY created_at DESC`
     ).bind(...params).all()
     const header = 'member_no,tier,status,name_zh,name_en,phone,gender,birth_year,district,role,kyc_status,source,referrer_no,roadshow,roadshow_location,expires_at,created_at'
     const BOM = '\uFEFF'
