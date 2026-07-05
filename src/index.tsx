@@ -4431,6 +4431,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 // ── State ──
 var allStores = [];
 var allDistricts = [];
+var rsCache = {}; // roadshow id -> object cache
 
 // ── Init ──
 (function(){
@@ -4512,6 +4513,9 @@ function loadRoadshows(){
       list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;"><i class="fas fa-calendar-times" style="font-size:32px;margin-bottom:12px;display:block"></i>暫無 Roadshow 資料</div>';
       return;
     }
+    // Cache roadshow data by id to avoid inline JSON in onclick
+    rsCache = {};
+    d.roadshows.forEach(function(rs){ rsCache[rs.id] = rs; });
     list.innerHTML = d.roadshows.map(function(rs){
       var statusClass = rs.status==='active'?'status-active':rs.status==='ended'?'status-ended':'status-inactive';
       var statusText = rs.status==='active'?'進行中':rs.status==='ended'?'已結束':'暫停';
@@ -4534,8 +4538,8 @@ function loadRoadshows(){
             (rs.notes?'<div style="font-size:12px;color:#6B7280;margin-top:4px">'+esc(rs.notes)+'</div>':'')+
           '</div>'+
           '<div style="display:flex;gap:6px;flex-shrink:0">'+
-            '<button class="btn btn-secondary btn-sm" onclick="openEditRs('+JSON.stringify(rs)+')"><i class="fas fa-edit"></i></button>'+
-            '<button class="btn btn-danger btn-sm" onclick="deleteRs('+rs.id+',\\'' +esc(rs.name)+'\\')"><i class="fas fa-trash"></i></button>'+
+            '<button class="btn btn-secondary btn-sm" onclick="openEditRsById('+rs.id+')"><i class="fas fa-edit"></i></button>'+
+            '<button class="btn btn-danger btn-sm" onclick="deleteRs('+rs.id+')"><i class="fas fa-trash"></i></button>'+
           '</div>'+
         '</div>'+
       '</div>';
@@ -4575,6 +4579,11 @@ function submitCreateRs(){
 }
 
 var editingRsId = null;
+function openEditRsById(id){
+  var rs = rsCache[id];
+  if(!rs){alert('找不到資料，請重新整理');return;}
+  openEditRs(rs);
+}
 function openEditRs(rs){
   editingRsId = rs.id;
   document.getElementById('edit-rs-id').value = rs.id;
@@ -4610,8 +4619,10 @@ function submitEditRs(){
     }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
 }
 
-function deleteRs(id,name){
-  if(!confirm('確認刪除 Roadshow「'+name+'」？\n注意：已登記會員的 roadshow 欄位不受影響。')){return;}
+function deleteRs(id){
+  var rs = rsCache[id];
+  var name = rs ? rs.name : 'ID '+id;
+  if(!confirm('確認刪除 Roadshow ['+name+'] ?  注意：已登記會員的 roadshow 欄位不受影響。')){return;}
   fetch('/api/admin/roadshows/'+id,{method:'DELETE'})
     .then(function(r){return r.json();})
     .then(function(d){if(d.ok){loadRoadshows();}else{alert(d.error||'刪除失敗');}})
