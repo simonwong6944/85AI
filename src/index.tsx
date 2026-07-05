@@ -1,15 +1,94 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 
 type Bindings = {
   DB: D1Database
+  ADMIN_PASSWORD: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
 
+// ─── Admin Auth Helpers ───────────────────────────────────────────────────────
+function makeToken(): string {
+  const arr = new Uint8Array(32)
+  crypto.getRandomValues(arr)
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function sessionExpiry(hours = 12): string {
+  const d = new Date()
+  d.setHours(d.getHours() + hours)
+  return d.toISOString().replace('T', ' ').slice(0, 19)
+}
+
+function getSessionToken(c: any): string | undefined {
+  return getCookie(c, 'admin_session')
+}
+
+async function verifySession(db: D1Database, token: string | undefined): Promise<boolean> {
+  if (!token) return false
+  const row = await db.prepare(
+    `SELECT id FROM admin_sessions WHERE token = ? AND expires_at > datetime('now')`
+  ).bind(token).first()
+  return !!row
+}
+
 // ─── CORS for API ────────────────────────────────────────────────────────────
 app.use('/api/*', cors())
+
+// ─── Admin Auth Middleware (MUST be before all /api/admin/* routes) ───────────
+// Exempt: login, logout, me (these handle their own auth)
+app.use('/api/admin/*', async (c, next) => {
+  const path = new URL(c.req.url).pathname
+  // Allow login/logout/me without session
+  const exempt = ['/api/admin/login', '/api/admin/logout', '/api/admin/me']
+  if (exempt.includes(path)) return next()
+
+  const token = getSessionToken(c)
+  const ok = await verifySession(c.env.DB, token)
+  if (!ok) return c.json({ ok: false, error: 'Unauthorized', code: 'AUTH_REQUIRED' }, 401)
+  return next()
+})
+
+// ─── Admin Auth Routes ────────────────────────────────────────────────────────
+app.post('/api/admin/login', async (c) => {
+  const { password } = await c.req.json<{ password: string }>()
+  const expected = c.env.ADMIN_PASSWORD || 'CoEldery85Admin'
+  if (!password || password !== expected) {
+    return c.json({ ok: false, error: '密碼錯誤' }, 401)
+  }
+  const token = makeToken()
+  const expiresAt = sessionExpiry(12)
+  await c.env.DB.prepare(
+    `INSERT INTO admin_sessions (token, role, label, expires_at) VALUES (?, 'admin', 'Admin', ?)`
+  ).bind(token, expiresAt).run()
+  setCookie(c, 'admin_session', token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: 12 * 3600
+  })
+  return c.json({ ok: true, role: 'admin', expires_at: expiresAt })
+})
+
+app.post('/api/admin/logout', async (c) => {
+  const token = getSessionToken(c)
+  if (token) {
+    await c.env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(token).run()
+  }
+  deleteCookie(c, 'admin_session', { path: '/' })
+  return c.json({ ok: true })
+})
+
+app.get('/api/admin/me', async (c) => {
+  const token = getSessionToken(c)
+  const ok = await verifySession(c.env.DB, token)
+  if (!ok) return c.json({ ok: false, loggedIn: false })
+  return c.json({ ok: true, loggedIn: true, role: 'admin' })
+})
 
 // ─── Static assets ───────────────────────────────────────────────────────────
 app.use('/shared.css', serveStatic({ root: './public' }))
@@ -591,6 +670,116 @@ app.patch('/api/admin/members/:no/group', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Roadshow APIs ───────────────────────────────────────────────────────────
+
+// List all JHC stores (for dropdown)
+app.get('/api/admin/roadshow/stores', async (c) => {
+  const db = c.env.DB
+  const district = c.req.query('district')
+  const search = c.req.query('search')
+  let where = 'WHERE active=1'
+  const params: string[] = []
+  if (district) { where += ' AND district=?'; params.push(district) }
+  if (search) { where += ' AND (name_zh LIKE ? OR store_code LIKE ? OR district LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`) }
+  const rows = await db.prepare(
+    `SELECT id, store_code, name_zh, name_en, district, address FROM jhc_stores ${where} ORDER BY district, name_zh`
+  ).bind(...params).all()
+  return c.json({ ok: true, stores: rows.results })
+})
+
+// List distinct districts
+app.get('/api/admin/roadshow/districts', async (c) => {
+  const db = c.env.DB
+  const rows = await db.prepare(
+    `SELECT DISTINCT district FROM jhc_stores WHERE active=1 AND district!='' ORDER BY district`
+  ).all()
+  return c.json({ ok: true, districts: rows.results.map((r: any) => r.district) })
+})
+
+// List roadshows
+app.get('/api/admin/roadshows', async (c) => {
+  const db = c.env.DB
+  const status = c.req.query('status')
+  let where = 'WHERE 1=1'
+  const params: string[] = []
+  if (status) { where += ' AND r.status=?'; params.push(status) }
+  const rows = await db.prepare(
+    `SELECT r.id, r.code, r.name, r.store_code, r.start_date, r.end_date, r.status, r.notes,
+            s.name_zh as store_name, s.district,
+            COUNT(m.id) as member_count
+     FROM roadshows r
+     LEFT JOIN jhc_stores s ON s.store_code = r.store_code
+     LEFT JOIN members m ON m.roadshow = r.code
+     ${where}
+     GROUP BY r.id
+     ORDER BY r.created_at DESC`
+  ).bind(...params).all()
+  return c.json({ ok: true, roadshows: rows.results })
+})
+
+// Create roadshow
+app.post('/api/admin/roadshows', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json<{
+    code: string; name: string; store_code?: string;
+    start_date?: string; end_date?: string; notes?: string
+  }>()
+  if (!body.code?.trim()) return c.json({ ok: false, error: 'Roadshow code 不能為空' }, 400)
+  if (!body.name?.trim()) return c.json({ ok: false, error: 'Roadshow 名稱不能為空' }, 400)
+
+  // Get store_id if store_code provided
+  let storeId: number | null = null
+  if (body.store_code) {
+    const store = await db.prepare('SELECT id FROM jhc_stores WHERE store_code=?').bind(body.store_code).first<{ id: number }>()
+    storeId = store?.id ?? null
+  }
+
+  try {
+    const result = await db.prepare(
+      `INSERT INTO roadshows (code, name, store_id, store_code, start_date, end_date, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`
+    ).bind(
+      body.code.trim(), body.name.trim(), storeId, body.store_code || '',
+      body.start_date || '', body.end_date || '', body.notes || ''
+    ).run()
+    return c.json({ ok: true, id: result.meta.last_row_id })
+  } catch (e: any) {
+    if (e.message?.includes('UNIQUE')) return c.json({ ok: false, error: '此 Roadshow Code 已存在' }, 409)
+    return c.json({ ok: false, error: '建立失敗' }, 500)
+  }
+})
+
+// Update roadshow
+app.patch('/api/admin/roadshows/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const body = await c.req.json<{
+    name?: string; store_code?: string; start_date?: string;
+    end_date?: string; status?: string; notes?: string
+  }>()
+  const allowed = ['name', 'store_code', 'start_date', 'end_date', 'status', 'notes']
+  const fields: string[] = []
+  const vals: any[] = []
+  for (const key of allowed) {
+    if (body[key as keyof typeof body] !== undefined) {
+      fields.push(`${key} = ?`)
+      vals.push(body[key as keyof typeof body])
+    }
+  }
+  if (!fields.length) return c.json({ ok: false, error: 'Nothing to update' }, 400)
+  vals.push(id)
+  await db.prepare(`UPDATE roadshows SET ${fields.join(', ')} WHERE id = ?`).bind(...vals).run()
+  return c.json({ ok: true })
+})
+
+// Delete roadshow
+app.delete('/api/admin/roadshows/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  await db.prepare('DELETE FROM roadshows WHERE id = ?').bind(id).run()
+  return c.json({ ok: true })
+})
+
 // Source statistics API
 app.get('/api/admin/source-stats', async (c) => {
   const db = c.env.DB
@@ -630,11 +819,13 @@ app.get('/governance',  (c) => c.html(comingSoonHtml('Governance', '治理管理
 app.get('/events',      (c) => c.html(comingSoonHtml('Events', '活動管理')))
 app.get('/volunteers',  (c) => c.html(comingSoonHtml('Volunteers', '義工管理')))
 
+// ─── /admin — New unified admin shell with login protection ─────────────────
+app.get('/admin', (c) => c.html(newAdminShellHtml()))
+
 // ─── Legacy redirects (old URLs → new URLs, keeps old links working) ──────────
 app.get('/login',       (c) => c.redirect('/membership', 301))
 app.get('/join',        (c) => c.redirect('/membership/join', 301))
 app.get('/join-family', (c) => c.redirect('/membership/join-family', 301))
-app.get('/admin',       (c) => c.redirect('/membership/admin', 301))
 app.get('/member/:no',  (c) => c.redirect(`/membership/card/${c.req.param('no')}`, 301))
 app.get('/poster',      (c) => c.redirect('/', 301))
 app.get('/sop',         (c) => c.redirect('/', 301))
@@ -3930,6 +4121,605 @@ document.getElementById('phone').addEventListener('keydown',function(e){
 });
 </script>
 </body></html>`
+}
+
+// ─── New /admin Shell (Login-protected) ──────────────────────────────────────
+function newAdminShellHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>85 AI 管理後台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+:root{--brand:#1B4332;--brand-light:#2D6A4F;--accent:#40916C;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F3F4F6;color:#1F2937;min-height:100vh;}
+/* ── Login Screen ── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1B4332 0%,#2D6A4F 100%);}
+.login-card{background:#fff;border-radius:12px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.login-logo{text-align:center;margin-bottom:28px;}
+.login-logo .mark{display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;background:var(--brand);color:#fff;font-size:26px;font-weight:900;border-radius:10px;margin-bottom:12px;}
+.login-logo h1{font-size:20px;font-weight:700;color:var(--brand);}
+.login-logo p{font-size:12px;color:#6B7280;margin-top:4px;}
+.login-field{margin-bottom:18px;}
+.login-field label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;}
+.login-field input{width:100%;padding:12px 14px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:16px;transition:border 0.2s;}
+.login-field input:focus{outline:none;border-color:var(--brand);}
+.login-btn{width:100%;padding:13px;background:var(--brand);color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s;}
+.login-btn:hover{background:var(--brand-light);}
+.login-btn:disabled{background:#9CA3AF;cursor:not-allowed;}
+.login-err{background:#FEF2F2;border:1px solid #FECACA;color:#DC2626;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:14px;display:none;}
+.login-err.show{display:block;}
+/* ── App Shell ── */
+#app-shell{display:none;min-height:100vh;}
+.sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background:var(--brand);color:#fff;display:flex;flex-direction:column;z-index:100;}
+.sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid rgba(255,255,255,0.1);}
+.sidebar-logo .mark{display:inline-block;background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:6px;font-weight:900;font-size:16px;letter-spacing:1px;margin-bottom:4px;}
+.sidebar-logo p{font-size:11px;opacity:0.7;margin-top:2px;}
+.sidebar-nav{flex:1;overflow-y:auto;padding:12px 0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 18px;cursor:pointer;transition:background 0.15s;font-size:14px;font-weight:500;}
+.nav-item:hover{background:rgba(255,255,255,0.08);}
+.nav-item.active{background:rgba(255,255,255,0.15);border-right:3px solid #fff;}
+.nav-item i{width:18px;text-align:center;opacity:0.8;}
+.sidebar-footer{padding:14px 16px;border-top:1px solid rgba(255,255,255,0.1);}
+.logout-btn{display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:13px;cursor:pointer;width:100%;transition:background 0.15s;}
+.logout-btn:hover{background:rgba(255,255,255,0.15);}
+.main-content{margin-left:220px;min-height:100vh;display:flex;flex-direction:column;}
+.topbar{background:#fff;border-bottom:1px solid #E5E7EB;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
+.topbar h2{font-size:18px;font-weight:700;color:#111827;}
+.page-area{flex:1;padding:24px;overflow-y:auto;}
+/* ── Module Pages ── */
+.mod-page{display:none;}
+.mod-page.active{display:block;}
+/* ── Roadshow Module ── */
+.rs-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+.rs-tabs{display:flex;gap:8px;border-bottom:2px solid #E5E7EB;margin-bottom:20px;}
+.rs-tab{padding:10px 18px;border:none;background:none;font-size:14px;font-weight:500;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color 0.15s;}
+.rs-tab.active{color:var(--brand);border-bottom-color:var(--brand);}
+.rs-card{background:#fff;border-radius:10px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:12px;}
+.rs-card-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.rs-card-name{font-size:15px;font-weight:700;color:#111827;}
+.rs-card-code{font-size:12px;color:#6B7280;font-family:monospace;background:#F3F4F6;padding:2px 8px;border-radius:4px;}
+.rs-card-meta{font-size:12px;color:#6B7280;margin-top:4px;}
+.status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;}
+.status-active{background:#D1FAE5;color:#065F46;}
+.status-inactive{background:#F3F4F6;color:#6B7280;}
+.status-ended{background:#FEE2E2;color:#991B1B;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all 0.15s;}
+.btn-primary{background:var(--brand);color:#fff;border-color:var(--brand);}
+.btn-primary:hover{background:var(--brand-light);}
+.btn-secondary{background:#fff;color:#374151;border-color:#D1D5DB;}
+.btn-secondary:hover{background:#F9FAFB;}
+.btn-danger{background:#EF4444;color:#fff;border-color:#EF4444;}
+.btn-danger:hover{background:#DC2626;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+/* ── Store grid ── */
+.store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+.store-card{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:14px 16px;}
+.store-card-code{font-family:monospace;font-size:11px;color:#6B7280;background:#F3F4F6;padding:2px 6px;border-radius:4px;margin-bottom:6px;display:inline-block;}
+.store-card-name{font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;}
+.store-card-dist{font-size:12px;color:#6B7280;}
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:12px;padding:28px 28px 24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:18px;color:#111827;}
+.form-field{margin-bottom:14px;}
+.form-field label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:5px;}
+.form-field input,.form-field select,.form-field textarea{width:100%;padding:9px 11px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{outline:none;border-color:var(--brand);}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
+/* ── Search ── */
+.search-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.search-bar input,.search-bar select{padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;}
+.search-bar input:focus,.search-bar select:focus{outline:none;border-color:var(--brand);}
+/* ── Membership redirect panel ── */
+.redirect-panel{background:#fff;border-radius:10px;border:1px solid #E5E7EB;padding:20px;text-align:center;}
+.redirect-panel p{color:#6B7280;font-size:14px;margin-bottom:14px;}
+.redirect-panel a{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:var(--brand);color:#fff;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="mark">老</div>
+      <h1>85 AI 管理後台</h1>
+      <p>CoEldery 85 老有聯盟 · 管理員專用</p>
+    </div>
+    <div class="login-err" id="login-err"></div>
+    <div class="login-field">
+      <label>管理員密碼</label>
+      <input type="password" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="login-btn" onclick="doAdminLogin()">
+      <i class="fas fa-sign-in-alt" style="margin-right:8px"></i>登入
+    </button>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="mark">老</div>
+      <p>85 AI 管理後台</p>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item" onclick="switchMod('mod-membership')">
+        <i class="fas fa-id-card"></i> 會員系統
+      </div>
+      <div class="nav-item active" onclick="switchMod('mod-roadshow')">
+        <i class="fas fa-map-marker-alt"></i> Roadshow 管理
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doAdminLogout()">
+        <i class="fas fa-sign-out-alt"></i> 登出
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="topbar">
+      <h2 id="topbar-title">Roadshow 管理</h2>
+      <span style="font-size:12px;color:#6B7280">CoEldery 85 老有聯盟</span>
+    </div>
+    <div class="page-area">
+
+      <!-- Membership Module (redirect panel) -->
+      <div id="mod-membership" class="mod-page">
+        <div class="redirect-panel">
+          <p>會員系統管理介面位於獨立頁面</p>
+          <a href="/membership/admin" target="_blank">
+            <i class="fas fa-external-link-alt"></i> 前往會員管理
+          </a>
+        </div>
+      </div>
+
+      <!-- Roadshow Module -->
+      <div id="mod-roadshow" class="mod-page active">
+        <!-- Tabs -->
+        <div class="rs-tabs">
+          <button class="rs-tab active" onclick="rsTab('roadshows')" id="rs-tab-roadshows">
+            <i class="fas fa-calendar-alt" style="margin-right:6px"></i>Roadshow 活動
+          </button>
+          <button class="rs-tab" onclick="rsTab('stores')" id="rs-tab-stores">
+            <i class="fas fa-store" style="margin-right:6px"></i>JHC 商店
+          </button>
+        </div>
+
+        <!-- Roadshow List Panel -->
+        <div id="rs-panel-roadshows">
+          <div class="rs-header">
+            <div>
+              <h3 style="font-size:16px;font-weight:700;color:#111827">Roadshow 活動列表</h3>
+              <p style="font-size:12px;color:#6B7280;margin-top:2px" id="rs-count-label"></p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <select id="rs-filter-status" onchange="loadRoadshows()" style="padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px;">
+                <option value="">全部狀態</option>
+                <option value="active">進行中</option>
+                <option value="inactive">暫停</option>
+                <option value="ended">已結束</option>
+              </select>
+              <button class="btn btn-primary" onclick="openCreateRs()">
+                <i class="fas fa-plus"></i> 新增 Roadshow
+              </button>
+            </div>
+          </div>
+          <div id="rs-list"></div>
+        </div>
+
+        <!-- Store List Panel -->
+        <div id="rs-panel-stores" style="display:none">
+          <div class="rs-header">
+            <div>
+              <h3 style="font-size:16px;font-weight:700;color:#111827">JHC 商店列表</h3>
+              <p style="font-size:12px;color:#6B7280;margin-top:2px" id="store-count-label"></p>
+            </div>
+          </div>
+          <div class="search-bar">
+            <input type="text" id="store-search" placeholder="搜尋商店名稱/代號..." oninput="loadStores()" style="flex:1;min-width:200px">
+            <select id="store-district-filter" onchange="loadStores()" style="min-width:120px">
+              <option value="">全部地區</option>
+            </select>
+          </div>
+          <div class="store-grid" id="store-grid"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Create Roadshow Modal -->
+<div class="modal-overlay" id="modal-create-rs">
+  <div class="modal">
+    <h3><i class="fas fa-plus-circle" style="margin-right:8px;color:var(--brand)"></i>新增 Roadshow 活動</h3>
+    <div class="form-field">
+      <label>Roadshow Code <span style="color:#EF4444">*</span></label>
+      <input type="text" id="new-rs-code" placeholder="例: RS2024-001" style="font-family:monospace">
+    </div>
+    <div class="form-field">
+      <label>活動名稱 <span style="color:#EF4444">*</span></label>
+      <input type="text" id="new-rs-name" placeholder="例: 北角健威坊 Roadshow">
+    </div>
+    <div class="form-field">
+      <label>選擇商店 (選填)</label>
+      <select id="new-rs-store">
+        <option value="">-- 不指定商店 --</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field">
+        <label>開始日期</label>
+        <input type="date" id="new-rs-start">
+      </div>
+      <div class="form-field">
+        <label>結束日期</label>
+        <input type="date" id="new-rs-end">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>備註</label>
+      <textarea id="new-rs-notes" rows="2" style="resize:vertical" placeholder="選填備註"></textarea>
+    </div>
+    <div id="modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-create-rs')">取消</button>
+      <button class="btn btn-primary" onclick="submitCreateRs()">
+        <i class="fas fa-save"></i> 儲存
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Roadshow Modal -->
+<div class="modal-overlay" id="modal-edit-rs">
+  <div class="modal">
+    <h3><i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯 Roadshow</h3>
+    <input type="hidden" id="edit-rs-id">
+    <div class="form-field">
+      <label>活動名稱 <span style="color:#EF4444">*</span></label>
+      <input type="text" id="edit-rs-name">
+    </div>
+    <div class="form-field">
+      <label>選擇商店</label>
+      <select id="edit-rs-store"></select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field">
+        <label>開始日期</label>
+        <input type="date" id="edit-rs-start">
+      </div>
+      <div class="form-field">
+        <label>結束日期</label>
+        <input type="date" id="edit-rs-end">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>狀態</label>
+      <select id="edit-rs-status">
+        <option value="active">進行中</option>
+        <option value="inactive">暫停</option>
+        <option value="ended">已結束</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>備註</label>
+      <textarea id="edit-rs-notes" rows="2" style="resize:vertical"></textarea>
+    </div>
+    <div id="modal-edit-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit-rs')">取消</button>
+      <button class="btn btn-primary" onclick="submitEditRs()">
+        <i class="fas fa-save"></i> 儲存
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+var allStores = [];
+var allDistricts = [];
+
+// ── Init ──
+(function(){
+  fetch('/api/admin/me').then(function(r){return r.json();}).then(function(d){
+    if(d.loggedIn){
+      showAppShell();
+    } else {
+      document.getElementById('login-screen').style.display='flex';
+    }
+  }).catch(function(){
+    document.getElementById('login-screen').style.display='flex';
+  });
+})();
+
+function showAppShell(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app-shell').style.display='flex';
+  loadRoadshows();
+  loadDistricts();
+  loadStoreDropdown();
+}
+
+// ── Login ──
+document.getElementById('login-pw').addEventListener('keydown',function(e){
+  if(e.key==='Enter') doAdminLogin();
+});
+
+function doAdminLogin(){
+  var pw = document.getElementById('login-pw').value;
+  var btn = document.getElementById('login-btn');
+  var err = document.getElementById('login-err');
+  if(!pw){err.textContent='請輸入密碼';err.classList.add('show');return;}
+  btn.disabled=true;btn.textContent='登入中...';err.classList.remove('show');
+  fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){showAppShell();}
+      else{err.textContent=d.error||'密碼錯誤';err.classList.add('show');btn.disabled=false;btn.textContent='登入';}
+    })
+    .catch(function(e){err.textContent='網絡錯誤';err.classList.add('show');btn.disabled=false;btn.textContent='登入';});
+}
+
+function doAdminLogout(){
+  fetch('/api/admin/logout',{method:'POST'}).finally(function(){
+    window.location.reload();
+  });
+}
+
+// ── Sidebar nav ──
+function switchMod(id){
+  document.querySelectorAll('.mod-page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  document.getElementById(id).classList.add('active');
+  event.currentTarget.classList.add('active');
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理'};
+  document.getElementById('topbar-title').textContent = titles[id]||id;
+  if(id==='mod-roadshow') loadRoadshows();
+}
+
+// ── Roadshow Tab ──
+function rsTab(name){
+  document.querySelectorAll('.rs-tab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('rs-tab-'+name).classList.add('active');
+  document.getElementById('rs-panel-roadshows').style.display = name==='roadshows'?'':'none';
+  document.getElementById('rs-panel-stores').style.display = name==='stores'?'':'none';
+  if(name==='stores') loadStores();
+}
+
+// ── Roadshow CRUD ──
+function loadRoadshows(){
+  var status = document.getElementById('rs-filter-status').value;
+  var url = '/api/admin/roadshows'+(status?'?status='+encodeURIComponent(status):'');
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    var list = document.getElementById('rs-list');
+    var label = document.getElementById('rs-count-label');
+    label.textContent = '共 '+d.roadshows.length+' 個 Roadshow';
+    if(!d.roadshows.length){
+      list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;"><i class="fas fa-calendar-times" style="font-size:32px;margin-bottom:12px;display:block"></i>暫無 Roadshow 資料</div>';
+      return;
+    }
+    list.innerHTML = d.roadshows.map(function(rs){
+      var statusClass = rs.status==='active'?'status-active':rs.status==='ended'?'status-ended':'status-inactive';
+      var statusText = rs.status==='active'?'進行中':rs.status==='ended'?'已結束':'暫停';
+      var dateRange = '';
+      if(rs.start_date||rs.end_date) dateRange = (rs.start_date||'?')+' ~ '+(rs.end_date||'?');
+      return '<div class="rs-card">'+
+        '<div class="rs-card-header">'+
+          '<div>'+
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+              '<span class="rs-card-name">'+esc(rs.name)+'</span>'+
+              '<span class="rs-card-code">'+esc(rs.code)+'</span>'+
+              '<span class="status-badge '+statusClass+'">'+statusText+'</span>'+
+            '</div>'+
+            '<div class="rs-card-meta">'+
+              (rs.store_name?'<i class="fas fa-store" style="margin-right:4px"></i>'+esc(rs.store_name)+' · ':'')+
+              (rs.district?'<i class="fas fa-map-pin" style="margin-right:4px"></i>'+esc(rs.district)+' · ':'')+
+              '<i class="fas fa-users" style="margin-right:4px"></i>'+(rs.member_count||0)+' 位會員'+
+              (dateRange?' · <i class="fas fa-calendar" style="margin-right:4px"></i>'+dateRange:'')+
+            '</div>'+
+            (rs.notes?'<div style="font-size:12px;color:#6B7280;margin-top:4px">'+esc(rs.notes)+'</div>':'')+
+          '</div>'+
+          '<div style="display:flex;gap:6px;flex-shrink:0">'+
+            '<button class="btn btn-secondary btn-sm" onclick="openEditRs('+JSON.stringify(rs)+')"><i class="fas fa-edit"></i></button>'+
+            '<button class="btn btn-danger btn-sm" onclick="deleteRs('+rs.id+',\\'' +esc(rs.name)+'\\')"><i class="fas fa-trash"></i></button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }).catch(function(e){console.error('loadRoadshows',e);});
+}
+
+function openCreateRs(){
+  document.getElementById('new-rs-code').value='';
+  document.getElementById('new-rs-name').value='';
+  document.getElementById('new-rs-store').value='';
+  document.getElementById('new-rs-start').value='';
+  document.getElementById('new-rs-end').value='';
+  document.getElementById('new-rs-notes').value='';
+  document.getElementById('modal-err').style.display='none';
+  document.getElementById('modal-create-rs').classList.add('open');
+}
+
+function submitCreateRs(){
+  var code = document.getElementById('new-rs-code').value.trim();
+  var name = document.getElementById('new-rs-name').value.trim();
+  var store_code = document.getElementById('new-rs-store').value;
+  var start_date = document.getElementById('new-rs-start').value;
+  var end_date = document.getElementById('new-rs-end').value;
+  var notes = document.getElementById('new-rs-notes').value.trim();
+  var errEl = document.getElementById('modal-err');
+  if(!code){errEl.textContent='請填寫 Roadshow Code';errEl.style.display='';return;}
+  if(!name){errEl.textContent='請填寫活動名稱';errEl.style.display='';return;}
+  errEl.style.display='none';
+  fetch('/api/admin/roadshows',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code:code,name:name,store_code:store_code||'',start_date:start_date,end_date:end_date,notes:notes})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-create-rs');loadRoadshows();}
+      else{errEl.textContent=d.error||'建立失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
+
+var editingRsId = null;
+function openEditRs(rs){
+  editingRsId = rs.id;
+  document.getElementById('edit-rs-id').value = rs.id;
+  document.getElementById('edit-rs-name').value = rs.name||'';
+  document.getElementById('edit-rs-start').value = rs.start_date||'';
+  document.getElementById('edit-rs-end').value = rs.end_date||'';
+  document.getElementById('edit-rs-status').value = rs.status||'active';
+  document.getElementById('edit-rs-notes').value = rs.notes||'';
+  // Populate store dropdown
+  var sel = document.getElementById('edit-rs-store');
+  populateStoreDropdown(sel, rs.store_code);
+  document.getElementById('modal-edit-err').style.display='none';
+  document.getElementById('modal-edit-rs').classList.add('open');
+}
+
+function submitEditRs(){
+  var id = editingRsId;
+  var name = document.getElementById('edit-rs-name').value.trim();
+  var store_code = document.getElementById('edit-rs-store').value;
+  var start_date = document.getElementById('edit-rs-start').value;
+  var end_date = document.getElementById('edit-rs-end').value;
+  var status = document.getElementById('edit-rs-status').value;
+  var notes = document.getElementById('edit-rs-notes').value.trim();
+  var errEl = document.getElementById('modal-edit-err');
+  if(!name){errEl.textContent='請填寫活動名稱';errEl.style.display='';return;}
+  errEl.style.display='none';
+  fetch('/api/admin/roadshows/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,store_code:store_code,start_date:start_date,end_date:end_date,status:status,notes:notes})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-edit-rs');loadRoadshows();}
+      else{errEl.textContent=d.error||'更新失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
+
+function deleteRs(id,name){
+  if(!confirm('確認刪除 Roadshow「'+name+'」？\n注意：已登記會員的 roadshow 欄位不受影響。')){return;}
+  fetch('/api/admin/roadshows/'+id,{method:'DELETE'})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.ok){loadRoadshows();}else{alert(d.error||'刪除失敗');}})
+    .catch(function(e){alert('網絡錯誤');});
+}
+
+// ── Stores ──
+function loadDistricts(){
+  fetch('/api/admin/roadshow/districts').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    allDistricts = d.districts;
+    var sel = document.getElementById('store-district-filter');
+    sel.innerHTML = '<option value="">全部地區</option>';
+    d.districts.forEach(function(dist){
+      sel.innerHTML += '<option value="'+esc(dist)+'">'+esc(dist)+'</option>';
+    });
+  });
+}
+
+function loadStoreDropdown(){
+  fetch('/api/admin/roadshow/stores').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    allStores = d.stores;
+  });
+}
+
+function populateStoreDropdown(sel, selectedCode){
+  sel.innerHTML = '<option value="">-- 不指定商店 --</option>';
+  allStores.forEach(function(s){
+    var opt = document.createElement('option');
+    opt.value = s.store_code;
+    opt.textContent = '['+s.district+'] '+s.name_zh+' ('+s.store_code+')';
+    if(s.store_code === selectedCode) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function loadStores(){
+  var search = document.getElementById('store-search').value.trim();
+  var district = document.getElementById('store-district-filter').value;
+  var params = new URLSearchParams();
+  if(search) params.set('search', search);
+  if(district) params.set('district', district);
+  fetch('/api/admin/roadshow/stores?'+params.toString())
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      var grid = document.getElementById('store-grid');
+      document.getElementById('store-count-label').textContent = '共 '+d.stores.length+' 間商店';
+      if(!d.stores.length){
+        grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:#9CA3AF"><i class="fas fa-search" style="font-size:28px;margin-bottom:10px;display:block"></i>沒有符合條件的商店</div>';
+        return;
+      }
+      grid.innerHTML = d.stores.map(function(s){
+        return '<div class="store-card">'+
+          '<div class="store-card-code">'+esc(s.store_code)+'</div>'+
+          '<div class="store-card-name">'+esc(s.name_zh)+'</div>'+
+          '<div class="store-card-dist"><i class="fas fa-map-pin" style="margin-right:4px;color:#9CA3AF"></i>'+esc(s.district)+'</div>'+
+          (s.address?'<div style="font-size:11px;color:#9CA3AF;margin-top:4px;line-height:1.4">'+esc(s.address)+'</div>':'')+
+        '</div>';
+      }).join('');
+    }).catch(function(e){console.error('loadStores',e);});
+}
+
+// ── Helpers ──
+function esc(s){
+  if(s==null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+}
+
+// Close modal on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(function(overlay){
+  overlay.addEventListener('click',function(e){
+    if(e.target===overlay) overlay.classList.remove('open');
+  });
+});
+
+// Populate store dropdowns when allStores is loaded
+var _origLoadStoreDropdown = loadStoreDropdown;
+window.addEventListener('load', function(){
+  // Populate new-rs-store dropdown
+  var createSel = document.getElementById('new-rs-store');
+  function refreshCreateDropdown(){
+    createSel.innerHTML = '<option value="">-- 不指定商店 --</option>';
+    allStores.forEach(function(s){
+      createSel.innerHTML += '<option value="'+esc(s.store_code)+'">['+esc(s.district)+'] '+esc(s.name_zh)+' ('+esc(s.store_code)+')</option>';
+    });
+  }
+  var origLoad = loadStoreDropdown;
+  window.loadStoreDropdown = function(){
+    fetch('/api/admin/roadshow/stores').then(function(r){return r.json();}).then(function(d){
+      if(!d.ok) return;
+      allStores = d.stores;
+      refreshCreateDropdown();
+    });
+  };
+  // Re-run if already authenticated
+  if(document.getElementById('app-shell').style.display !== 'none'){
+    window.loadStoreDropdown();
+  }
+});
+</script>
+</body>
+</html>`
 }
 
 export default app
