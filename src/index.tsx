@@ -2398,7 +2398,7 @@ body{background:#f2f3f5;padding:0;font-size:14px;}
 .nav-tab.active{opacity:1;border-bottom-color:var(--ferrari);}
 .topbar-right{margin-left:auto;font-size:11px;opacity:0.5;}
 /* layout */
-.wrap{max-width:1280px;margin:0 auto;padding:24px;}
+.wrap{max-width:100%;margin:0 auto;padding:16px 24px;}
 .page{display:none}.page.active{display:block}
 /* stat cards */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
@@ -4290,7 +4290,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           </div>
         </div>
         <iframe id="membership-frame" src="about:blank"
-          style="width:100%;height:calc(100vh - 160px);border:1px solid #E5E7EB;border-radius:8px;background:#fff;display:block;">
+          style="width:100%;height:calc(100vh - 110px);border:1px solid #E5E7EB;border-radius:8px;background:#fff;display:block;">
         </iframe>
       </div>
 
@@ -4504,6 +4504,7 @@ function switchMod(id){
     document.getElementById('membership-frame').src = '/membership/admin';
     _membershipFrameLoaded = true;
   }
+  document.querySelector('.page-area').style.padding = (id==='mod-membership') ? '10px' : '24px';
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
