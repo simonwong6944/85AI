@@ -205,6 +205,7 @@ app.get('/api/admin/members', async (c) => {
   const status = c.req.query('status')
   const source = c.req.query('source')
   const district = c.req.query('district')
+  const roadshow = c.req.query('roadshow')
   const exportCsv = c.req.query('export') === 'csv'
   const offset = (page - 1) * limit
 
@@ -215,6 +216,7 @@ app.get('/api/admin/members', async (c) => {
   if (status) { where += ' AND m.status = ?'; params.push(status) }
   if (source) { where += ' AND m.source = ?'; params.push(source) }
   if (district) { where += ' AND m.district = ?'; params.push(district) }
+  if (roadshow) { where += ' AND m.roadshow = ?'; params.push(roadshow) }
   if (groupFilter === 'none') { where += ' AND m.group_id IS NULL' }
   else if (groupFilter) { where += ' AND m.group_id = ?'; params.push(groupFilter) }
   if (search) {
@@ -235,13 +237,14 @@ app.get('/api/admin/members', async (c) => {
        FROM members ${where} ORDER BY created_at DESC`
     ).bind(...params).all()
     const header = 'member_no,tier,status,name_zh,name_en,phone,gender,birth_year,district,role,kyc_status,source,referrer_no,roadshow,roadshow_location,expires_at,created_at'
-    const csv = header + '\n' + rows.results.map((m: any) =>
+    const BOM = '\uFEFF'
+    const csv = BOM + header + '\n' + rows.results.map((m: any) =>
       [m.member_no,m.tier,m.status,m.name_zh,m.name_en,m.phone,m.gender,m.birth_year,
        m.district,m.role,m.kyc_status,m.source,m.referrer_no,m.roadshow,m.roadshow_location,
        m.expires_at,m.created_at].map((v: any) => `"${(v||'').toString().replace(/"/g,'""')}"`).join(',')
     ).join('\n')
     return new Response(csv, { headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Type': 'text/csv; charset=utf-8-sig',
       'Content-Disposition': `attachment; filename="members_${new Date().toISOString().slice(0,10)}.csv"`
     }})
   }
@@ -431,15 +434,16 @@ app.get('/api/admin/medical', async (c) => {
   `).bind(...params).all()
 
   if (exportCsv) {
+    const BOM = '\uFEFF'
     const header = 'ID,會員編號,中文全名,英文全名,HKID頭4位,電話,狀態,申請日期,傳送日期,備註'
     const lines = (rows.results as any[]).map(r =>
       [r.id, r.member_no, r.name_zh_full, r.name_en_full, r.hkid_prefix,
        r.phone, r.status, r.applied_at, r.sent_at||'', r.notes||'']
       .map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')
     )
-    return new Response([header, ...lines].join('\n'), {
+    return new Response(BOM + [header, ...lines].join('\n'), {
       headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Type': 'text/csv; charset=utf-8-sig',
         'Content-Disposition': `attachment; filename="medical_applications_${new Date().toISOString().slice(0,10)}.csv"`
       }
     })
@@ -834,7 +838,10 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .medical-cta{background:#E8F0FE;border-bottom:1px solid #C5CAE9;transition:background 0.15s;}
 .medical-cta-label{display:flex;align-items:center;gap:0;cursor:pointer;width:100%;padding:0;}
 .medical-cta-check{display:flex;align-items:center;justify-content:center;background:#1565C0;width:56px;min-height:64px;flex-shrink:0;}
-.medical-cta-check input[type=checkbox]{width:24px;height:24px;accent-color:#fff;cursor:pointer;pointer-events:none;}
+.medical-cta-check input[type=checkbox]{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
+.custom-check-box{width:26px;height:26px;border-radius:5px;border:2.5px solid #fff;background:transparent;display:flex;align-items:center;justify-content:center;transition:background 0.15s,border-color 0.15s;flex-shrink:0;}
+.custom-check-box.checked{background:#fff;border-color:#fff;}
+.custom-check-box.checked::after{content:'';display:block;width:8px;height:14px;border-right:3px solid #1565C0;border-bottom:3px solid #1565C0;transform:rotate(45deg) translate(-1px,-2px);}
 .medical-cta-text{flex:1;padding:14px 14px 14px 16px;}
 .medical-cta-main{font-size:15px;color:#0D47A1;font-weight:700;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;margin-bottom:4px;}
 .medical-cta-sub{font-size:12px;color:#5C6BC0;line-height:1.5;}
@@ -979,6 +986,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
         <div class="medical-cta-label" id="medCta" style="cursor:pointer;" onclick="var cb=document.getElementById('applyMedical');cb.checked=!cb.checked;toggleMedical(cb);">
           <div class="medical-cta-check">
             <input type="checkbox" id="applyMedical" onchange="toggleMedical(this)" onclick="event.stopPropagation();">
+            <div class="custom-check-box" id="customCheckBox"></div>
           </div>
           <div class="medical-cta-text">
             <div class="medical-cta-main" id="medCtaMain">點擊申請免費醫健卡（可選）</div>
@@ -1301,7 +1309,9 @@ function toggleMedical(cb) {
   var arrow = document.getElementById('medArrow');
   var cta = document.getElementById('medCta');
   var mainLabel = document.getElementById('medCtaMain');
+  var customBox = document.getElementById('customCheckBox');
   if (cb.checked) {
+    if(customBox){ customBox.classList.add('checked'); }
     extra.classList.add('show');
     if(arrow){ arrow.classList.add('open'); }
     if(cta){ cta.style.background='#C8D8FA'; }
@@ -1314,6 +1324,7 @@ function toggleMedical(cb) {
     document.getElementById('submitBtn').textContent = '立即登記（兩卡同申）';
     extra.scrollIntoView({behavior:'smooth', block:'nearest'});
   } else {
+    if(customBox){ customBox.classList.remove('checked'); }
     extra.classList.remove('show');
     if(arrow){ arrow.classList.remove('open'); }
     if(cta){ cta.style.background=''; }
@@ -2420,6 +2431,8 @@ tr.inactive td{opacity:0.45;}
       <button class="btn btn-green" onclick="loadMembers(1)">🔍 搜尋</button>
       <button class="btn btn-grey" onclick="clearFilters()">清除</button>
       <button class="btn btn-blue" onclick="exportCsv()" title="匯出 CSV">⬇ CSV</button>
+      <input type="hidden" id="filterRoadshow" value="">
+      <span id="roadshowFilterBadge" style="display:none;background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:4px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;" onclick="clearRoadshowFilter()" title="點擊清除 Roadshow 篩選"></span>
     </div>
     <div class="table-wrap">
       <div class="table-meta">

@@ -627,13 +627,21 @@ async function loadStats(){
 
 // ── Dashboard jump helpers
 function jumpToMembersRoadshow(rsCode){
-  // switch to members tab, set search to roadshow code, reload
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   document.querySelectorAll('.nav-tab').forEach(function(n){ n.classList.remove('active'); });
   document.getElementById('page-members').classList.add('active');
   document.querySelectorAll('.nav-tab')[1].classList.add('active');
-  document.getElementById('search').value = rsCode;
+  document.getElementById('search').value = '';
   document.getElementById('filterSource').value = '';
+  document.getElementById('filterRoadshow').value = rsCode;
+  var badge = document.getElementById('roadshowFilterBadge');
+  if(badge){ badge.style.display=''; badge.textContent='📍 Roadshow: '+rsCode+' ✕'; }
+  loadMembers(1);
+}
+function clearRoadshowFilter(){
+  document.getElementById('filterRoadshow').value='';
+  var badge=document.getElementById('roadshowFilterBadge');
+  if(badge){ badge.style.display='none'; badge.textContent=''; }
   loadMembers(1);
 }
 function jumpToMembersReferrer(refNo){
@@ -655,9 +663,10 @@ async function loadMembers(page){
   var st=document.getElementById('filterStatus').value;
   var src=document.getElementById('filterSource').value;
   var grp=document.getElementById('filterGroup').value;
+  var rs=document.getElementById('filterRoadshow').value.trim();
   if(s)p.set('search',s); if(t)p.set('tier',t);
   if(st)p.set('status',st); if(src)p.set('source',src);
-  if(grp)p.set('group_id',grp);
+  if(grp)p.set('group_id',grp); if(rs)p.set('roadshow',rs);
   var r=await fetch('/api/admin/members?'+p); var d=await r.json(); if(!d.ok)return;
   totalPages=Math.ceil(d.total/50)||1;
   document.getElementById('searchCount').textContent='共 '+d.total+' 筆記錄';
@@ -884,6 +893,9 @@ function clearFilters(){
   document.getElementById('filterStatus').value='';
   document.getElementById('filterSource').value='';
   document.getElementById('filterGroup').value='';
+  document.getElementById('filterRoadshow').value='';
+  var badge=document.getElementById('roadshowFilterBadge');
+  if(badge){ badge.style.display='none'; badge.textContent=''; }
   loadMembers(1);
 }
 
@@ -894,9 +906,10 @@ function exportCsv(){
   var st=document.getElementById('filterStatus').value;
   var src=document.getElementById('filterSource').value;
   var grp=document.getElementById('filterGroup').value;
+  var rs=document.getElementById('filterRoadshow').value.trim();
   if(s)p.set('search',s); if(t)p.set('tier',t);
   if(st)p.set('status',st); if(src)p.set('source',src);
-  if(grp)p.set('group_id',grp);
+  if(grp)p.set('group_id',grp); if(rs)p.set('roadshow',rs);
   window.open('/api/admin/members?'+p,'_blank');
 }
 
