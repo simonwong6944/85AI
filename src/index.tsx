@@ -4136,6 +4136,7 @@ function newAdminShellHtml(): string {
 <style>
 :root{--brand:#1B4332;--brand-light:#2D6A4F;--accent:#40916C;}
 *{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;min-height:100vh;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F3F4F6;color:#1F2937;min-height:100vh;}
 /* ── Login Screen ── */
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1B4332 0%,#2D6A4F 100%);}
@@ -4154,7 +4155,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .login-err{background:#FEF2F2;border:1px solid #FECACA;color:#DC2626;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:14px;display:none;}
 .login-err.show{display:block;}
 /* ── App Shell ── */
-#app-shell{display:none;min-height:100vh;}
+#app-shell{display:none;min-height:100vh;width:100%;}
 .sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background:var(--brand);color:#fff;display:flex;flex-direction:column;z-index:100;}
 .sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid rgba(255,255,255,0.1);}
 .sidebar-logo .mark{display:inline-block;background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:6px;font-weight:900;font-size:16px;letter-spacing:1px;margin-bottom:4px;}
@@ -4167,7 +4168,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .sidebar-footer{padding:14px 16px;border-top:1px solid rgba(255,255,255,0.1);}
 .logout-btn{display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:13px;cursor:pointer;width:100%;transition:background 0.15s;}
 .logout-btn:hover{background:rgba(255,255,255,0.15);}
-.main-content{margin-left:220px;min-height:100vh;display:flex;flex-direction:column;}
+.main-content{margin-left:220px;min-height:100vh;width:calc(100% - 220px);display:flex;flex-direction:column;}
 .topbar{background:#fff;border-bottom:1px solid #E5E7EB;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
 .topbar h2{font-size:18px;font-weight:700;color:#111827;}
 .page-area{flex:1;padding:24px;overflow-y:auto;}
