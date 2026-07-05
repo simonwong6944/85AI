@@ -4914,7 +4914,7 @@ function loadProducts(){
     }
     grid.innerHTML = d.products.map(function(p){
       var img = p.photo_url
-        ? '<img src="'+esc(p.photo_url)+'" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;" onerror="this.style.display=\'none\'">'
+        ? '<img src="'+esc(p.photo_url)+'" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;" onerror="this.remove()">'
         : '<div style="width:100%;height:120px;background:#F3F4F6;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;color:#D1D5DB;"><i class="fas fa-image" style="font-size:28px"></i></div>';
       var inactive = p.active ? '' : '<span style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;">已停用</span>';
       return '<div class="store-card" style="cursor:pointer" onclick="openEditProduct('+p.id+')">'+
