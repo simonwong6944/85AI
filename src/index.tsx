@@ -4274,14 +4274,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
     <div class="page-area">
 
-      <!-- Membership Module (redirect panel) -->
+      <!-- Membership Module (embedded via iframe — 原生一體外觀) -->
       <div id="mod-membership" class="mod-page">
-        <div class="redirect-panel">
-          <p>會員系統管理介面位於獨立頁面</p>
-          <a href="/membership/admin" target="_blank">
-            <i class="fas fa-external-link-alt"></i> 前往會員管理
-          </a>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;margin-bottom:10px;background:#fff;border:1px solid #E5E7EB;border-radius:8px;">
+          <span style="font-size:13px;font-weight:600;color:#374151;">
+            <i class="fas fa-id-card" style="margin-right:6px;color:var(--brand)"></i>會員管理系統
+          </span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="reloadMembershipFrame()">
+              <i class="fas fa-rotate-right"></i> 重新載入
+            </button>
+            <a class="btn btn-secondary btn-sm" href="/membership/admin" target="_blank" style="text-decoration:none;">
+              <i class="fas fa-external-link-alt"></i> 新分頁開啟
+            </a>
+          </div>
         </div>
+        <iframe id="membership-frame" src="about:blank"
+          style="width:100%;height:calc(100vh - 160px);border:1px solid #E5E7EB;border-radius:8px;background:#fff;display:block;">
+        </iframe>
       </div>
 
       <!-- Roadshow Module -->
@@ -4481,6 +4491,7 @@ function doAdminLogout(){
 }
 
 // ── Sidebar nav ──
+var _membershipFrameLoaded = false;
 function switchMod(id){
   document.querySelectorAll('.mod-page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
@@ -4489,6 +4500,15 @@ function switchMod(id){
   var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
+  if(id==='mod-membership' && !_membershipFrameLoaded){
+    document.getElementById('membership-frame').src = '/membership/admin';
+    _membershipFrameLoaded = true;
+  }
+}
+function reloadMembershipFrame(){
+  var f = document.getElementById('membership-frame');
+  f.src = '/membership/admin';
+  _membershipFrameLoaded = true;
 }
 
 // ── Roadshow Tab ──
