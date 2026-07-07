@@ -352,6 +352,7 @@ app.get('/api/admin/members', async (c) => {
             m.district, m.id_prefix, m.role, m.kyc_status, m.source, m.referrer_no, m.roadshow,
             m.roadshow_location, m.parent_no, m.parent_name, m.relation,
             m.expires_at, m.created_at, m.notes, m.admin_notes, m.verified_at, m.wa_clicked_at,
+            m.wa_channel, m.re_verify,
             m.group_id, g.name as group_name, g.color as group_color
      FROM members m
      LEFT JOIN member_groups g ON g.id = m.group_id
@@ -494,6 +495,17 @@ app.delete('/api/admin/members/:no/verify', async (c) => {
   const no = c.req.param('no')
   const db = c.env.DB
   await db.prepare(`UPDATE members SET verified_at = NULL WHERE member_no = ?`).bind(no).run()
+  return c.json({ ok: true })
+})
+
+// ─── Admin: mark member as needing re-verification (watermark returns) ────────
+app.post('/api/admin/members/:no/re-verify', async (c) => {
+  const no = c.req.param('no')
+  const db = c.env.DB
+  const existing = await db.prepare('SELECT member_no FROM members WHERE member_no = ?').bind(no).first()
+  if (!existing) return c.json({ ok: false, error: '查無此會員' }, 404)
+  // Clear verified_at + wa_clicked_at + wa_channel, set re_verify=1 so watermark reappears
+  await db.prepare(`UPDATE members SET verified_at = NULL, wa_clicked_at = NULL, wa_channel = NULL, re_verify = 1 WHERE member_no = ?`).bind(no).run()
   return c.json({ ok: true })
 })
 
@@ -793,14 +805,21 @@ app.patch('/api/members/:no/profile', async (c) => {
   return c.json({ ok: true })
 })
 
-// ─── Self-verify: member marks themselves as verified after sending WA ───────
-// ─── User WA button click — records wa_clicked_at only, does NOT set verified_at
+// ─── User WA button click — records wa_clicked_at + wa_channel, does NOT set verified_at
 app.post('/api/members/:no/wa-click', async (c) => {
   const no = c.req.param('no')
   const db = c.env.DB
-  const existing = await db.prepare('SELECT member_no FROM members WHERE member_no = ?').bind(no).first()
+  const existing = await db.prepare('SELECT member_no, re_verify FROM members WHERE member_no = ?').bind(no).first<{ member_no: string; re_verify: number }>()
   if (!existing) return c.json({ ok: false, error: '查無此會員' }, 404)
-  await db.prepare(`UPDATE members SET wa_clicked_at = datetime('now') WHERE member_no = ? AND wa_clicked_at IS NULL`).bind(no).run()
+  // Accept optional channel from request body (default to 'BIZ' for backward compat)
+  let channel = 'BIZ'
+  try {
+    const body = await c.req.json<{ channel?: string }>()
+    if (body.channel === 'ICON' || body.channel === 'BIZ') channel = body.channel
+  } catch (_) { /* body may be empty */ }
+  // Always update wa_clicked_at + wa_channel (allow re-click after re_verify flag)
+  await db.prepare(`UPDATE members SET wa_clicked_at = datetime('now'), wa_channel = ?, re_verify = 0 WHERE member_no = ?`)
+    .bind(channel, no).run()
   return c.json({ ok: true })
 })
 
@@ -810,7 +829,8 @@ app.post('/api/members/:no/verify', async (c) => {
   const existing = await db.prepare('SELECT member_no, verified_at FROM members WHERE member_no = ?').bind(no).first<{ member_no: string; verified_at: string | null }>()
   if (!existing) return c.json({ ok: false, error: '查無此會員' }, 404)
   if (existing.verified_at) return c.json({ ok: true, alreadyVerified: true, verified_at: existing.verified_at })
-  await db.prepare(`UPDATE members SET verified_at = datetime('now') WHERE member_no = ?`).bind(no).run()
+  // Set verified_at + ensure wa_clicked_at + wa_channel=ICON (normal WA flow) + clear re_verify
+  await db.prepare(`UPDATE members SET verified_at = datetime('now'), wa_clicked_at = COALESCE(wa_clicked_at, datetime('now')), wa_channel = COALESCE(wa_channel, 'ICON'), re_verify = 0 WHERE member_no = ?`).bind(no).run()
   return c.json({ ok: true, alreadyVerified: false })
 })
 
@@ -3446,6 +3466,8 @@ function memberProfileHtml(m: any, medStatus: string | null = null) {
   const expDisp = expMonth && expYear ? `${expMonth} / ${expYear}` : '—'
   const kycLabel: Record<string,string> = { PENDING:'待核實', VERIFIED:'已核實', REJECTED:'未通過' }
   const roleLabel: Record<string,string> = { CoExplorery:'探索者', CoFounder:'創始人', CoChampion:'支持者' }
+  // Watermark: show if user has NOT clicked any WA button, OR admin flagged re_verify
+  const showWatermark = !m.wa_clicked_at || (m.re_verify === 1 || m.re_verify === true)
 
   return `<!DOCTYPE html>
 <html lang="zh-HK">
@@ -3567,9 +3589,35 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
 <div class="wrap">
 
   <!-- ── 會員卡圖片 ── -->
-  <div class="card-wrap">
+  <div class="card-wrap" style="position:relative;">
     <canvas id="offCanvas"></canvas>
     <img id="cardImg" alt="會員卡" style="opacity:0;transition:opacity 0.3s;">
+    <!-- Pending verification watermark overlay — hidden if wa_clicked_at set AND not re_verify -->
+    <div id="pendingWatermark" style="position:absolute;inset:0;border-radius:14px;display:${showWatermark ? 'flex' : 'none'};flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.38);pointer-events:none;">
+      <div style="color:#fff;font-size:17px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
+      <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
+    </div>
+  </div>
+  <!-- WA Verification block — shown only when watermark is showing -->
+  <div id="waVerifyBlock" style="display:${showWatermark ? 'block' : 'none'};margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px;">
+    <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
+    <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
+    <!-- Button 1: Normal WhatsApp — open WA, records channel=ICON, visibilitychange/pageshow hides watermark -->
+    <button id="waVerifyBtn" onclick="openWA()"
+      style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:14px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;">
+      💬 我有 WhatsApp — 發送驗證訊息
+    </button>
+    <!-- Button 2: WA Business — fake 2.5s flow, records channel=BIZ -->
+    <button id="waBizBtn" onclick="openWABiz()"
+      style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:14px;font-weight:700;padding:12px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;">
+      📱 我用 WhatsApp Business
+    </button>
+    <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:13px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
+  </div>
+  <!-- Banner: after WA sent (icon or biz) -->
+  <div id="waSentBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
+    <div style="font-size:14px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發送！</div>
+    <div style="font-size:12px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
   </div>
 
   <!-- ── 卡片操作 ── -->
@@ -3854,10 +3902,28 @@ var MEMBER_DATA = ${JSON.stringify({
   role: m.role
 })};
 
+// ── WA verify state from DB (server-rendered) ────────────────────────────────
+var SHOW_WATERMARK = ${showWatermark ? 'true' : 'false'};
+
 // ── QR + Card render on load ──────────────────────────────────────────────────
 window.addEventListener('load', function(){
   renderCardImage(MEMBER_DATA, MEMBER_DATA.tier);
   ${isPrimary ? 'loadFamily();' : ''}
+  // If watermark shown, load admin WA number and inject preview
+  if(SHOW_WATERMARK) {
+    fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
+      var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
+      var msgText='你好，我的老有卡會員編號：'+MEMBER_NO+'，請幫我確認。';
+      var msgEnc=encodeURIComponent(msgText);
+      var phoneDigits=waNum.replace(/\\D/g,'');
+      var isMobile=/iphone|ipad|ipod|android/i.test(navigator.userAgent);
+      window._waUrl=isMobile
+        ?'whatsapp://send?phone='+phoneDigits+'&text='+msgEnc
+        :'https://wa.me/'+phoneDigits+'?text='+msgEnc;
+      var preview=document.getElementById('waVerifyMsgPreview');
+      if(preview) preview.textContent=msgText;
+    }).catch(function(){});
+  }
 });
 
 function showToast(msg, dur) {
@@ -4175,6 +4241,67 @@ async function submitAddParent() {
       document.getElementById('panelNew').style.display='none';
     } else { errEl.textContent=data.error||'開卡失敗'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='為長輩開主卡'; }
   } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='為長輩開主卡'; }
+}
+// ── WA Verification (card page) ───────────────────────────────────────────────
+// Button 1: Normal WhatsApp — records channel=ICON via /verify endpoint
+function openWA() {
+  if(!window._waUrl) return;
+  if(window._waSent) return;
+  window._waSent = true;
+  var btn = document.getElementById('waVerifyBtn');
+  var bizBtn = document.getElementById('waBizBtn');
+  if(btn){ btn.disabled=true; btn.textContent='📤 正在開啟 WhatsApp...'; btn.style.background='#a5d6a7'; }
+  if(bizBtn){ bizBtn.disabled=true; bizBtn.style.opacity='0.4'; }
+  window.location.href = window._waUrl;
+  document.addEventListener('visibilitychange', function onVis() {
+    if(document.visibilityState==='visible'){ document.removeEventListener('visibilitychange',onVis); markWASent(); }
+  });
+  window.addEventListener('pageshow', function onPS() {
+    window.removeEventListener('pageshow',onPS); markWASent();
+  });
+}
+// Called when user returns after normal WA — hides watermark, calls /verify (sets verified_at + ICON)
+function markWASent() {
+  if(window._waSentDone) return;
+  window._waSentDone = true;
+  var wm = document.getElementById('pendingWatermark');
+  var block = document.getElementById('waVerifyBlock');
+  var banner = document.getElementById('waSentBanner');
+  if(wm) wm.style.display='none';
+  if(block) block.style.display='none';
+  if(banner) banner.style.display='block';
+  // Call /verify — sets verified_at + wa_clicked_at + wa_channel=ICON
+  fetch('/api/members/'+encodeURIComponent(MEMBER_NO)+'/verify',{method:'POST'}).catch(function(){});
+}
+// Button 2: WA Business — fake 2.5s, records channel=BIZ via /wa-click, hides watermark
+function openWABiz() {
+  if(window._waBizSent) return;
+  window._waBizSent = true;
+  var bizBtn = document.getElementById('waBizBtn');
+  var waBtn = document.getElementById('waVerifyBtn');
+  var sendingMsg = document.getElementById('waSendingMsg');
+  if(bizBtn){ bizBtn.disabled=true; bizBtn.textContent='📤 發送中...'; bizBtn.style.background='#c8e6c9'; bizBtn.style.color='#2E7D32'; }
+  if(waBtn){ waBtn.disabled=true; waBtn.style.opacity='0.4'; }
+  if(sendingMsg) sendingMsg.style.display='block';
+  // Record click with channel=BIZ
+  fetch('/api/members/'+encodeURIComponent(MEMBER_NO)+'/wa-click',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({channel:'BIZ'})
+  }).catch(function(){});
+  setTimeout(markVerified, 2500);
+}
+// Called after WA Biz — hides watermark, shows banner
+function markVerified() {
+  if(window._verifyDone) return;
+  window._verifyDone = true;
+  var wm = document.getElementById('pendingWatermark');
+  var block = document.getElementById('waVerifyBlock');
+  var sendingMsg = document.getElementById('waSendingMsg');
+  var banner = document.getElementById('waSentBanner');
+  if(wm) wm.style.display='none';
+  if(block) block.style.display='none';
+  if(sendingMsg) sendingMsg.style.display='none';
+  if(banner) banner.style.display='block';
 }
 </script>
 </body></html>`

@@ -690,12 +690,17 @@ async function loadMembers(page){
       <td>${m.district||'—'}</td>
       <td style="font-size:11px;">${(m.role||'CoExplorery').replace('Co','').replace('ery','')}</td>
       <td><span class="badge badge-${m.kyc_status==='DONE'?'done':'pending'}">${m.kyc_status}</span></td>
-      <td id="wa-cell-${m.member_no}">${m.verified_at
-        ? '<span class="badge badge-done" title="'+m.verified_at.slice(0,16).replace('T',' ')+'">✅ 已驗證</span>'
-        : m.wa_clicked_at
-          ? '<span class="badge" style="background:#fff3e0;color:#e65100;border:1px solid #ffb74d;" title="用戶已點擊 '+m.wa_clicked_at.slice(0,16).replace('T',' ')+'">📱 待確認</span>'
-          : '<span class="badge badge-pending">⏳ 未操作</span>'
-      }</td>
+      <td id="wa-cell-${m.member_no}">${(function(){
+        if(m.verified_at)
+          return '<span class="badge badge-done" title="驗證時間：'+m.verified_at.slice(0,16).replace('T',' ')+'">✅ 已驗證</span>';
+        if(m.re_verify===1||m.re_verify===true)
+          return '<span class="badge" style="background:#fce4ec;color:#880e4f;border:1px solid #f48fb1;" title="管理員標記需重新驗證">🔄 需重新驗證</span>';
+        if(m.wa_clicked_at && m.wa_channel==='BIZ')
+          return '<span class="badge" style="background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;" title="用戶點擊 WA Biz '+m.wa_clicked_at.slice(0,16).replace('T',' ')+'">📲 WA Biz</span>';
+        if(m.wa_clicked_at)
+          return '<span class="badge" style="background:#fff3e0;color:#e65100;border:1px solid #ffb74d;" title="用戶點擊 WA Icon '+m.wa_clicked_at.slice(0,16).replace('T',' ')+'">📱 待確認</span>';
+        return '<span class="badge badge-pending">⏳ 未操作</span>';
+      })()}</td>
       <td id="grp-cell-${m.member_no}">${(function(){
         var badge=m.group_name
           ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;color:#fff;background:'+(m.group_color||'#4caf50')+'">'+m.group_name+'</span> '
@@ -712,8 +717,11 @@ async function loadMembers(page){
         <button class="act-btn act-edit" onclick="openEdit(${i})">編輯</button>
         ${m.kyc_status!=='DONE'?'<button class="act-btn act-kyc" onclick="approveKyc('+i+')">KYC✓</button>':''}
         ${!m.verified_at
-          ? `<button class="act-btn" style="background:#25D366;color:#fff;" onclick="adminVerify('${m.member_no}')">WA✓</button>`
-          : `<button class="act-btn" style="background:#e0e0e0;color:#555;font-size:10px;" onclick="adminUnverify('${m.member_no}')">取消驗證</button>`}
+          ? `<button class="act-btn" style="background:#25D366;color:#fff;" onclick="adminVerify('${m.member_no}')" title="手動確認 WA 已驗證">WA✓</button>`
+          : `<button class="act-btn" style="background:#e0e0e0;color:#555;font-size:10px;" onclick="adminUnverify('${m.member_no}')" title="取消驗證（保留 wa_clicked_at）">取消驗證</button>`}
+        ${m.verified_at||m.wa_clicked_at
+          ? `<button class="act-btn" style="background:#f06292;color:#fff;font-size:10px;" onclick="adminReVerify('${m.member_no}')" title="要求用戶重新驗證（水印會出現）">再驗</button>`
+          : ''}
         ${m.status==='ACTIVE'?'<button class="act-btn act-deact" onclick="deactivateMember('+i+')">停用</button>':
           m.status==='INACTIVE'?'<button class="act-btn act-react" onclick="reactivateMember('+i+')">啟用</button>':''}
       </td>
@@ -804,6 +812,25 @@ function adminUnverify(no){
     .catch(function(e){
       alert('網絡錯誤：'+e.message);
       if(btn){ btn.disabled=false; btn.textContent='取消驗證'; }
+    });
+}
+function adminReVerify(no){
+  if(!confirm('確認將此會員標記為「需重新驗證」？\n水印將重新出現，用戶需再次點擊 WA 按鈕。')) return;
+  var btn=event&&event.target;
+  if(btn){ btn.disabled=true; btn.textContent='處理中…'; }
+  fetch('/api/admin/members/'+encodeURIComponent(no)+'/re-verify',{method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.ok){
+        loadMembers(currentPage);
+      } else {
+        alert('操作失敗：'+(d.error||'未知錯誤'));
+        if(btn){ btn.disabled=false; btn.textContent='再驗'; }
+      }
+    })
+    .catch(function(e){
+      alert('網絡錯誤：'+e.message);
+      if(btn){ btn.disabled=false; btn.textContent='再驗'; }
     });
 }
 async function deactivateMember(i){
