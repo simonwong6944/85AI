@@ -1391,7 +1391,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
         <div class="gc-cardname">老有卡</div>
       </div>
       <div class="gc-explorery">CoExplorery 探索者</div>
-      <div class="gc-tier">PRIMARY MEMBER</div>
+      <div class="gc-tier" id="cardTierLabel">PRIMARY MEMBER</div>
       <div class="gc-name-block">
         <div class="gc-prefix">MEMBER NAME · 姓名</div>
         <div class="gc-zh" id="cardZh"></div>
@@ -1661,7 +1661,6 @@ async function submitForm() {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
-        tier: 'PRIMARY',
         nameZh: nameZh,
         phone: phone,
         nameEn: nameEn,
@@ -1708,7 +1707,9 @@ function showSuccess(data, appliedMedical) {
   sessionStorage.setItem('successData', JSON.stringify(data));
   sessionStorage.setItem('appliedMedical', appliedMedical ? '1' : '0');
   // Build card image after short delay (let DOM paint) — watermark shown by default
-  setTimeout(function(){ renderCardImage(data, 'PRIMARY'); }, 100);
+  var gcTierEl = document.getElementById('cardTierLabel');
+  if(gcTierEl) gcTierEl.textContent = (data.tier === 'FAMILY') ? 'FAMILY MEMBER' : 'PRIMARY MEMBER';
+  setTimeout(function(){ renderCardImage(data, data.tier || 'PRIMARY'); }, 100);
   // Load admin WhatsApp and inject verification block
   fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
     var waNum = (s.settings && s.settings.admin_whatsapp) ? s.settings.admin_whatsapp : '85291477341';
