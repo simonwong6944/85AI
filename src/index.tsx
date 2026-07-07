@@ -627,6 +627,146 @@ app.post('/api/members/:no/medical', async (c) => {
   }
 })
 
+// ─── API: Add family card under a primary card ───────────────────────────────
+app.post('/api/members/:no/add-family', async (c) => {
+  const db = c.env.DB
+  const parentNo = c.req.param('no')
+  try {
+    const body = await c.req.json<{
+      nameZh: string; phone: string; gender?: string;
+      birthYear?: string; district?: string
+    }>()
+
+    // Confirm parent exists and is PRIMARY
+    const parent = await db.prepare(
+      "SELECT member_no, name_zh FROM members WHERE member_no = ? AND tier = 'PRIMARY'"
+    ).bind(parentNo).first<{ member_no: string; name_zh: string }>()
+    if (!parent) return c.json({ ok: false, error: '主卡不存在' }, 404)
+
+    if (!body.nameZh?.trim()) return c.json({ ok: false, error: '請填寫中文姓名' }, 400)
+    if (!body.phone?.trim()) return c.json({ ok: false, error: '請填寫電話' }, 400)
+    const phoneClean = body.phone.replace(/\D/g, '')
+    const phoneCheck = validateHKPhone(phoneClean)
+    if (!phoneCheck.ok) return c.json({ ok: false, error: phoneCheck.error }, 400)
+
+    // Duplicate phone check for FAMILY tier
+    const dup = await db.prepare(
+      "SELECT member_no FROM members WHERE phone = ? AND tier = 'FAMILY'"
+    ).bind(phoneClean).first()
+    if (dup) return c.json({ ok: false, error: '此電話已登記家庭卡' }, 409)
+
+    const memberNo = await nextMemberNo(db)
+    const expires = expiryDate(1)
+    const now = new Date().toISOString()
+
+    await db.prepare(`
+      INSERT INTO members
+        (member_no, tier, name_zh, phone, gender, birth_year, district,
+         parent_no, parent_name, kyc_status, role, expires_at, created_at,
+         source, status)
+      VALUES (?, 'FAMILY', ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'CoExplorery', ?, ?, 'referral', 'ACTIVE')
+    `).bind(
+      memberNo, body.nameZh.trim(), phoneClean,
+      body.gender || '', body.birthYear ? parseInt(body.birthYear) : null,
+      body.district || '', parent.member_no, parent.name_zh, expires, now
+    ).run()
+
+    return c.json({ ok: true, member_no: memberNo })
+  } catch (e) {
+    return c.json({ ok: false, error: '新增失敗，請重試' }, 500)
+  }
+})
+
+// ─── API: Link family card to existing primary card ──────────────────────────
+app.post('/api/members/:no/link-parent', async (c) => {
+  const db = c.env.DB
+  const familyNo = c.req.param('no')
+  try {
+    const body = await c.req.json<{ parentPhone: string }>()
+
+    const family = await db.prepare(
+      "SELECT member_no FROM members WHERE member_no = ? AND tier = 'FAMILY'"
+    ).bind(familyNo).first<{ member_no: string }>()
+    if (!family) return c.json({ ok: false, error: '家庭卡不存在' }, 404)
+
+    if (!body.parentPhone?.trim()) return c.json({ ok: false, error: '請輸入主卡電話' }, 400)
+    const phoneClean = body.parentPhone.replace(/\D/g, '')
+
+    const parent = await db.prepare(
+      "SELECT member_no, name_zh FROM members WHERE phone = ? AND tier = 'PRIMARY'"
+    ).bind(phoneClean).first<{ member_no: string; name_zh: string }>()
+    if (!parent) return c.json({ ok: false, error: '找不到對應主卡，請確認電話' }, 404)
+
+    await db.prepare(
+      'UPDATE members SET parent_no = ?, parent_name = ? WHERE member_no = ?'
+    ).bind(parent.member_no, parent.name_zh, familyNo).run()
+
+    return c.json({ ok: true, parent_no: parent.member_no, parent_name: parent.name_zh })
+  } catch (e) {
+    return c.json({ ok: false, error: '綁定失敗，請重試' }, 500)
+  }
+})
+
+// ─── API: Create new primary card for a family card member ───────────────────
+app.post('/api/members/:no/add-parent', async (c) => {
+  const db = c.env.DB
+  const familyNo = c.req.param('no')
+  try {
+    const body = await c.req.json<{
+      nameZh: string; phone: string; gender?: string;
+      birthYear: string; district?: string
+    }>()
+
+    const family = await db.prepare(
+      "SELECT member_no FROM members WHERE member_no = ? AND tier = 'FAMILY'"
+    ).bind(familyNo).first<{ member_no: string }>()
+    if (!family) return c.json({ ok: false, error: '家庭卡不存在' }, 404)
+
+    if (!body.nameZh?.trim()) return c.json({ ok: false, error: '請填寫中文姓名' }, 400)
+    if (!body.birthYear || isNaN(parseInt(body.birthYear)))
+      return c.json({ ok: false, error: '請填寫出生年份' }, 400)
+
+    // Primary card must be 55+
+    const age = new Date().getFullYear() - parseInt(body.birthYear)
+    if (age < 55) return c.json({ ok: false, error: '主卡需年滿 55 歲' }, 400)
+
+    if (!body.phone?.trim()) return c.json({ ok: false, error: '請填寫電話' }, 400)
+    const phoneClean = body.phone.replace(/\D/g, '')
+    const phoneCheck = validateHKPhone(phoneClean)
+    if (!phoneCheck.ok) return c.json({ ok: false, error: phoneCheck.error }, 400)
+
+    const dup = await db.prepare(
+      "SELECT member_no FROM members WHERE phone = ? AND tier = 'PRIMARY'"
+    ).bind(phoneClean).first()
+    if (dup) return c.json({ ok: false, error: '此電話已登記主卡' }, 409)
+
+    const parentNo = await nextMemberNo(db)
+    const expires = expiryDate(1)
+    const now = new Date().toISOString()
+
+    // Create new primary card
+    await db.prepare(`
+      INSERT INTO members
+        (member_no, tier, name_zh, phone, gender, birth_year, district,
+         kyc_status, role, expires_at, created_at, source, status)
+      VALUES (?, 'PRIMARY', ?, ?, ?, ?, ?, 'PENDING', 'CoExplorery', ?, ?, 'referral', 'ACTIVE')
+    `).bind(
+      parentNo, body.nameZh.trim(), phoneClean,
+      body.gender || '', parseInt(body.birthYear), body.district || '',
+      expires, now
+    ).run()
+
+    // Link family card to new primary card
+    await db.prepare(
+      'UPDATE members SET parent_no = ?, parent_name = ? WHERE member_no = ?'
+    ).bind(parentNo, body.nameZh.trim(), familyNo).run()
+
+    return c.json({ ok: true, parent_no: parentNo })
+  } catch (e) {
+    return c.json({ ok: false, error: '新增失敗，請重試' }, 500)
+  }
+})
+
 // ─── API: Member self-update profile ─────────────────────────────────────────
 app.patch('/api/members/:no/profile', async (c) => {
   const no = c.req.param('no')
@@ -3390,6 +3530,27 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
 .med-err.show{display:block;}
 .med-success{background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:6px;padding:12px 14px;font-size:13px;color:#1B5E20;display:none;margin-top:12px;}
 .med-success.show{display:block;}
+
+/* ── Family linking block ── */
+.fam-section{background:#fff;border-radius:8px;padding:20px;margin-bottom:14px;border:1.5px solid #A5D6A7;}
+.fam-section-title{font-family:"Noto Serif TC",serif;font-size:13px;color:${forestDeep};letter-spacing:3px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #E8F5E9;}
+.fam-tab-bar{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:16px;border-radius:6px;overflow:hidden;border:1.5px solid #A5D6A7;}
+.fam-tab{padding:10px 4px;text-align:center;font-family:"Noto Serif TC",serif;font-size:13px;font-weight:700;cursor:pointer;border:none;background:#F1F8E9;color:${forestDeep};letter-spacing:1px;transition:all 0.15s;}
+.fam-tab.active{background:${forestDeep};color:#fff;}
+.fam-panel{display:none;}
+.fam-panel.active{display:block;}
+.fam-field{margin-bottom:14px;}
+.fam-field label{display:block;font-size:13px;color:${forestDeep};font-weight:700;margin-bottom:5px;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;}
+.fam-field input,.fam-field select{width:100%;padding:12px 14px;border:2px solid #C8E6C9;border-radius:6px;font-size:16px;font-family:inherit;color:#333;}
+.fam-field input:focus,.fam-field select:focus{outline:0;border-color:${forestDeep};}
+.fam-submit-btn{width:100%;padding:14px;background:${forestDeep};color:#fff;border:0;border-radius:6px;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:4px;}
+.fam-submit-btn:disabled{background:#A5D6A7;cursor:not-allowed;}
+.fam-open-btn{width:100%;padding:14px;background:#fff;color:${forestDeep};border:2px solid ${forestDeep};border-radius:6px;font-family:"Noto Serif TC",serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;}
+.fam-err{color:#C62828;font-size:13px;margin-top:8px;display:none;}
+.fam-err.show{display:block;}
+.fam-success{background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:6px;padding:12px 14px;font-size:13px;color:#1B5E20;display:none;margin-top:12px;line-height:1.7;}
+.fam-success.show{display:block;}
+.fam-linked-info{background:#F1F8E9;border:1.5px solid #A5D6A7;border-radius:6px;padding:12px 14px;font-size:14px;color:${forestDeep};line-height:1.7;}
 </style>
 </head>
 <body>
@@ -3565,6 +3726,107 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
       ✅ 醫健卡申請已提交！狀態：<strong>PENDING</strong><br>
       <span style="font-size:12px;">職員將以 WhatsApp 聯絡你安排發卡手續。</span>
     </div>
+    `}
+  </div>
+
+  <!-- ── 家庭成員區塊 ── -->
+  <div class="fam-section">
+    <div class="fam-section-title">👨‍👩‍👧 家庭成員</div>
+    ${isPrimary ? `
+    <!-- 主卡：幫家人加家庭卡 -->
+    <button class="fam-open-btn" id="famOpenBtn" onclick="toggleFamForm()">＋ 幫家人加家庭同行卡</button>
+    <div class="fam-panel active" id="famFormWrap" style="display:none;margin-top:16px;">
+      <div class="fam-field">
+        <label>家人中文姓名 <span style="color:#C62828;">✽</span></label>
+        <input id="ffNameZh" type="text" placeholder="例：陳小文">
+      </div>
+      <div class="fam-field">
+        <label>WhatsApp 電話 <span style="color:#C62828;">✽</span></label>
+        <input id="ffPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="例：91234567">
+      </div>
+      <div class="fam-field">
+        <label>性別</label>
+        <select id="ffGender">
+          <option value="">— 請選擇（選填）—</option>
+          <option value="M">男 M</option>
+          <option value="F">女 F</option>
+          <option value="X">其他</option>
+        </select>
+      </div>
+      <div class="fam-field">
+        <label>出生年份</label>
+        <input id="ffBirthYear" type="number" placeholder="例：1985（選填）" min="1920" max="2010">
+      </div>
+      <div class="fam-field">
+        <label>居住地區</label>
+        <select id="ffDistrict">
+          <option value="">— 請選擇（選填）—</option>
+          ${['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','荃灣','屯門','元朗','北區','大埔','沙田','西貢','葵青','離島'].map(d=>`<option value="${d}">${d}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fam-err" id="famErr"></div>
+      <button class="fam-submit-btn" id="famSubmitBtn" onclick="submitAddFamily()">新增家庭同行卡</button>
+    </div>
+    <div class="fam-success" id="famSuccess"></div>
+    ` : `
+    <!-- 家庭卡：綁主卡 or 開主卡 -->
+    ${m.parent_no ? `
+    <div class="fam-linked-info">
+      ✅ 已綁定主卡：<strong>${m.parent_name || ''}</strong>（<a href="/membership/card/${m.parent_no}" style="color:${forestDeep};font-weight:700;">${m.parent_no}</a>）
+    </div>
+    ` : `
+    <div class="fam-tab-bar">
+      <button class="fam-tab active" id="tabLink" onclick="switchFamTab('link')">🔗 綁定已有主卡</button>
+      <button class="fam-tab" id="tabNew" onclick="switchFamTab('new')">➕ 幫長輩開主卡</button>
+    </div>
+
+    <!-- Panel 1: 綁定已有主卡 -->
+    <div class="fam-panel active" id="panelLink">
+      <div class="fam-field">
+        <label>主卡持有人電話 <span style="color:#C62828;">✽</span></label>
+        <input id="lpPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="例：91234567">
+      </div>
+      <div class="fam-err" id="linkErr"></div>
+      <button class="fam-submit-btn" id="linkSubmitBtn" onclick="submitLinkParent()">確認綁定</button>
+    </div>
+
+    <!-- Panel 2: 幫長輩開主卡 -->
+    <div class="fam-panel" id="panelNew">
+      <div class="fam-field">
+        <label>長輩中文姓名 <span style="color:#C62828;">✽</span></label>
+        <input id="npNameZh" type="text" placeholder="例：陳大文">
+      </div>
+      <div class="fam-field">
+        <label>長輩 WhatsApp 電話 <span style="color:#C62828;">✽</span></label>
+        <input id="npPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="例：91234567">
+      </div>
+      <div class="fam-field">
+        <label>出生年份 <span style="color:#C62828;">✽</span>（需年滿 55 歲）</label>
+        <input id="npBirthYear" type="number" placeholder="例：1960" min="1920" max="1971">
+        <div style="font-size:11px;color:#78909C;margin-top:4px;">主卡需年滿 55 歲</div>
+      </div>
+      <div class="fam-field">
+        <label>性別</label>
+        <select id="npGender">
+          <option value="">— 請選擇（選填）—</option>
+          <option value="M">男 M</option>
+          <option value="F">女 F</option>
+          <option value="X">其他</option>
+        </select>
+      </div>
+      <div class="fam-field">
+        <label>居住地區</label>
+        <select id="npDistrict">
+          <option value="">— 請選擇（選填）—</option>
+          ${['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','荃灣','屯門','元朗','北區','大埔','沙田','西貢','葵青','離島'].map(d=>`<option value="${d}">${d}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fam-err" id="newErr"></div>
+      <button class="fam-submit-btn" id="newSubmitBtn" onclick="submitAddParent()">為長輩開主卡</button>
+    </div>
+
+    <div class="fam-success" id="famLinkSuccess"></div>
+    `}
     `}
   </div>
 
@@ -3817,6 +4079,102 @@ async function submitMedical() {
     errEl.classList.add('show');
     btn.disabled = false; btn.textContent = '提交申請';
   }
+}
+// ── Family card management (Batch 3) ─────────────────────────────────────────
+function toggleFamForm() {
+  var wrap = document.getElementById('famFormWrap');
+  var btn = document.getElementById('famOpenBtn');
+  if (!wrap) return;
+  var isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  if(btn) btn.textContent = isOpen ? '＋ 幫家人加家庭同行卡' : '✕ 收起';
+}
+function switchFamTab(tab) {
+  document.getElementById('tabLink').classList.toggle('active', tab === 'link');
+  document.getElementById('tabNew').classList.toggle('active', tab === 'new');
+  document.getElementById('panelLink').classList.toggle('active', tab === 'link');
+  document.getElementById('panelNew').classList.toggle('active', tab === 'new');
+}
+async function submitAddFamily() {
+  var nameZh = document.getElementById('ffNameZh').value.trim();
+  var phone = document.getElementById('ffPhone').value.replace(/\D/g,'');
+  var gender = document.getElementById('ffGender').value;
+  var birthYear = document.getElementById('ffBirthYear').value;
+  var district = document.getElementById('ffDistrict').value;
+  var errEl = document.getElementById('famErr');
+  errEl.classList.remove('show');
+  if (!nameZh) { errEl.textContent='請填寫中文姓名'; errEl.classList.add('show'); return; }
+  if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.classList.add('show'); return; }
+  var btn = document.getElementById('famSubmitBtn');
+  btn.disabled = true; btn.textContent = '新增中…';
+  try {
+    var res = await fetch('/api/members/'+MEMBER_NO+'/add-family', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ nameZh, phone, gender, birthYear: birthYear||undefined, district: district||undefined })
+    });
+    var data = await res.json();
+    if (data.ok) {
+      document.getElementById('famFormWrap').style.display='none';
+      document.getElementById('famOpenBtn').style.display='none';
+      var s = document.getElementById('famSuccess');
+      s.innerHTML = '✅ 已成功新增家庭同行卡！<br><strong>會員編號：'+data.member_no+'</strong>';
+      s.classList.add('show');
+    } else { errEl.textContent = data.error||'新增失敗'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='新增家庭同行卡'; }
+  } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='新增家庭同行卡'; }
+}
+async function submitLinkParent() {
+  var phone = document.getElementById('lpPhone').value.replace(/\D/g,'');
+  var errEl = document.getElementById('linkErr');
+  errEl.classList.remove('show');
+  if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.classList.add('show'); return; }
+  var btn = document.getElementById('linkSubmitBtn');
+  btn.disabled=true; btn.textContent='綁定中…';
+  try {
+    var res = await fetch('/api/members/'+MEMBER_NO+'/link-parent', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ parentPhone: phone })
+    });
+    var data = await res.json();
+    if (data.ok) {
+      var s = document.getElementById('famLinkSuccess');
+      s.innerHTML = '✅ 已成功綁定主卡！<br><strong>'+data.parent_name+'（'+data.parent_no+'）</strong>';
+      s.classList.add('show');
+      document.getElementById('tabLink').style.display='none';
+      document.getElementById('tabNew').style.display='none';
+      document.getElementById('panelLink').style.display='none';
+      document.getElementById('panelNew').style.display='none';
+    } else { errEl.textContent=data.error||'綁定失敗'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='確認綁定'; }
+  } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='確認綁定'; }
+}
+async function submitAddParent() {
+  var nameZh = document.getElementById('npNameZh').value.trim();
+  var phone = document.getElementById('npPhone').value.replace(/\D/g,'');
+  var birthYear = document.getElementById('npBirthYear').value;
+  var gender = document.getElementById('npGender').value;
+  var district = document.getElementById('npDistrict').value;
+  var errEl = document.getElementById('newErr');
+  errEl.classList.remove('show');
+  if (!nameZh) { errEl.textContent='請填寫中文姓名'; errEl.classList.add('show'); return; }
+  if (!birthYear) { errEl.textContent='請填寫出生年份'; errEl.classList.add('show'); return; }
+  if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.classList.add('show'); return; }
+  var btn = document.getElementById('newSubmitBtn');
+  btn.disabled=true; btn.textContent='開卡中…';
+  try {
+    var res = await fetch('/api/members/'+MEMBER_NO+'/add-parent', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ nameZh, phone, birthYear, gender: gender||undefined, district: district||undefined })
+    });
+    var data = await res.json();
+    if (data.ok) {
+      var s = document.getElementById('famLinkSuccess');
+      s.innerHTML = '✅ 已成功為長輩開主卡！<br><strong>主卡編號：'+data.parent_no+'</strong>';
+      s.classList.add('show');
+      document.getElementById('tabLink').style.display='none';
+      document.getElementById('tabNew').style.display='none';
+      document.getElementById('panelLink').style.display='none';
+      document.getElementById('panelNew').style.display='none';
+    } else { errEl.textContent=data.error||'開卡失敗'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='為長輩開主卡'; }
+  } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='為長輩開主卡'; }
 }
 </script>
 </body></html>`
