@@ -240,6 +240,17 @@ app.post('/api/members', async (c) => {
         body.medHkid.trim().toUpperCase(),
         phoneClean
       ).run()
+      // Sync real name from medical card back to member record (Part A)
+      await db.prepare(`
+        UPDATE members
+        SET name_zh = ?, name_en = ?, id_prefix = ?
+        WHERE member_no = ?
+      `).bind(
+        body.medNameZh.trim(),
+        body.medNameEn.trim().toUpperCase(),
+        body.medHkid.trim().toUpperCase(),
+        memberNo
+      ).run()
       medicalApplied = true
     }
 
@@ -557,6 +568,63 @@ app.patch('/api/admin/medical/:id', async (c) => {
   await db.prepare(`UPDATE medical_card_applications SET ${fields.join(', ')} WHERE id = ?`)
     .bind(...vals).run()
   return c.json({ ok: true })
+})
+
+// ─── API: Medical card application (re-apply from card page) ─────────────────
+app.post('/api/members/:no/medical', async (c) => {
+  const db = c.env.DB
+  const memberNo = c.req.param('no')
+  try {
+    const body = await c.req.json<{
+      nameZh: string; nameEn: string; hkid: string
+    }>()
+
+    // Verify member exists
+    const member = await db.prepare(
+      'SELECT member_no, phone FROM members WHERE member_no = ?'
+    ).bind(memberNo).first<{ member_no: string; phone: string }>()
+    if (!member) return c.json({ ok: false, error: '會員不存在' }, 404)
+
+    // Validate required fields
+    if (!body.nameZh?.trim() || !body.nameEn?.trim() || !body.hkid?.trim()) {
+      return c.json({ ok: false, error: '請填寫中文全名、英文全名及身份證頭 4 位' }, 400)
+    }
+
+    // Prevent duplicate: already applied
+    const existing = await db.prepare(
+      'SELECT id, status FROM medical_card_applications WHERE member_no = ?'
+    ).bind(memberNo).first<{ id: number; status: string }>()
+    if (existing) {
+      return c.json({ ok: false, error: '你已申請醫健卡', status: existing.status, alreadyApplied: true }, 409)
+    }
+
+    // Insert application
+    await db.prepare(`
+      INSERT INTO medical_card_applications
+        (member_no, name_zh_full, name_en_full, hkid_prefix, phone)
+      VALUES (?,?,?,?,?)
+    `).bind(
+      memberNo,
+      body.nameZh.trim(),
+      body.nameEn.trim().toUpperCase(),
+      body.hkid.trim().toUpperCase(),
+      member.phone
+    ).run()
+
+    // Sync real name back to members (Part A)
+    await db.prepare(`
+      UPDATE members SET name_zh = ?, name_en = ?, id_prefix = ? WHERE member_no = ?
+    `).bind(
+      body.nameZh.trim(),
+      body.nameEn.trim().toUpperCase(),
+      body.hkid.trim().toUpperCase(),
+      memberNo
+    ).run()
+
+    return c.json({ ok: true })
+  } catch (e) {
+    return c.json({ ok: false, error: '提交失敗，請重試' }, 500)
+  }
 })
 
 // ─── API: Member self-update profile ─────────────────────────────────────────
@@ -896,7 +964,11 @@ app.get('/membership/card/:no', async (c) => {
   const db = c.env.DB
   const row = await db.prepare('SELECT * FROM members WHERE member_no = ?').bind(no).first<any>()
   if (!row) return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>查無此會員</h2><p>${no}</p><a href="/membership/join">立即登記</a></body></html>`, 404)
-  return c.html(memberProfileHtml(row))
+  // Check medical card application status
+  const medApp = await db.prepare(
+    'SELECT status FROM medical_card_applications WHERE member_no = ? LIMIT 1'
+  ).bind(no).first<{ status: string }>()
+  return c.html(memberProfileHtml(row, medApp?.status ?? null))
 })
 
 // ─── Future modules (placeholder) ────────────────────────────────────────────
@@ -3223,7 +3295,7 @@ function sopHtml() {
 }
 
 // ─── Member Profile HTML ──────────────────────────────────────────────────────
-function memberProfileHtml(m: any) {
+function memberProfileHtml(m: any, medStatus: string | null = null) {
   const isPrimary = m.tier === 'PRIMARY'
   const forestDeep = '#0d3e12', forest = '#2E7D32'
   const ferrari = '#C62828', ferrariDeep = '#8B0000'
@@ -3295,6 +3367,29 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
 .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:30px;font-size:14px;opacity:0;transition:opacity 0.3s;z-index:100;pointer-events:none;}
 .toast.show{opacity:1;}
 .toggle-edit-btn{background:none;border:none;color:${accentMid};font-size:13px;font-family:"Noto Serif TC",serif;cursor:pointer;font-weight:700;letter-spacing:1px;text-decoration:underline;padding:0;}
+
+/* ── Medical card block ── */
+.med-section{background:#fff;border-radius:8px;padding:20px;margin-bottom:14px;border:1.5px solid #90CAF9;}
+.med-section-title{font-family:"Noto Serif TC",serif;font-size:13px;color:#1565C0;letter-spacing:3px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #e3f2fd;}
+.med-status-badge{display:inline-block;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:1px;}
+.med-status-badge.pending{background:#FFF8E1;color:#F57F17;}
+.med-status-badge.sent{background:#E3F2FD;color:#1565C0;}
+.med-status-badge.issued{background:#E8F5E9;color:#1B5E20;}
+.med-status-badge.declined{background:#FFEBEE;color:#B71C1C;}
+.med-apply-btn{width:100%;padding:15px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;}
+.med-apply-btn:disabled{background:#90CAF9;cursor:not-allowed;}
+.med-form{display:none;margin-top:16px;}
+.med-form.open{display:block;}
+.med-field{margin-bottom:14px;}
+.med-field label{display:block;font-size:13px;color:#1565C0;font-weight:700;margin-bottom:5px;font-family:"Noto Serif TC",serif;}
+.med-field input{width:100%;padding:12px 14px;border:2px solid #90CAF9;border-radius:6px;font-size:16px;font-family:inherit;color:#333;}
+.med-field input:focus{outline:0;border-color:#1565C0;}
+.med-submit-btn{width:100%;padding:14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:4px;}
+.med-submit-btn:disabled{background:#90CAF9;cursor:not-allowed;}
+.med-err{color:#C62828;font-size:13px;margin-top:8px;display:none;}
+.med-err.show{display:block;}
+.med-success{background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:6px;padding:12px 14px;font-size:13px;color:#1B5E20;display:none;margin-top:12px;}
+.med-success.show{display:block;}
 </style>
 </head>
 <body>
@@ -3431,6 +3526,47 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
     </div>
     <a href="/membership/join-family?parent=${m.member_no}" class="add-family-btn">＋ 為家人申請家庭同行卡</a>
   </div>` : ''}
+
+  <!-- ── 醫健卡區塊 ── -->
+  <div class="med-section">
+    <div class="med-section-title">🏥 醫健卡</div>
+    ${medStatus !== null ? `
+    <div style="font-size:14px;color:#37474F;margin-bottom:10px;">你的醫健卡申請狀態：</div>
+    <span class="med-status-badge ${medStatus.toLowerCase()}">${
+      medStatus === 'PENDING'  ? '⏳ 審核中 PENDING'  :
+      medStatus === 'SENT'     ? '📮 已發送 SENT'      :
+      medStatus === 'ISSUED'   ? '✅ 已發出 ISSUED'    :
+      medStatus === 'DECLINED' ? '❌ 未批准 DECLINED'  : medStatus
+    }</span>
+    <div style="font-size:12px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<a href="https://wa.me/85291477341" style="color:#1565C0;">9147-7341</a></div>
+    ` : `
+    <div style="font-size:13px;color:#546E7A;margin-bottom:14px;line-height:1.6;">
+      由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>
+      申請後職員將以 WhatsApp 聯絡辦理。
+    </div>
+    <button class="med-apply-btn" id="medApplyBtn" onclick="toggleMedForm()">＋ 申請免費醫健卡</button>
+    <div class="med-form" id="medForm">
+      <div class="med-field">
+        <label>中文全名 <span style="color:#C62828;">✽ 必填</span>（與身份證相同）</label>
+        <input id="mfNameZh" type="text" placeholder="例：陳大文">
+      </div>
+      <div class="med-field">
+        <label>英文全名 <span style="color:#C62828;">✽ 必填</span>（與身份證相同）</label>
+        <input id="mfNameEn" type="text" placeholder="例：CHAN TAI MAN" style="text-transform:uppercase;">
+      </div>
+      <div class="med-field">
+        <label>身份證頭 4 位 <span style="color:#C62828;">✽ 必填</span></label>
+        <input id="mfHkid" type="text" placeholder="例：K608" maxlength="4" style="text-transform:uppercase;letter-spacing:4px;font-size:20px;font-weight:700;">
+      </div>
+      <div class="med-err" id="medErr"></div>
+      <button class="med-submit-btn" id="medSubmitBtn" onclick="submitMedical()">提交申請</button>
+    </div>
+    <div class="med-success" id="medSuccess">
+      ✅ 醫健卡申請已提交！狀態：<strong>PENDING</strong><br>
+      <span style="font-size:12px;">職員將以 WhatsApp 聯絡你安排發卡手續。</span>
+    </div>
+    `}
+  </div>
 
   <!-- ── 底部連結 ── -->
   <div style="text-align:center;margin-top:20px;font-size:12px;color:#aaa;line-height:2;">
@@ -3635,6 +3771,52 @@ async function shareCardToWA(){
   }
   saveCardImage();
   showToast('圖片已下載，請貼入 WhatsApp 傳送', 3000);
+}
+
+// ── Medical card re-apply (Part C) ───────────────────────────────────────────
+function toggleMedForm() {
+  var form = document.getElementById('medForm');
+  var btn = document.getElementById('medApplyBtn');
+  if (!form) return;
+  var isOpen = form.classList.contains('open');
+  if (isOpen) { form.classList.remove('open'); if(btn) btn.textContent = '＋ 申請免費醫健卡'; }
+  else { form.classList.add('open'); if(btn) btn.textContent = '✕ 收起'; }
+}
+async function submitMedical() {
+  var nameZh = document.getElementById('mfNameZh').value.trim();
+  var nameEn = document.getElementById('mfNameEn').value.trim().toUpperCase();
+  var hkid = document.getElementById('mfHkid').value.trim().toUpperCase();
+  var errEl = document.getElementById('medErr');
+  errEl.classList.remove('show');
+  if (!nameZh || !nameEn || !hkid) { errEl.textContent = '請填寫所有必填欄位'; errEl.classList.add('show'); return; }
+  if (hkid.length < 3) { errEl.textContent = '身份證頭 4 位格式不正確（如 K608）'; errEl.classList.add('show'); return; }
+  var btn = document.getElementById('medSubmitBtn');
+  btn.disabled = true; btn.textContent = '提交中…';
+  try {
+    var res = await fetch('/api/members/' + MEMBER_NO + '/medical', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ nameZh: nameZh, nameEn: nameEn, hkid: hkid })
+    });
+    var data = await res.json();
+    if (data.ok) {
+      document.getElementById('medForm').classList.remove('open');
+      document.getElementById('medApplyBtn').style.display = 'none';
+      document.getElementById('medSuccess').classList.add('show');
+    } else if (data.alreadyApplied) {
+      errEl.textContent = '你已申請醫健卡，狀態：' + (data.status || 'PENDING');
+      errEl.classList.add('show');
+      btn.disabled = false; btn.textContent = '提交申請';
+    } else {
+      errEl.textContent = data.error || '提交失敗，請重試';
+      errEl.classList.add('show');
+      btn.disabled = false; btn.textContent = '提交申請';
+    }
+  } catch(e) {
+    errEl.textContent = '網絡錯誤，請重試';
+    errEl.classList.add('show');
+    btn.disabled = false; btn.textContent = '提交申請';
+  }
 }
 </script>
 </body></html>`
