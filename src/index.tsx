@@ -1228,11 +1228,12 @@ app.get('/survey/:id', async (c) => {
   ).bind(surveyId).all<{ id: number; seq: number; qtype: string; text_zh: string; options_json: string | null; required: number }>()
   const questions = qRows.results || []
 
-  // Optional member greeting
+  // Optional member greeting — ?m= value used as-is (CE85-000001 format), no reformatting
   const memberNo = c.req.query('m') || ''
   const roadshowCode = c.req.query('rs') || ''
   let greeting = '您好 👋'
   if (memberNo) {
+    // memberNo passed directly to WHERE member_no = ? — matches CE85-000001 format in DB
     const mem = await db.prepare('SELECT name_zh FROM members WHERE member_no = ?').bind(memberNo).first<{ name_zh: string }>()
     if (mem?.name_zh) greeting = `${mem.name_zh} 您好 👋`
   }
