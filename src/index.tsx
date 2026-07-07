@@ -141,14 +141,22 @@ app.post('/api/members', async (c) => {
     // Validate required fields
     if (!body.nameZh?.trim()) return c.json({ ok: false, error: '請填寫中文姓名' }, 400)
     if (!body.phone?.trim()) return c.json({ ok: false, error: '請填寫 WhatsApp 電話' }, 400)
+    if (!body.birthYear || isNaN(parseInt(body.birthYear))) {
+      return c.json({ ok: false, error: '請填寫出生年份' }, 400)
+    }
     const phoneClean = body.phone.replace(/\D/g, '')
     const phoneCheck = validateHKPhone(phoneClean)
     if (!phoneCheck.ok) return c.json({ ok: false, error: phoneCheck.error }, 400)
 
+    // Auto-assign tier by age (ignore frontend-supplied tier to prevent spoofing)
+    const currentYear = new Date().getFullYear()
+    const age = currentYear - parseInt(body.birthYear)
+    const tier = age >= 55 ? 'PRIMARY' : 'FAMILY'
+
     // Check duplicate phone for same tier
     const existing = await db.prepare(
       'SELECT member_no FROM members WHERE phone = ? AND tier = ?'
-    ).bind(phoneClean, body.tier || 'PRIMARY').first<{ member_no: string }>()
+    ).bind(phoneClean, tier).first<{ member_no: string }>()
     if (existing) {
       return c.json({ ok: false, error: `此電話已登記，會員編號：${existing.member_no}` }, 409)
     }
@@ -156,7 +164,7 @@ app.post('/api/members', async (c) => {
     // Find parent for FAMILY tier
     let parentNo = ''
     let parentName = body.parentName || ''
-    if (body.tier === 'FAMILY') {
+    if (tier === 'FAMILY') {
       if (body.parentNo) {
         // Direct lookup by member_no (from /member/:no profile page link)
         const parent = await db.prepare(
@@ -179,7 +187,7 @@ app.post('/api/members', async (c) => {
     }
 
     const memberNo = await nextMemberNo(db)
-    const expires = expiryDate(3)
+    const expires = expiryDate(1)
     const now = new Date().toISOString()
     const roadshow = body.roadshow || 'walk-in'
     const source = body.source || 'walk-in'
@@ -200,7 +208,7 @@ app.post('/api/members', async (c) => {
          source, referrer_no, roadshow_location, status)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).bind(
-      memberNo, body.tier || 'PRIMARY',
+      memberNo, tier,
       body.nameZh.trim(), phoneClean,
       body.nameEn?.trim() || '', body.gender || '',
       body.birthYear ? parseInt(body.birthYear) : null,
@@ -240,7 +248,7 @@ app.post('/api/members', async (c) => {
       memberNo,
       nameZh: body.nameZh.trim(),
       nameEn: body.nameEn?.trim() || '',
-      tier: body.tier || 'PRIMARY',
+      tier: tier,
       expiresAt: expires,
       role: 'CoExplorery',
       medicalApplied
@@ -1335,9 +1343,9 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
         </div>
 
         <div class="field">
-          <div class="label-row"><label for="birthYear">出生年份</label><span class="req">✽ 必填</span></div>
-          <input id="birthYear" type="number" placeholder="例：1960" inputmode="numeric" min="1920" max="1972">
-          <div class="hint">請填寫 1972 年或以前（55歲或以上）</div>
+          <div class="label-row"><label for="birthYear">出生年份 <span style="color:var(--ferrari);font-size:12px;">✽ 必填</span></label></div>
+          <input id="birthYear" type="number" placeholder="例：1960" inputmode="numeric" min="1920" max="2010" required>
+          <div class="hint">年滿 55 歲自動成為主卡，55 歲以下為家庭卡</div>
         </div>
 
         <div class="field">
@@ -1624,8 +1632,8 @@ async function submitForm() {
   var phoneErr = validateHKPhone(phone);
   if (phoneErr) { showErr(phoneErr); return; }
   if (!selectedGender) { showErr('請選擇性別'); return; }
-  if (!birthYear || birthYear > 1972) { showErr('請填寫出生年份（1972年或以前，即55歲或以上）'); return; }
-  if (birthYear < 1920) { showErr('請填寫正確的出生年份'); return; }
+  if (!birthYear) { showErr('請填寫出生年份'); return; }
+  if (birthYear < 1920 || birthYear > 2010) { showErr('請填寫正確的出生年份（1920–2010）'); return; }
   if (!district) { showErr('請選擇居住地區'); return; }
   if (!consent) { showErr('請同意私隱政策'); return; }
 
