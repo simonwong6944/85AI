@@ -1148,6 +1148,306 @@ app.get('/member/:no',  (c) => c.redirect(`/membership/card/${c.req.param('no')}
 app.get('/poster',      (c) => c.redirect('/', 301))
 app.get('/sop',         (c) => c.redirect('/', 301))
 
+// ─── Survey module ────────────────────────────────────────────────────────────
+
+// POST /api/survey/:id/submit — public, no auth required
+app.post('/api/survey/:id/submit', async (c) => {
+  const surveyId = parseInt(c.req.param('id'))
+  if (isNaN(surveyId)) return c.json({ ok: false, error: '無效問卷 ID' }, 400)
+  const db = c.env.DB
+
+  // Validate survey exists and is OPEN
+  const survey = await db.prepare(
+    "SELECT id, status FROM surveys WHERE id = ?"
+  ).bind(surveyId).first<{ id: number; status: string }>()
+  if (!survey) return c.json({ ok: false, error: '問卷不存在' }, 404)
+  if (survey.status !== 'OPEN') return c.json({ ok: false, error: '問卷已關閉' }, 400)
+
+  // Parse body
+  let body: { memberNo?: string; roadshowCode?: string; answers?: Record<string, any> }
+  try { body = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效請求格式' }, 400) }
+  const { memberNo, roadshowCode, answers } = body
+  if (!answers || typeof answers !== 'object') return c.json({ ok: false, error: '缺少 answers' }, 400)
+
+  // Load required questions and validate completeness
+  const qRows = await db.prepare(
+    "SELECT id, required FROM survey_questions WHERE survey_id = ? AND required = 1"
+  ).bind(surveyId).all<{ id: number; required: number }>()
+
+  const missing: number[] = []
+  for (const q of (qRows.results || [])) {
+    const val = answers[String(q.id)]
+    const isEmpty = val === undefined || val === null || val === '' ||
+      (Array.isArray(val) && val.length === 0)
+    if (isEmpty) missing.push(q.id)
+  }
+  if (missing.length > 0) {
+    return c.json({ ok: false, error: '以下必答題未填寫', missing }, 400)
+  }
+
+  // Insert response
+  await db.prepare(
+    `INSERT INTO survey_responses (survey_id, member_no, roadshow_code, answers_json)
+     VALUES (?, ?, ?, ?)`
+  ).bind(
+    surveyId,
+    memberNo?.trim() || null,
+    roadshowCode?.trim() || null,
+    JSON.stringify(answers)
+  ).run()
+
+  return c.json({ ok: true })
+})
+
+// GET /survey/:id — public elderly-friendly fill page
+app.get('/survey/:id', async (c) => {
+  const surveyId = parseInt(c.req.param('id'))
+  if (isNaN(surveyId)) return c.html('<h2>無效問卷連結</h2>', 400)
+  const db = c.env.DB
+
+  // Load survey
+  const survey = await db.prepare(
+    "SELECT id, title_zh, status FROM surveys WHERE id = ?"
+  ).bind(surveyId).first<{ id: number; title_zh: string; status: string }>()
+  if (!survey) return c.html('<h2>找不到問卷</h2>', 404)
+
+  if (survey.status !== 'OPEN') {
+    return c.html(`<!DOCTYPE html><html lang="zh-HK"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>問卷已關閉</title></head>
+<body style="font-family:sans-serif;text-align:center;padding:60px 20px;background:#fff;">
+<div style="font-size:48px;margin-bottom:20px;">🔒</div>
+<div style="font-size:24px;font-weight:700;color:#333;">問卷已關閉</div>
+<div style="font-size:18px;color:#555;margin-top:12px;">感謝您的參與！</div>
+</body></html>`)
+  }
+
+  // Load questions
+  const qRows = await db.prepare(
+    "SELECT id, seq, qtype, text_zh, options_json, required FROM survey_questions WHERE survey_id = ? ORDER BY seq ASC"
+  ).bind(surveyId).all<{ id: number; seq: number; qtype: string; text_zh: string; options_json: string | null; required: number }>()
+  const questions = qRows.results || []
+
+  // Optional member greeting
+  const memberNo = c.req.query('m') || ''
+  const roadshowCode = c.req.query('rs') || ''
+  let greeting = '您好 👋'
+  if (memberNo) {
+    const mem = await db.prepare('SELECT name_zh FROM members WHERE member_no = ?').bind(memberNo).first<{ name_zh: string }>()
+    if (mem?.name_zh) greeting = `${mem.name_zh} 您好 👋`
+  }
+
+  // Build question HTML
+  const questionsJson = JSON.stringify(questions)
+
+  return c.html(`<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>${survey.title_zh}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#fff;color:#111;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-size:20px;min-height:100vh;}
+.topbar{background:#1b5e20;color:#fff;padding:16px 20px 14px;}
+.topbar .greeting{font-size:18px;opacity:0.9;margin-bottom:4px;}
+.topbar .survey-title{font-size:24px;font-weight:900;line-height:1.3;}
+.topbar .prog{font-size:16px;opacity:0.85;margin-top:6px;}
+.wrap{max-width:600px;margin:0 auto;padding:20px 16px 80px;}
+.q-block{background:#f8f8f8;border-radius:12px;padding:22px 18px;margin-bottom:24px;border:2px solid #e0e0e0;}
+.q-block.error{border-color:#c62828;background:#fff8f8;}
+.q-num{font-size:14px;color:#1b5e20;font-weight:700;letter-spacing:1px;margin-bottom:6px;}
+.q-text{font-size:22px;font-weight:700;color:#111;line-height:1.4;margin-bottom:16px;}
+.q-required{color:#c62828;font-size:14px;font-weight:700;margin-left:6px;}
+.opt-btn{display:block;width:100%;min-height:60px;padding:14px 18px;margin-bottom:10px;
+  background:#fff;border:2.5px solid #388e3c;border-radius:10px;
+  font-size:20px;font-weight:600;color:#1b5e20;text-align:left;cursor:pointer;
+  transition:background 0.15s,color 0.15s;line-height:1.3;}
+.opt-btn:last-child{margin-bottom:0;}
+.opt-btn.selected{background:#1b5e20;color:#fff;border-color:#1b5e20;}
+.opt-btn:active{opacity:0.85;}
+.rating-wrap{display:flex;gap:12px;justify-content:flex-start;flex-wrap:wrap;margin-top:4px;}
+.star-btn{font-size:44px;background:none;border:none;cursor:pointer;padding:4px;opacity:0.35;transition:opacity 0.1s;line-height:1;}
+.star-btn.lit{opacity:1;}
+.rating-label{font-size:16px;color:#555;margin-top:8px;}
+textarea.q-textarea{width:100%;min-height:120px;padding:14px;border:2.5px solid #388e3c;border-radius:10px;
+  font-size:20px;font-family:inherit;color:#111;resize:vertical;background:#fff;}
+textarea.q-textarea:focus{outline:none;border-color:#1b5e20;}
+.err-msg{color:#c62828;font-size:17px;font-weight:700;margin-top:8px;display:none;}
+.err-msg.show{display:block;}
+.submit-wrap{position:sticky;bottom:0;background:#fff;padding:14px 16px;border-top:2px solid #e0e0e0;}
+.submit-btn{display:block;width:100%;padding:20px;background:#1b5e20;color:#fff;
+  border:none;border-radius:12px;font-size:22px;font-weight:900;cursor:pointer;letter-spacing:2px;}
+.submit-btn:disabled{background:#a5d6a7;cursor:not-allowed;}
+.success-wrap{text-align:center;padding:60px 20px;}
+.success-wrap .icon{font-size:72px;margin-bottom:20px;}
+.success-wrap .msg{font-size:26px;font-weight:900;color:#1b5e20;line-height:1.4;}
+.success-wrap .sub{font-size:20px;color:#333;margin-top:12px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="greeting">${greeting}</div>
+  <div class="survey-title">${survey.title_zh}</div>
+  <div class="prog">共 ${questions.length} 題</div>
+</div>
+
+<div id="formWrap">
+<div class="wrap" id="questionsWrap"></div>
+<div class="submit-wrap">
+  <div id="globalErr" class="err-msg" style="margin-bottom:10px;"></div>
+  <button class="submit-btn" id="submitBtn" onclick="submitSurvey()">✅ 提交問卷</button>
+</div>
+</div>
+
+<div id="successWrap" style="display:none;" class="success-wrap">
+  <div class="icon">✅</div>
+  <div class="msg">多謝您！<br>已經收到您嘅意見</div>
+  <div class="sub">感謝您抽時間填寫問卷 🙏</div>
+</div>
+
+<script>
+var SURVEY_ID = ${survey.id};
+var MEMBER_NO = ${memberNo ? JSON.stringify(memberNo) : 'null'};
+var ROADSHOW_CODE = ${roadshowCode ? JSON.stringify(roadshowCode) : 'null'};
+var QUESTIONS = ${questionsJson};
+// answers store: key = question id (string), value = answer
+var answers = {};
+
+function renderQuestions() {
+  var wrap = document.getElementById('questionsWrap');
+  wrap.innerHTML = QUESTIONS.map(function(q) {
+    var reqMark = q.required ? '<span class="q-required">✽ 必填</span>' : '';
+    var inner = '';
+    if (q.qtype === 'single') {
+      var opts = [];
+      try { opts = JSON.parse(q.options_json || '[]'); } catch(e){}
+      inner = opts.map(function(o) {
+        return '<button class="opt-btn" data-qid="'+q.id+'" data-val="'+escHtml(o)+'" onclick="pickSingle('+q.id+',this)">' + escHtml(o) + '</button>';
+      }).join('');
+    } else if (q.qtype === 'multi') {
+      var opts = [];
+      try { opts = JSON.parse(q.options_json || '[]'); } catch(e){}
+      inner = opts.map(function(o) {
+        return '<button class="opt-btn" data-qid="'+q.id+'" data-val="'+escHtml(o)+'" onclick="pickMulti('+q.id+',this)">' + escHtml(o) + '</button>';
+      }).join('');
+    } else if (q.qtype === 'rating') {
+      inner = '<div class="rating-wrap">' +
+        [1,2,3,4,5].map(function(n){
+          return '<button class="star-btn" id="star-'+q.id+'-'+n+'" onclick="pickRating('+q.id+','+n+')" aria-label="'+n+'星">⭐</button>';
+        }).join('') +
+      '</div><div class="rating-label" id="rating-label-'+q.id+'">請揀1至5星</div>';
+    } else if (q.qtype === 'text') {
+      inner = '<textarea class="q-textarea" id="ta-'+q.id+'" placeholder="請輸入您的意見（可以唔填）" oninput="answers[\\''+q.id+'\\'] = this.value"></textarea>';
+    }
+    return '<div class="q-block" id="qb-'+q.id+'">' +
+      '<div class="q-num">第 '+q.seq+' 題</div>' +
+      '<div class="q-text">'+escHtml(q.text_zh)+reqMark+'</div>' +
+      inner +
+      '<div class="err-msg" id="err-'+q.id+'"></div>' +
+    '</div>';
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function pickSingle(qid, btn) {
+  // Deselect all in group
+  document.querySelectorAll('.opt-btn[data-qid="'+qid+'"]').forEach(function(b){ b.classList.remove('selected'); });
+  btn.classList.add('selected');
+  answers[String(qid)] = btn.getAttribute('data-val');
+  clearErr(qid);
+}
+
+function pickMulti(qid, btn) {
+  btn.classList.toggle('selected');
+  var selected = [];
+  document.querySelectorAll('.opt-btn[data-qid="'+qid+'"].selected').forEach(function(b){ selected.push(b.getAttribute('data-val')); });
+  answers[String(qid)] = selected;
+  if (selected.length > 0) clearErr(qid);
+}
+
+function pickRating(qid, n) {
+  answers[String(qid)] = n;
+  for (var i = 1; i <= 5; i++) {
+    var s = document.getElementById('star-'+qid+'-'+i);
+    if (s) s.classList.toggle('lit', i <= n);
+  }
+  var lbl = document.getElementById('rating-label-'+qid);
+  if (lbl) lbl.textContent = n + ' 星';
+  clearErr(qid);
+}
+
+function clearErr(qid) {
+  var qb = document.getElementById('qb-'+qid);
+  var err = document.getElementById('err-'+qid);
+  if (qb) qb.classList.remove('error');
+  if (err) { err.textContent = ''; err.classList.remove('show'); }
+}
+
+function showErr(qid, msg) {
+  var qb = document.getElementById('qb-'+qid);
+  var err = document.getElementById('err-'+qid);
+  if (qb) { qb.classList.add('error'); qb.scrollIntoView({behavior:'smooth',block:'center'}); }
+  if (err) { err.textContent = msg; err.classList.add('show'); }
+}
+
+async function submitSurvey() {
+  var btn = document.getElementById('submitBtn');
+  var globalErr = document.getElementById('globalErr');
+  globalErr.classList.remove('show');
+
+  // Validate required questions
+  var firstErrQid = null;
+  for (var i = 0; i < QUESTIONS.length; i++) {
+    var q = QUESTIONS[i];
+    if (!q.required) continue;
+    var val = answers[String(q.id)];
+    var isEmpty = val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0);
+    if (isEmpty) {
+      showErr(q.id, '⚠️ 此題必須填寫');
+      if (!firstErrQid) firstErrQid = q.id;
+    }
+  }
+  if (firstErrQid) {
+    globalErr.textContent = '⚠️ 請先回答所有必填題目（紅框）';
+    globalErr.classList.add('show');
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = '提交中…';
+  try {
+    var res = await fetch('/api/survey/' + SURVEY_ID + '/submit', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ memberNo: MEMBER_NO, roadshowCode: ROADSHOW_CODE, answers: answers })
+    });
+    var data = await res.json();
+    if (data.ok) {
+      document.getElementById('formWrap').style.display = 'none';
+      document.getElementById('successWrap').style.display = 'block';
+      window.scrollTo(0,0);
+    } else {
+      globalErr.textContent = '⚠️ ' + (data.error || '提交失敗，請再試');
+      globalErr.classList.add('show');
+      btn.disabled = false; btn.textContent = '✅ 提交問卷';
+    }
+  } catch(e) {
+    globalErr.textContent = '⚠️ 網絡錯誤，請重試';
+    globalErr.classList.add('show');
+    btn.disabled = false; btn.textContent = '✅ 提交問卷';
+  }
+}
+
+// Init
+renderQuestions();
+</script>
+</body></html>`)
+})
+
 // ─── HTML Pages ───────────────────────────────────────────────────────────────
 
 // ── 85 AI Technology Limited Dashboard (Homepage) ────────────────────────────
