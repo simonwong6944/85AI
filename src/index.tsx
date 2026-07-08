@@ -2077,7 +2077,7 @@ function switchTab(t) {
 // ── Login ─────────────────────────────────────────────────────────────────────
 async function doLogin() {
   document.getElementById('loginErrMsg').classList.remove('show');
-  var phone = document.getElementById('loginPhone').value.replace(/\D/g, '');
+  var phone = document.getElementById('loginPhone').value.replace(/[^0-9]/g, '');
   var phoneErr = validateHKPhone(phone);
   if (phoneErr) { showLoginErr(phoneErr); return; }
   var btn = document.getElementById('loginBtn');
@@ -2198,7 +2198,7 @@ function showErr(msg) {
 async function submitForm() {
   document.getElementById('errMsg').classList.remove('show');
   var nameZh = document.getElementById('nameZh').value.trim();
-  var phone = document.getElementById('phone').value.replace(/\D/g,'');
+  var phone = document.getElementById('phone').value.replace(/[^0-9]/g,'');
   var consent = document.getElementById('consent').checked;
   var applyMedical = document.getElementById('applyMedical').checked;
 
@@ -2294,7 +2294,7 @@ function showSuccess(data, appliedMedical) {
     var msgText = '你好，我剛登記了老有卡，會員編號：' + data.memberNo + '，請幫我確認。';
     var msgEnc = encodeURIComponent(msgText);
     // Build deep link URLs for direct WA app launch (bypass wa.me interstitial page)
-    var phoneDigits = waNum.replace(/\D/g,'');
+    var phoneDigits = waNum.replace(/[^0-9]/g,'');
     // Use whatsapp:// on all mobile (works on both iOS and Android)
     // Desktop fallback: wa.me link
     var isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
@@ -2760,9 +2760,9 @@ function validateHKPhone(p){
 async function submitForm(){
   document.getElementById('errMsg').classList.remove('show');
   var nameZh=document.getElementById('nameZh').value.trim();
-  var phone=document.getElementById('phone').value.replace(/\D/g,'');
+  var phone=document.getElementById('phone').value.replace(/[^0-9]/g,'');
   var linkedParentNo=document.getElementById('linkedParentNo').value.trim();
-  var parentPhone=document.getElementById('parentPhone').value.replace(/\D/g,'');
+  var parentPhone=document.getElementById('parentPhone').value.replace(/[^0-9]/g,'');
   if(!nameZh){showErr('請填寫中文姓名');return;}
   var phoneErr=validateHKPhone(phone);
   if(phoneErr){showErr(phoneErr);return;}
@@ -2800,7 +2800,7 @@ async function submitForm(){
       var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
       var msgText='你好，我剛登記了老有卡家庭同行卡，會員編號：'+data.memberNo+'，請幫我確認。';
       var msgEnc=encodeURIComponent(msgText);
-      var phoneDigits=waNum.replace(/\D/g,'');
+      var phoneDigits=waNum.replace(/[^0-9]/g,'');
       var isMobile=/iphone|ipad|ipod|android/i.test(navigator.userAgent);
       var waUrl=isMobile
         ?'whatsapp://send?phone='+phoneDigits+'&text='+msgEnc
@@ -4269,7 +4269,7 @@ window.addEventListener('load', function(){
       var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
       var msgText='你好，我的老有卡會員編號：'+MEMBER_NO+'，請幫我確認。';
       var msgEnc=encodeURIComponent(msgText);
-      var phoneDigits=waNum.replace(/\\D/g,'');
+      var phoneDigits=waNum.replace(/[^0-9]/g,'');
       var isMobile=/iphone|ipad|ipod|android/i.test(navigator.userAgent);
       window._waUrl=isMobile
         ?'whatsapp://send?phone='+phoneDigits+'&text='+msgEnc
@@ -4517,7 +4517,7 @@ function switchFamTab(tab) {
 }
 async function submitAddFamily() {
   var nameZh = document.getElementById('ffNameZh').value.trim();
-  var phone = document.getElementById('ffPhone').value.replace(/\D/g,'');
+  var phone = document.getElementById('ffPhone').value.replace(/[^0-9]/g,'');
   var gender = document.getElementById('ffGender').value;
   var birthYear = document.getElementById('ffBirthYear').value;
   var district = document.getElementById('ffDistrict').value;
@@ -4543,7 +4543,7 @@ async function submitAddFamily() {
   } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='新增家庭同行卡'; }
 }
 async function submitLinkParent() {
-  var phone = document.getElementById('lpPhone').value.replace(/\D/g,'');
+  var phone = document.getElementById('lpPhone').value.replace(/[^0-9]/g,'');
   var errEl = document.getElementById('linkErr');
   errEl.classList.remove('show');
   if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.classList.add('show'); return; }
@@ -4568,7 +4568,7 @@ async function submitLinkParent() {
 }
 async function submitAddParent() {
   var nameZh = document.getElementById('npNameZh').value.trim();
-  var phone = document.getElementById('npPhone').value.replace(/\D/g,'');
+  var phone = document.getElementById('npPhone').value.replace(/[^0-9]/g,'');
   var birthYear = document.getElementById('npBirthYear').value;
   var gender = document.getElementById('npGender').value;
   var district = document.getElementById('npDistrict').value;
@@ -4889,7 +4889,7 @@ function validateHKPhone(p){
 // ── LOGIN ────────────────────────────────────────────────────────────────────
 async function doLogin(){
   document.getElementById('errMsg').classList.remove('show');
-  var phone=document.getElementById('loginPhone').value.replace(/\D/g,'');
+  var phone=document.getElementById('loginPhone').value.replace(/[^0-9]/g,'');
   var phoneErr=validateHKPhone(phone);
   if(phoneErr){showErr(phoneErr);return;}
   var btn=document.getElementById('loginBtn');
@@ -4924,7 +4924,7 @@ document.getElementById('loginPhone').addEventListener('keydown',function(e){if(
 async function doRegister(){
   document.getElementById('errMsg').classList.remove('show');
   var nameZh=document.getElementById('nameZh').value.trim();
-  var phone=document.getElementById('phone').value.replace(/\D/g,'');
+  var phone=document.getElementById('phone').value.replace(/[^0-9]/g,'');
   if(!nameZh){showErr('請填寫中文姓名');return;}
   var phoneErr=validateHKPhone(phone);
   if(phoneErr){showErr(phoneErr);return;}
@@ -5182,7 +5182,7 @@ function showErr(msg){var el=document.getElementById('errMsg');el.textContent=ms
 
 async function doLogin(){
   document.getElementById('errMsg').classList.remove('show');
-  var phone=document.getElementById('phone').value.replace(/\D/g,'');
+  var phone=document.getElementById('phone').value.replace(/[^0-9]/g,'');
   if(phone.length!==8){showErr('請輸入正確的 8 位電話號碼');return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true; btn.textContent='查詢中…';
@@ -6182,7 +6182,8 @@ function detectBrowser() {
   var ua = navigator.userAgent || '';
   var isIOS = /iPhone|iPad|iPod/.test(ua);
   var isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|mercury/.test(ua);
-  var isInApp = /FBAN|FBAV|Instagram|WhatsApp|Line\//.test(ua);
+  // Use RegExp constructor to avoid regex literal slash escaping issues in template string
+  var isInApp = new RegExp('FBAN|FBAV|Instagram|WhatsApp|Line').test(ua);
   return { isIOS: isIOS, isSafari: isSafari, isInApp: isInApp };
 }
 
