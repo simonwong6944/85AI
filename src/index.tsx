@@ -2061,6 +2061,14 @@ window._deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', function(e) {
   e.preventDefault();
   window._deferredInstallPrompt = e;
+  // If install banner is already showing (user already clicked WA), activate install button
+  if(window._installBannerPending) {
+    window._installBannerPending = false;
+    var btn = document.getElementById('pwaInstallBtn');
+    var fb = document.getElementById('pwaInstallFallback');
+    if(btn) { btn.style.display = ''; }
+    if(fb) { fb.style.display = 'none'; }
+  }
 });
 // ── HK Phone validator (frontend mirror of backend validateHKPhone) ───────────
 function validateHKPhone(p) {
@@ -2413,23 +2421,23 @@ function showInstallPrompt() {
     content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">📱 將老有卡加落主畫面</h3>' +
       '<p style="font-size:16px;color:#333;margin-bottom:12px;">你而家係用 WhatsApp/FB 內置瀏覽器。請複製網址，喺 Safari 或 Chrome 開啟後加入主畫面。</p>' +
       '<button onclick="copyAppUrl()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">📋 複製老有卡網址</button>';
-  } else if(window._deferredInstallPrompt) {
-    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">📱 將老有卡加落主畫面</h3>' +
-      '<p style="font-size:16px;color:#333;margin-bottom:12px;">安裝後可以喺主畫面直接開啟，唔使記住網址！</p>' +
-      '<button onclick="doInstallApp()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">⬇️ 安裝到主畫面</button>';
   } else if(isIOS && isSafari) {
     content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">📱 將老有卡加落主畫面</h3>' +
       '<div style="background:#fff;border-radius:10px;padding:14px;">' +
-      '<div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">1</span><span style="font-size:16px;">撳 Safari 下面嘅 <strong>「分享」掣</strong> 🔗</span></div>' +
+      '<div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">1</span><span style="font-size:16px;">撳 Safari 下面嘅 <strong>「共享」掣</strong> 🔗</span></div>' +
       '<div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">2</span><span style="font-size:16px;">揀 <strong>「加至主畫面」</strong> ＋</span></div>' +
       '<div style="display:flex;gap:10px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">3</span><span style="font-size:16px;">撳右上角 <strong>「新增」</strong> 完成！</span></div>' +
       '</div>';
   } else {
-    // Generic: show app URL
-    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">📱 下次直接用老有卡 App</h3>' +
-      '<p style="font-size:16px;color:#333;margin-bottom:12px;">喺 Chrome/Safari 開啟以下網址，再加到主畫面：</p>' +
-      '<div style="background:#fff;border-radius:8px;padding:12px;font-size:16px;font-weight:700;color:#228B22;word-break:break-all;">' + location.origin + '/app</div>' +
-      '<button onclick="copyAppUrl()" style="display:block;width:100%;margin-top:10px;padding:12px;background:#fff;color:#228B22;border:2px solid #228B22;border-radius:10px;font-size:16px;font-weight:900;cursor:pointer;">📋 複製網址</button>';
+    // Android Chrome (or other) — show install button; if beforeinstallprompt not yet fired, button will trigger it when ready
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">📱 將老有卡加落主畫面</h3>' +
+      '<p style="font-size:16px;color:#333;margin-bottom:12px;">安裝後可以喺主畫面直接開啟，唔使記住網址！</p>' +
+      '<button id="pwaInstallBtn" onclick="doInstallApp()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">⬇️ 安裝到主畫面</button>' +
+      '<div id="pwaInstallFallback" style="display:none;margin-top:12px;background:#fff;border-radius:8px;padding:12px;">' +
+      '<p style="font-size:14px;color:#555;margin-bottom:8px;">喺 Chrome 選單（⋮）揀「加至主螢幕」即可安裝。</p>' +
+      '<div style="font-size:14px;font-weight:700;color:#228B22;word-break:break-all;margin-bottom:8px;">' + location.origin + '/app</div>' +
+      '<button onclick="copyAppUrl()" style="width:100%;padding:10px;background:#fff;color:#228B22;border:2px solid #228B22;border-radius:8px;font-size:15px;font-weight:900;cursor:pointer;">📋 複製網址</button>' +
+      '</div>';
   }
   banner.innerHTML = content;
   // Insert after successSection or waVerifyBlock, whichever is visible
@@ -2440,6 +2448,10 @@ function showInstallPrompt() {
     document.body.appendChild(banner);
   }
   banner.scrollIntoView({behavior:'smooth', block:'center'});
+  // If beforeinstallprompt arrives after banner is shown, update button state
+  if(!isInApp && !isIOS) {
+    window._installBannerPending = true;
+  }
 }
 function copyAppUrl() {
   var url = location.origin + '/app';
@@ -2448,13 +2460,20 @@ function copyAppUrl() {
   } else { prompt('請複製以下網址：', url); }
 }
 function doInstallApp() {
-  if(!window._deferredInstallPrompt) return;
-  window._deferredInstallPrompt.prompt();
-  window._deferredInstallPrompt.userChoice.then(function(r) {
-    window._deferredInstallPrompt = null;
-    var b = document.getElementById('pwaInstallBanner');
-    if(b && r.outcome === 'accepted') b.style.display = 'none';
-  });
+  if(window._deferredInstallPrompt) {
+    window._deferredInstallPrompt.prompt();
+    window._deferredInstallPrompt.userChoice.then(function(r) {
+      window._deferredInstallPrompt = null;
+      var b = document.getElementById('pwaInstallBanner');
+      if(b && r.outcome === 'accepted') b.style.display = 'none';
+    });
+  } else {
+    // Prompt not ready — show fallback instructions
+    var fb = document.getElementById('pwaInstallFallback');
+    if(fb) fb.style.display = '';
+    var btn = document.getElementById('pwaInstallBtn');
+    if(btn) btn.style.display = 'none';
+  }
 }
 
 // ── Draw member card onto an off-screen canvas — design-matched ───────────────
@@ -2804,6 +2823,14 @@ window._deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', function(e) {
   e.preventDefault();
   window._deferredInstallPrompt = e;
+  // If install banner is already showing (user already clicked WA), activate install button
+  if(window._installBannerPending) {
+    window._installBannerPending = false;
+    var btn = document.getElementById('pwaInstallBtn');
+    var fb = document.getElementById('pwaInstallFallback');
+    if(btn) { btn.style.display = ''; }
+    if(fb) { fb.style.display = 'none'; }
+  }
 });
 // Auto-fill parent info from ?parent=CE85-XXXXXX URL param
 (function(){
@@ -2980,18 +3007,21 @@ function showInstallPrompt() {
   var content = '';
   if(isInApp) {
     content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><p style="font-size:16px;color:#333;margin-bottom:12px;">\u8acb\u8907\u88fd\u7db2\u5740\uff0c\u55ba Safari \u6216 Chrome \u958b\u555f\u5f8c\u52a0\u5165\u4e3b\u756b\u9762\u3002</p><button onclick="copyAppUrl()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">\ud83d\udccb \u8907\u88fd\u8001\u6709\u5361\u7db2\u5740</button>';
-  } else if(window._deferredInstallPrompt) {
-    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><p style="font-size:16px;color:#333;margin-bottom:12px;">\u5b89\u88dd\u5f8c\u53ef\u4ee5\u55ba\u4e3b\u756b\u9762\u76f4\u63a5\u958b\u555f\uff01</p><button onclick="doInstallApp()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">\u2b07\ufe0f \u5b89\u88dd\u5230\u4e3b\u756b\u9762</button>';
   } else if(isIOS && isSafari) {
-    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><div style="background:#fff;border-radius:10px;padding:14px;"><div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">1</span><span style="font-size:16px;">\u64b3 Safari \u4e0b\u9762\u5605 <strong>\u300c\u5206\u4eab\u300d\u63a3</strong> \ud83d\udd17</span></div><div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">2</span><span style="font-size:16px;">\u63c0 <strong>\u300c\u52a0\u81f3\u4e3b\u756b\u9762\u300d</strong> \uff0b</span></div><div style="display:flex;gap:10px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">3</span><span style="font-size:16px;">\u64b3\u53f3\u4e0a\u89d2 <strong>\u300c\u65b0\u589e\u300d</strong> \u5b8c\u6210\uff01</span></div></div>';
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><div style="background:#fff;border-radius:10px;padding:14px;"><div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">1</span><span style="font-size:16px;">\u64b3 Safari \u4e0b\u9762\u5605 <strong>\u300c\u5171\u4eab\u300d\u63a3</strong> \ud83d\udd17</span></div><div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">2</span><span style="font-size:16px;">\u63c0 <strong>\u300c\u52a0\u81f3\u4e3b\u756b\u9762\u300d</strong> \uff0b</span></div><div style="display:flex;gap:10px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">3</span><span style="font-size:16px;">\u64b3\u53f3\u4e0a\u89d2 <strong>\u300c\u65b0\u589e\u300d</strong> \u5b8c\u6210\uff01</span></div></div>';
   } else {
-    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u4e0b\u6b21\u76f4\u63a5\u7528\u8001\u6709\u5361 App</h3><p style="font-size:16px;color:#333;margin-bottom:12px;">\u55ba Chrome/Safari \u958b\u555f\u4ee5\u4e0b\u7db2\u5740\uff0c\u518d\u52a0\u5230\u4e3b\u756b\u9762\uff1a</p><div style="background:#fff;border-radius:8px;padding:12px;font-size:16px;font-weight:700;color:#228B22;word-break:break-all;">' + location.origin + '/app</div><button onclick="copyAppUrl()" style="display:block;width:100%;margin-top:10px;padding:12px;background:#fff;color:#228B22;border:2px solid #228B22;border-radius:10px;font-size:16px;font-weight:900;cursor:pointer;">\ud83d\udccb \u8907\u88fd\u7db2\u5740</button>';
+    // Android Chrome (or other) — show install button; fallback instructions if beforeinstallprompt not yet fired
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><p style="font-size:16px;color:#333;margin-bottom:12px;">\u5b89\u88dd\u5f8c\u53ef\u4ee5\u55ba\u4e3b\u756b\u9762\u76f4\u63a5\u958b\u555f\uff0c\u5524\u4f7f\u8a18\u4f4f\u7db2\u5740\uff01</p><button id="pwaInstallBtn" onclick="doInstallApp()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">\u2b07\ufe0f \u5b89\u88dd\u5230\u4e3b\u756b\u9762</button><div id="pwaInstallFallback" style="display:none;margin-top:12px;background:#fff;border-radius:8px;padding:12px;"><p style="font-size:14px;color:#555;margin-bottom:8px;">\u55ba Chrome \u9078\u55ae\uff08\u22ee\uff09\u63c0\u300c\u52a0\u81f3\u4e3b\u87a2\u5e55\u300d\u5373\u53ef\u5b89\u88dd\u3002</p><div style="font-size:14px;font-weight:700;color:#228B22;word-break:break-all;margin-bottom:8px;">' + location.origin + '/app</div><button onclick="copyAppUrl()" style="width:100%;padding:10px;background:#fff;color:#228B22;border:2px solid #228B22;border-radius:8px;font-size:15px;font-weight:900;cursor:pointer;">\ud83d\udccb \u8907\u88fd\u7db2\u5740</button></div>';
   }
   banner.innerHTML = content;
   var anchor = document.getElementById('verifiedBanner') || document.getElementById('waSentBanner') || document.getElementById('successSection');
   if(anchor && anchor.parentNode) { anchor.parentNode.insertBefore(banner, anchor.nextSibling); }
   else { document.body.appendChild(banner); }
   banner.scrollIntoView({behavior:'smooth', block:'center'});
+  // Flag for beforeinstallprompt to activate install button if banner is showing
+  if(!isInApp && !isIOS) {
+    window._installBannerPending = true;
+  }
 }
 function copyAppUrl() {
   var url = location.origin + '/app';
@@ -3000,13 +3030,20 @@ function copyAppUrl() {
   } else { prompt('\u8acb\u8907\u88fd\u4ee5\u4e0b\u7db2\u5740\uff1a', url); }
 }
 function doInstallApp() {
-  if(!window._deferredInstallPrompt) return;
-  window._deferredInstallPrompt.prompt();
-  window._deferredInstallPrompt.userChoice.then(function(r) {
-    window._deferredInstallPrompt = null;
-    var b = document.getElementById('pwaInstallBanner');
-    if(b && r.outcome === 'accepted') b.style.display = 'none';
-  });
+  if(window._deferredInstallPrompt) {
+    window._deferredInstallPrompt.prompt();
+    window._deferredInstallPrompt.userChoice.then(function(r) {
+      window._deferredInstallPrompt = null;
+      var b = document.getElementById('pwaInstallBanner');
+      if(b && r.outcome === 'accepted') b.style.display = 'none';
+    });
+  } else {
+    // Prompt not ready — show fallback instructions
+    var fb = document.getElementById('pwaInstallFallback');
+    if(fb) fb.style.display = '';
+    var btn = document.getElementById('pwaInstallBtn');
+    if(btn) btn.style.display = 'none';
+  }
 }
 
 // Restore success page after WA redirect (family card — full page reload fallback)
@@ -6270,7 +6307,7 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
       <div class="ios-steps">
         <div class="step">
           <div class="step-num">1</div>
-          <div class="step-text">撳 Safari 下面嘅 <strong>「分享」掣</strong> 🔗</div>
+          <div class="step-text">撳 Safari 下面嘅 <strong>「共享」掣</strong> 🔗</div>
         </div>
         <div class="step">
           <div class="step-num">2</div>
@@ -6304,9 +6341,13 @@ var deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', function(e) {
   e.preventDefault();
   deferredPrompt = e;
-  // 如果安裝區段已顯示（用戶已點 WA），補顯示 Android 安裝掣
-  if (document.getElementById('installSection').style.display !== 'none') {
-    showInstallBanner();
+  // 如果安裝區段已顯示（用戶已點 WA），補顯示/更新 Android 安裝掣
+  var sec = document.getElementById('installSection');
+  if (sec && sec.style.display !== 'none') {
+    // Section already visible — just show the Android install button
+    document.getElementById('installAndroid').style.display = '';
+    document.getElementById('installIOS').style.display = 'none';
+    document.getElementById('installInApp').style.display = 'none';
   }
 });
 
@@ -6348,17 +6389,40 @@ function showInstallBanner() {
   sec.style.display = '';
   // 根據瀏覽器類型顯示對應指引
   if (info.isInApp) {
+    // WhatsApp/FB in-app browser — show copy URL instructions
     document.getElementById('installInApp').style.display = '';
     document.getElementById('installAndroid').style.display = 'none';
     document.getElementById('installIOS').style.display = 'none';
-  } else if (deferredPrompt) {
-    document.getElementById('installAndroid').style.display = '';
-    document.getElementById('installInApp').style.display = 'none';
-    document.getElementById('installIOS').style.display = 'none';
   } else if (info.isIOS && info.isSafari) {
+    // iOS Safari — show step-by-step Share instructions
     document.getElementById('installIOS').style.display = '';
     document.getElementById('installInApp').style.display = 'none';
     document.getElementById('installAndroid').style.display = 'none';
+  } else {
+    // Android Chrome or other — show install button (may be activated when beforeinstallprompt fires)
+    if (deferredPrompt) {
+      document.getElementById('installAndroid').style.display = '';
+    } else {
+      // Show section but hide specific blocks until prompt arrives
+      // beforeinstallprompt listener will show installAndroid when ready
+      document.getElementById('installAndroid').style.display = '';
+      // Update button text to indicate waiting
+      var btn = document.getElementById('installBtn');
+      if (btn) {
+        btn.textContent = '⬇️ 安裝到主畫面';
+        btn.onclick = function() {
+          if (deferredPrompt) {
+            doInstall();
+          } else {
+            // Fallback: show Chrome menu instructions
+            btn.textContent = '請喺 Chrome 選單（⋮）→ 加至主螢幕';
+            btn.style.background = '#888';
+          }
+        };
+      }
+    }
+    document.getElementById('installInApp').style.display = 'none';
+    document.getElementById('installIOS').style.display = 'none';
   }
   // 平滑捲到安裝提示
   sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
