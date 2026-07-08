@@ -304,19 +304,21 @@ app.get('/api/members/lookup', async (c) => {
   let row: any = null
   if (/^CE85-/i.test(q)) {
     row = await db.prepare(
-      'SELECT member_no, name_zh FROM members WHERE member_no = ? LIMIT 1'
+      'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status FROM members WHERE member_no = ? LIMIT 1'
     ).bind(q.toUpperCase()).first()
   }
   if (!row) {
     const digits = q.replace(/\D/g, '')
     if (digits) {
       row = await db.prepare(
-        'SELECT member_no, name_zh FROM members WHERE phone = ? ORDER BY created_at LIMIT 1'
+        'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status FROM members WHERE phone = ? ORDER BY created_at LIMIT 1'
       ).bind(digits).first()
     }
   }
   if (!row) return c.json({ ok: false, error: '查無此電話號碼或會員編號' }, 404)
-  return c.json({ ok: true, member_no: (row as any).member_no, name_zh: (row as any).name_zh })
+  // Return both formats: legacy {ok, member:{...}} AND new {ok, member_no, name_zh}
+  const m = row as any
+  return c.json({ ok: true, member: m, member_no: m.member_no, name_zh: m.name_zh })
 })
 
 // ─── API: Get member by number ────────────────────────────────────────────────
@@ -6244,10 +6246,12 @@ function doLookup() {
     .then(function(data) {
       btn.disabled = false;
       btn.textContent = '🔍 搵我的卡';
-      if (data.member_no) {
+      // API returns {ok, member_no, member:{member_no,...}} — check ok first
+      var memberNo = data.member_no || (data.member && data.member.member_no);
+      if (data.ok && memberNo) {
         // 儲存到 localStorage
-        localStorage.setItem('ce85_member_no', data.member_no);
-        showCard(data.member_no);
+        localStorage.setItem('ce85_member_no', memberNo);
+        showCard(memberNo);
       } else {
         err.textContent = '搵唔到，請確認電話號碼是否正確';
         err.classList.add('show');
