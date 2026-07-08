@@ -95,6 +95,11 @@ app.use('/shared.css', serveStatic({ root: './public' }))
 app.use('/static/*', serveStatic({ root: './public' }))
 app.use('/vendor/*', serveStatic({ root: './public' }))
 app.use('/assets/*', serveStatic({ root: './public' }))
+// PWA static files
+app.use('/manifest.webmanifest', serveStatic({ root: './public' }))
+app.use('/sw.js', serveStatic({ root: './public' }))
+app.use('/icon-192.png', serveStatic({ root: './public' }))
+app.use('/icon-512.png', serveStatic({ root: './public' }))
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function nextMemberNo(db: D1Database): Promise<string> {
@@ -291,14 +296,27 @@ app.post('/api/members', async (c) => {
 
 // ─── API: Lookup member by phone ──────────────────────────────────────────────
 app.get('/api/members/lookup', async (c) => {
-  const phone = c.req.query('phone')?.replace(/\D/g, '')
-  if (!phone) return c.json({ ok: false, error: 'Missing phone' }, 400)
+  // Support: ?phone=XXXXX (legacy) or ?q=XXXXX (phone or member_no, from /app)
+  const q = c.req.query('q')?.trim() || c.req.query('phone')?.trim() || ''
+  if (!q) return c.json({ ok: false, error: 'Missing query' }, 400)
   const db = c.env.DB
-  const row = await db.prepare(
-    'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status FROM members WHERE phone = ? ORDER BY created_at LIMIT 1'
-  ).bind(phone).first()
-  if (!row) return c.json({ ok: false, error: '查無此電話號碼' }, 404)
-  return c.json({ ok: true, member: row })
+  // Try member_no first (CE85-XXXXXX format), then phone (digits only)
+  let row: any = null
+  if (/^CE85-/i.test(q)) {
+    row = await db.prepare(
+      'SELECT member_no, name_zh FROM members WHERE member_no = ? LIMIT 1'
+    ).bind(q.toUpperCase()).first()
+  }
+  if (!row) {
+    const digits = q.replace(/\D/g, '')
+    if (digits) {
+      row = await db.prepare(
+        'SELECT member_no, name_zh FROM members WHERE phone = ? ORDER BY created_at LIMIT 1'
+      ).bind(digits).first()
+    }
+  }
+  if (!row) return c.json({ ok: false, error: '查無此電話號碼或會員編號' }, 404)
+  return c.json({ ok: true, member_no: (row as any).member_no, name_zh: (row as any).name_zh })
 })
 
 // ─── API: Get member by number ────────────────────────────────────────────────
@@ -1167,6 +1185,11 @@ app.get('/member/:no',  (c) => c.redirect(`/membership/card/${c.req.param('no')}
 app.get('/poster',      (c) => c.redirect('/', 301))
 app.get('/sop',         (c) => c.redirect('/', 301))
 
+// ─── PWA entry: /app ─────────────────────────────────────────────────────────
+app.get('/app', (c) => {
+  return c.html(pwaAppHtml())
+})
+
 // ─── Survey module ────────────────────────────────────────────────────────────
 
 // POST /api/survey/:id/submit — public, no auth required
@@ -1587,6 +1610,14 @@ function htmlHead(title: string, extra = '') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>${title} · CoEldery 85</title>
+<!-- PWA -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#228B22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CoEldery 85">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<!-- /PWA -->
 <link rel="stylesheet" href="/shared.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Noto+Serif+TC:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;700&family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
@@ -3787,6 +3818,14 @@ function memberProfileHtml(m: any, medStatus: string | null = null) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>${m.name_zh} · 老有卡 · CoEldery 85</title>
+<!-- PWA -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#228B22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CoEldery 85">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<!-- /PWA -->
 <link rel="stylesheet" href="/shared.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Noto+Serif+TC:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;700&family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
@@ -5973,6 +6012,286 @@ function submitProduct(){
       else{errEl.textContent=d.error||'儲存失敗';errEl.style.display='';}
     }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
 }
+</script>
+</body>
+</html>`
+}
+
+// ─── PWA App HTML ─────────────────────────────────────────────────────────────
+function pwaAppHtml() {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>CoEldery 85 老有聯盟</title>
+<!-- PWA -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#228B22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CoEldery 85">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<!-- /PWA -->
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--green:#228B22;--green-dark:#1a6b1a;--red:#c62828;--bg:#F0EBD8;--white:#fff;}
+body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-size:20px;line-height:1.7;color:#111;}
+
+/* ── 頂部 ── */
+.topbar{background:var(--green-dark);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;}
+.topbar img{width:44px;height:44px;border-radius:8px;}
+.topbar .brand{font-size:22px;font-weight:900;letter-spacing:1px;}
+.topbar .sub{font-size:14px;opacity:0.8;margin-top:2px;}
+
+/* ── 主內容 ── */
+.wrap{max-width:480px;margin:0 auto;padding:28px 18px 60px;}
+
+/* ── 輸入區 ── */
+.lookup-card{background:var(--white);border-radius:14px;padding:28px 22px;box-shadow:0 4px 20px rgba(0,0,0,0.08);}
+.lookup-card h2{font-size:26px;font-weight:900;color:var(--green-dark);margin-bottom:8px;line-height:1.3;}
+.lookup-card p{font-size:18px;color:#444;margin-bottom:24px;line-height:1.6;}
+.field-label{font-size:20px;font-weight:700;color:#222;margin-bottom:10px;display:block;}
+.big-input{width:100%;padding:16px 14px;font-size:22px;border:2.5px solid #388e3c;border-radius:10px;
+  font-family:inherit;color:#111;background:#fff;min-height:60px;outline:none;}
+.big-input:focus{border-color:var(--green-dark);box-shadow:0 0 0 3px rgba(34,139,34,0.15);}
+.big-btn{display:block;width:100%;padding:18px;margin-top:18px;background:var(--green);color:#fff;
+  border:none;border-radius:10px;font-size:22px;font-weight:900;cursor:pointer;min-height:60px;
+  letter-spacing:1px;transition:background 0.15s;}
+.big-btn:active{background:var(--green-dark);}
+.big-btn:disabled{background:#a5d6a7;cursor:not-allowed;}
+.err-msg{margin-top:16px;padding:14px 16px;background:#ffebee;border:2px solid var(--red);border-radius:8px;
+  color:var(--red);font-size:20px;font-weight:700;display:none;line-height:1.5;}
+.err-msg.show{display:block;}
+
+/* ── 安裝提示區 ── */
+.install-banner{background:#e8f5e9;border:2px solid #a5d6a7;border-radius:14px;padding:22px 18px;
+  margin-top:24px;}
+.install-banner h3{font-size:22px;font-weight:900;color:var(--green-dark);margin-bottom:10px;}
+.install-banner p{font-size:18px;color:#333;line-height:1.7;margin-bottom:14px;}
+.install-btn{display:block;width:100%;padding:16px;background:var(--green);color:#fff;border:none;
+  border-radius:10px;font-size:20px;font-weight:900;cursor:pointer;min-height:58px;letter-spacing:1px;}
+.copy-btn{display:block;width:100%;padding:14px;background:#fff;color:var(--green-dark);border:2.5px solid var(--green);
+  border-radius:10px;font-size:20px;font-weight:900;cursor:pointer;min-height:58px;margin-top:12px;}
+.ios-steps{background:#fff;border-radius:10px;padding:16px;margin-top:12px;}
+.ios-steps p{font-size:18px;color:#333;margin-bottom:8px;}
+.ios-steps .step{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.ios-steps .step-num{background:var(--green);color:#fff;width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0;margin-top:2px;}
+.ios-steps .step-text{font-size:18px;line-height:1.5;}
+
+/* ── 換人連結 ── */
+.switch-wrap{text-align:center;margin-top:28px;}
+.switch-link{font-size:16px;color:#888;cursor:pointer;background:none;border:none;text-decoration:underline;padding:8px;}
+
+/* ── 卡片框架 ── */
+.card-frame{width:100%;border:none;min-height:600px;background:transparent;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <img src="/icon-192.png" alt="CoEldery 85">
+  <div>
+    <div class="brand">CoEldery 85</div>
+    <div class="sub">老有聯盟</div>
+  </div>
+</div>
+
+<div class="wrap" id="mainWrap">
+
+  <!-- 輸入電話查詢 (初始顯示) -->
+  <div class="lookup-card" id="lookupSection">
+    <h2>📱 查閱你的老有卡</h2>
+    <p>請輸入你登記時用嘅電話號碼，系統即時搵出你張卡。</p>
+    <label class="field-label" for="phoneInput">電話號碼 / 會員編號</label>
+    <input class="big-input" id="phoneInput" type="tel" inputmode="numeric"
+      placeholder="例：91234567" autocomplete="tel" maxlength="20">
+    <button class="big-btn" id="lookupBtn" onclick="doLookup()">🔍 搵我的卡</button>
+    <div class="err-msg" id="errMsg">搵唔到，請確認電話號碼是否正確</div>
+  </div>
+
+  <!-- 安裝提示 (搵到會員後顯示) -->
+  <div id="installSection" style="display:none;">
+    <!-- Android / Chrome beforeinstallprompt -->
+    <div class="install-banner" id="installAndroid" style="display:none;">
+      <h3>📱 將會員卡加落手機主畫面</h3>
+      <p>安裝後可以喺主畫面直接開啟，唔使記住網址！</p>
+      <button class="install-btn" id="installBtn" onclick="doInstall()">⬇️ 安裝到主畫面</button>
+    </div>
+    <!-- iPhone Safari -->
+    <div class="install-banner" id="installIOS" style="display:none;">
+      <h3>📱 將會員卡加落主畫面</h3>
+      <div class="ios-steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">撳 Safari 下面嘅 <strong>「分享」掣</strong> 🔗</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">向上捲，揀 <strong>「加至主畫面」</strong> ＋</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">撳右上角 <strong>「新增」</strong> 完成！</div>
+        </div>
+      </div>
+    </div>
+    <!-- WhatsApp / FB 內置瀏覽器 -->
+    <div class="install-banner" id="installInApp" style="display:none;">
+      <h3>📱 請用 Safari 或 Chrome 開啟</h3>
+      <p>你而家係用 WhatsApp / FB 入面嘅瀏覽器，<strong>唔支援安裝到主畫面</strong>。</p>
+      <p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>
+      <button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>
+    </div>
+
+    <!-- 換人 -->
+    <div class="switch-wrap">
+      <button class="switch-link" onclick="switchUser()">唔係你？換人</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── PWA 安裝提示儲存 ──
+var deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  deferredPrompt = e;
+  // 如果已搵到會員，顯示 Android 安裝掣
+  if (document.getElementById('installSection').style.display !== 'none') {
+    showInstallBanner();
+  }
+});
+
+// ── Service Worker 注冊 ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function(e) {
+      console.warn('SW register failed:', e);
+    });
+  });
+}
+
+// ── 偵測瀏覽器類型 ──
+function detectBrowser() {
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPhone|iPad|iPod/.test(ua);
+  var isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|mercury/.test(ua);
+  var isInApp = /FBAN|FBAV|Instagram|WhatsApp|Line\//.test(ua);
+  return { isIOS: isIOS, isSafari: isSafari, isInApp: isInApp };
+}
+
+function showInstallBanner() {
+  var info = detectBrowser();
+  document.getElementById('installSection').style.display = '';
+  if (info.isInApp) {
+    document.getElementById('installInApp').style.display = '';
+  } else if (deferredPrompt) {
+    document.getElementById('installAndroid').style.display = '';
+  } else if (info.isIOS && info.isSafari) {
+    document.getElementById('installIOS').style.display = '';
+  }
+  // 如果係 standalone 模式（已安裝）就唔顯示安裝提示
+  if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+    document.getElementById('installAndroid').style.display = 'none';
+    document.getElementById('installIOS').style.display = 'none';
+    document.getElementById('installInApp').style.display = 'none';
+  }
+}
+
+// ── 安裝觸發 ──
+function doInstall() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(function(r) {
+    deferredPrompt = null;
+    if (r.outcome === 'accepted') {
+      document.getElementById('installAndroid').style.display = 'none';
+    }
+  });
+}
+
+// ── 複製網址 ──
+function copyUrl() {
+  var url = window.location.origin + '/app';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function() {
+      alert('已複製！請喺 Safari 或 Chrome 開啟：' + url);
+    });
+  } else {
+    prompt('請複製以下網址：', url);
+  }
+}
+
+// ── 主查詢邏輯 ──
+function doLookup() {
+  var input = document.getElementById('phoneInput').value.trim();
+  var btn = document.getElementById('lookupBtn');
+  var err = document.getElementById('errMsg');
+  if (!input) {
+    err.textContent = '請輸入電話號碼或會員編號';
+    err.classList.add('show');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '搜尋中…';
+  err.classList.remove('show');
+
+  fetch('/api/members/lookup?q=' + encodeURIComponent(input))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = '🔍 搵我的卡';
+      if (data.member_no) {
+        // 儲存到 localStorage
+        localStorage.setItem('ce85_member_no', data.member_no);
+        showCard(data.member_no);
+      } else {
+        err.textContent = '搵唔到，請確認電話號碼是否正確';
+        err.classList.add('show');
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = '🔍 搵我的卡';
+      err.textContent = '網絡錯誤，請稍後再試';
+      err.classList.add('show');
+    });
+}
+
+// ── 顯示會員卡 ──
+function showCard(memberNo) {
+  // 替換整個 lookup 區為 iframe 嵌入卡頁
+  var wrap = document.getElementById('mainWrap');
+  wrap.innerHTML =
+    '<iframe class="card-frame" src="/membership/card/' + encodeURIComponent(memberNo) +
+    '" title="老有卡" frameborder="0" allow="fullscreen"></iframe>' +
+    '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>';
+  showInstallBanner();
+}
+
+// ── 換人（清除 localStorage）──
+function switchUser() {
+  if (confirm('確定要換人？將會清除記住的帳號。')) {
+    localStorage.removeItem('ce85_member_no');
+    window.location.reload();
+  }
+}
+
+// ── 頁面載入：檢查 localStorage ──
+(function init() {
+  // Enter 鍵觸發查詢
+  document.getElementById('phoneInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLookup();
+  });
+
+  var saved = localStorage.getItem('ce85_member_no');
+  if (saved) {
+    showCard(saved);
+  }
+})();
 </script>
 </body>
 </html>`
