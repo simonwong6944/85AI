@@ -304,21 +304,22 @@ app.get('/api/members/lookup', async (c) => {
   let row: any = null
   if (/^CE85-/i.test(q)) {
     row = await db.prepare(
-      'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status FROM members WHERE member_no = ? LIMIT 1'
+      'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status, verified_at FROM members WHERE member_no = ? LIMIT 1'
     ).bind(q.toUpperCase()).first()
   }
   if (!row) {
     const digits = q.replace(/\D/g, '')
     if (digits) {
       row = await db.prepare(
-        'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status FROM members WHERE phone = ? ORDER BY created_at LIMIT 1'
+        'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status, verified_at FROM members WHERE phone = ? ORDER BY created_at LIMIT 1'
       ).bind(digits).first()
     }
   }
   if (!row) return c.json({ ok: false, error: '查無此電話號碼或會員編號' }, 404)
-  // Return both formats: legacy {ok, member:{...}} AND new {ok, member_no, name_zh}
+  // Return both formats: legacy {ok, member:{...}} AND new {ok, member_no, name_zh, verified_at}
+  // verified_at is used by /app to decide whether to show PWA install prompt
   const m = row as any
-  return c.json({ ok: true, member: m, member_no: m.member_no, name_zh: m.name_zh })
+  return c.json({ ok: true, member: m, member_no: m.member_no, name_zh: m.name_zh, verified_at: m.verified_at ?? null })
 })
 
 // ─── API: Get member by number ────────────────────────────────────────────────
@@ -6249,9 +6250,12 @@ function doLookup() {
       // API returns {ok, member_no, member:{member_no,...}} — check ok first
       var memberNo = data.member_no || (data.member && data.member.member_no);
       if (data.ok && memberNo) {
-        // 儲存到 localStorage
+        // 儲存到 localStorage（包括 verified_at，用於判斷是否顯示安裝提示）
         localStorage.setItem('ce85_member_no', memberNo);
-        showCard(memberNo);
+        // verified_at 非空 = WA 已驗證，才顯示安裝提示
+        var verifiedAt = data.verified_at || (data.member && data.member.verified_at) || null;
+        localStorage.setItem('ce85_verified_at', verifiedAt || '');
+        showCard(memberNo, verifiedAt);
       } else {
         err.textContent = '搵唔到，請確認電話號碼是否正確';
         err.classList.add('show');
@@ -6266,20 +6270,26 @@ function doLookup() {
 }
 
 // ── 顯示會員卡 ──
-function showCard(memberNo) {
+// verifiedAt: string (datetime) or null/undefined
+function showCard(memberNo, verifiedAt) {
   // 替換整個 lookup 區為 iframe 嵌入卡頁
   var wrap = document.getElementById('mainWrap');
   wrap.innerHTML =
     '<iframe class="card-frame" src="/membership/card/' + encodeURIComponent(memberNo) +
     '" title="老有卡" frameborder="0" allow="fullscreen"></iframe>' +
     '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>';
-  showInstallBanner();
+  // 安裝提示只在 WA 驗證後（verified_at 非空）才顯示
+  if (verifiedAt) {
+    showInstallBanner();
+  }
+  // 若未驗證，installSection 保持隱藏，等用戶完成 WA 驗證後重新進入 /app 才顯示
 }
 
 // ── 換人（清除 localStorage）──
 function switchUser() {
   if (confirm('確定要換人？將會清除記住的帳號。')) {
     localStorage.removeItem('ce85_member_no');
+    localStorage.removeItem('ce85_verified_at');
     window.location.reload();
   }
 }
@@ -6293,7 +6303,24 @@ function switchUser() {
 
   var saved = localStorage.getItem('ce85_member_no');
   if (saved) {
-    showCard(saved);
+    // 有記住的 member_no：先用 localStorage 的 verified_at 顯示卡
+    var savedVerified = localStorage.getItem('ce85_verified_at') || null;
+    showCard(saved, savedVerified);
+    // 再 refresh 最新 verified_at（用戶可能在其他地方完成了 WA 驗證）
+    fetch('/api/members/lookup?q=' + encodeURIComponent(saved))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          var latestVerified = data.verified_at || (data.member && data.member.verified_at) || null;
+          var prev = localStorage.getItem('ce85_verified_at') || '';
+          localStorage.setItem('ce85_verified_at', latestVerified || '');
+          // 如果剛剛變成已驗證（之前係空，現在有值），補顯示安裝提示
+          if (latestVerified && !prev) {
+            showInstallBanner();
+          }
+        }
+      })
+      .catch(function() { /* ignore refresh error */ });
   }
 })();
 </script>
