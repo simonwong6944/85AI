@@ -304,22 +304,22 @@ app.get('/api/members/lookup', async (c) => {
   let row: any = null
   if (/^CE85-/i.test(q)) {
     row = await db.prepare(
-      'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status, verified_at FROM members WHERE member_no = ? LIMIT 1'
+      'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status, verified_at, wa_clicked_at FROM members WHERE member_no = ? LIMIT 1'
     ).bind(q.toUpperCase()).first()
   }
   if (!row) {
     const digits = q.replace(/\D/g, '')
     if (digits) {
       row = await db.prepare(
-        'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status, verified_at FROM members WHERE phone = ? ORDER BY created_at LIMIT 1'
+        'SELECT member_no, name_zh, name_en, tier, role, expires_at, kyc_status, verified_at, wa_clicked_at FROM members WHERE phone = ? ORDER BY created_at LIMIT 1'
       ).bind(digits).first()
     }
   }
   if (!row) return c.json({ ok: false, error: '查無此電話號碼或會員編號' }, 404)
-  // Return both formats: legacy {ok, member:{...}} AND new {ok, member_no, name_zh, verified_at}
-  // verified_at is used by /app to decide whether to show PWA install prompt
+  // Return both formats for compatibility
+  // wa_clicked_at: used by /app to show install banner immediately (user clicked WA before)
   const m = row as any
-  return c.json({ ok: true, member: m, member_no: m.member_no, name_zh: m.name_zh, verified_at: m.verified_at ?? null })
+  return c.json({ ok: true, member: m, member_no: m.member_no, name_zh: m.name_zh, verified_at: m.verified_at ?? null, wa_clicked_at: m.wa_clicked_at ?? null })
 })
 
 // ─── API: Get member by number ────────────────────────────────────────────────
@@ -2056,6 +2056,12 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 </div><!-- /container -->
 
 <script>
+// ── PWA install prompt storage (for use in showInstallPrompt) ──
+window._deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  window._deferredInstallPrompt = e;
+});
 // ── HK Phone validator (frontend mirror of backend validateHKPhone) ───────────
 function validateHKPhone(p) {
   if (p.length !== 8) return '請填寫正確的 8 位香港電話號碼';
@@ -2350,6 +2356,8 @@ function markWASent() {
   if(banner) banner.style.display = 'block';
   var no = window._verifyMemberNo;
   if(no) fetch('/api/members/' + encodeURIComponent(no) + '/verify', {method:'POST'}).catch(function(){});
+  // Show PWA install prompt immediately after WA click
+  showInstallPrompt();
 }
 
 // ── Button 2: WA Business — fake 2.5s flow, records wa_clicked_at, hides watermark ──
@@ -2365,6 +2373,8 @@ function openWABiz() {
   // Record click in DB (fire and forget)
   var no = window._verifyMemberNo;
   if(no) fetch('/api/members/' + encodeURIComponent(no) + '/wa-click', {method:'POST'}).catch(function(){});
+  // Show PWA install prompt immediately when WA Biz clicked
+  showInstallPrompt();
   // 2.5s fake process then show complete
   setTimeout(markVerified, 2500);
 }
@@ -2382,6 +2392,69 @@ function markVerified() {
   if(sendingMsg) sendingMsg.style.display = 'none';
   if(banner) banner.style.display = 'block';
   // Do NOT call /verify — admin must manually confirm via admin panel
+}
+
+// ── PWA Install Prompt (shown after WA click) ──
+function showInstallPrompt() {
+  // Skip if already installed (standalone mode)
+  if(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return;
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPhone|iPad|iPod/.test(ua);
+  var isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|mercury/.test(ua);
+  var isInApp = new RegExp('FBAN|FBAV|Instagram|WhatsApp|Line').test(ua);
+  // Show a simple banner below the card
+  var existing = document.getElementById('pwaInstallBanner');
+  if(existing) return; // already shown
+  var banner = document.createElement('div');
+  banner.id = 'pwaInstallBanner';
+  banner.style.cssText = 'margin:20px 0;background:#e8f5e9;border:2px solid #a5d6a7;border-radius:14px;padding:20px 18px;';
+  var content = '';
+  if(isInApp) {
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">📱 將老有卡加落主畫面</h3>' +
+      '<p style="font-size:16px;color:#333;margin-bottom:12px;">你而家係用 WhatsApp/FB 內置瀏覽器。請複製網址，喺 Safari 或 Chrome 開啟後加入主畫面。</p>' +
+      '<button onclick="copyAppUrl()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">📋 複製老有卡網址</button>';
+  } else if(window._deferredInstallPrompt) {
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">📱 將老有卡加落主畫面</h3>' +
+      '<p style="font-size:16px;color:#333;margin-bottom:12px;">安裝後可以喺主畫面直接開啟，唔使記住網址！</p>' +
+      '<button onclick="doInstallApp()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">⬇️ 安裝到主畫面</button>';
+  } else if(isIOS && isSafari) {
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">📱 將老有卡加落主畫面</h3>' +
+      '<div style="background:#fff;border-radius:10px;padding:14px;">' +
+      '<div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">1</span><span style="font-size:16px;">撳 Safari 下面嘅 <strong>「分享」掣</strong> 🔗</span></div>' +
+      '<div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">2</span><span style="font-size:16px;">揀 <strong>「加至主畫面」</strong> ＋</span></div>' +
+      '<div style="display:flex;gap:10px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">3</span><span style="font-size:16px;">撳右上角 <strong>「新增」</strong> 完成！</span></div>' +
+      '</div>';
+  } else {
+    // Generic: show app URL
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">📱 下次直接用老有卡 App</h3>' +
+      '<p style="font-size:16px;color:#333;margin-bottom:12px;">喺 Chrome/Safari 開啟以下網址，再加到主畫面：</p>' +
+      '<div style="background:#fff;border-radius:8px;padding:12px;font-size:16px;font-weight:700;color:#228B22;word-break:break-all;">' + location.origin + '/app</div>' +
+      '<button onclick="copyAppUrl()" style="display:block;width:100%;margin-top:10px;padding:12px;background:#fff;color:#228B22;border:2px solid #228B22;border-radius:10px;font-size:16px;font-weight:900;cursor:pointer;">📋 複製網址</button>';
+  }
+  banner.innerHTML = content;
+  // Insert after successSection or waVerifyBlock, whichever is visible
+  var anchor = document.getElementById('verifiedBanner') || document.getElementById('waSentBanner') || document.getElementById('successSection');
+  if(anchor && anchor.parentNode) {
+    anchor.parentNode.insertBefore(banner, anchor.nextSibling);
+  } else {
+    document.body.appendChild(banner);
+  }
+  banner.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function copyAppUrl() {
+  var url = location.origin + '/app';
+  if(navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function(){ alert('已複製！請喺 Safari 或 Chrome 開啟：' + url); });
+  } else { prompt('請複製以下網址：', url); }
+}
+function doInstallApp() {
+  if(!window._deferredInstallPrompt) return;
+  window._deferredInstallPrompt.prompt();
+  window._deferredInstallPrompt.userChoice.then(function(r) {
+    window._deferredInstallPrompt = null;
+    var b = document.getElementById('pwaInstallBanner');
+    if(b && r.outcome === 'accepted') b.style.display = 'none';
+  });
 }
 
 // ── Draw member card onto an off-screen canvas — design-matched ───────────────
@@ -2726,6 +2799,12 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 </div>
 
 <script>
+// ── PWA install prompt storage ──
+window._deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  window._deferredInstallPrompt = e;
+});
 // Auto-fill parent info from ?parent=CE85-XXXXXX URL param
 (function(){
   var params = new URLSearchParams(location.search);
@@ -2850,6 +2929,8 @@ function markWASent(){
   if(banner)banner.style.display='block';
   var no=window._verifyMemberNo;
   if(no)fetch('/api/members/'+encodeURIComponent(no)+'/verify',{method:'POST'}).catch(function(){});
+  // Show PWA install prompt immediately after WA click
+  showInstallPrompt();
 }
 
 // ── Button 2: WA Business — fake 2.5s flow, records wa_clicked_at, hides watermark ──
@@ -2864,6 +2945,8 @@ function openWABiz(){
   if(sendingMsg)sendingMsg.style.display='block';
   var no=window._verifyMemberNo;
   if(no)fetch('/api/members/'+encodeURIComponent(no)+'/wa-click',{method:'POST'}).catch(function(){});
+  // Show PWA install prompt immediately on WA Biz click
+  showInstallPrompt();
   setTimeout(markVerified,2500);
 }
 
@@ -2880,6 +2963,50 @@ function markVerified(){
   if(sendingMsg)sendingMsg.style.display='none';
   if(banner)banner.style.display='block';
   // Do NOT call /verify — admin must manually confirm via admin panel
+}
+
+// ── PWA Install Prompt (shown after WA click on join-family page) ──
+function showInstallPrompt() {
+  if(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return;
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPhone|iPad|iPod/.test(ua);
+  var isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|mercury/.test(ua);
+  var isInApp = new RegExp('FBAN|FBAV|Instagram|WhatsApp|Line').test(ua);
+  var existing = document.getElementById('pwaInstallBanner');
+  if(existing) return;
+  var banner = document.createElement('div');
+  banner.id = 'pwaInstallBanner';
+  banner.style.cssText = 'margin:20px 0;background:#e8f5e9;border:2px solid #a5d6a7;border-radius:14px;padding:20px 18px;';
+  var content = '';
+  if(isInApp) {
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><p style="font-size:16px;color:#333;margin-bottom:12px;">\u8acb\u8907\u88fd\u7db2\u5740\uff0c\u55ba Safari \u6216 Chrome \u958b\u555f\u5f8c\u52a0\u5165\u4e3b\u756b\u9762\u3002</p><button onclick="copyAppUrl()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">\ud83d\udccb \u8907\u88fd\u8001\u6709\u5361\u7db2\u5740</button>';
+  } else if(window._deferredInstallPrompt) {
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><p style="font-size:16px;color:#333;margin-bottom:12px;">\u5b89\u88dd\u5f8c\u53ef\u4ee5\u55ba\u4e3b\u756b\u9762\u76f4\u63a5\u958b\u555f\uff01</p><button onclick="doInstallApp()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">\u2b07\ufe0f \u5b89\u88dd\u5230\u4e3b\u756b\u9762</button>';
+  } else if(isIOS && isSafari) {
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><div style="background:#fff;border-radius:10px;padding:14px;"><div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">1</span><span style="font-size:16px;">\u64b3 Safari \u4e0b\u9762\u5605 <strong>\u300c\u5206\u4eab\u300d\u63a3</strong> \ud83d\udd17</span></div><div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">2</span><span style="font-size:16px;">\u63c0 <strong>\u300c\u52a0\u81f3\u4e3b\u756b\u9762\u300d</strong> \uff0b</span></div><div style="display:flex;gap:10px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">3</span><span style="font-size:16px;">\u64b3\u53f3\u4e0a\u89d2 <strong>\u300c\u65b0\u589e\u300d</strong> \u5b8c\u6210\uff01</span></div></div>';
+  } else {
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u4e0b\u6b21\u76f4\u63a5\u7528\u8001\u6709\u5361 App</h3><p style="font-size:16px;color:#333;margin-bottom:12px;">\u55ba Chrome/Safari \u958b\u555f\u4ee5\u4e0b\u7db2\u5740\uff0c\u518d\u52a0\u5230\u4e3b\u756b\u9762\uff1a</p><div style="background:#fff;border-radius:8px;padding:12px;font-size:16px;font-weight:700;color:#228B22;word-break:break-all;">' + location.origin + '/app</div><button onclick="copyAppUrl()" style="display:block;width:100%;margin-top:10px;padding:12px;background:#fff;color:#228B22;border:2px solid #228B22;border-radius:10px;font-size:16px;font-weight:900;cursor:pointer;">\ud83d\udccb \u8907\u88fd\u7db2\u5740</button>';
+  }
+  banner.innerHTML = content;
+  var anchor = document.getElementById('verifiedBanner') || document.getElementById('waSentBanner') || document.getElementById('successSection');
+  if(anchor && anchor.parentNode) { anchor.parentNode.insertBefore(banner, anchor.nextSibling); }
+  else { document.body.appendChild(banner); }
+  banner.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function copyAppUrl() {
+  var url = location.origin + '/app';
+  if(navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function(){ alert('\u5df2\u8907\u88fd\uff01\u8acb\u55ba Safari \u6216 Chrome \u958b\u555f\uff1a' + url); });
+  } else { prompt('\u8acb\u8907\u88fd\u4ee5\u4e0b\u7db2\u5740\uff1a', url); }
+}
+function doInstallApp() {
+  if(!window._deferredInstallPrompt) return;
+  window._deferredInstallPrompt.prompt();
+  window._deferredInstallPrompt.userChoice.then(function(r) {
+    window._deferredInstallPrompt = null;
+    var b = document.getElementById('pwaInstallBanner');
+    if(b && r.outcome === 'accepted') b.style.display = 'none';
+  });
 }
 
 // Restore success page after WA redirect (family card — full page reload fallback)
@@ -4626,6 +4753,8 @@ function markWASent() {
   if(banner) banner.style.display='block';
   // Call /verify — sets verified_at + wa_clicked_at + wa_channel=ICON
   fetch('/api/members/'+encodeURIComponent(MEMBER_NO)+'/verify',{method:'POST'}).catch(function(){});
+  // Notify parent page (/app iframe) to show install banner
+  notifyParentWAClicked();
 }
 // Button 2: WA Business — fake 2.5s, records channel=BIZ via /wa-click, hides watermark
 function openWABiz() {
@@ -4642,6 +4771,8 @@ function openWABiz() {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({channel:'BIZ'})
   }).catch(function(){});
+  // Notify parent page (/app iframe) to show install banner immediately on WA Biz click
+  notifyParentWAClicked();
   setTimeout(markVerified, 2500);
 }
 // Called after WA Biz — hides watermark, shows banner
@@ -4656,6 +4787,17 @@ function markVerified() {
   if(block) block.style.display='none';
   if(sendingMsg) sendingMsg.style.display='none';
   if(banner) banner.style.display='block';
+}
+// Notify parent /app page to show PWA install banner (cross-frame via postMessage)
+function notifyParentWAClicked() {
+  try {
+    // Store in localStorage so /app knows on next load too
+    localStorage.setItem('ce85_wa_clicked', '1');
+    // postMessage to parent frame if in iframe
+    if(window.parent && window.parent !== window) {
+      window.parent.postMessage({type:'ce85_wa_clicked', memberNo: MEMBER_NO}, '*');
+    }
+  } catch(e) {}
 }
 </script>
 </body></html>`
@@ -6162,8 +6304,18 @@ var deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', function(e) {
   e.preventDefault();
   deferredPrompt = e;
-  // 如果已搵到會員，顯示 Android 安裝掣
+  // 如果安裝區段已顯示（用戶已點 WA），補顯示 Android 安裝掣
   if (document.getElementById('installSection').style.display !== 'none') {
+    showInstallBanner();
+  }
+});
+
+// ── 接收 card iframe 的 postMessage（用戶在卡頁點咗 WA 按鈕）──
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'ce85_wa_clicked') {
+    // 記錄到 localStorage
+    localStorage.setItem('ce85_wa_clicked', '1');
+    // 立即顯示安裝提示
     showInstallBanner();
   }
 });
@@ -6188,21 +6340,28 @@ function detectBrowser() {
 }
 
 function showInstallBanner() {
+  // 已係 standalone（已安裝 PWA）就唔顯示
+  if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return;
   var info = detectBrowser();
-  document.getElementById('installSection').style.display = '';
+  var sec = document.getElementById('installSection');
+  if (!sec) return;
+  sec.style.display = '';
+  // 根據瀏覽器類型顯示對應指引
   if (info.isInApp) {
     document.getElementById('installInApp').style.display = '';
-  } else if (deferredPrompt) {
-    document.getElementById('installAndroid').style.display = '';
-  } else if (info.isIOS && info.isSafari) {
-    document.getElementById('installIOS').style.display = '';
-  }
-  // 如果係 standalone 模式（已安裝）就唔顯示安裝提示
-  if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
     document.getElementById('installAndroid').style.display = 'none';
     document.getElementById('installIOS').style.display = 'none';
+  } else if (deferredPrompt) {
+    document.getElementById('installAndroid').style.display = '';
     document.getElementById('installInApp').style.display = 'none';
+    document.getElementById('installIOS').style.display = 'none';
+  } else if (info.isIOS && info.isSafari) {
+    document.getElementById('installIOS').style.display = '';
+    document.getElementById('installInApp').style.display = 'none';
+    document.getElementById('installAndroid').style.display = 'none';
   }
+  // 平滑捲到安裝提示
+  sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ── 安裝觸發 ──
@@ -6248,15 +6407,17 @@ function doLookup() {
     .then(function(data) {
       btn.disabled = false;
       btn.textContent = '🔍 搵我的卡';
-      // API returns {ok, member_no, member:{member_no,...}} — check ok first
       var memberNo = data.member_no || (data.member && data.member.member_no);
       if (data.ok && memberNo) {
-        // 儲存到 localStorage（包括 verified_at，用於判斷是否顯示安裝提示）
         localStorage.setItem('ce85_member_no', memberNo);
-        // verified_at 非空 = WA 已驗證，才顯示安裝提示
-        var verifiedAt = data.verified_at || (data.member && data.member.verified_at) || null;
-        localStorage.setItem('ce85_verified_at', verifiedAt || '');
-        showCard(memberNo, verifiedAt);
+        // 用 wa_clicked_at 判斷用戶是否已點過 WA 按鈕（後端有記錄）
+        var waClickedAt = data.wa_clicked_at || (data.member && data.member.wa_clicked_at) || null;
+        if (waClickedAt) {
+          localStorage.setItem('ce85_wa_clicked', '1');
+        }
+        // waClicked = 後端記錄 OR localStorage 本地已記錄（同一裝置之前點過）
+        var waClicked = !!waClickedAt || localStorage.getItem('ce85_wa_clicked') === '1';
+        showCard(memberNo, waClicked);
       } else {
         err.textContent = '搵唔到，請確認電話號碼是否正確';
         err.classList.add('show');
@@ -6271,26 +6432,25 @@ function doLookup() {
 }
 
 // ── 顯示會員卡 ──
-// verifiedAt: string (datetime) or null/undefined
-function showCard(memberNo, verifiedAt) {
+// waClicked: boolean — 用戶已點過 WA 按鈕（立即顯示安裝提示）
+function showCard(memberNo, waClicked) {
   // 替換整個 lookup 區為 iframe 嵌入卡頁
   var wrap = document.getElementById('mainWrap');
   wrap.innerHTML =
     '<iframe class="card-frame" src="/membership/card/' + encodeURIComponent(memberNo) +
     '" title="老有卡" frameborder="0" allow="fullscreen"></iframe>' +
     '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>';
-  // 安裝提示只在 WA 驗證後（verified_at 非空）才顯示
-  if (verifiedAt) {
+  // 用戶已點過 WA 按鈕 → 立即顯示安裝提示
+  if (waClicked) {
     showInstallBanner();
   }
-  // 若未驗證，installSection 保持隱藏，等用戶完成 WA 驗證後重新進入 /app 才顯示
 }
 
 // ── 換人（清除 localStorage）──
 function switchUser() {
   if (confirm('確定要換人？將會清除記住的帳號。')) {
     localStorage.removeItem('ce85_member_no');
-    localStorage.removeItem('ce85_verified_at');
+    localStorage.removeItem('ce85_wa_clicked');
     window.location.reload();
   }
 }
@@ -6304,19 +6464,18 @@ function switchUser() {
 
   var saved = localStorage.getItem('ce85_member_no');
   if (saved) {
-    // 有記住的 member_no：先用 localStorage 的 verified_at 顯示卡
-    var savedVerified = localStorage.getItem('ce85_verified_at') || null;
-    showCard(saved, savedVerified);
-    // 再 refresh 最新 verified_at（用戶可能在其他地方完成了 WA 驗證）
+    // 有記住的 member_no：先用 localStorage 的 wa_clicked 狀態顯示卡
+    var savedWaClicked = localStorage.getItem('ce85_wa_clicked') === '1';
+    showCard(saved, savedWaClicked);
+    // 再 refresh 最新 wa_clicked_at（用戶可能在其他裝置點過 WA）
     fetch('/api/members/lookup?q=' + encodeURIComponent(saved))
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.ok) {
-          var latestVerified = data.verified_at || (data.member && data.member.verified_at) || null;
-          var prev = localStorage.getItem('ce85_verified_at') || '';
-          localStorage.setItem('ce85_verified_at', latestVerified || '');
-          // 如果剛剛變成已驗證（之前係空，現在有值），補顯示安裝提示
-          if (latestVerified && !prev) {
+          var latestWaClickedAt = data.wa_clicked_at || (data.member && data.member.wa_clicked_at) || null;
+          if (latestWaClickedAt && !savedWaClicked) {
+            // 後端有記錄但本地未記錄 → 更新並補顯示安裝提示
+            localStorage.setItem('ce85_wa_clicked', '1');
             showInstallBanner();
           }
         }
