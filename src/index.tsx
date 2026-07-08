@@ -1626,7 +1626,7 @@ ${extra}
 // ─── Signup Main HTML ─────────────────────────────────────────────────────────
 function signupMainHtml() {
   return htmlHead('申請老有卡', `<style>
-/* ── 長者友善基礎字體 ── */
+/* ── 長者友善基礎字體 v2 ── */
 body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-height:1.7;color:#111;}
 .container{max-width:480px;margin:0 auto;}
 .brand-strip{display:flex;align-items:center;gap:12px;margin-bottom:24px;}
