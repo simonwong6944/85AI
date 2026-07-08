@@ -228,37 +228,56 @@ app.post('/api/members', async (c) => {
 
     // Medical card application (if opted in)
     let medicalApplied = false
-    if (body.applyMedical && body.medNameZh && body.medNameEn && body.medHkid) {
+    const medNameZhFinal = body.medNameZh?.trim() || ''
+    const medNameEnFinal = body.medNameEn?.trim().toUpperCase() || ''
+    const medHkidFinal = body.medHkid?.trim().toUpperCase() || ''
+    if (body.applyMedical && medNameZhFinal && medNameEnFinal && medHkidFinal) {
       await db.prepare(`
         INSERT INTO medical_card_applications
           (member_no, name_zh_full, name_en_full, hkid_prefix, phone)
         VALUES (?,?,?,?,?)
       `).bind(
         memberNo,
-        body.medNameZh.trim(),
-        body.medNameEn.trim().toUpperCase(),
-        body.medHkid.trim().toUpperCase(),
+        medNameZhFinal,
+        medNameEnFinal,
+        medHkidFinal,
         phoneClean
       ).run()
-      // Sync real name from medical card back to member record (Part A)
+
+      // 改動 3: 覆蓋真名前先讀原化名，記入 admin_notes
+      const origRow = await db.prepare(
+        'SELECT name_zh, admin_notes FROM members WHERE member_no = ?'
+      ).bind(memberNo).first<{ name_zh: string; admin_notes: string | null }>()
+      const origName = origRow?.name_zh || ''
+      const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 19)
+      const newNote = `原註冊名：${origName}（醫健卡補真名覆蓋 於 ${nowStr}）`
+      const existingNotes = origRow?.admin_notes ? origRow.admin_notes.trim() : ''
+      const mergedNotes = existingNotes ? `${existingNotes}\n${newNote}` : newNote
+
+      // Sync real name from medical card back to member record (Part A) + append admin_notes
       await db.prepare(`
         UPDATE members
-        SET name_zh = ?, name_en = ?, id_prefix = ?
+        SET name_zh = ?, name_en = ?, id_prefix = ?, admin_notes = ?
         WHERE member_no = ?
       `).bind(
-        body.medNameZh.trim(),
-        body.medNameEn.trim().toUpperCase(),
-        body.medHkid.trim().toUpperCase(),
+        medNameZhFinal,
+        medNameEnFinal,
+        medHkidFinal,
+        mergedNotes,
         memberNo
       ).run()
       medicalApplied = true
     }
 
+    // 改動 4: response 返回正確名字（若有申請醫健卡，用醫健卡真名）
+    const responseNameZh = medicalApplied ? medNameZhFinal : body.nameZh.trim()
+    const responseNameEn = medicalApplied ? medNameEnFinal : (body.nameEn?.trim() || '')
+
     return c.json({
       ok: true,
       memberNo,
-      nameZh: body.nameZh.trim(),
-      nameEn: body.nameEn?.trim() || '',
+      nameZh: responseNameZh,
+      nameEn: responseNameEn,
       tier: tier,
       expiresAt: expires,
       role: 'CoExplorery',
@@ -1607,77 +1626,82 @@ ${extra}
 // ─── Signup Main HTML ─────────────────────────────────────────────────────────
 function signupMainHtml() {
   return htmlHead('申請老有卡', `<style>
-body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
-.container{max-width:420px;margin:0 auto;}
+/* ── 長者友善基礎字體 ── */
+body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-height:1.7;color:#111;}
+.container{max-width:480px;margin:0 auto;}
 .brand-strip{display:flex;align-items:center;gap:12px;margin-bottom:24px;}
-.brand-strip .mark{width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.brand-strip .mark img{width:44px;height:44px;object-fit:contain;}
-.brand-strip .name .zh{font-family:"Noto Serif TC",serif;font-size:16px;color:var(--forest-deep);font-weight:700;letter-spacing:2px;line-height:1;}
-.brand-strip .name .en{font-size:11px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
-.header-card{background:linear-gradient(135deg,#0d3e12 0%,#1B5E20 100%);color:#fff;padding:24px 22px;border-radius:4px;margin-bottom:20px;position:relative;overflow:hidden;}
+.brand-strip .mark{width:48px;height:48px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.brand-strip .mark img{width:48px;height:48px;object-fit:contain;}
+.brand-strip .name .zh{font-family:"Noto Serif TC",serif;font-size:18px;color:var(--forest-deep);font-weight:700;letter-spacing:2px;line-height:1.3;}
+.brand-strip .name .en{font-size:12px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
+.header-card{background:linear-gradient(135deg,#0d3e12 0%,#1B5E20 100%);color:#fff;padding:26px 22px;border-radius:4px;margin-bottom:20px;position:relative;overflow:hidden;}
 .header-card::before{content:"85";position:absolute;right:-20px;bottom:-60px;font-family:"Noto Serif TC",serif;font-size:200px;font-weight:900;color:var(--ferrari);opacity:0.22;line-height:1;}
-.header-card .tag{display:inline-block;background:var(--ferrari);color:#fff;padding:3px 10px;font-size:11px;letter-spacing:3px;font-weight:700;margin-bottom:12px;position:relative;z-index:2;}
-.header-card h1{font-family:"Noto Serif TC",serif;font-size:30px;font-weight:900;letter-spacing:3px;line-height:1.2;margin-bottom:8px;position:relative;z-index:2;}
-.header-card p{font-size:13px;opacity:0.9;line-height:1.6;position:relative;z-index:2;}
-.form-card{background:#fff;padding:24px 22px;border-radius:4px;margin-bottom:16px;}
-.form-card .step-note{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#FFF3B0;border-left:3px solid var(--ferrari);font-size:13px;color:var(--grey-1);margin-bottom:20px;line-height:1.5;}
-.field{margin-bottom:18px;}
-.field .label-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
-.field label{font-family:"Noto Serif TC",serif;font-size:15px;color:var(--forest-deep);font-weight:700;letter-spacing:1px;}
-.field .req{color:var(--ferrari);font-size:12px;font-weight:700;}
-.field .opt{color:var(--grey-3);font-size:11px;}
-.field input,.field select{width:100%;padding:14px;border:2px solid var(--line);border-radius:4px;font-size:17px;font-family:inherit;color:var(--ink);background:#fff;transition:border 0.2s;}
-.field input:focus,.field select:focus{outline:0;border-color:var(--forest);}
-.field .hint{font-size:11px;color:var(--grey-3);margin-top:4px;line-height:1.5;}
-.section-divider{padding:14px 0 10px;font-family:"Noto Serif TC",serif;font-size:13px;color:var(--grey-2);letter-spacing:3px;border-top:1px dashed var(--line);margin-top:8px;}
-.gender-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
-.gender-row .g-btn{padding:12px 4px;border:2px solid var(--line);background:#fff;text-align:center;cursor:pointer;font-size:14px;font-family:inherit;color:var(--grey-1);border-radius:4px;font-weight:500;}
-.gender-row .g-btn.active{border-color:var(--forest);background:var(--forest-pale);color:var(--forest-deep);font-weight:700;}
-.consent{padding:14px;background:var(--forest-pale);border-radius:4px;font-size:12px;color:var(--grey-1);line-height:1.7;margin-bottom:20px;}
-.consent label{display:flex;gap:10px;cursor:pointer;}
-.consent input{width:20px;height:20px;margin-top:2px;flex-shrink:0;accent-color:var(--forest);}
+.header-card .tag{display:inline-block;background:var(--ferrari);color:#fff;padding:4px 12px;font-size:13px;letter-spacing:3px;font-weight:700;margin-bottom:12px;position:relative;z-index:2;}
+.header-card h1{font-family:"Noto Serif TC",serif;font-size:32px;font-weight:900;letter-spacing:3px;line-height:1.25;margin-bottom:8px;position:relative;z-index:2;}
+.header-card p{font-size:16px;opacity:0.9;line-height:1.7;position:relative;z-index:2;}
+.form-card{background:#fff;padding:28px 22px;border-radius:4px;margin-bottom:20px;}
+.form-card .step-note{display:flex;align-items:center;gap:8px;padding:12px 14px;background:#FFF3B0;border-left:3px solid var(--ferrari);font-size:16px;color:var(--grey-1);margin-bottom:24px;line-height:1.6;}
+/* ── 欄位標籤：22px ── */
+.field{margin-bottom:24px;}
+.field .label-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+.field label{font-family:"Noto Serif TC",serif;font-size:22px;color:var(--forest-deep);font-weight:700;letter-spacing:1px;line-height:1.4;}
+.field .req{color:var(--ferrari);font-size:16px;font-weight:700;}
+.field .opt{color:var(--grey-3);font-size:14px;}
+/* ── input / select：最少 55px 高、20px 字體 ── */
+.field input,.field select{width:100%;padding:16px 14px;min-height:55px;border:2px solid var(--line);border-radius:6px;font-size:20px;font-family:inherit;color:#111;background:#fff;transition:border 0.2s;box-sizing:border-box;line-height:1.4;}
+.field input:focus,.field select:focus{outline:0;border-color:var(--forest);border-width:3px;}
+.field .hint{font-size:14px;color:var(--grey-3);margin-top:6px;line-height:1.6;}
+.section-divider{padding:16px 0 10px;font-family:"Noto Serif TC",serif;font-size:15px;color:var(--grey-2);letter-spacing:3px;border-top:1px dashed var(--line);margin-top:8px;}
+/* ── 性別掣：最少 55px 高、20px 字體 ── */
+.gender-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.gender-row .g-btn{padding:14px 4px;min-height:55px;border:2px solid var(--line);background:#fff;text-align:center;cursor:pointer;font-size:20px;font-family:inherit;color:#333;border-radius:6px;font-weight:600;line-height:1.3;}
+.gender-row .g-btn.active{border-color:var(--forest);border-width:3px;background:var(--forest-pale);color:var(--forest-deep);font-weight:700;}
+/* ── 同意條款：字體放大 ── */
+.consent{padding:16px;background:var(--forest-pale);border-radius:4px;font-size:16px;color:#111;line-height:1.8;margin-bottom:24px;}
+.consent label{display:flex;gap:12px;cursor:pointer;align-items:flex-start;}
+.consent input{width:24px;height:24px;margin-top:3px;flex-shrink:0;accent-color:var(--forest);}
 .consent a{color:var(--forest);text-decoration:underline;}
 /* Medical card opt-in block */
-.medical-block{border:2px solid #1565C0;border-radius:6px;overflow:hidden;margin-bottom:20px;}
-.medical-header{background:linear-gradient(135deg,#1565C0 0%,#1976D2 100%);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;user-select:none;}
+.medical-block{border:2px solid #1565C0;border-radius:6px;overflow:hidden;margin-bottom:24px;}
+.medical-header{background:linear-gradient(135deg,#1565C0 0%,#1976D2 100%);color:#fff;padding:16px 16px;display:flex;align-items:center;justify-content:space-between;user-select:none;}
 .medical-header .mh-left{display:flex;align-items:center;gap:10px;}
-.medical-header .mh-icon{font-size:24px;line-height:1;}
-.medical-header .mh-title{font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:1px;}
-.medical-header .mh-sub{font-size:11px;opacity:0.85;margin-top:2px;letter-spacing:0.5px;}
-.medical-header .mh-badge{background:#FFD600;color:#1A237E;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:1px;white-space:nowrap;}
+.medical-header .mh-icon{font-size:28px;line-height:1;}
+.medical-header .mh-title{font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:1px;line-height:1.3;}
+.medical-header .mh-sub{font-size:13px;opacity:0.85;margin-top:3px;letter-spacing:0.5px;}
+.medical-header .mh-badge{background:#FFD600;color:#1A237E;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:1px;white-space:nowrap;}
 .medical-cta{background:#E8F0FE;border-bottom:1px solid #C5CAE9;transition:background 0.15s;}
 .medical-cta-label{display:flex;align-items:center;gap:0;cursor:pointer;width:100%;padding:0;}
-.medical-cta-check{display:flex;align-items:center;justify-content:center;background:#1565C0;width:56px;min-height:64px;flex-shrink:0;}
+.medical-cta-check{display:flex;align-items:center;justify-content:center;background:#1565C0;width:64px;min-height:72px;flex-shrink:0;}
 .medical-cta-check input[type=checkbox]{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
-.custom-check-box{width:26px;height:26px;border-radius:5px;border:2.5px solid #fff;background:transparent;display:flex;align-items:center;justify-content:center;transition:background 0.15s,border-color 0.15s;flex-shrink:0;}
+.custom-check-box{width:30px;height:30px;border-radius:6px;border:2.5px solid #fff;background:transparent;display:flex;align-items:center;justify-content:center;transition:background 0.15s,border-color 0.15s;flex-shrink:0;}
 .custom-check-box.checked{background:#fff;border-color:#fff;}
-.custom-check-box.checked::after{content:'';display:block;width:8px;height:14px;border-right:3px solid #1565C0;border-bottom:3px solid #1565C0;transform:rotate(45deg) translate(-1px,-2px);}
-.medical-cta-text{flex:1;padding:14px 14px 14px 16px;}
-.medical-cta-main{font-size:15px;color:#0D47A1;font-weight:700;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;margin-bottom:4px;}
-.medical-cta-sub{font-size:12px;color:#5C6BC0;line-height:1.5;}
-.medical-cta-arrow{font-size:20px;color:#1565C0;padding-right:14px;flex-shrink:0;transition:transform 0.2s;}
+.custom-check-box.checked::after{content:'';display:block;width:9px;height:16px;border-right:3px solid #1565C0;border-bottom:3px solid #1565C0;transform:rotate(45deg) translate(-1px,-2px);}
+.medical-cta-text{flex:1;padding:16px 14px 16px 16px;}
+.medical-cta-main{font-size:18px;color:#0D47A1;font-weight:700;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;margin-bottom:5px;line-height:1.4;}
+.medical-cta-sub{font-size:14px;color:#5C6BC0;line-height:1.6;}
+.medical-cta-arrow{font-size:22px;color:#1565C0;padding-right:14px;flex-shrink:0;transition:transform 0.2s;}
 .medical-cta-arrow.open{transform:rotate(180deg);}
-.medical-extra{display:none;padding:16px;background:#fff;}
+.medical-extra{display:none;padding:20px;background:#fff;}
 .medical-extra.show{display:block;}
-
-.medical-extra .notice{background:#FFF8E1;border-left:3px solid #F9A825;padding:10px 12px;font-size:12px;color:#5D4037;line-height:1.6;margin-bottom:16px;border-radius:0 4px 4px 0;}
+.medical-extra .notice{background:#FFF8E1;border-left:3px solid #F9A825;padding:12px 14px;font-size:15px;color:#5D4037;line-height:1.7;margin-bottom:20px;border-radius:0 4px 4px 0;}
 .medical-extra .field label{color:#1565C0;}
 .medical-extra .field input{border-color:#90CAF9;}
 .medical-extra .field input:focus{border-color:#1565C0;}
-.medical-privacy{background:#E3F2FD;border-radius:4px;padding:12px 14px;font-size:11px;color:#37474F;line-height:1.8;margin-top:12px;}
-.medical-privacy label{display:flex;gap:8px;cursor:pointer;align-items:flex-start;}
-.medical-privacy input{width:18px;height:18px;flex-shrink:0;margin-top:1px;accent-color:#1565C0;}
-.submit-btn{width:100%;padding:18px;background:var(--forest);color:#fff;border:0;border-radius:4px;font-size:18px;font-family:"Noto Serif TC",sans-serif;font-weight:700;letter-spacing:4px;cursor:pointer;box-shadow:0 4px 0 var(--forest-deep);transition:all 0.1s;}
+.medical-privacy{background:#E3F2FD;border-radius:4px;padding:14px 16px;font-size:14px;color:#37474F;line-height:1.9;margin-top:14px;}
+.medical-privacy label{display:flex;gap:10px;cursor:pointer;align-items:flex-start;}
+.medical-privacy input{width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:#1565C0;}
+/* ── 提交掣：最少 55px 高、20px 字體 ── */
+.submit-btn{width:100%;padding:20px;min-height:55px;background:var(--forest);color:#fff;border:0;border-radius:6px;font-size:22px;font-family:"Noto Serif TC",sans-serif;font-weight:700;letter-spacing:3px;cursor:pointer;box-shadow:0 4px 0 var(--forest-deep);transition:all 0.1s;line-height:1.3;}
 .submit-btn:active{transform:translateY(2px);box-shadow:0 2px 0 var(--forest-deep);}
 .submit-btn:disabled{background:var(--grey-3);box-shadow:0 4px 0 var(--grey-2);cursor:not-allowed;}
-.footer-links{text-align:center;margin-top:20px;font-size:11px;color:var(--grey-3);line-height:1.8;}
+.footer-links{text-align:center;margin-top:20px;font-size:14px;color:var(--grey-3);line-height:2;}
 .footer-links a{color:var(--forest);text-decoration:none;}
 .success{display:none;text-align:center;}
 .success.show{display:block;}
 .success-icon{width:80px;height:80px;background:var(--forest);color:#fff;border-radius:50%;margin:20px auto 24px;display:flex;align-items:center;justify-content:center;font-size:44px;animation:pop 0.4s cubic-bezier(0.34,1.56,0.64,1);}
 @keyframes pop{0%{transform:scale(0);}100%{transform:scale(1);}}
 .success h1{font-family:"Noto Serif TC",serif;font-size:28px;color:var(--forest-deep);margin-bottom:6px;letter-spacing:3px;}
-.success .welcome{font-size:14px;color:var(--grey-2);margin-bottom:24px;}
+.success .welcome{font-size:16px;color:var(--grey-2);margin-bottom:24px;}
 .gen-card{width:340px;height:232px;margin:0 auto 20px;background:linear-gradient(150deg,#FAF7F0 0%,#F0EBD8 100%);border:1px solid #E5DEC8;border-radius:12px;position:relative;overflow:hidden;color:var(--forest-deep);box-shadow:0 12px 30px rgba(0,0,0,0.18);text-align:left;}
 .gen-card::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--forest) 0%,var(--forest-light) 45%,var(--ferrari) 45%,var(--ferrari) 100%);}
 .gen-card .gc-brand{position:absolute;top:16px;left:18px;display:flex;align-items:center;gap:8px;}
@@ -1695,35 +1719,36 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .gen-card .gc-qr{width:46px;height:46px;background:#fff;padding:3px;border:1.5px solid var(--forest);border-radius:3px;flex-shrink:0;}
 .gen-card .gc-qr canvas{width:100%;height:100%;}
 .action-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
-.action-btn{padding:14px 8px;background:#fff;border:2px solid var(--forest);color:var(--forest-deep);font-family:"Noto Serif TC",serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;border-radius:4px;text-align:center;}
+.action-btn{padding:14px 8px;background:#fff;border:2px solid var(--forest);color:var(--forest-deep);font-family:"Noto Serif TC",serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;border-radius:4px;text-align:center;}
 .action-btn.red{border-color:var(--ferrari);color:var(--ferrari);}
-.wa-link{display:block;width:100%;padding:16px;background:var(--forest);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:12px;}
-.err-msg{background:var(--ferrari-pale);border:1px solid var(--ferrari);color:var(--ferrari-deep);padding:12px 16px;border-radius:4px;font-size:13px;margin-bottom:16px;display:none;}
+.wa-link{display:block;width:100%;padding:18px;background:var(--forest);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:12px;}
+/* ── 錯誤提示：大紅字最少 20px ── */
+.err-msg{background:var(--ferrari-pale);border:2px solid var(--ferrari);color:#b71c1c;padding:14px 18px;border-radius:6px;font-size:20px;font-weight:700;margin-bottom:20px;display:none;line-height:1.5;}
 .err-msg.show{display:block;}
 /* ── Tab bar (Login / Register) ── */
 .tab-bar{display:grid;grid-template-columns:1fr 1fr;border-radius:6px 6px 0 0;overflow:hidden;margin-bottom:0;}
-.tab-btn{padding:14px 8px;text-align:center;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;border:none;background:var(--forest-pale);color:var(--forest-deep);transition:all 0.2s;}
+.tab-btn{padding:16px 8px;text-align:center;font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:2px;cursor:pointer;border:none;background:var(--forest-pale);color:var(--forest-deep);transition:all 0.2s;min-height:55px;}
 .tab-btn.active{background:var(--forest-deep);color:#fff;}
 .tab-section{display:none;}
 .tab-section.active{display:block;}
 /* ── Login panel ── */
 .login-panel{background:#fff;border-radius:0 0 6px 6px;padding:28px 22px;margin-bottom:16px;}
-.login-panel .field{margin-bottom:18px;}
-.login-panel .field label{font-family:"Noto Serif TC",serif;font-size:14px;color:var(--grey-1);font-weight:700;letter-spacing:1px;margin-bottom:7px;display:block;}
-.login-panel .field input{width:100%;padding:14px;border:2px solid var(--line);border-radius:4px;font-size:17px;font-family:inherit;color:var(--ink);background:#fff;transition:border 0.2s;box-sizing:border-box;}
-.login-panel .field input:focus{outline:0;border-color:var(--forest);}
-.login-panel .field .hint{font-size:11px;color:var(--grey-3);margin-top:5px;line-height:1.5;}
+.login-panel .field{margin-bottom:22px;}
+.login-panel .field label{font-family:"Noto Serif TC",serif;font-size:20px;color:#111;font-weight:700;letter-spacing:1px;margin-bottom:8px;display:block;line-height:1.4;}
+.login-panel .field input{width:100%;padding:16px 14px;min-height:55px;border:2px solid var(--line);border-radius:6px;font-size:20px;font-family:inherit;color:#111;background:#fff;transition:border 0.2s;box-sizing:border-box;}
+.login-panel .field input:focus{outline:0;border-color:var(--forest);border-width:3px;}
+.login-panel .field .hint{font-size:14px;color:var(--grey-3);margin-top:6px;line-height:1.6;}
 .result-block{background:#E8F5E9;border:2px solid var(--forest);border-radius:6px;padding:20px;margin-top:16px;display:none;}
 .result-block.show{display:block;}
 .rb-name{font-family:"Noto Serif TC",serif;font-size:28px;font-weight:900;color:var(--forest-deep);}
-.rb-no{font-family:"Space Grotesk",monospace;font-size:14px;color:var(--grey-2);margin-bottom:14px;}
-.rb-go{display:block;width:100%;padding:15px;background:var(--forest-deep);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:8px;}
-.rb-family-title{font-family:"Noto Serif TC",serif;font-size:12px;color:var(--ferrari-deep);letter-spacing:2px;font-weight:700;margin:14px 0 8px;padding-top:12px;border-top:1px solid #c8e6c9;}
-.fc-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e0f0e0;}
+.rb-no{font-family:"Space Grotesk",monospace;font-size:15px;color:var(--grey-2);margin-bottom:14px;}
+.rb-go{display:block;width:100%;padding:16px;background:var(--forest-deep);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:8px;}
+.rb-family-title{font-family:"Noto Serif TC",serif;font-size:14px;color:var(--ferrari-deep);letter-spacing:2px;font-weight:700;margin:14px 0 8px;padding-top:12px;border-top:1px solid #c8e6c9;}
+.fc-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e0f0e0;}
 .fc-row:last-child{border-bottom:none;}
-.fc-row .fn{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;color:var(--ferrari-deep);}
-.fc-row .fno{font-size:11px;color:#aaa;}
-.fc-row a{padding:5px 12px;background:var(--ferrari);color:#fff;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;}
+.fc-row .fn{font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;color:var(--ferrari-deep);}
+.fc-row .fno{font-size:13px;color:#aaa;}
+.fc-row a{padding:8px 14px;background:var(--ferrari);color:#fff;border-radius:4px;font-size:13px;font-weight:700;text-decoration:none;}
 </style>`) + `
 <body>
 <div class="container">
@@ -1843,18 +1868,10 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       <div class="form-card">
         <div class="field">
           <div class="label-row">
-            <label for="nameZh">中文姓名</label>
+            <label for="nameZh">姓名／稱呼</label>
             <span class="req">✽ 必填</span>
           </div>
-          <input id="nameZh" type="text" placeholder="例：陳大文" autocomplete="name" oninput="syncNameFromMain()">
-        </div>
-
-        <div class="field">
-          <div class="label-row">
-            <label for="nameEn">英文姓名</label>
-            <span class="req">✽ 必填</span>
-          </div>
-          <input id="nameEn" type="text" placeholder="例：CHAN TAI MAN" autocomplete="name" style="text-transform:uppercase;" oninput="syncNameFromMain()">
+          <input id="nameZh" type="text" placeholder="填你嘅名或稱呼（中英文都得）" autocomplete="name">
         </div>
 
         <div class="field">
@@ -2098,20 +2115,16 @@ function setGender(v, btn) {
 }
 
 function syncNameFromMain() {
-  // When user types in main form nameZh/nameEn, sync to medical card fields if medical is checked
+  // 主表單已合併成單一「姓名／稱呼」欄，只同步 nameZh 到醫健卡中文名
   if (!document.getElementById('applyMedical').checked) return;
   var zh = document.getElementById('nameZh').value.trim();
-  var en = document.getElementById('nameEn').value.trim().toUpperCase();
   if (zh) document.getElementById('medNameZh').value = zh;
-  if (en) document.getElementById('medNameEn').value = en;
 }
 
 function syncNameFromMedical() {
-  // When user types in medical card nameZh/nameEn, sync to main form fields
+  // 醫健卡中文名反向同步回主表單「姓名／稱呼」欄（英文名欄已移除，不再同步 nameEn）
   var zh = document.getElementById('medNameZh').value.trim();
-  var en = document.getElementById('medNameEn').value.trim().toUpperCase();
   if (zh) document.getElementById('nameZh').value = zh;
-  if (en) document.getElementById('nameEn').value = en;
 }
 
 function toggleMedical(cb) {
@@ -2126,11 +2139,9 @@ function toggleMedical(cb) {
     if(arrow){ arrow.classList.add('open'); }
     if(cta){ cta.style.background='#C8D8FA'; }
     if(mainLabel){ mainLabel.textContent='✅ 已勾選申請免費醫健卡'; }
-    // Pre-fill medical fields from main form
+    // 預填醫健卡中文名（主表單已無獨立 nameEn，只同步 nameZh）
     var zh = document.getElementById('nameZh').value.trim();
-    var en = document.getElementById('nameEn').value.trim().toUpperCase();
     if (zh) document.getElementById('medNameZh').value = zh;
-    if (en) document.getElementById('medNameEn').value = en;
     document.getElementById('submitBtn').textContent = '立即登記（兩卡同申）';
     extra.scrollIntoView({behavior:'smooth', block:'nearest'});
   } else {
@@ -2157,11 +2168,11 @@ async function submitForm() {
   var consent = document.getElementById('consent').checked;
   var applyMedical = document.getElementById('applyMedical').checked;
 
-  var nameEn = document.getElementById('nameEn').value.trim().toUpperCase();
+  // 主表單已合併成單一「姓名／稱呼」欄，nameEn 在未申請醫健卡時存空字串
+  var nameEn = '';
   var birthYear = parseInt(document.getElementById('birthYear').value || '0');
   var district = document.getElementById('district').value;
-  if (!nameZh) { showErr('請填寫中文姓名'); return; }
-  if (!nameEn) { showErr('請填寫英文姓名（與身份證相同）'); return; }
+  if (!nameZh) { showErr('請填寫姓名／稱呼'); return; }
   var phoneErr = validateHKPhone(phone);
   if (phoneErr) { showErr(phoneErr); return; }
   if (!selectedGender) { showErr('請選擇性別'); return; }
