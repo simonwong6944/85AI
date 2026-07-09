@@ -1240,6 +1240,141 @@ app.delete('/api/admin/useful-links/:id', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Jobs: Public APIs ───────────────────────────────────────────────────────
+
+// GET /api/jobs — 公開，只回 open，依 sort_order
+app.get('/api/jobs', async (c) => {
+  const db = c.env.DB
+  const rows = await db.prepare(
+    'SELECT id, image_url, title, location, job_type, company, salary, sort_order FROM jobs WHERE status=? ORDER BY sort_order ASC, id ASC'
+  ).bind('open').all()
+  return c.json({ ok: true, jobs: rows.results })
+})
+
+// GET /api/jobs/:id — 單一工作詳情（公開）
+app.get('/api/jobs/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const job = await db.prepare('SELECT * FROM jobs WHERE id=?').bind(id).first<any>()
+  if (!job) return c.json({ ok: false, error: '工作不存在' }, 404)
+  return c.json({ ok: true, job })
+})
+
+// POST /api/jobs/:id/apply — 申請工作（公開，需帶 member_no）
+app.post('/api/jobs/:id/apply', async (c) => {
+  const jobId = c.req.param('id')
+  const db = c.env.DB
+  const body = await c.req.json<{ member_no?: string }>()
+  const memberNo = (body.member_no || '').trim()
+  if (!memberNo) return c.json({ ok: false, error: '請先喺「我的卡」登記會員' }, 400)
+  // 確認工作存在且 open
+  const job = await db.prepare('SELECT id, status FROM jobs WHERE id=?').bind(jobId).first<any>()
+  if (!job) return c.json({ ok: false, error: '工作不存在' }, 404)
+  if (job.status !== 'open') return c.json({ ok: false, error: '此職位已截止申請' }, 400)
+  try {
+    await db.prepare(
+      'INSERT INTO job_applications (job_id, member_no) VALUES (?,?)'
+    ).bind(jobId, memberNo).run()
+    return c.json({ ok: true, message: '已收到你嘅申請，我哋會跟進' })
+  } catch (e: any) {
+    // UNIQUE constraint → 已申請過
+    if (e && (String(e.message || e).includes('UNIQUE') || String(e.message || e).includes('unique'))) {
+      return c.json({ ok: false, already: true, error: '你已經申請咗呢份工' }, 409)
+    }
+    return c.json({ ok: false, error: '申請失敗，請稍後再試' }, 500)
+  }
+})
+
+// ─── Jobs: Admin APIs ────────────────────────────────────────────────────────
+
+// GET /api/admin/jobs — 列出全部工作
+app.get('/api/admin/jobs', async (c) => {
+  const db = c.env.DB
+  const rows = await db.prepare(
+    'SELECT * FROM jobs ORDER BY sort_order ASC, id ASC'
+  ).all()
+  return c.json({ ok: true, jobs: rows.results })
+})
+
+// POST /api/admin/jobs — 新增工作
+app.post('/api/admin/jobs', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json<{
+    image_url?: string; title?: string; location?: string; job_type?: string;
+    company?: string; description?: string; requirement?: string;
+    salary?: string; status?: string; sort_order?: number
+  }>()
+  if (!body.title) return c.json({ ok: false, error: '職位名稱必填' }, 400)
+  const result = await db.prepare(
+    `INSERT INTO jobs (image_url, title, location, job_type, company, description, requirement, salary, status, sort_order)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`
+  ).bind(
+    body.image_url || null, body.title, body.location || null, body.job_type || null,
+    body.company || null, body.description || null, body.requirement || null,
+    body.salary || null, body.status || 'open', body.sort_order ?? 0
+  ).run()
+  return c.json({ ok: true, id: result.meta.last_row_id })
+})
+
+// PUT /api/admin/jobs/:id — 更新工作
+app.put('/api/admin/jobs/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const body = await c.req.json<{
+    image_url?: string; title?: string; location?: string; job_type?: string;
+    company?: string; description?: string; requirement?: string;
+    salary?: string; status?: string; sort_order?: number
+  }>()
+  const allowed = ['image_url', 'title', 'location', 'job_type', 'company', 'description', 'requirement', 'salary', 'status', 'sort_order']
+  const fields: string[] = []
+  const vals: any[] = []
+  for (const key of allowed) {
+    if (body[key as keyof typeof body] !== undefined) {
+      fields.push(`${key} = ?`)
+      vals.push(body[key as keyof typeof body])
+    }
+  }
+  if (!fields.length) return c.json({ ok: false, error: 'Nothing to update' }, 400)
+  vals.push(id)
+  await db.prepare(`UPDATE jobs SET ${fields.join(', ')} WHERE id = ?`).bind(...vals).run()
+  return c.json({ ok: true })
+})
+
+// DELETE /api/admin/jobs/:id — 刪除工作（同時刪相關申請）
+app.delete('/api/admin/jobs/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  await db.prepare('DELETE FROM job_applications WHERE job_id=?').bind(id).run()
+  await db.prepare('DELETE FROM jobs WHERE id=?').bind(id).run()
+  return c.json({ ok: true })
+})
+
+// GET /api/admin/jobs/:id/applications — 列出某工作嘅申請（join members 取姓名）
+app.get('/api/admin/jobs/:id/applications', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const rows = await db.prepare(
+    `SELECT ja.id, ja.job_id, ja.member_no, ja.applied_at, ja.handle_status,
+            m.name_zh, m.name_en
+     FROM job_applications ja
+     LEFT JOIN members m ON m.member_no = ja.member_no
+     WHERE ja.job_id = ?
+     ORDER BY ja.applied_at ASC`
+  ).bind(id).all()
+  return c.json({ ok: true, applications: rows.results })
+})
+
+// PUT /api/admin/applications/:id — 更新 handle_status
+app.put('/api/admin/applications/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const body = await c.req.json<{ handle_status?: string }>()
+  const hs = body.handle_status || ''
+  if (!['new', 'handled'].includes(hs)) return c.json({ ok: false, error: 'handle_status 必須為 new 或 handled' }, 400)
+  await db.prepare('UPDATE job_applications SET handle_status=? WHERE id=?').bind(hs, id).run()
+  return c.json({ ok: true })
+})
+
 // ─── Root: 85 AI Technology Limited Dashboard ────────────────────────────────
 app.get('/', (c) => c.html(dashboardHtml()))
 
@@ -5698,6 +5833,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="nav-item" onclick="switchMod('mod-useful-links')">
         <i class="fas fa-info-circle"></i> 有用資訊管理
       </div>
+      <div class="nav-item" onclick="switchMod('mod-jobs')">
+        <i class="fas fa-briefcase"></i> 工作管理
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doAdminLogout()">
@@ -5959,6 +6097,76 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- Jobs Module -->
+<div id="mod-jobs" class="mod-page">
+  <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <h3 style="font-size:16px;font-weight:700;color:#111827">工作市場管理</h3>
+      <p style="font-size:12px;color:#6B7280;margin-top:2px" id="jobs-count-label"></p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateJob()">
+      <i class="fas fa-plus"></i> 新增工作
+    </button>
+  </div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:14px" id="jobs-table">
+      <thead>
+        <tr style="background:#F3F4F6;text-align:left">
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">縮圖</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">職位名稱</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">地點</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">性質</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">排序</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">狀態</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">操作</th>
+        </tr>
+      </thead>
+      <tbody id="jobs-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Jobs Create/Edit Modal -->
+<div class="modal-overlay" id="modal-job">
+  <div class="modal" style="max-height:90vh;overflow-y:auto">
+    <h3 id="job-modal-title"><i class="fas fa-briefcase" style="margin-right:8px;color:var(--brand)"></i>新增工作</h3>
+    <input type="hidden" id="job-id">
+    <div class="form-field"><label>圖片 URL (4:3 比例)</label><input type="text" id="job-image-url" placeholder="https://..."></div>
+    <div class="form-field"><label>職位名稱 <span style="color:#EF4444">*</span></label><input type="text" id="job-title"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field"><label>工作地點</label><input type="text" id="job-location" placeholder="例：旺角"></div>
+      <div class="form-field"><label>工作性質</label><input type="text" id="job-type" placeholder="兼職/全職/義工"></div>
+      <div class="form-field"><label>公司／機構</label><input type="text" id="job-company"></div>
+      <div class="form-field"><label>待遇／時薪</label><input type="text" id="job-salary" placeholder="例：$60/小時"></div>
+    </div>
+    <div class="form-field"><label>詳細資料</label><textarea id="job-description" rows="3" style="resize:vertical"></textarea></div>
+    <div class="form-field"><label>要求</label><textarea id="job-requirement" rows="2" style="resize:vertical"></textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field"><label>排序（細數排前）</label><input type="number" id="job-sort-order" value="0" min="0"></div>
+      <div class="form-field" id="job-status-field" style="display:none">
+        <label>狀態</label>
+        <select id="job-status"><option value="open">開放申請</option><option value="closed">已截止</option></select>
+      </div>
+    </div>
+    <div id="job-modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-job')">取消</button>
+      <button class="btn btn-primary" onclick="submitJob()"><i class="fas fa-save"></i> 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Job Applications Modal -->
+<div class="modal-overlay" id="modal-job-apps">
+  <div class="modal" style="max-width:620px;max-height:90vh;overflow-y:auto">
+    <h3 id="job-apps-title"><i class="fas fa-users" style="margin-right:8px;color:var(--brand)"></i>申請名單</h3>
+    <div id="job-apps-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-job-apps')">關閉</button>
+    </div>
+  </div>
+</div>
+
 <!-- Product Create/Edit Modal -->
 <div class="modal-overlay" id="modal-product">
   <div class="modal">
@@ -6048,7 +6256,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -6058,6 +6266,7 @@ function switchMod(id){
   document.querySelector('.page-area').style.padding = (id==='mod-membership') ? '10px' : '24px';
   if(id==='mod-products'){ loadProductCategories(); loadProducts(); }
   if(id==='mod-useful-links') loadUsefulLinks();
+  if(id==='mod-jobs') loadJobs();
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
@@ -6501,6 +6710,154 @@ function toggleUsefulLinkActive(id,newActive){
       else{alert(d.error||'更新失敗');}
     }).catch(function(){alert('網絡錯誤');});
 }
+
+// ── Jobs ──
+function loadJobs(){
+  fetch('/api/admin/jobs').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('jobs-tbody').innerHTML='<tr><td colspan="7" style="padding:20px;text-align:center;color:#DC2626">讀取失敗</td></tr>';return;}
+    var jobs=d.jobs||[];
+    document.getElementById('jobs-count-label').textContent='共 '+jobs.length+' 份工作';
+    if(!jobs.length){
+      document.getElementById('jobs-tbody').innerHTML='<tr><td colspan="7" style="padding:30px;text-align:center;color:#9CA3AF">尚未有工作，請新增</td></tr>';
+      return;
+    }
+    document.getElementById('jobs-tbody').innerHTML=jobs.map(function(j){
+      var thumb=j.image_url?'<img src="'+esc(j.image_url)+'" style="width:60px;height:45px;object-fit:cover;border-radius:6px;border:1px solid #E5E7EB">':'<div style="width:60px;height:45px;background:#F3F4F6;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:11px">無圖</div>';
+      var statusBadge='<span style="padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;background:'+(j.status==='open'?'#D1FAE5':'#FEE2E2')+';color:'+(j.status==='open'?'#065F46':'#991B1B')+'">'+(j.status==='open'?'開放':'已截止')+'</span>';
+      return '<tr style="border-bottom:1px solid #F3F4F6">'+
+        '<td style="padding:8px 12px">'+thumb+'</td>'+
+        '<td style="padding:8px 12px;font-weight:600;max-width:160px">'+esc(j.title)+'</td>'+
+        '<td style="padding:8px 12px">'+esc(j.location||'—')+'</td>'+
+        '<td style="padding:8px 12px">'+esc(j.job_type||'—')+'</td>'+
+        '<td style="padding:8px 12px">'+j.sort_order+'</td>'+
+        '<td style="padding:8px 12px">'+statusBadge+'</td>'+
+        '<td style="padding:8px 12px;white-space:nowrap">'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px" onclick="openEditJob('+j.id+')"><i class="fas fa-edit"></i></button>'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px;background:'+(j.status==='open'?'#FEF3C7':'#D1FAE5')+';color:'+(j.status==='open'?'#92400E':'#065F46')+'" onclick="toggleJobStatus('+j.id+',\''+( j.status==='open'?'closed':'open')+'\')">'+
+            (j.status==='open'?'截止':'重開')+'</button>'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px" onclick="viewJobApplications('+j.id+',\''+esc(j.title)+'\')"><i class="fas fa-users"></i> 申請</button>'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;background:#FEE2E2;color:#DC2626" onclick="deleteJob('+j.id+')"><i class="fas fa-trash"></i></button>'+
+        '</td>'+
+      '</tr>';
+    }).join('');
+  }).catch(function(e){console.error('loadJobs',e);});
+}
+function openCreateJob(){
+  document.getElementById('job-modal-title').innerHTML='<i class="fas fa-briefcase" style="margin-right:8px;color:var(--brand)"></i>新增工作';
+  document.getElementById('job-id').value='';
+  ['job-image-url','job-title','job-location','job-type','job-company','job-salary','job-description','job-requirement'].forEach(function(f){document.getElementById(f).value='';});
+  document.getElementById('job-sort-order').value='0';
+  document.getElementById('job-status-field').style.display='none';
+  document.getElementById('job-modal-err').style.display='none';
+  document.getElementById('modal-job').classList.add('open');
+}
+function openEditJob(id){
+  fetch('/api/admin/jobs').then(function(r){return r.json();}).then(function(d){
+    var j=(d.jobs||[]).find(function(x){return x.id===id;});
+    if(!j){alert('讀取失敗');return;}
+    document.getElementById('job-modal-title').innerHTML='<i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯工作';
+    document.getElementById('job-id').value=j.id;
+    document.getElementById('job-image-url').value=j.image_url||'';
+    document.getElementById('job-title').value=j.title||'';
+    document.getElementById('job-location').value=j.location||'';
+    document.getElementById('job-type').value=j.job_type||'';
+    document.getElementById('job-company').value=j.company||'';
+    document.getElementById('job-salary').value=j.salary||'';
+    document.getElementById('job-description').value=j.description||'';
+    document.getElementById('job-requirement').value=j.requirement||'';
+    document.getElementById('job-sort-order').value=j.sort_order||0;
+    document.getElementById('job-status').value=j.status||'open';
+    document.getElementById('job-status-field').style.display='';
+    document.getElementById('job-modal-err').style.display='none';
+    document.getElementById('modal-job').classList.add('open');
+  });
+}
+function submitJob(){
+  var id=document.getElementById('job-id').value;
+  var body={
+    image_url:document.getElementById('job-image-url').value.trim(),
+    title:document.getElementById('job-title').value.trim(),
+    location:document.getElementById('job-location').value.trim(),
+    job_type:document.getElementById('job-type').value.trim(),
+    company:document.getElementById('job-company').value.trim(),
+    salary:document.getElementById('job-salary').value.trim(),
+    description:document.getElementById('job-description').value.trim(),
+    requirement:document.getElementById('job-requirement').value.trim(),
+    sort_order:parseInt(document.getElementById('job-sort-order').value)||0
+  };
+  var errEl=document.getElementById('job-modal-err');
+  if(!body.title){errEl.textContent='職位名稱必填';errEl.style.display='';return;}
+  if(id) body.status=document.getElementById('job-status').value;
+  errEl.style.display='none';
+  var url=id?'/api/admin/jobs/'+id:'/api/admin/jobs';
+  var method=id?'PUT':'POST';
+  fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-job');loadJobs();}
+      else{errEl.textContent=d.error||'儲存失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
+function deleteJob(id){
+  if(!confirm('確定刪除此工作？相關申請紀錄亦會一併刪除，此操作不可還原。'))return;
+  fetch('/api/admin/jobs/'+id,{method:'DELETE'})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.ok){loadJobs();}else{alert(d.error||'刪除失敗');}})
+    .catch(function(){alert('網絡錯誤');});
+}
+function toggleJobStatus(id,newStatus){
+  fetch('/api/admin/jobs/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.ok){loadJobs();}else{alert(d.error||'更新失敗');}})
+    .catch(function(){alert('網絡錯誤');});
+}
+function viewJobApplications(jobId,jobTitle){
+  document.getElementById('job-apps-title').innerHTML='<i class="fas fa-users" style="margin-right:8px;color:var(--brand)"></i>申請名單 — '+esc(jobTitle);
+  var content=document.getElementById('job-apps-content');
+  content.innerHTML='<div style="padding:20px;text-align:center;color:#6B7280">載入中...</div>';
+  document.getElementById('modal-job-apps').classList.add('open');
+  fetch('/api/admin/jobs/'+jobId+'/applications').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){content.innerHTML='<div style="padding:20px;text-align:center;color:#DC2626">讀取失敗</div>';return;}
+    var apps=d.applications||[];
+    if(!apps.length){content.innerHTML='<div style="padding:20px;text-align:center;color:#9CA3AF">未有人申請</div>';return;}
+    content.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px">'+
+      '<thead><tr style="background:#F3F4F6">'+
+        '<th style="padding:8px 12px;text-align:left">會員編號</th>'+
+        '<th style="padding:8px 12px;text-align:left">姓名</th>'+
+        '<th style="padding:8px 12px;text-align:left">申請時間</th>'+
+        '<th style="padding:8px 12px;text-align:left">狀態</th>'+
+        '<th style="padding:8px 12px;text-align:left">操作</th>'+
+      '</tr></thead>'+
+      '<tbody>'+apps.map(function(a){
+        var name=esc(a.name_zh||a.name_en||'—');
+        var isNew=a.handle_status==='new';
+        return '<tr style="border-bottom:1px solid #F3F4F6">'+
+          '<td style="padding:8px 12px;font-family:monospace">'+esc(a.member_no)+'</td>'+
+          '<td style="padding:8px 12px">'+name+'</td>'+
+          '<td style="padding:8px 12px;font-size:12px;color:#6B7280">'+esc((a.applied_at||'').replace('T',' ').substring(0,16))+'</td>'+
+          '<td style="padding:8px 12px"><span style="padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;background:'+(isNew?'#FEF3C7':'#D1FAE5')+';color:'+(isNew?'#92400E':'#065F46')+'">'+(isNew?'待處理':'已處理')+'</span></td>'+
+          '<td style="padding:8px 12px">'+
+            '<button class="btn btn-secondary" style="font-size:12px;padding:3px 10px;background:'+(isNew?'#D1FAE5':'#FEF3C7')+';color:'+(isNew?'#065F46':'#92400E')+'" onclick="toggleAppStatus('+a.id+','+(isNew?'\'handled\'':'\'new\'')+')">'+(isNew?'標記已處理':'還原待處理')+'</button>'+
+          '</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  });
+}
+function toggleAppStatus(appId,newStatus){
+  fetch('/api/admin/applications/'+appId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({handle_status:newStatus})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){
+        // 重新載入申請列表（需要知道 jobId，直接重抓）
+        var titleEl=document.getElementById('job-apps-title');
+        // 簡單方案：重關再手動提示
+        alert((newStatus==='handled'?'✅ 已標記處理':'已還原為待處理'));
+        closeModal('modal-job-apps');
+        loadJobs();
+      }else{alert(d.error||'更新失敗');}
+    }).catch(function(){alert('網絡錯誤');});
+}
 </script>
 </body>
 </html>`
@@ -6691,9 +7048,33 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 </div>
 
 <!-- ── Tab 面板：工作 ── -->
-<div id="tabWork" class="coming-soon-panel">
-  <div class="coming-icon">💼</div>
-  <div class="coming-text">🚧 即將推出，敬請期待 🙏</div>
+<div id="tabWork" style="display:none;padding-bottom:80px">
+  <!-- 工作列表頁 -->
+  <div id="jobListView">
+    <div style="padding:16px 16px 8px;font-size:22px;font-weight:800;color:#111827">💼 工作市場</div>
+    <div id="job-list-loading" style="text-align:center;padding:60px 20px;font-size:20px;color:#6B7280">載入中...</div>
+    <div id="job-list-empty" style="display:none;text-align:center;padding:60px 20px">
+      <div style="font-size:56px;margin-bottom:16px">🔍</div>
+      <div style="font-size:20px;font-weight:700;color:#374151">暫無招聘資訊</div>
+      <div style="font-size:16px;color:#6B7280;margin-top:8px">請稍後再來查看</div>
+    </div>
+    <div id="job-list-cards" style="padding:0 12px;display:flex;flex-direction:column;gap:16px"></div>
+  </div>
+  <!-- 工作詳情頁 -->
+  <div id="jobDetailView" style="display:none">
+    <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:1.5px solid #E5E7EB;background:#fff;position:sticky;top:0;z-index:10">
+      <button onclick="showJobList()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#228B22;padding:0 12px 0 0;line-height:1">&#8592;</button>
+      <span style="font-size:18px;font-weight:700;color:#111827">職位詳情</span>
+    </div>
+    <div id="job-detail-content" style="padding-bottom:100px"></div>
+    <!-- 申請掣 -->
+    <div style="position:fixed;bottom:68px;left:0;right:0;padding:12px 16px;background:#fff;border-top:1.5px solid #E5E7EB;z-index:50">
+      <button id="job-apply-btn" onclick="applyJob()" style="width:100%;min-height:55px;font-size:20px;font-weight:800;background:#228B22;color:#fff;border:none;border-radius:14px;cursor:pointer;letter-spacing:1px">
+        我要申請
+      </button>
+      <div id="job-apply-msg" style="text-align:center;font-size:18px;font-weight:700;margin-top:10px;display:none"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ── 有用資訊 Panel (overlay) ── -->
@@ -7031,6 +7412,162 @@ function closeUsefulLinksPanel(){
 }
 function escHtml(s){
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── 工作市場 ──
+var _jobsLoaded = false;
+var _currentJobId = null;
+
+// switchTab 切到 work 時自動載入
+var _origSwitchTab = switchTab;
+switchTab = function(name) {
+  _origSwitchTab(name);
+  if (name === 'work' && !_jobsLoaded) { loadJobList(); }
+};
+
+function loadJobList() {
+  var loading = document.getElementById('job-list-loading');
+  var empty = document.getElementById('job-list-empty');
+  var cards = document.getElementById('job-list-cards');
+  if (loading) loading.style.display = 'block';
+  if (empty) empty.style.display = 'none';
+  if (cards) cards.innerHTML = '';
+  fetch('/api/jobs')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (loading) loading.style.display = 'none';
+      if (!d.ok || !d.jobs || !d.jobs.length) {
+        if (empty) empty.style.display = 'block';
+        return;
+      }
+      _jobsLoaded = true;
+      if (cards) {
+        cards.innerHTML = d.jobs.map(function(j) {
+          var imgHtml = j.image_url
+            ? '<div style="width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:12px 12px 0 0;background:#F3F4F6"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.parentNode.innerHTML=\'<div style=&quot;width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:14px&quot;>暫無圖片</div>\'"></div>'
+            : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:18px">📷 暫無圖片</div>';
+          var loc = j.location ? '<div style="font-size:18px;color:#374151;margin-top:4px">📍 ' + escHtml(j.location) + '</div>' : '';
+          var type = j.job_type ? '<div style="display:inline-block;margin-top:8px;padding:4px 12px;background:#D1FAE5;color:#065F46;border-radius:20px;font-size:16px;font-weight:600">' + escHtml(j.job_type) + '</div>' : '';
+          return '<div onclick="showJobDetail(' + j.id + ')" style="background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.10);border:1.5px solid #E5E7EB;cursor:pointer;overflow:hidden;-webkit-tap-highlight-color:rgba(0,0,0,0.05)">'+
+            imgHtml +
+            '<div style="padding:14px 16px 16px">' +
+              '<div style="font-size:22px;font-weight:800;color:#111827;line-height:1.3">' + escHtml(j.title) + '</div>' +
+              loc + type +
+              (j.salary ? '<div style="font-size:17px;color:#228B22;font-weight:700;margin-top:8px">💰 ' + escHtml(j.salary) + '</div>' : '') +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+    })
+    .catch(function() {
+      if (loading) loading.style.display = 'none';
+      if (empty) { empty.style.display = 'block'; empty.querySelector('div:last-child').textContent = '載入失敗，請稍後再試'; }
+    });
+}
+
+function showJobDetail(jobId) {
+  _currentJobId = jobId;
+  document.getElementById('jobListView').style.display = 'none';
+  document.getElementById('jobDetailView').style.display = 'block';
+  var content = document.getElementById('job-detail-content');
+  var applyMsg = document.getElementById('job-apply-msg');
+  var applyBtn = document.getElementById('job-apply-btn');
+  content.innerHTML = '<div style="text-align:center;padding:60px 20px;font-size:20px;color:#6B7280">載入中...</div>';
+  applyMsg.style.display = 'none';
+  applyBtn.disabled = false;
+  applyBtn.style.background = '#228B22';
+  applyBtn.textContent = '我要申請';
+  window.scrollTo({ top: 0 });
+  fetch('/api/jobs/' + jobId)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { content.innerHTML = '<div style="padding:40px;text-align:center;color:#DC2626;font-size:20px">載入失敗</div>'; return; }
+      var j = d.job;
+      var imgHtml = j.image_url
+        ? '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;overflow:hidden"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.style.display=\'none\'"></div>'
+        : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:20px">📷 暫無圖片</div>';
+      var rows = [
+        j.company ? ['🏢 公司／機構', j.company] : null,
+        j.location ? ['📍 工作地點', j.location] : null,
+        j.job_type ? ['⏰ 工作性質', j.job_type] : null,
+        j.salary ? ['💰 待遇', j.salary] : null,
+      ].filter(Boolean);
+      var rowsHtml = rows.map(function(r) {
+        return '<div style="display:flex;gap:10px;padding:12px 0;border-bottom:1px solid #F3F4F6">'+
+          '<div style="font-size:18px;color:#6B7280;min-width:130px;flex-shrink:0">' + r[0] + '</div>'+
+          '<div style="font-size:18px;font-weight:600;color:#111827;flex:1">' + escHtml(r[1]) + '</div>'+
+        '</div>';
+      }).join('');
+      var descHtml = j.description ? '<div style="margin-top:20px"><div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:8px">📋 詳細資料</div><div style="font-size:18px;color:#374151;line-height:1.7;white-space:pre-wrap">' + escHtml(j.description) + '</div></div>' : '';
+      var reqHtml = j.requirement ? '<div style="margin-top:20px"><div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:8px">✅ 要求</div><div style="font-size:18px;color:#374151;line-height:1.7;white-space:pre-wrap">' + escHtml(j.requirement) + '</div></div>' : '';
+      content.innerHTML = imgHtml +
+        '<div style="padding:16px">' +
+          '<div style="font-size:24px;font-weight:800;color:#111827;line-height:1.3;margin-bottom:12px">' + escHtml(j.title) + '</div>' +
+          rowsHtml + descHtml + reqHtml +
+          '<div style="height:20px"></div>' +
+        '</div>';
+    })
+    .catch(function() {
+      content.innerHTML = '<div style="padding:40px;text-align:center;color:#DC2626;font-size:20px">載入失敗，請稍後再試</div>';
+    });
+}
+
+function showJobList() {
+  _currentJobId = null;
+  document.getElementById('jobDetailView').style.display = 'none';
+  document.getElementById('jobListView').style.display = 'block';
+  window.scrollTo({ top: 0 });
+}
+
+function applyJob() {
+  if (!_currentJobId) return;
+  var memberNo = localStorage.getItem('ce85_member_no') || '';
+  var applyBtn = document.getElementById('job-apply-btn');
+  var applyMsg = document.getElementById('job-apply-msg');
+  if (!memberNo) {
+    applyMsg.style.display = 'block';
+    applyMsg.style.color = '#D97706';
+    applyMsg.textContent = '⚠️ 請先喺「我的卡」登記會員';
+    return;
+  }
+  applyBtn.disabled = true;
+  applyBtn.style.background = '#6B7280';
+  applyBtn.textContent = '申請中...';
+  applyMsg.style.display = 'none';
+  fetch('/api/jobs/' + _currentJobId + '/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ member_no: memberNo })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      applyMsg.style.display = 'block';
+      if (d.ok) {
+        applyBtn.style.display = 'none';
+        applyMsg.style.color = '#065F46';
+        applyMsg.textContent = '✅ 已收到你嘅申請，我哋會跟進';
+      } else if (d.already) {
+        applyBtn.disabled = false;
+        applyBtn.style.background = '#9CA3AF';
+        applyBtn.textContent = '已申請';
+        applyMsg.style.color = '#374151';
+        applyMsg.textContent = '你已經申請咗呢份工';
+      } else {
+        applyBtn.disabled = false;
+        applyBtn.style.background = '#228B22';
+        applyBtn.textContent = '我要申請';
+        applyMsg.style.color = '#DC2626';
+        applyMsg.textContent = d.error || '申請失敗，請稍後再試';
+      }
+    })
+    .catch(function() {
+      applyBtn.disabled = false;
+      applyBtn.style.background = '#228B22';
+      applyBtn.textContent = '我要申請';
+      applyMsg.style.display = 'block';
+      applyMsg.style.color = '#DC2626';
+      applyMsg.textContent = '網絡錯誤，請稍後再試';
+    });
 }
 </script>
 </body>
