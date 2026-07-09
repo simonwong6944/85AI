@@ -7444,8 +7444,8 @@ function loadJobList() {
       if (cards) {
         cards.innerHTML = d.jobs.map(function(j) {
           var imgHtml = j.image_url
-            ? '<div style="width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:12px 12px 0 0;background:#F3F4F6"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.parentNode.innerHTML=\'<div style=&quot;width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:14px&quot;>暫無圖片</div>\'"></div>'
-            : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:18px">📷 暫無圖片</div>';
+            ? '<div style="width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:12px 12px 0 0;background:#F3F4F6"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.display=String.fromCharCode(110,111,110,101)"></div>'
+            : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:18px">&#128247; \u6682\u7121\u5716\u7247</div>';
           var loc = j.location ? '<div style="font-size:18px;color:#374151;margin-top:4px">📍 ' + escHtml(j.location) + '</div>' : '';
           var type = j.job_type ? '<div style="display:inline-block;margin-top:8px;padding:4px 12px;background:#D1FAE5;color:#065F46;border-radius:20px;font-size:16px;font-weight:600">' + escHtml(j.job_type) + '</div>' : '';
           return '<div onclick="showJobDetail(' + j.id + ')" style="background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.10);border:1.5px solid #E5E7EB;cursor:pointer;overflow:hidden;-webkit-tap-highlight-color:rgba(0,0,0,0.05)">'+
@@ -7484,8 +7484,8 @@ function showJobDetail(jobId) {
       if (!d.ok) { content.innerHTML = '<div style="padding:40px;text-align:center;color:#DC2626;font-size:20px">載入失敗</div>'; return; }
       var j = d.job;
       var imgHtml = j.image_url
-        ? '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;overflow:hidden"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.style.display=\'none\'"></div>'
-        : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:20px">📷 暫無圖片</div>';
+        ? '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;overflow:hidden"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.style.display=String.fromCharCode(110,111,110,101)"></div>'
+        : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:20px">&#128247; \u6682\u7121\u5716\u7247</div>';
       var rows = [
         j.company ? ['🏢 公司／機構', j.company] : null,
         j.location ? ['📍 工作地點', j.location] : null,
