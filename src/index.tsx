@@ -4653,18 +4653,22 @@ async function shareCardToWA(){
   showToast('圖片已下載，請貼入 WhatsApp 傳送', 3000);
 }
 
-// ── 強制開普通 WhatsApp（Android 用 intent://，iOS/Desktop 用 api.whatsapp.com）──
+// ── 開普通 WhatsApp（whatsapp:// deep link，兩平台通用）──
 function openNormalWA(msg) {
-  var ua = navigator.userAgent || '';
-  var isAndroid = /android/i.test(ua);
-  if (isAndroid) {
-    // intent:// 明確指定 package=com.whatsapp，唔會開 WA Biz (com.whatsapp.w4b)
-    var intentUrl = 'intent://send#Intent;action=android.intent.action.SEND;type=text/plain;package=com.whatsapp;S.android.intent.extra.TEXT=' + encodeURIComponent(msg) + ';end';
-    window.location.href = intentUrl;
-  } else {
-    // iOS / Desktop：api.whatsapp.com 強制普通 WA（唔係 wa.me）
-    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(msg), '_blank');
-  }
+  // whatsapp:// 係 WhatsApp 官方 URI scheme，直接喚起 WhatsApp app
+  // 唔會開 WA Biz，唔會跳 Google Play，iOS/Android 都 work
+  var encoded = encodeURIComponent(msg);
+  var deepLink = 'whatsapp://send?text=' + encoded;
+  var webFallback = 'https://wa.me/?text=' + encoded;
+  // 嘗試 deep link，500ms 後如果 app 冇打開就用 web fallback
+  var fallbackTimer = setTimeout(function() {
+    window.open(webFallback, '_blank');
+  }, 500);
+  window.addEventListener('blur', function onBlur() {
+    clearTimeout(fallbackTimer);
+    window.removeEventListener('blur', onBlur);
+  }, { once: true });
+  window.location.href = deepLink;
 }
 
 // ── 分享我張卡 ──

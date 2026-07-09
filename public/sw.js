@@ -1,10 +1,8 @@
 // CoEldery 85 Service Worker
-const CACHE_NAME = 'coeldery85-v1';
+// v3: icons & manifest use network-first so updates are picked up immediately
+const CACHE_NAME = 'coeldery85-v3';
 const OFFLINE_URLS = [
-  '/app',
-  '/manifest.webmanifest',
-  '/icon-192.png',
-  '/icon-512.png'
+  '/app'
 ];
 
 self.addEventListener('install', (event) => {
@@ -20,6 +18,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
+    // Delete ALL old caches (including v1, v2) so stale icons are gone
     caches.keys().then((keys) =>
       Promise.all(
         keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
@@ -30,12 +29,11 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // For navigation requests to /app — serve from cache if offline
+  // Navigation: network first, fallback to cache
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() =>
@@ -45,26 +43,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For static assets (icons, manifest) — cache-first
+  // Icons & manifest: NETWORK FIRST so updates are always picked up
+  // Falls back to cache only if offline
   if (
     url.pathname === '/icon-192.png' ||
     url.pathname === '/icon-512.png' ||
-    url.pathname === '/manifest.webmanifest' ||
-    url.pathname === '/sw.js'
+    url.pathname === '/manifest.webmanifest'
   ) {
     event.respondWith(
-      caches.match(event.request).then((cached) => {
-        return cached || fetch(event.request).then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          return response;
-        });
-      })
+      fetch(event.request).then((response) => {
+        // Update cache with fresh copy
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        return response;
+      }).catch(() => caches.match(event.request))
     );
     return;
   }
 
-  // Everything else — network first, fallback to cache
+  // Everything else: network first, fallback to cache
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
