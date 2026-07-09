@@ -695,7 +695,7 @@ app.post('/api/members/:no/add-family', async (c) => {
   try {
     const body = await c.req.json<{
       nameZh: string; phone: string; gender?: string;
-      birthYear?: string; district?: string
+      birthYear?: string; district?: string; relation?: string;
     }>()
 
     // Confirm parent exists and is PRIMARY
@@ -704,17 +704,23 @@ app.post('/api/members/:no/add-family', async (c) => {
     ).bind(parentNo).first<{ member_no: string; name_zh: string }>()
     if (!parent) return c.json({ ok: false, error: '主卡不存在' }, 404)
 
-    if (!body.nameZh?.trim()) return c.json({ ok: false, error: '請填寫中文姓名' }, 400)
+    if (!body.nameZh?.trim()) return c.json({ ok: false, error: '請填寫姓名／稱呼' }, 400)
     if (!body.phone?.trim()) return c.json({ ok: false, error: '請填寫電話' }, 400)
     const phoneClean = body.phone.replace(/\D/g, '')
     const phoneCheck = validateHKPhone(phoneClean)
     if (!phoneCheck.ok) return c.json({ ok: false, error: phoneCheck.error }, 400)
 
-    // Duplicate phone check for FAMILY tier
+    // Auto-assign tier by age (same rule as main join: born ≤ 1971 → PRIMARY, else FAMILY)
+    const currentYear = new Date().getFullYear()
+    const birthYearNum = body.birthYear ? parseInt(body.birthYear) : null
+    const age = birthYearNum ? currentYear - birthYearNum : 0
+    const tier = age >= 55 ? 'PRIMARY' : 'FAMILY'
+
+    // Duplicate phone check for computed tier
     const dup = await db.prepare(
-      "SELECT member_no FROM members WHERE phone = ? AND tier = 'FAMILY'"
-    ).bind(phoneClean).first()
-    if (dup) return c.json({ ok: false, error: '此電話已登記家庭卡' }, 409)
+      'SELECT member_no FROM members WHERE phone = ? AND tier = ?'
+    ).bind(phoneClean, tier).first()
+    if (dup) return c.json({ ok: false, error: `此電話已登記${tier === 'PRIMARY' ? '主卡' : '家庭卡'}` }, 409)
 
     const memberNo = await nextMemberNo(db)
     const expires = expiryDate(1)
@@ -722,17 +728,18 @@ app.post('/api/members/:no/add-family', async (c) => {
 
     await db.prepare(`
       INSERT INTO members
-        (member_no, tier, name_zh, phone, gender, birth_year, district,
-         parent_no, parent_name, kyc_status, role, expires_at, created_at,
+        (member_no, tier, name_zh, name_en, phone, gender, birth_year, district,
+         parent_no, parent_name, relation, kyc_status, role, expires_at, created_at,
          source, status)
-      VALUES (?, 'FAMILY', ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'CoExplorery', ?, ?, 'referral', 'ACTIVE')
+      VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'CoExplorery', ?, ?, 'referral', 'ACTIVE')
     `).bind(
-      memberNo, body.nameZh.trim(), phoneClean,
-      body.gender || '', body.birthYear ? parseInt(body.birthYear) : null,
-      body.district || '', parent.member_no, parent.name_zh, expires, now
+      memberNo, tier, body.nameZh.trim(), phoneClean,
+      body.gender || '', birthYearNum,
+      body.district || '', parent.member_no, parent.name_zh,
+      body.relation || '', expires, now
     ).run()
 
-    return c.json({ ok: true, member_no: memberNo })
+    return c.json({ ok: true, member_no: memberNo, tier })
   } catch (e) {
     return c.json({ ok: false, error: '新增失敗，請重試' }, 500)
   }
@@ -1912,7 +1919,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 .field .hint{font-size:18px;color:var(--grey-3);margin-top:6px;line-height:1.6;}
 .section-divider{padding:16px 0 10px;font-family:"Noto Serif TC",serif;font-size:18px;color:var(--grey-2);letter-spacing:3px;border-top:1px dashed var(--line);margin-top:8px;}
 /* ── 性別掣：最少 55px 高、20px 字體 ── */
-.gender-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.gender-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .gender-row .g-btn{padding:14px 4px;min-height:55px;border:2px solid var(--line);background:#fff;text-align:center;cursor:pointer;font-size:20px;font-family:inherit;color:#333;border-radius:6px;font-weight:600;line-height:1.3;}
 .gender-row .g-btn.active{border-color:var(--forest);border-width:3px;background:var(--forest-pale);color:var(--forest-deep);font-weight:700;}
 /* ── 同意條款：字體放大 ── */
@@ -2065,8 +2072,8 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 
     <form id="signupForm" onsubmit="return false;">
 
-      <!-- ── 醫健卡 opt-in ── -->
-      <div class="medical-block">
+      <!-- ── 醫健卡 opt-in（隱藏：前端不顯示；後端 API 及 medical_card_applications 表保留）── -->
+      <div class="medical-block" style="display:none;" aria-hidden="true">
         <div class="medical-header">
           <div class="mh-left">
             <div class="mh-icon">🏥</div>
@@ -2147,7 +2154,6 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
           <div class="gender-row">
             <button type="button" class="g-btn" data-v="M" onclick="setGender('M',this)">男 M</button>
             <button type="button" class="g-btn" data-v="F" onclick="setGender('F',this)">女 F</button>
-            <button type="button" class="g-btn" data-v="X" onclick="setGender('X',this)">其他</button>
           </div>
         </div>
 
@@ -2899,6 +2905,9 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 </style>`) + `
 <body>
 <div class="container">
+  <div style="margin-bottom:12px;">
+    <button type="button" onclick="history.length>1?history.back():window.location.href='/membership/join'" style="display:inline-flex;align-items:center;gap:6px;padding:14px 20px;min-height:55px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;border-radius:6px;cursor:pointer;letter-spacing:1px;">← 返回</button>
+  </div>
   <div class="brand-strip">
     <div class="mark">家</div>
     <div class="name">
@@ -2919,16 +2928,27 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
     <form id="signupForm" onsubmit="return false;">
       <div class="form-card">
         <div class="field">
-          <div class="label-row"><label for="nameZh">你的中文姓名</label><span class="req">✽ 必填</span></div>
-          <input id="nameZh" type="text" placeholder="例：陳小明">
+          <div class="label-row"><label for="nameZh">姓名／稱呼</label><span class="req">✽ 必填</span></div>
+          <input id="nameZh" type="text" placeholder="填佢嘅名或稱呼（中英文都得）">
         </div>
         <div class="field">
           <div class="label-row"><label for="phone">你的 WhatsApp 電話</label><span class="req">✽ 必填</span></div>
           <input id="phone" type="tel" placeholder="例：91234567" inputmode="numeric" maxlength="8">
         </div>
         <div class="field">
-          <div class="label-row"><label for="nameEn">英文姓名</label><span style="color:var(--grey-3);font-size:18px;">選填</span></div>
-          <input id="nameEn" type="text" placeholder="例：CHAN SIU MING" style="text-transform:uppercase;">
+          <div class="label-row"><label for="birthYear">出生年份</label><span class="req">✽ 必填</span></div>
+          <select id="birthYear">
+            <option value="">— 請選擇 —</option>
+            ${(()=>{const opts=[];for(let y=2010;y>=1930;y--){opts.push(`<option value="${y}">${y}</option>`);}return opts.join('');})()}
+          </select>
+          <div class="hint">出生年份 ≤ 1971（55歲或以上）將自動升為主卡級別</div>
+        </div>
+        <div class="field">
+          <div class="label-row"><label>性別</label><span class="req">✽ 必填</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <button type="button" class="g-btn" id="gBtnM" data-v="M" onclick="setFamilyGender('M',this)">男 M</button>
+            <button type="button" class="g-btn" id="gBtnF" data-v="F" onclick="setFamilyGender('F',this)">女 F</button>
+          </div>
         </div>
         <div class="field" id="parentPhoneField">
           <div class="label-row"><label for="parentPhone">長輩的 WhatsApp 電話</label><span class="req">✽ 必填</span></div>
@@ -3079,6 +3099,12 @@ window.addEventListener('beforeinstallprompt', function(e) {
     .catch(function(e){ console.warn('parent lookup failed', e); });
 })();
 
+var _familyGender='';
+function setFamilyGender(v,btn){
+  _familyGender=v;
+  document.querySelectorAll('#signupForm .g-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+}
 function showErr(msg){var el=document.getElementById('errMsg');el.textContent=msg;el.classList.add('show');el.scrollIntoView({behavior:'smooth'});}
 function validateHKPhone(p){
   if(p.length!==8)return '請填寫正確的 8 位香港電話號碼';
@@ -3091,9 +3117,12 @@ async function submitForm(){
   document.getElementById('errMsg').classList.remove('show');
   var nameZh=document.getElementById('nameZh').value.trim();
   var phone=document.getElementById('phone').value.replace(/[^0-9]/g,'');
+  var birthYear=document.getElementById('birthYear').value;
   var linkedParentNo=document.getElementById('linkedParentNo').value.trim();
   var parentPhone=document.getElementById('parentPhone').value.replace(/[^0-9]/g,'');
-  if(!nameZh){showErr('請填寫中文姓名');return;}
+  if(!nameZh){showErr('請填寫姓名／稱呼');return;}
+  if(!birthYear){showErr('請選擇出生年份');return;}
+  if(!_familyGender){showErr('請選擇性別');return;}
   var phoneErr=validateHKPhone(phone);
   if(phoneErr){showErr(phoneErr);return;}
   if(!linkedParentNo){var ppErr=validateHKPhone(parentPhone);if(ppErr){showErr('長輩電話：'+ppErr);return;}}
@@ -3101,7 +3130,7 @@ async function submitForm(){
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.textContent='處理中…';
   var params=new URLSearchParams(location.search);
-  var payload={tier:'FAMILY',nameZh,phone,nameEn:document.getElementById('nameEn').value.trim().toUpperCase(),relation:document.getElementById('relation').value,roadshow:params.get('rs')||'walk-in',source:params.get('src')||(params.get('rs')?'roadshow':params.get('ref')?'referral':'walk-in'),referrerNo:params.get('ref')||'',roadshowLocation:params.get('loc')||''};
+  var payload={tier:'FAMILY',nameZh,phone,birthYear:birthYear,gender:_familyGender,relation:document.getElementById('relation').value,roadshow:params.get('rs')||'walk-in',source:params.get('src')||(params.get('rs')?'roadshow':params.get('ref')?'referral':'walk-in'),referrerNo:params.get('ref')||'',roadshowLocation:params.get('loc')||''};
   if(linkedParentNo){payload.parentNo=linkedParentNo;}else{payload.parentPhone=parentPhone;}
   try{
     var res=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -3119,12 +3148,12 @@ async function submitForm(){
     var mySubSep=document.getElementById('mySubPageSep');
     if(mySubLink){mySubLink.href='/membership/card/'+data.memberNo;mySubLink.style.display='inline';}
     if(mySubSep){mySubSep.style.display='inline';}
-    setTimeout(function(){renderCardImage(data,'FAMILY');},100);
+    setTimeout(function(){renderCardImage(data, data.tier||'FAMILY');},100);
     // Store member no for verify
     window._verifyMemberNo=data.memberNo;
     // Save to sessionStorage so WA redirect + return can restore this page
     sessionStorage.setItem('successData', JSON.stringify(data));
-    sessionStorage.setItem('successTier', 'FAMILY');
+    sessionStorage.setItem('successTier', data.tier||'FAMILY');
     // Load admin WhatsApp and inject verification block
     fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
       var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
