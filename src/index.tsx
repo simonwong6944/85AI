@@ -4644,18 +4644,18 @@ async function shareCardToWA(){
   showToast('圖片已下載，請貼入 WhatsApp 傳送', 3000);
 }
 
-// ── 分享我張卡（wa.me 傳卡連結俾朋友）──
+// ── 分享我張卡（普通 WA 傳卡連結俾朋友）──
 function shareMyCard() {
   var nl = String.fromCharCode(10);
   var msg = '我係 CoEldery 老有聯盟85 會員，呢個係我張會員卡：' + nl + 'https://coeldery85.com/membership/card/' + MEMBER_NO;
-  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(msg), '_blank');
 }
 
-// ── 邀請朋友加入（wa.me 傳註冊連結）──
+// ── 邀請朋友加入（普通 WA 傳註冊連結）──
 function inviteFriend() {
   var nl = String.fromCharCode(10);
   var msg = '我邀請你加入 CoEldery 老有聯盟85！免費登記做會員：' + nl + 'https://coeldery85.com/membership/join';
-  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(msg), '_blank');
 }
 
 // ── Medical card re-apply (Part C) ───────────────────────────────────────────
