@@ -6733,9 +6733,9 @@ function loadJobs(){
         '<td style="padding:8px 12px">'+statusBadge+'</td>'+
         '<td style="padding:8px 12px;white-space:nowrap">'+
           '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px" onclick="openEditJob('+j.id+')"><i class="fas fa-edit"></i></button>'+
-          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px;background:'+(j.status==='open'?'#FEF3C7':'#D1FAE5')+';color:'+(j.status==='open'?'#92400E':'#065F46')+'" onclick="toggleJobStatus('+j.id+',\''+( j.status==='open'?'closed':'open')+'\')">'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px;background:'+(j.status==='open'?'#FEF3C7':'#D1FAE5')+';color:'+(j.status==='open'?'#92400E':'#065F46')+'" onclick="toggleJobStatus('+j.id+',' + (j.status==='open'?'"closed"':'"open"') + ')">'+
             (j.status==='open'?'截止':'重開')+'</button>'+
-          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px" onclick="viewJobApplications('+j.id+',\''+esc(j.title)+'\')"><i class="fas fa-users"></i> 申請</button>'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px" onclick="viewJobApplications('+j.id+')" ><i class="fas fa-users"></i> 申請</button>'+
           '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;background:#FEE2E2;color:#DC2626" onclick="deleteJob('+j.id+')"><i class="fas fa-trash"></i></button>'+
         '</td>'+
       '</tr>';
@@ -6811,8 +6811,10 @@ function toggleJobStatus(id,newStatus){
     .then(function(d){if(d.ok){loadJobs();}else{alert(d.error||'更新失敗');}})
     .catch(function(){alert('網絡錯誤');});
 }
-function viewJobApplications(jobId,jobTitle){
-  document.getElementById('job-apps-title').innerHTML='<i class="fas fa-users" style="margin-right:8px;color:var(--brand)"></i>申請名單 — '+esc(jobTitle);
+function viewJobApplications(jobId){
+  var jobTitle='';
+  // try to get title from the table row
+  document.getElementById('job-apps-title').innerHTML='<i class="fas fa-users" style="margin-right:8px;color:var(--brand)"></i>申請名單';
   var content=document.getElementById('job-apps-content');
   content.innerHTML='<div style="padding:20px;text-align:center;color:#6B7280">載入中...</div>';
   document.getElementById('modal-job-apps').classList.add('open');
@@ -6837,7 +6839,7 @@ function viewJobApplications(jobId,jobTitle){
           '<td style="padding:8px 12px;font-size:12px;color:#6B7280">'+esc((a.applied_at||'').replace('T',' ').substring(0,16))+'</td>'+
           '<td style="padding:8px 12px"><span style="padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;background:'+(isNew?'#FEF3C7':'#D1FAE5')+';color:'+(isNew?'#92400E':'#065F46')+'">'+(isNew?'待處理':'已處理')+'</span></td>'+
           '<td style="padding:8px 12px">'+
-            '<button class="btn btn-secondary" style="font-size:12px;padding:3px 10px;background:'+(isNew?'#D1FAE5':'#FEF3C7')+';color:'+(isNew?'#065F46':'#92400E')+'" onclick="toggleAppStatus('+a.id+','+(isNew?'\'handled\'':'\'new\'')+')">'+(isNew?'標記已處理':'還原待處理')+'</button>'+
+            '<button class="btn btn-secondary" style="font-size:12px;padding:3px 10px;background:'+(isNew?'#D1FAE5':'#FEF3C7')+';color:'+(isNew?'#065F46':'#92400E')+'" onclick="toggleAppStatus('+a.id+',' + (isNew?'"handled"':'"new"') + ')">'+(isNew?'標記已處理':'還原待處理')+'</button>'+
           '</td>'+
         '</tr>';
       }).join('')+
