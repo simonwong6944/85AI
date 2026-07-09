@@ -95,11 +95,20 @@ app.use('/shared.css', serveStatic({ root: './public' }))
 app.use('/static/*', serveStatic({ root: './public' }))
 app.use('/vendor/*', serveStatic({ root: './public' }))
 app.use('/assets/*', serveStatic({ root: './public' }))
-// PWA static files
-app.use('/manifest.webmanifest', serveStatic({ root: './public' }))
+// PWA static files — manifest & icons with no-cache headers so Android PWA picks up icon updates
+app.use('/manifest.webmanifest', async (c, next) => {
+  await next()
+  c.res.headers.set('Cache-Control', 'no-cache, must-revalidate')
+}, serveStatic({ root: './public' }))
 app.use('/sw.js', serveStatic({ root: './public' }))
-app.use('/icon-192.png', serveStatic({ root: './public' }))
-app.use('/icon-512.png', serveStatic({ root: './public' }))
+app.use('/icon-192.png', async (c, next) => {
+  await next()
+  c.res.headers.set('Cache-Control', 'no-cache, must-revalidate')
+}, serveStatic({ root: './public' }))
+app.use('/icon-512.png', async (c, next) => {
+  await next()
+  c.res.headers.set('Cache-Control', 'no-cache, must-revalidate')
+}, serveStatic({ root: './public' }))
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function nextMemberNo(db: D1Database): Promise<string> {
@@ -4644,18 +4653,32 @@ async function shareCardToWA(){
   showToast('圖片已下載，請貼入 WhatsApp 傳送', 3000);
 }
 
-// ── 分享我張卡（普通 WA 傳卡連結俾朋友）──
+// ── 強制開普通 WhatsApp（Android 用 intent://，iOS/Desktop 用 api.whatsapp.com）──
+function openNormalWA(msg) {
+  var ua = navigator.userAgent || '';
+  var isAndroid = /android/i.test(ua);
+  if (isAndroid) {
+    // intent:// 明確指定 package=com.whatsapp，唔會開 WA Biz (com.whatsapp.w4b)
+    var intentUrl = 'intent://send#Intent;action=android.intent.action.SEND;type=text/plain;package=com.whatsapp;S.android.intent.extra.TEXT=' + encodeURIComponent(msg) + ';end';
+    window.location.href = intentUrl;
+  } else {
+    // iOS / Desktop：api.whatsapp.com 強制普通 WA（唔係 wa.me）
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(msg), '_blank');
+  }
+}
+
+// ── 分享我張卡 ──
 function shareMyCard() {
   var nl = String.fromCharCode(10);
   var msg = '我係 CoEldery 老有聯盟85 會員，呢個係我張會員卡：' + nl + 'https://coeldery85.com/membership/card/' + MEMBER_NO;
-  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(msg), '_blank');
+  openNormalWA(msg);
 }
 
-// ── 邀請朋友加入（普通 WA 傳註冊連結）──
+// ── 邀請朋友加入 ──
 function inviteFriend() {
   var nl = String.fromCharCode(10);
   var msg = '我邀請你加入 CoEldery 老有聯盟85！免費登記做會員：' + nl + 'https://coeldery85.com/membership/join';
-  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(msg), '_blank');
+  openNormalWA(msg);
 }
 
 // ── Medical card re-apply (Part C) ───────────────────────────────────────────
