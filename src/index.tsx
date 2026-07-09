@@ -4149,13 +4149,16 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
 
   <!-- ── 會員資料 ── -->
   <div class="section">
-    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleMemberInfo()">
       <span>◆ 會員資料</span>
-      <button class="toggle-edit-btn" onclick="toggleEdit()">✏️ 編輯</button>
+      <span style="display:flex;align-items:center;gap:10px;">
+        <button class="toggle-edit-btn" id="editToggleBtn" style="display:none;" onclick="event.stopPropagation();toggleEdit()">✏️ 編輯</button>
+        <span id="memberInfoArrow" style="font-size:22px;color:#2E7D32;line-height:1;user-select:none;">▼</span>
+      </span>
     </div>
 
-    <!-- 顯示模式 -->
-    <div id="viewMode">
+    <!-- 顯示模式（預設收起）-->
+    <div id="viewMode" style="display:none;">
       <div class="info-row">
         <span class="info-label">中文姓名</span>
         <span class="info-value" style="font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;color:${accentDark};">${m.name_zh}</span>
@@ -4451,6 +4454,28 @@ function showToast(msg, dur) {
 }
 
 // ── Edit toggle ───────────────────────────────────────────────────────────────
+// ── 展開/收起「◆ 會員資料」區塊 ──
+function toggleMemberInfo() {
+  var vm = document.getElementById('viewMode');
+  var em = document.getElementById('editMode');
+  var arrow = document.getElementById('memberInfoArrow');
+  var editBtn = document.getElementById('editToggleBtn');
+  // 判斷目前是否展開（viewMode 可見 OR editMode 開着）
+  var isOpen = (vm && vm.style.display !== 'none') || (em && em.classList.contains('open'));
+  if (isOpen) {
+    // 收起
+    if (vm) vm.style.display = 'none';
+    if (em) em.classList.remove('open');
+    if (arrow) arrow.textContent = '\u25bc';
+    if (editBtn) editBtn.style.display = 'none';
+  } else {
+    // 展開
+    if (vm) vm.style.display = '';
+    if (arrow) arrow.textContent = '\u25b2';
+    if (editBtn) editBtn.style.display = '';
+  }
+}
+
 function toggleEdit() {
   var vm = document.getElementById('viewMode');
   var em = document.getElementById('editMode');
@@ -6269,12 +6294,7 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 /* ── 卡片框架 ── */
 .card-frame{width:100%;border:none;min-height:600px;background:transparent;}
 
-/* ── Accordion（展開查看/編輯資料）── */
-.accordion-btn{display:block;width:100%;min-height:55px;margin-top:18px;
-  background:var(--green);color:#fff;border:none;border-radius:10px;
-  font-size:20px;font-weight:900;cursor:pointer;letter-spacing:1px;
-  padding:14px 18px;text-align:center;transition:background 0.15s;}
-.accordion-btn:active{background:var(--green-dark);}
+/* ── Accordion（install section 收結）── */
 .accordion-content{margin-top:0;overflow:hidden;}
 
 /* ── 底部 5-tab 導航列 ── */
@@ -6439,19 +6459,8 @@ function switchTab(name) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── Accordion（展開/收起會員資料）──
-function toggleAccordion() {
-  var content = document.getElementById('accordionContent');
-  var btn = document.getElementById('accordionBtn');
-  if (!content || !btn) return;
-  if (content.style.display === 'none' || content.style.display === '') {
-    content.style.display = 'block';
-    btn.textContent = '▲ 收起資料';
-  } else {
-    content.style.display = 'none';
-    btn.textContent = '▼ 展開查看 / 編輯資料';
-  }
-}
+// ── toggleAccordion 已不再使用（accordion-btn 已移除）──
+function toggleAccordion() {}
 
 // ── PWA 安裝提示儲存 ──
 var deferredPrompt = null;
@@ -6499,13 +6508,6 @@ function showInstallBanner() {
   var info = detectBrowser();
   var sec = document.getElementById('installSection');
   if (!sec) return;
-  // 展開 accordion（如有）再顯示安裝提示
-  var accordionContent = document.getElementById('accordionContent');
-  var accordionBtn = document.getElementById('accordionBtn');
-  if (accordionContent && accordionContent.style.display !== 'block') {
-    accordionContent.style.display = 'block';
-    if (accordionBtn) accordionBtn.textContent = '▲ 收起資料';
-  }
   sec.style.display = '';
   if (info.isInApp) {
     document.getElementById('installInApp').style.display = '';
@@ -6607,35 +6609,31 @@ function showCard(memberNo, waClicked) {
   // 卡 iframe
   var iframeHtml = '<iframe class="card-frame" src="/membership/card/' + encodeURIComponent(memberNo) +
     '" title="老有卡" frameborder="0" allow="fullscreen"></iframe>';
-  // Accordion 按鈕（預設收起，顯示展開掣）
-  var accordionBtnHtml = '<button class="accordion-btn" id="accordionBtn" onclick="toggleAccordion()">▼ 展開查看 / 編輯資料</button>';
-  // Accordion 內容（installSection + switch-wrap，預設隱藏）
-  var accordionContentHtml =
-    '<div class="accordion-content" id="accordionContent" style="display:none;">' +
-      '<div id="installSection" style="display:none;">' +
-        '<div class="install-banner" id="installAndroid" style="display:none;">' +
-          '<h3>📱 將會員卡加落手機主畫面</h3>' +
-          '<p>安裝後可以喺主畫面直接開啟，唔使記住網址！</p>' +
-          '<button class="install-btn" id="installBtn" onclick="doInstall()">⬇️ 安裝到主畫面</button>' +
-        '</div>' +
-        '<div class="install-banner" id="installIOS" style="display:none;">' +
-          '<h3>📱 將會員卡加落主畫面</h3>' +
-          '<div class="ios-steps">' +
-            '<div class="step"><div class="step-num">1</div><div class="step-text">撳 Safari 下面嘅 <strong>「共享」掣</strong> 🔗</div></div>' +
-            '<div class="step"><div class="step-num">2</div><div class="step-text">向上捲，揀 <strong>「加至主畫面」</strong> ＋</div></div>' +
-            '<div class="step"><div class="step-num">3</div><div class="step-text">撳右上角 <strong>「新增」</strong> 完成！</div></div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="install-banner" id="installInApp" style="display:none;">' +
-          '<h3>📱 請用 Safari 或 Chrome 開啟</h3>' +
-          '<p>你而家係用 WhatsApp / FB 入面嘅瀏覽器，<strong>唔支援安裝到主畫面</strong>。</p>' +
-          '<p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>' +
-          '<button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>' +
-        '</div>' +
-        '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>' +
+  // install section + 換人（預設隱藏，由 showInstallBanner() 展開）
+  var installHtml =
+    '<div id="installSection" style="display:none;">' +
+      '<div class="install-banner" id="installAndroid" style="display:none;">' +
+        '<h3>📱 將會員卡加落手機主畫面</h3>' +
+        '<p>安裝後可以喺主畫面直接開啟，唔使記住網址！</p>' +
+        '<button class="install-btn" id="installBtn" onclick="doInstall()">⬇️ 安裝到主畫面</button>' +
       '</div>' +
+      '<div class="install-banner" id="installIOS" style="display:none;">' +
+        '<h3>📱 將會員卡加落主畫面</h3>' +
+        '<div class="ios-steps">' +
+          '<div class="step"><div class="step-num">1</div><div class="step-text">撳 Safari 下面嘅 <strong>「共享」掣</strong> 🔗</div></div>' +
+          '<div class="step"><div class="step-num">2</div><div class="step-text">向上捲，揀 <strong>「加至主畫面」</strong> ＋</div></div>' +
+          '<div class="step"><div class="step-num">3</div><div class="step-text">撳右上角 <strong>「新增」</strong> 完成！</div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="install-banner" id="installInApp" style="display:none;">' +
+        '<h3>📱 請用 Safari 或 Chrome 開啟</h3>' +
+        '<p>你而家係用 WhatsApp / FB 入面嘅瀏覽器，<strong>唔支援安裝到主畫面</strong>。</p>' +
+        '<p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>' +
+        '<button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>' +
+      '</div>' +
+      '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>' +
     '</div>';
-  wrap.innerHTML = iframeHtml + accordionBtnHtml + accordionContentHtml;
+  wrap.innerHTML = iframeHtml + installHtml;
   // 用戶已點過 WA 按鈕 → 立即展開 accordion + 顯示安裝提示
   if (waClicked) {
     showInstallBanner();
