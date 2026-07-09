@@ -6227,7 +6227,7 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 .topbar .sub{font-size:14px;opacity:0.8;margin-top:2px;}
 
 /* ── 主內容 ── */
-.wrap{max-width:480px;margin:0 auto;padding:28px 18px 60px;}
+.wrap{max-width:480px;margin:0 auto;padding:28px 18px 80px;}
 
 /* ── 輸入區 ── */
 .lookup-card{background:var(--white);border-radius:14px;padding:28px 22px;box-shadow:0 4px 20px rgba(0,0,0,0.08);}
@@ -6268,6 +6268,35 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 
 /* ── 卡片框架 ── */
 .card-frame{width:100%;border:none;min-height:600px;background:transparent;}
+
+/* ── Accordion（展開查看/編輯資料）── */
+.accordion-btn{display:block;width:100%;min-height:55px;margin-top:18px;
+  background:var(--green);color:#fff;border:none;border-radius:10px;
+  font-size:20px;font-weight:900;cursor:pointer;letter-spacing:1px;
+  padding:14px 18px;text-align:center;transition:background 0.15s;}
+.accordion-btn:active{background:var(--green-dark);}
+.accordion-content{margin-top:0;overflow:hidden;}
+
+/* ── 底部 5-tab 導航列 ── */
+.bottom-tab-bar{position:fixed;bottom:0;left:0;right:0;height:68px;
+  background:#fff;border-top:1.5px solid #ddd;
+  display:flex;align-items:stretch;z-index:999;
+  box-shadow:0 -2px 10px rgba(0,0,0,0.08);}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:none;border:none;cursor:pointer;padding:6px 2px;
+  color:#888;font-family:inherit;transition:color 0.15s;min-height:60px;gap:2px;}
+.tab-btn .tab-icon{font-size:26px;line-height:1;}
+.tab-btn .tab-label{font-size:13px;font-weight:600;line-height:1;letter-spacing:0.3px;}
+.tab-btn.active{color:var(--green);}
+.tab-btn.tab-card-btn{color:var(--green-dark);}
+.tab-btn.tab-card-btn .tab-icon{font-size:30px;}
+.tab-btn.tab-card-btn .tab-label{font-size:14px;font-weight:900;}
+.tab-btn.tab-card-btn.active{color:var(--green);}
+
+/* ── Coming soon panel ── */
+.coming-soon-panel{display:none;padding:60px 20px;text-align:center;}
+.coming-soon-panel .coming-icon{font-size:56px;margin-bottom:18px;}
+.coming-soon-panel .coming-text{font-size:24px;font-weight:900;color:#444;line-height:1.6;}
 </style>
 </head>
 <body>
@@ -6276,66 +6305,154 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
   <img src="/icon-192.png" alt="CoEldery 85">
   <div>
     <div class="brand">CoEldery 85</div>
-    <div class="sub">老有聯盟</div>
+    <div class="sub">老有聯盟 85</div>
   </div>
 </div>
 
-<div class="wrap" id="mainWrap">
+<!-- ── Tab 面板：購物 ── -->
+<div id="tabShop" class="coming-soon-panel">
+  <div class="coming-icon">🛒</div>
+  <div class="coming-text">🚧 即將推出，敬請期待 🙏</div>
+</div>
 
-  <!-- 輸入電話查詢 (初始顯示) -->
-  <div class="lookup-card" id="lookupSection">
-    <h2>📱 查閱你的老有卡</h2>
-    <p>請輸入你登記時用嘅電話號碼，系統即時搵出你張卡。</p>
-    <label class="field-label" for="phoneInput">電話號碼 / 會員編號</label>
-    <input class="big-input" id="phoneInput" type="tel" inputmode="numeric"
-      placeholder="例：91234567" autocomplete="tel" maxlength="20">
-    <button class="big-btn" id="lookupBtn" onclick="doLookup()">🔍 搵我的卡</button>
-    <div class="err-msg" id="errMsg">搵唔到，請確認電話號碼是否正確</div>
-  </div>
+<!-- ── Tab 面板：消息 ── -->
+<div id="tabNews" class="coming-soon-panel">
+  <div class="coming-icon">📢</div>
+  <div class="coming-text">🚧 即將推出，敬請期待 🙏</div>
+</div>
 
-  <!-- 安裝提示 (搵到會員後顯示) -->
-  <div id="installSection" style="display:none;">
-    <!-- Android / Chrome beforeinstallprompt -->
-    <div class="install-banner" id="installAndroid" style="display:none;">
-      <h3>📱 將會員卡加落手機主畫面</h3>
-      <p>安裝後可以喺主畫面直接開啟，唔使記住網址！</p>
-      <button class="install-btn" id="installBtn" onclick="doInstall()">⬇️ 安裝到主畫面</button>
+<!-- ── Tab 面板：我的卡（預設顯示）── -->
+<div id="tabCard" style="display:block;">
+  <div class="wrap" id="mainWrap">
+
+    <!-- 輸入電話查詢 (初始顯示) -->
+    <div class="lookup-card" id="lookupSection">
+      <h2>📱 查閱你的老有卡</h2>
+      <p>請輸入你登記時用嘅電話號碼，系統即時搵出你張卡。</p>
+      <label class="field-label" for="phoneInput">電話號碼 / 會員編號</label>
+      <input class="big-input" id="phoneInput" type="tel" inputmode="numeric"
+        placeholder="例：91234567" autocomplete="tel" maxlength="20">
+      <button class="big-btn" id="lookupBtn" onclick="doLookup()">🔍 搵我的卡</button>
+      <div class="err-msg" id="errMsg">搵唔到，請確認電話號碼是否正確</div>
     </div>
-    <!-- iPhone Safari -->
-    <div class="install-banner" id="installIOS" style="display:none;">
-      <h3>📱 將會員卡加落主畫面</h3>
-      <div class="ios-steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-text">撳 Safari 下面嘅 <strong>「共享」掣</strong> 🔗</div>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-text">向上捲，揀 <strong>「加至主畫面」</strong> ＋</div>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-text">撳右上角 <strong>「新增」</strong> 完成！</div>
+
+    <!-- 安裝提示 (搵到會員後顯示，在 accordion 內) -->
+    <div id="installSection" style="display:none;">
+      <!-- Android / Chrome beforeinstallprompt -->
+      <div class="install-banner" id="installAndroid" style="display:none;">
+        <h3>📱 將會員卡加落手機主畫面</h3>
+        <p>安裝後可以喺主畫面直接開啟，唔使記住網址！</p>
+        <button class="install-btn" id="installBtn" onclick="doInstall()">⬇️ 安裝到主畫面</button>
+      </div>
+      <!-- iPhone Safari -->
+      <div class="install-banner" id="installIOS" style="display:none;">
+        <h3>📱 將會員卡加落主畫面</h3>
+        <div class="ios-steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text">撳 Safari 下面嘅 <strong>「共享」掣</strong> 🔗</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text">向上捲，揀 <strong>「加至主畫面」</strong> ＋</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text">撳右上角 <strong>「新增」</strong> 完成！</div>
+          </div>
         </div>
       </div>
-    </div>
-    <!-- WhatsApp / FB 內置瀏覽器 -->
-    <div class="install-banner" id="installInApp" style="display:none;">
-      <h3>📱 請用 Safari 或 Chrome 開啟</h3>
-      <p>你而家係用 WhatsApp / FB 入面嘅瀏覽器，<strong>唔支援安裝到主畫面</strong>。</p>
-      <p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>
-      <button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>
+      <!-- WhatsApp / FB 內置瀏覽器 -->
+      <div class="install-banner" id="installInApp" style="display:none;">
+        <h3>📱 請用 Safari 或 Chrome 開啟</h3>
+        <p>你而家係用 WhatsApp / FB 入面嘅瀏覽器，<strong>唔支援安裝到主畫面</strong>。</p>
+        <p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>
+        <button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>
+      </div>
+      <!-- 換人 -->
+      <div class="switch-wrap">
+        <button class="switch-link" onclick="switchUser()">唔係你？換人</button>
+      </div>
     </div>
 
-    <!-- 換人 -->
-    <div class="switch-wrap">
-      <button class="switch-link" onclick="switchUser()">唔係你？換人</button>
-    </div>
   </div>
-
 </div>
 
+<!-- ── Tab 面板：心聲 ── -->
+<div id="tabVoice" class="coming-soon-panel">
+  <div class="coming-icon">💬</div>
+  <div class="coming-text">🚧 即將推出，敬請期待 🙏</div>
+</div>
+
+<!-- ── Tab 面板：工作 ── -->
+<div id="tabWork" class="coming-soon-panel">
+  <div class="coming-icon">💼</div>
+  <div class="coming-text">🚧 即將推出，敬請期待 🙏</div>
+</div>
+
+<!-- ── 底部 5-tab 導航列 ── -->
+<nav class="bottom-tab-bar" id="bottomTabBar">
+  <button class="tab-btn" id="tabBtnShop" onclick="switchTab('shop')">
+    <span class="tab-icon">🛒</span>
+    <span class="tab-label">購物</span>
+  </button>
+  <button class="tab-btn" id="tabBtnNews" onclick="switchTab('news')">
+    <span class="tab-icon">📢</span>
+    <span class="tab-label">消息</span>
+  </button>
+  <button class="tab-btn tab-card-btn active" id="tabBtnCard" onclick="switchTab('card')">
+    <span class="tab-icon">💳</span>
+    <span class="tab-label">我的卡</span>
+  </button>
+  <button class="tab-btn" id="tabBtnVoice" onclick="switchTab('voice')">
+    <span class="tab-icon">💬</span>
+    <span class="tab-label">心聲</span>
+  </button>
+  <button class="tab-btn" id="tabBtnWork" onclick="switchTab('work')">
+    <span class="tab-icon">💼</span>
+    <span class="tab-label">工作</span>
+  </button>
+</nav>
+
 <script>
+// ── Tab 切換 ──
+var TAB_PANELS = { shop:'tabShop', news:'tabNews', card:'tabCard', voice:'tabVoice', work:'tabWork' };
+var TAB_BTNS   = { shop:'tabBtnShop', news:'tabBtnNews', card:'tabBtnCard', voice:'tabBtnVoice', work:'tabBtnWork' };
+var currentTab = 'card';
+
+function switchTab(name) {
+  if (name === currentTab) return;
+  // 隱藏現在的 panel
+  var oldPanel = document.getElementById(TAB_PANELS[currentTab]);
+  if (oldPanel) oldPanel.style.display = 'none';
+  // 移除 active class
+  var oldBtn = document.getElementById(TAB_BTNS[currentTab]);
+  if (oldBtn) oldBtn.classList.remove('active');
+  // 顯示新 panel
+  currentTab = name;
+  var newPanel = document.getElementById(TAB_PANELS[name]);
+  if (newPanel) newPanel.style.display = 'block';
+  // 加 active class
+  var newBtn = document.getElementById(TAB_BTNS[name]);
+  if (newBtn) newBtn.classList.add('active');
+  // 捲到頂部
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Accordion（展開/收起會員資料）──
+function toggleAccordion() {
+  var content = document.getElementById('accordionContent');
+  var btn = document.getElementById('accordionBtn');
+  if (!content || !btn) return;
+  if (content.style.display === 'none' || content.style.display === '') {
+    content.style.display = 'block';
+    btn.textContent = '▲ 收起資料';
+  } else {
+    content.style.display = 'none';
+    btn.textContent = '▼ 展開查看 / 編輯資料';
+  }
+}
+
 // ── PWA 安裝提示儲存 ──
 var deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', function(e) {
@@ -6344,7 +6461,6 @@ window.addEventListener('beforeinstallprompt', function(e) {
   // 如果安裝區段已顯示（用戶已點 WA），補顯示/更新 Android 安裝掣
   var sec = document.getElementById('installSection');
   if (sec && sec.style.display !== 'none') {
-    // Section already visible — just show the Android install button
     document.getElementById('installAndroid').style.display = '';
     document.getElementById('installIOS').style.display = 'none';
     document.getElementById('installInApp').style.display = 'none';
@@ -6354,9 +6470,7 @@ window.addEventListener('beforeinstallprompt', function(e) {
 // ── 接收 card iframe 的 postMessage（用戶在卡頁點咗 WA 按鈕）──
 window.addEventListener('message', function(e) {
   if (e.data && e.data.type === 'ce85_wa_clicked') {
-    // 記錄到 localStorage
     localStorage.setItem('ce85_wa_clicked', '1');
-    // 立即顯示安裝提示
     showInstallBanner();
   }
 });
@@ -6375,7 +6489,6 @@ function detectBrowser() {
   var ua = navigator.userAgent || '';
   var isIOS = /iPhone|iPad|iPod/.test(ua);
   var isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|mercury/.test(ua);
-  // Use RegExp constructor to avoid regex literal slash escaping issues in template string
   var isInApp = new RegExp('FBAN|FBAV|Instagram|WhatsApp|Line').test(ua);
   return { isIOS: isIOS, isSafari: isSafari, isInApp: isInApp };
 }
@@ -6386,45 +6499,39 @@ function showInstallBanner() {
   var info = detectBrowser();
   var sec = document.getElementById('installSection');
   if (!sec) return;
+  // 展開 accordion（如有）再顯示安裝提示
+  var accordionContent = document.getElementById('accordionContent');
+  var accordionBtn = document.getElementById('accordionBtn');
+  if (accordionContent && accordionContent.style.display !== 'block') {
+    accordionContent.style.display = 'block';
+    if (accordionBtn) accordionBtn.textContent = '▲ 收起資料';
+  }
   sec.style.display = '';
-  // 根據瀏覽器類型顯示對應指引
   if (info.isInApp) {
-    // WhatsApp/FB in-app browser — show copy URL instructions
     document.getElementById('installInApp').style.display = '';
     document.getElementById('installAndroid').style.display = 'none';
     document.getElementById('installIOS').style.display = 'none';
   } else if (info.isIOS && info.isSafari) {
-    // iOS Safari — show step-by-step Share instructions
     document.getElementById('installIOS').style.display = '';
     document.getElementById('installInApp').style.display = 'none';
     document.getElementById('installAndroid').style.display = 'none';
   } else {
-    // Android Chrome or other — show install button (may be activated when beforeinstallprompt fires)
-    if (deferredPrompt) {
-      document.getElementById('installAndroid').style.display = '';
-    } else {
-      // Show section but hide specific blocks until prompt arrives
-      // beforeinstallprompt listener will show installAndroid when ready
-      document.getElementById('installAndroid').style.display = '';
-      // Update button text to indicate waiting
-      var btn = document.getElementById('installBtn');
-      if (btn) {
-        btn.textContent = '⬇️ 安裝到主畫面';
-        btn.onclick = function() {
-          if (deferredPrompt) {
-            doInstall();
-          } else {
-            // Fallback: show Chrome menu instructions
-            btn.textContent = '請喺 Chrome 選單（⋮）→ 加至主螢幕';
-            btn.style.background = '#888';
-          }
-        };
-      }
+    document.getElementById('installAndroid').style.display = '';
+    var btn = document.getElementById('installBtn');
+    if (btn && !deferredPrompt) {
+      btn.textContent = '⬇️ 安裝到主畫面';
+      btn.onclick = function() {
+        if (deferredPrompt) {
+          doInstall();
+        } else {
+          btn.textContent = '請喺 Chrome 選單（⋮）→ 加至主螢幕';
+          btn.style.background = '#888';
+        }
+      };
     }
     document.getElementById('installInApp').style.display = 'none';
     document.getElementById('installIOS').style.display = 'none';
   }
-  // 平滑捲到安裝提示
   sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -6474,12 +6581,10 @@ function doLookup() {
       var memberNo = data.member_no || (data.member && data.member.member_no);
       if (data.ok && memberNo) {
         localStorage.setItem('ce85_member_no', memberNo);
-        // 用 wa_clicked_at 判斷用戶是否已點過 WA 按鈕（後端有記錄）
         var waClickedAt = data.wa_clicked_at || (data.member && data.member.wa_clicked_at) || null;
         if (waClickedAt) {
           localStorage.setItem('ce85_wa_clicked', '1');
         }
-        // waClicked = 後端記錄 OR localStorage 本地已記錄（同一裝置之前點過）
         var waClicked = !!waClickedAt || localStorage.getItem('ce85_wa_clicked') === '1';
         showCard(memberNo, waClicked);
       } else {
@@ -6495,16 +6600,43 @@ function doLookup() {
     });
 }
 
-// ── 顯示會員卡 ──
+// ── 顯示會員卡（查到後替換主內容）──
 // waClicked: boolean — 用戶已點過 WA 按鈕（立即顯示安裝提示）
 function showCard(memberNo, waClicked) {
-  // 替換整個 lookup 區為 iframe 嵌入卡頁
   var wrap = document.getElementById('mainWrap');
-  wrap.innerHTML =
-    '<iframe class="card-frame" src="/membership/card/' + encodeURIComponent(memberNo) +
-    '" title="老有卡" frameborder="0" allow="fullscreen"></iframe>' +
-    '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>';
-  // 用戶已點過 WA 按鈕 → 立即顯示安裝提示
+  // 卡 iframe
+  var iframeHtml = '<iframe class="card-frame" src="/membership/card/' + encodeURIComponent(memberNo) +
+    '" title="老有卡" frameborder="0" allow="fullscreen"></iframe>';
+  // Accordion 按鈕（預設收起，顯示展開掣）
+  var accordionBtnHtml = '<button class="accordion-btn" id="accordionBtn" onclick="toggleAccordion()">▼ 展開查看 / 編輯資料</button>';
+  // Accordion 內容（installSection + switch-wrap，預設隱藏）
+  var accordionContentHtml =
+    '<div class="accordion-content" id="accordionContent" style="display:none;">' +
+      '<div id="installSection" style="display:none;">' +
+        '<div class="install-banner" id="installAndroid" style="display:none;">' +
+          '<h3>📱 將會員卡加落手機主畫面</h3>' +
+          '<p>安裝後可以喺主畫面直接開啟，唔使記住網址！</p>' +
+          '<button class="install-btn" id="installBtn" onclick="doInstall()">⬇️ 安裝到主畫面</button>' +
+        '</div>' +
+        '<div class="install-banner" id="installIOS" style="display:none;">' +
+          '<h3>📱 將會員卡加落主畫面</h3>' +
+          '<div class="ios-steps">' +
+            '<div class="step"><div class="step-num">1</div><div class="step-text">撳 Safari 下面嘅 <strong>「共享」掣</strong> 🔗</div></div>' +
+            '<div class="step"><div class="step-num">2</div><div class="step-text">向上捲，揀 <strong>「加至主畫面」</strong> ＋</div></div>' +
+            '<div class="step"><div class="step-num">3</div><div class="step-text">撳右上角 <strong>「新增」</strong> 完成！</div></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="install-banner" id="installInApp" style="display:none;">' +
+          '<h3>📱 請用 Safari 或 Chrome 開啟</h3>' +
+          '<p>你而家係用 WhatsApp / FB 入面嘅瀏覽器，<strong>唔支援安裝到主畫面</strong>。</p>' +
+          '<p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>' +
+          '<button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>' +
+        '</div>' +
+        '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>' +
+      '</div>' +
+    '</div>';
+  wrap.innerHTML = iframeHtml + accordionBtnHtml + accordionContentHtml;
+  // 用戶已點過 WA 按鈕 → 立即展開 accordion + 顯示安裝提示
   if (waClicked) {
     showInstallBanner();
   }
@@ -6522,23 +6654,23 @@ function switchUser() {
 // ── 頁面載入：檢查 localStorage ──
 (function init() {
   // Enter 鍵觸發查詢
-  document.getElementById('phoneInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') doLookup();
-  });
+  var phoneInput = document.getElementById('phoneInput');
+  if (phoneInput) {
+    phoneInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doLookup();
+    });
+  }
 
   var saved = localStorage.getItem('ce85_member_no');
   if (saved) {
-    // 有記住的 member_no：先用 localStorage 的 wa_clicked 狀態顯示卡
     var savedWaClicked = localStorage.getItem('ce85_wa_clicked') === '1';
     showCard(saved, savedWaClicked);
-    // 再 refresh 最新 wa_clicked_at（用戶可能在其他裝置點過 WA）
     fetch('/api/members/lookup?q=' + encodeURIComponent(saved))
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.ok) {
           var latestWaClickedAt = data.wa_clicked_at || (data.member && data.member.wa_clicked_at) || null;
           if (latestWaClickedAt && !savedWaClicked) {
-            // 後端有記錄但本地未記錄 → 更新並補顯示安裝提示
             localStorage.setItem('ce85_wa_clicked', '1');
             showInstallBanner();
           }
