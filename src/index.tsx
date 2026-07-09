@@ -4141,9 +4141,9 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
   <!-- ── 卡片操作 ── -->
   <div class="card-actions">
     <button class="card-btn" onclick="saveCardImage()">💾 儲存卡圖</button>
-    <button class="card-btn" onclick="shareCardToWA()">📤 分享</button>
-    <button class="card-btn wa" onclick="shareCardToWA()">
-      📱 WhatsApp 分享會員卡
+    <button class="card-btn" onclick="shareMyCard()" style="min-height:55px;font-size:20px;font-weight:900;">📤 分享我張卡</button>
+    <button class="card-btn wa" onclick="inviteFriend()" style="min-height:55px;font-size:20px;font-weight:900;">
+      👥 邀請朋友加入
     </button>
   </div>
 
@@ -4642,6 +4642,18 @@ async function shareCardToWA(){
   }
   saveCardImage();
   showToast('圖片已下載，請貼入 WhatsApp 傳送', 3000);
+}
+
+// ── 分享我張卡（wa.me 傳卡連結俾朋友）──
+function shareMyCard() {
+  var msg = '我係 CoEldery 老有聯盟85 會員，呢個係我張會員卡：\nhttps://coeldery85.com/membership/card/' + MEMBER_NO;
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ── 邀請朋友加入（wa.me 傳註冊連結）──
+function inviteFriend() {
+  var msg = '我邀請你加入 CoEldery 老有聯盟85！免費登記做會員：\nhttps://coeldery85.com/membership/join';
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
 // ── Medical card re-apply (Part C) ───────────────────────────────────────────
