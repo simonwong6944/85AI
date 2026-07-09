@@ -1676,31 +1676,31 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 .brand-strip .mark{width:48px;height:48px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .brand-strip .mark img{width:48px;height:48px;object-fit:contain;}
 .brand-strip .name .zh{font-family:"Noto Serif TC",serif;font-size:18px;color:var(--forest-deep);font-weight:700;letter-spacing:2px;line-height:1.3;}
-.brand-strip .name .en{font-size:12px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
+.brand-strip .name .en{font-size:18px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
 .header-card{background:linear-gradient(135deg,#0d3e12 0%,#1B5E20 100%);color:#fff;padding:26px 22px;border-radius:4px;margin-bottom:20px;position:relative;overflow:hidden;}
 .header-card::before{content:"85";position:absolute;right:-20px;bottom:-60px;font-family:"Noto Serif TC",serif;font-size:200px;font-weight:900;color:var(--ferrari);opacity:0.22;line-height:1;}
-.header-card .tag{display:inline-block;background:var(--ferrari);color:#fff;padding:4px 12px;font-size:13px;letter-spacing:3px;font-weight:700;margin-bottom:12px;position:relative;z-index:2;}
+.header-card .tag{display:inline-block;background:var(--ferrari);color:#fff;padding:4px 12px;font-size:18px;letter-spacing:3px;font-weight:700;margin-bottom:12px;position:relative;z-index:2;}
 .header-card h1{font-family:"Noto Serif TC",serif;font-size:32px;font-weight:900;letter-spacing:3px;line-height:1.25;margin-bottom:8px;position:relative;z-index:2;}
-.header-card p{font-size:16px;opacity:0.9;line-height:1.7;position:relative;z-index:2;}
+.header-card p{font-size:20px;opacity:0.9;line-height:1.7;position:relative;z-index:2;}
 .form-card{background:#fff;padding:28px 22px;border-radius:4px;margin-bottom:20px;}
-.form-card .step-note{display:flex;align-items:center;gap:8px;padding:12px 14px;background:#FFF3B0;border-left:3px solid var(--ferrari);font-size:16px;color:var(--grey-1);margin-bottom:24px;line-height:1.6;}
+.form-card .step-note{display:flex;align-items:center;gap:8px;padding:12px 14px;background:#FFF3B0;border-left:3px solid var(--ferrari);font-size:18px;color:var(--grey-1);margin-bottom:24px;line-height:1.6;}
 /* ── 欄位標籤：22px ── */
 .field{margin-bottom:24px;}
 .field .label-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
 .field label{font-family:"Noto Serif TC",serif;font-size:22px;color:var(--forest-deep);font-weight:700;letter-spacing:1px;line-height:1.4;}
-.field .req{color:var(--ferrari);font-size:16px;font-weight:700;}
-.field .opt{color:var(--grey-3);font-size:14px;}
+.field .req{color:var(--ferrari);font-size:18px;font-weight:700;}
+.field .opt{color:var(--grey-3);font-size:18px;}
 /* ── input / select：最少 55px 高、20px 字體 ── */
 .field input,.field select{width:100%;padding:16px 14px;min-height:55px;border:2px solid var(--line);border-radius:6px;font-size:20px;font-family:inherit;color:#111;background:#fff;transition:border 0.2s;box-sizing:border-box;line-height:1.4;}
 .field input:focus,.field select:focus{outline:0;border-color:var(--forest);border-width:3px;}
-.field .hint{font-size:14px;color:var(--grey-3);margin-top:6px;line-height:1.6;}
-.section-divider{padding:16px 0 10px;font-family:"Noto Serif TC",serif;font-size:15px;color:var(--grey-2);letter-spacing:3px;border-top:1px dashed var(--line);margin-top:8px;}
+.field .hint{font-size:18px;color:var(--grey-3);margin-top:6px;line-height:1.6;}
+.section-divider{padding:16px 0 10px;font-family:"Noto Serif TC",serif;font-size:18px;color:var(--grey-2);letter-spacing:3px;border-top:1px dashed var(--line);margin-top:8px;}
 /* ── 性別掣：最少 55px 高、20px 字體 ── */
 .gender-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
 .gender-row .g-btn{padding:14px 4px;min-height:55px;border:2px solid var(--line);background:#fff;text-align:center;cursor:pointer;font-size:20px;font-family:inherit;color:#333;border-radius:6px;font-weight:600;line-height:1.3;}
 .gender-row .g-btn.active{border-color:var(--forest);border-width:3px;background:var(--forest-pale);color:var(--forest-deep);font-weight:700;}
 /* ── 同意條款：字體放大 ── */
-.consent{padding:16px;background:var(--forest-pale);border-radius:4px;font-size:16px;color:#111;line-height:1.8;margin-bottom:24px;}
+.consent{padding:16px;background:var(--forest-pale);border-radius:4px;font-size:18px;color:#111;line-height:1.8;margin-bottom:24px;}
 .consent label{display:flex;gap:12px;cursor:pointer;align-items:flex-start;}
 .consent input{width:24px;height:24px;margin-top:3px;flex-shrink:0;accent-color:var(--forest);}
 .consent a{color:var(--forest);text-decoration:underline;}
@@ -1709,9 +1709,9 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 .medical-header{background:linear-gradient(135deg,#1565C0 0%,#1976D2 100%);color:#fff;padding:16px 16px;display:flex;align-items:center;justify-content:space-between;user-select:none;}
 .medical-header .mh-left{display:flex;align-items:center;gap:10px;}
 .medical-header .mh-icon{font-size:28px;line-height:1;}
-.medical-header .mh-title{font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:1px;line-height:1.3;}
-.medical-header .mh-sub{font-size:13px;opacity:0.85;margin-top:3px;letter-spacing:0.5px;}
-.medical-header .mh-badge{background:#FFD600;color:#1A237E;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:1px;white-space:nowrap;}
+.medical-header .mh-title{font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:1px;line-height:1.3;}
+.medical-header .mh-sub{font-size:18px;opacity:0.85;margin-top:3px;letter-spacing:0.5px;}
+.medical-header .mh-badge{background:#FFD600;color:#1A237E;font-size:18px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:1px;white-space:nowrap;}
 .medical-cta{background:#E8F0FE;border-bottom:1px solid #C5CAE9;transition:background 0.15s;}
 .medical-cta-label{display:flex;align-items:center;gap:0;cursor:pointer;width:100%;padding:0;}
 .medical-cta-check{display:flex;align-items:center;justify-content:center;background:#1565C0;width:64px;min-height:72px;flex-shrink:0;}
@@ -1720,31 +1720,31 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 .custom-check-box.checked{background:#fff;border-color:#fff;}
 .custom-check-box.checked::after{content:'';display:block;width:9px;height:16px;border-right:3px solid #1565C0;border-bottom:3px solid #1565C0;transform:rotate(45deg) translate(-1px,-2px);}
 .medical-cta-text{flex:1;padding:16px 14px 16px 16px;}
-.medical-cta-main{font-size:18px;color:#0D47A1;font-weight:700;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;margin-bottom:5px;line-height:1.4;}
-.medical-cta-sub{font-size:14px;color:#5C6BC0;line-height:1.6;}
+.medical-cta-main{font-size:20px;color:#0D47A1;font-weight:700;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;margin-bottom:5px;line-height:1.4;}
+.medical-cta-sub{font-size:18px;color:#5C6BC0;line-height:1.6;}
 .medical-cta-arrow{font-size:22px;color:#1565C0;padding-right:14px;flex-shrink:0;transition:transform 0.2s;}
 .medical-cta-arrow.open{transform:rotate(180deg);}
 .medical-extra{display:none;padding:20px;background:#fff;}
 .medical-extra.show{display:block;}
-.medical-extra .notice{background:#FFF8E1;border-left:3px solid #F9A825;padding:12px 14px;font-size:15px;color:#5D4037;line-height:1.7;margin-bottom:20px;border-radius:0 4px 4px 0;}
+.medical-extra .notice{background:#FFF8E1;border-left:3px solid #F9A825;padding:12px 14px;font-size:18px;color:#5D4037;line-height:1.7;margin-bottom:20px;border-radius:0 4px 4px 0;}
 .medical-extra .field label{color:#1565C0;}
 .medical-extra .field input{border-color:#90CAF9;}
 .medical-extra .field input:focus{border-color:#1565C0;}
-.medical-privacy{background:#E3F2FD;border-radius:4px;padding:14px 16px;font-size:14px;color:#37474F;line-height:1.9;margin-top:14px;}
+.medical-privacy{background:#E3F2FD;border-radius:4px;padding:14px 16px;font-size:18px;color:#37474F;line-height:1.9;margin-top:14px;}
 .medical-privacy label{display:flex;gap:10px;cursor:pointer;align-items:flex-start;}
 .medical-privacy input{width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:#1565C0;}
 /* ── 提交掣：最少 55px 高、20px 字體 ── */
 .submit-btn{width:100%;padding:20px;min-height:55px;background:var(--forest);color:#fff;border:0;border-radius:6px;font-size:22px;font-family:"Noto Serif TC",sans-serif;font-weight:700;letter-spacing:3px;cursor:pointer;box-shadow:0 4px 0 var(--forest-deep);transition:all 0.1s;line-height:1.3;}
 .submit-btn:active{transform:translateY(2px);box-shadow:0 2px 0 var(--forest-deep);}
 .submit-btn:disabled{background:var(--grey-3);box-shadow:0 4px 0 var(--grey-2);cursor:not-allowed;}
-.footer-links{text-align:center;margin-top:20px;font-size:14px;color:var(--grey-3);line-height:2;}
+.footer-links{text-align:center;margin-top:20px;font-size:18px;color:var(--grey-3);line-height:2;}
 .footer-links a{color:var(--forest);text-decoration:none;}
 .success{display:none;text-align:center;}
 .success.show{display:block;}
 .success-icon{width:80px;height:80px;background:var(--forest);color:#fff;border-radius:50%;margin:20px auto 24px;display:flex;align-items:center;justify-content:center;font-size:44px;animation:pop 0.4s cubic-bezier(0.34,1.56,0.64,1);}
 @keyframes pop{0%{transform:scale(0);}100%{transform:scale(1);}}
 .success h1{font-family:"Noto Serif TC",serif;font-size:28px;color:var(--forest-deep);margin-bottom:6px;letter-spacing:3px;}
-.success .welcome{font-size:16px;color:var(--grey-2);margin-bottom:24px;}
+.success .welcome{font-size:20px;color:var(--grey-2);margin-bottom:24px;}
 .gen-card{width:340px;height:232px;margin:0 auto 20px;background:linear-gradient(150deg,#FAF7F0 0%,#F0EBD8 100%);border:1px solid #E5DEC8;border-radius:12px;position:relative;overflow:hidden;color:var(--forest-deep);box-shadow:0 12px 30px rgba(0,0,0,0.18);text-align:left;}
 .gen-card::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--forest) 0%,var(--forest-light) 45%,var(--ferrari) 45%,var(--ferrari) 100%);}
 .gen-card .gc-brand{position:absolute;top:16px;left:18px;display:flex;align-items:center;gap:8px;}
@@ -1762,9 +1762,9 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 .gen-card .gc-qr{width:46px;height:46px;background:#fff;padding:3px;border:1.5px solid var(--forest);border-radius:3px;flex-shrink:0;}
 .gen-card .gc-qr canvas{width:100%;height:100%;}
 .action-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
-.action-btn{padding:14px 8px;background:#fff;border:2px solid var(--forest);color:var(--forest-deep);font-family:"Noto Serif TC",serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;border-radius:4px;text-align:center;}
+.action-btn{padding:14px 8px;background:#fff;border:2px solid var(--forest);color:var(--forest-deep);font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:1px;cursor:pointer;border-radius:4px;text-align:center;min-height:55px;}
 .action-btn.red{border-color:var(--ferrari);color:var(--ferrari);}
-.wa-link{display:block;width:100%;padding:18px;background:var(--forest);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:12px;}
+.wa-link{display:block;width:100%;padding:18px;background:var(--forest);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:12px;min-height:55px;}
 /* ── 錯誤提示：大紅字最少 20px ── */
 .err-msg{background:var(--ferrari-pale);border:2px solid var(--ferrari);color:#b71c1c;padding:14px 18px;border-radius:6px;font-size:20px;font-weight:700;margin-bottom:20px;display:none;line-height:1.5;}
 .err-msg.show{display:block;}
@@ -1780,18 +1780,18 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 .login-panel .field label{font-family:"Noto Serif TC",serif;font-size:20px;color:#111;font-weight:700;letter-spacing:1px;margin-bottom:8px;display:block;line-height:1.4;}
 .login-panel .field input{width:100%;padding:16px 14px;min-height:55px;border:2px solid var(--line);border-radius:6px;font-size:20px;font-family:inherit;color:#111;background:#fff;transition:border 0.2s;box-sizing:border-box;}
 .login-panel .field input:focus{outline:0;border-color:var(--forest);border-width:3px;}
-.login-panel .field .hint{font-size:14px;color:var(--grey-3);margin-top:6px;line-height:1.6;}
+.login-panel .field .hint{font-size:18px;color:var(--grey-3);margin-top:6px;line-height:1.6;}
 .result-block{background:#E8F5E9;border:2px solid var(--forest);border-radius:6px;padding:20px;margin-top:16px;display:none;}
 .result-block.show{display:block;}
 .rb-name{font-family:"Noto Serif TC",serif;font-size:28px;font-weight:900;color:var(--forest-deep);}
-.rb-no{font-family:"Space Grotesk",monospace;font-size:15px;color:var(--grey-2);margin-bottom:14px;}
-.rb-go{display:block;width:100%;padding:16px;background:var(--forest-deep);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:8px;}
-.rb-family-title{font-family:"Noto Serif TC",serif;font-size:14px;color:var(--ferrari-deep);letter-spacing:2px;font-weight:700;margin:14px 0 8px;padding-top:12px;border-top:1px solid #c8e6c9;}
+.rb-no{font-family:"Space Grotesk",monospace;font-size:18px;color:var(--grey-2);margin-bottom:14px;}
+.rb-go{display:block;width:100%;padding:16px;background:var(--forest-deep);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:8px;min-height:55px;}
+.rb-family-title{font-family:"Noto Serif TC",serif;font-size:18px;color:var(--ferrari-deep);letter-spacing:2px;font-weight:700;margin:14px 0 8px;padding-top:12px;border-top:1px solid #c8e6c9;}
 .fc-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e0f0e0;}
 .fc-row:last-child{border-bottom:none;}
-.fc-row .fn{font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;color:var(--ferrari-deep);}
-.fc-row .fno{font-size:13px;color:#aaa;}
-.fc-row a{padding:8px 14px;background:var(--ferrari);color:#fff;border-radius:4px;font-size:13px;font-weight:700;text-decoration:none;}
+.fc-row .fn{font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;color:var(--ferrari-deep);}
+.fc-row .fno{font-size:18px;color:#aaa;}
+.fc-row a{padding:8px 14px;background:var(--ferrari);color:#fff;border-radius:4px;font-size:18px;font-weight:700;text-decoration:none;}
 </style>`) + `
 <body>
 <div class="container">
@@ -1878,14 +1878,14 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
           </div>
           <div class="field">
             <div class="label-row">
-              <label for="medNameZh">中文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
+              <label for="medNameZh">中文全名 <span style="font-size:16px;font-weight:400;color:#888;">（與身份證相同）</span></label>
               <span class="req">✽ 必填</span>
             </div>
             <input id="medNameZh" type="text" placeholder="例：陳大文" oninput="syncNameFromMedical()">
           </div>
           <div class="field">
             <div class="label-row">
-              <label for="medNameEn">英文全名 <span style="font-size:10px;font-weight:400;color:#888;">（與身份證相同）</span></label>
+              <label for="medNameEn">英文全名 <span style="font-size:16px;font-weight:400;color:#888;">（與身份證相同）</span></label>
               <span class="req">✽ 必填</span>
             </div>
             <input id="medNameEn" type="text" placeholder="例：CHAN TAI MAN" style="text-transform:uppercase;" oninput="syncNameFromMedical()">
@@ -1936,7 +1936,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
         </div>
 
         <div class="field">
-          <div class="label-row"><label for="birthYear">出生年份 <span style="color:var(--ferrari);font-size:12px;">✽ 必填</span></label></div>
+          <div class="label-row"><label for="birthYear">出生年份 <span style="color:var(--ferrari);font-size:18px;">✽ 必填</span></label></div>
           <input id="birthYear" type="number" placeholder="例：1960" inputmode="numeric" min="1920" max="2010" required>
           <div class="hint">年滿 55 歲自動成為主卡，55 歲以下為家庭卡</div>
         </div>
@@ -2004,45 +2004,44 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
       <img id="cardImg" style="width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.18);" alt="會員卡">
       <!-- Pending verification watermark overlay -->
       <div id="pendingWatermark" style="position:absolute;inset:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.38);pointer-events:none;">
-        <div style="color:#fff;font-size:17px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
-        <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
+        <div style="color:#fff;font-size:18px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
+        <div style="color:#ffe082;font-size:18px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
       </div>
     </div>
 
     <!-- WA Verification block — shown directly below card, BEFORE other action buttons -->
     <div id="waVerifyBlock" style="display:none;margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px;">
-      <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
-      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
+      <div style="font-size:20px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
+      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:18px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
       <!-- Button 1: Normal WhatsApp — real flow, visibilitychange triggers markVerified on return -->
       <button id="waVerifyBtn" onclick="openWA()"
-        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:14px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;">
+        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:20px;font-weight:700;padding:16px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;min-height:55px;">
         💬 我有 WhatsApp — 發送驗證訊息
       </button>
       <!-- Button 2: WA Business — fake 2.5s flow, records wa_clicked_at only -->
       <button id="waBizBtn" onclick="openWABiz()"
-        style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:14px;font-weight:700;padding:12px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;">
+        style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:18px;font-weight:700;padding:14px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;min-height:55px;">
         📱 我用 WhatsApp Business
       </button>
-      <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:13px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
+      <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:18px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
     </div>
 
     <!-- Banner A: normal WA sent — watermark stays, waiting for admin confirm -->
     <div id="waSentBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
-      <div style="font-size:14px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發出！</div>
-      <div style="font-size:12px;color:#388E3C;margin-top:4px;">請在 WhatsApp 中發送訊息給我們，Admin 確認後會籍即生效。</div>
+      <div style="font-size:20px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發出！</div>
+      <div style="font-size:18px;color:#388E3C;margin-top:4px;">請在 WhatsApp 中發送訊息給我們，Admin 確認後會籍即生效。</div>
     </div>
     <!-- Banner B: WA Biz fake complete — watermark hidden -->
     <div id="verifiedBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
-      <div style="font-size:14px;font-weight:700;color:#2E7D32;">✅ 驗證訊息已發送！</div>
-      <div style="font-size:12px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
+      <div style="font-size:20px;font-weight:700;color:#2E7D32;">✅ 驗證訊息已發送！</div>
+      <div style="font-size:18px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
     </div>
 
     <!-- Medical card notice (shown if applied) -->
     <div id="medSuccessNotice" style="display:none;background:#E3F2FD;border:1.5px solid #1565C0;border-radius:6px;padding:14px 16px;margin-bottom:16px;text-align:left;">
-      <div style="font-size:15px;font-weight:700;color:#0D47A1;margin-bottom:6px;">🏥 醫健卡申請已提交</div>
-      <div style="font-size:13px;color:#1A237E;line-height:1.7;">
-        你的醫健卡申請已記錄，<strong>香港商貿慈善基金</strong>職員將會以<strong>電話或 WhatsApp</strong> 聯絡你安排發卡手續。<br>
-        <span style="font-size:11px;color:#5C6BC0;">如有查詢請致電：9888 5708 或瀏覽 hmmp.com.hk</span>
+      <div style="font-size:20px;font-weight:700;color:#0D47A1;margin-bottom:6px;">🏥 醫健卡申請已提交</div>
+      <div style="font-size:18px;color:#1A237E;line-height:1.7;">
+        你的醫健卡申請已記錄，<strong>香港商貿慈善基金</strong>職員將會以<strong>電話或 WhatsApp</strong> 聯絡你安排發卡手續。如有查詢請致電或 WhatsApp：<strong>9888 5708</strong>
       </div>
     </div>
 
@@ -2633,31 +2632,31 @@ async function shareCardToWA() {
 // ─── Signup Sub HTML ──────────────────────────────────────────────────────────
 function signupSubHtml() {
   return htmlHead('申請家庭同行卡', `<style>
-body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
+body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-height:1.6;}
 .container{max-width:420px;margin:0 auto;}
 .brand-strip{display:flex;align-items:center;gap:12px;margin-bottom:24px;}
 .brand-strip .mark{width:44px;height:44px;background:var(--ferrari-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Noto Serif TC",serif;font-weight:900;font-size:18px;border-radius:6px;}
-.brand-strip .name .zh{font-family:"Noto Serif TC",serif;font-size:16px;color:var(--ferrari-deep);font-weight:700;letter-spacing:2px;line-height:1;}
-.brand-strip .name .en{font-size:11px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
+.brand-strip .name .zh{font-family:"Noto Serif TC",serif;font-size:20px;color:var(--ferrari-deep);font-weight:700;letter-spacing:2px;line-height:1;}
+.brand-strip .name .en{font-size:18px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
 .header-card{background:linear-gradient(135deg,var(--ferrari-deep) 0%,var(--ferrari) 100%);color:#fff;padding:24px 22px;border-radius:4px;margin-bottom:20px;position:relative;overflow:hidden;}
 .header-card::before{content:"家";position:absolute;right:-10px;bottom:-40px;font-family:"Noto Serif TC",serif;font-size:180px;font-weight:900;color:rgba(255,255,255,0.1);line-height:1;}
-.header-card .tag{display:inline-block;background:rgba(255,255,255,0.2);color:#fff;padding:3px 10px;font-size:11px;letter-spacing:3px;font-weight:700;margin-bottom:12px;position:relative;z-index:2;}
+.header-card .tag{display:inline-block;background:rgba(255,255,255,0.2);color:#fff;padding:3px 10px;font-size:18px;letter-spacing:3px;font-weight:700;margin-bottom:12px;position:relative;z-index:2;}
 .header-card h1{font-family:"Noto Serif TC",serif;font-size:28px;font-weight:900;letter-spacing:3px;line-height:1.2;margin-bottom:8px;position:relative;z-index:2;}
-.header-card p{font-size:13px;opacity:0.9;line-height:1.6;position:relative;z-index:2;}
+.header-card p{font-size:20px;opacity:0.9;line-height:1.6;position:relative;z-index:2;}
 .form-card{background:#fff;padding:24px 22px;border-radius:4px;margin-bottom:16px;}
 .field{margin-bottom:18px;}
 .field .label-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
-.field label{font-family:"Noto Serif TC",serif;font-size:15px;color:var(--ferrari-deep);font-weight:700;letter-spacing:1px;}
-.field .req{color:var(--ferrari);font-size:12px;font-weight:700;}
-.field input,.field select{width:100%;padding:14px;border:2px solid var(--line);border-radius:4px;font-size:17px;font-family:inherit;color:var(--ink);background:#fff;transition:border 0.2s;}
+.field label{font-family:"Noto Serif TC",serif;font-size:22px;color:var(--ferrari-deep);font-weight:700;letter-spacing:1px;}
+.field .req{color:var(--ferrari);font-size:18px;font-weight:700;}
+.field input,.field select{width:100%;padding:14px;border:2px solid var(--line);border-radius:4px;font-size:20px;font-family:inherit;color:var(--ink);background:#fff;transition:border 0.2s;min-height:55px;}
 .field input:focus,.field select:focus{outline:0;border-color:var(--ferrari);}
-.field .hint{font-size:11px;color:var(--grey-3);margin-top:4px;line-height:1.5;}
-.consent{padding:14px;background:var(--ferrari-pale);border-radius:4px;font-size:12px;color:var(--grey-1);line-height:1.7;margin-bottom:20px;}
+.field .hint{font-size:18px;color:var(--grey-3);margin-top:4px;line-height:1.5;}
+.consent{padding:14px;background:var(--ferrari-pale);border-radius:4px;font-size:18px;color:var(--grey-1);line-height:1.7;margin-bottom:20px;}
 .consent label{display:flex;gap:10px;cursor:pointer;}
 .consent input{width:20px;height:20px;margin-top:2px;flex-shrink:0;accent-color:var(--ferrari);}
 .submit-btn{width:100%;padding:18px;background:var(--ferrari);color:#fff;border:0;border-radius:4px;font-size:18px;font-family:"Noto Serif TC",sans-serif;font-weight:700;letter-spacing:4px;cursor:pointer;box-shadow:0 4px 0 var(--ferrari-deep);transition:all 0.1s;}
 .submit-btn:disabled{background:var(--grey-3);box-shadow:0 4px 0 var(--grey-2);cursor:not-allowed;}
-.footer-links{text-align:center;margin-top:20px;font-size:11px;color:var(--grey-3);line-height:1.8;}
+.footer-links{text-align:center;margin-top:20px;font-size:18px;color:var(--grey-3);line-height:1.8;}
 .footer-links a{color:var(--ferrari);text-decoration:none;}
 .success{display:none;text-align:center;}
 .success.show{display:block;}
@@ -2678,8 +2677,8 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .gc-num .k{font-family:"Noto Serif TC",serif;font-size:10px;color:var(--grey-2);letter-spacing:2.5px;margin-bottom:4px;display:block;font-weight:500;}
 .gc-qr{width:46px;height:46px;background:#fff;padding:3px;border:1.5px solid var(--ferrari);border-radius:3px;flex-shrink:0;}
 .gc-qr canvas{width:100%;height:100%;}
-.wa-link{display:block;width:100%;padding:16px;background:var(--ferrari);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:12px;}
-.err-msg{background:var(--ferrari-pale);border:1px solid var(--ferrari);color:var(--ferrari-deep);padding:12px 16px;border-radius:4px;font-size:13px;margin-bottom:16px;display:none;}
+.wa-link{display:block;width:100%;padding:16px;background:var(--ferrari);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:12px;min-height:55px;}
+.err-msg{background:var(--ferrari-pale);border:1px solid var(--ferrari);color:var(--ferrari-deep);padding:12px 16px;border-radius:4px;font-size:20px;font-weight:700;margin-bottom:16px;display:none;}
 .err-msg.show{display:block;}
 </style>`) + `
 <body>
@@ -2712,7 +2711,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
           <input id="phone" type="tel" placeholder="例：91234567" inputmode="numeric" maxlength="8">
         </div>
         <div class="field">
-          <div class="label-row"><label for="nameEn">英文姓名</label><span style="color:var(--grey-3);font-size:11px;">選填</span></div>
+          <div class="label-row"><label for="nameEn">英文姓名</label><span style="color:var(--grey-3);font-size:18px;">選填</span></div>
           <input id="nameEn" type="text" placeholder="例：CHAN SIU MING" style="text-transform:uppercase;">
         </div>
         <div class="field" id="parentPhoneField">
@@ -2722,11 +2721,11 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
         </div>
         <div class="field" id="parentLinkedField" style="display:none;">
           <div class="label-row"><label>已連結主卡</label></div>
-          <div id="parentLinkedInfo" style="padding:12px 14px;background:#f0f7f0;border:2px solid #4caf50;border-radius:4px;font-size:15px;font-weight:700;color:#2e7d32;">✅ 已連結</div>
+          <div id="parentLinkedInfo" style="padding:12px 14px;background:#f0f7f0;border:2px solid #4caf50;border-radius:4px;font-size:18px;font-weight:700;color:#2e7d32;">✅ 已連結</div>
           <div class="hint">長輩的電話已自動填入，無需再輸入</div>
         </div>
         <div class="field">
-          <div class="label-row"><label for="relation">你與長輩的關係</label><span style="color:var(--grey-3);font-size:11px;">選填</span></div>
+          <div class="label-row"><label for="relation">你與長輩的關係</label><span style="color:var(--grey-3);font-size:18px;">選填</span></div>
           <select id="relation">
             <option value="">— 請選擇 —</option>
             <option>子女</option><option>配偶</option><option>孫</option>
@@ -2756,7 +2755,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
   <div class="success" id="successSection">
     <div class="success-icon">✓</div>
     <h1>申請成功！</h1>
-    <p style="font-size:14px;color:var(--grey-2);margin-bottom:24px;">家庭同行卡已發出</p>
+    <p style="font-size:18px;color:var(--grey-2);margin-bottom:24px;">家庭同行卡已發出</p>
 
     <!-- Live CSS card (hidden after image renders) -->
     <div class="gen-card" id="genCard">
@@ -2778,42 +2777,42 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       <img id="cardImg" style="width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.18);" alt="家庭同行卡">
       <!-- Pending verification watermark overlay -->
       <div id="pendingWatermark" style="position:absolute;inset:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.38);pointer-events:none;">
-        <div style="color:#fff;font-size:17px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
-        <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
+        <div style="color:#fff;font-size:18px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
+        <div style="color:#ffe082;font-size:18px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
       </div>
     </div>
 
     <!-- WA Verification block — shown directly below card -->
     <div id="waVerifyBlock" style="display:none;margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px;">
-      <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
-      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
+      <div style="font-size:20px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
+      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:18px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
       <!-- Button 1: Normal WhatsApp — real flow -->
       <button id="waVerifyBtn" onclick="openWA()"
-        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:14px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;">
+        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:20px;font-weight:700;padding:16px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;min-height:55px;">
         💬 我有 WhatsApp — 發送驗證訊息
       </button>
       <!-- Button 2: WA Business — fake 2.5s flow -->
       <button id="waBizBtn" onclick="openWABiz()"
-        style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:14px;font-weight:700;padding:12px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;">
+        style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:18px;font-weight:700;padding:14px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;min-height:55px;">
         📱 我用 WhatsApp Business
       </button>
-      <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:13px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
+      <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:18px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
     </div>
 
     <!-- Banner A: normal WA sent — watermark stays -->
     <div id="waSentBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
-      <div style="font-size:14px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發出！</div>
-      <div style="font-size:12px;color:#388E3C;margin-top:4px;">請在 WhatsApp 中發送訊息給我們，Admin 確認後會籍即生效。</div>
+      <div style="font-size:20px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發出！</div>
+      <div style="font-size:18px;color:#388E3C;margin-top:4px;">請在 WhatsApp 中發送訊息給我們，Admin 確認後會籍即生效。</div>
     </div>
     <!-- Banner B: WA Biz fake complete — watermark hidden -->
     <div id="verifiedBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
-      <div style="font-size:14px;font-weight:700;color:#2E7D32;">✅ 驗證訊息已發送！</div>
-      <div style="font-size:12px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
+      <div style="font-size:20px;font-weight:700;color:#2E7D32;">✅ 驗證訊息已發送！</div>
+      <div style="font-size:18px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
     </div>
 
     <div class="action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:4px;" onclick="saveCardImage()">💾 儲存卡圖</button>
-      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:4px;" onclick="window.location.href='/membership/join'">← 返回主卡</button>
+      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;cursor:pointer;border-radius:4px;min-height:55px;" onclick="saveCardImage()">💾 儲存卡圖</button>
+      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;cursor:pointer;border-radius:4px;min-height:55px;" onclick="window.location.href='/membership/join'">← 返回主卡</button>
     </div>
 
     <button class="wa-link" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
@@ -4007,11 +4006,11 @@ function memberProfileHtml(m: any, medStatus: string | null = null) {
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans TC",sans-serif;}
+body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans TC",sans-serif;line-height:1.6;}
 .topbar{background:${accentDark};color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
 .topbar .mark{width:36px;height:36px;background:${accentMid};border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:"Noto Serif TC",serif;font-weight:900;font-size:16px;}
-.topbar .title{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;letter-spacing:2px;}
-.topbar .no{font-family:"Space Grotesk",monospace;font-size:12px;opacity:0.7;margin-top:2px;}
+.topbar .title{font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:2px;}
+.topbar .no{font-family:"Space Grotesk",monospace;font-size:18px;opacity:0.7;margin-top:2px;}
 .wrap{max-width:480px;margin:0 auto;padding:20px 16px 40px;}
 
 /* ── Card canvas area ── */
@@ -4019,19 +4018,19 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
 .card-wrap canvas{display:none;}
 .card-wrap img#cardImg{width:100%;max-width:420px;border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,0.2);}
 .card-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
-.card-btn{padding:13px 8px;background:#fff;border:2px solid ${accentMid};color:${accentDark};font-family:"Noto Serif TC",serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;border-radius:6px;text-align:center;text-decoration:none;display:block;}
+.card-btn{padding:13px 8px;background:#fff;border:2px solid ${accentMid};color:${accentDark};font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:1px;cursor:pointer;border-radius:6px;text-align:center;text-decoration:none;display:block;min-height:55px;}
 .card-btn.primary{background:${accentDark};color:#fff;border-color:${accentDark};}
-.card-btn.wa{background:#25D366;border-color:#25D366;color:#fff;grid-column:1/-1;font-size:15px;}
+.card-btn.wa{background:#25D366;border-color:#25D366;color:#fff;grid-column:1/-1;font-size:20px;}
 
 /* ── Info sections ── */
 .section{background:#fff;border-radius:8px;padding:20px;margin-bottom:14px;}
-.section-title{font-family:"Noto Serif TC",serif;font-size:13px;color:${accentMid};letter-spacing:3px;font-weight:700;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #eee;}
+.section-title{font-family:"Noto Serif TC",serif;font-size:18px;color:${accentMid};letter-spacing:3px;font-weight:700;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #eee;}
 .info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5;}
 .info-row:last-child{border-bottom:none;}
-.info-label{font-size:12px;color:#999;letter-spacing:1px;}
-.info-value{font-size:15px;color:#333;font-weight:500;text-align:right;}
-.info-value.big{font-family:"Space Grotesk",monospace;font-size:18px;font-weight:700;color:${accentDark};}
-.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:1px;}
+.info-label{font-size:18px;color:#999;letter-spacing:1px;}
+.info-value{font-size:20px;color:#333;font-weight:500;text-align:right;}
+.info-value.big{font-family:"Space Grotesk",monospace;font-size:22px;font-weight:700;color:${accentDark};}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:18px;font-weight:700;letter-spacing:1px;}
 .badge.green{background:#E8F5E9;color:${forestDeep};}
 .badge.red{background:#FFEBEE;color:${ferrariDeep};}
 .badge.grey{background:#f5f5f5;color:#666;}
@@ -4039,67 +4038,67 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
 
 /* ── Family cards list ── */
 .family-card{background:#fff9f9;border:1px solid #FFCDD2;border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
-.family-card .fc-name{font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;color:${ferrariDeep};}
-.family-card .fc-no{font-family:"Space Grotesk",monospace;font-size:12px;color:#999;}
-.family-card .fc-link{padding:6px 14px;background:${ferrari};color:#fff;border-radius:4px;font-size:12px;font-weight:700;text-decoration:none;}
-.add-family-btn{width:100%;padding:15px;background:#fff;border:2px dashed ${ferrari};color:${ferrari};font-family:"Noto Serif TC",serif;font-size:14px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:8px;text-align:center;text-decoration:none;display:block;margin-top:4px;}
+.family-card .fc-name{font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;color:${ferrariDeep};}
+.family-card .fc-no{font-family:"Space Grotesk",monospace;font-size:18px;color:#999;}
+.family-card .fc-link{padding:6px 14px;background:${ferrari};color:#fff;border-radius:4px;font-size:18px;font-weight:700;text-decoration:none;}
+.add-family-btn{width:100%;padding:15px;background:#fff;border:2px dashed ${ferrari};color:${ferrari};font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:8px;text-align:center;text-decoration:none;display:block;margin-top:4px;min-height:55px;}
 
 /* ── Edit form ── */
 .edit-section{display:none;}
 .edit-section.open{display:block;}
 .field{margin-bottom:16px;}
-.field label{display:block;font-family:"Noto Serif TC",serif;font-size:13px;color:${accentDark};font-weight:700;letter-spacing:1px;margin-bottom:6px;}
-.field input,.field select{width:100%;padding:12px 14px;border:2px solid #e0e0e0;border-radius:6px;font-size:16px;font-family:inherit;color:#333;background:#fff;transition:border 0.2s;}
+.field label{display:block;font-family:"Noto Serif TC",serif;font-size:18px;color:${accentDark};font-weight:700;letter-spacing:1px;margin-bottom:6px;}
+.field input,.field select{width:100%;padding:12px 14px;border:2px solid #e0e0e0;border-radius:6px;font-size:20px;font-family:inherit;color:#333;background:#fff;transition:border 0.2s;min-height:55px;}
 .field input:focus,.field select:focus{outline:0;border-color:${accentMid};}
-.save-btn{width:100%;padding:16px;background:${accentDark};color:#fff;border:0;border-radius:6px;font-size:17px;font-family:"Noto Serif TC",serif;font-weight:700;letter-spacing:3px;cursor:pointer;margin-top:8px;}
-.cancel-btn{width:100%;padding:12px;background:transparent;border:2px solid #ccc;color:#999;border-radius:6px;font-size:14px;font-family:inherit;cursor:pointer;margin-top:8px;}
-.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:30px;font-size:14px;opacity:0;transition:opacity 0.3s;z-index:100;pointer-events:none;}
+.save-btn{width:100%;padding:16px;background:${accentDark};color:#fff;border:0;border-radius:6px;font-size:20px;font-family:"Noto Serif TC",serif;font-weight:700;letter-spacing:3px;cursor:pointer;margin-top:8px;min-height:55px;}
+.cancel-btn{width:100%;padding:12px;background:transparent;border:2px solid #ccc;color:#999;border-radius:6px;font-size:18px;font-family:inherit;cursor:pointer;margin-top:8px;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:30px;font-size:18px;opacity:0;transition:opacity 0.3s;z-index:100;pointer-events:none;}
 .toast.show{opacity:1;}
-.toggle-edit-btn{background:none;border:none;color:${accentMid};font-size:13px;font-family:"Noto Serif TC",serif;cursor:pointer;font-weight:700;letter-spacing:1px;text-decoration:underline;padding:0;}
+.toggle-edit-btn{background:none;border:none;color:${accentMid};font-size:18px;font-family:"Noto Serif TC",serif;cursor:pointer;font-weight:700;letter-spacing:1px;text-decoration:underline;padding:0;}
 
 /* ── Medical card block ── */
 .med-section{background:#fff;border-radius:8px;padding:20px;margin-bottom:14px;border:1.5px solid #90CAF9;}
-.med-section-title{font-family:"Noto Serif TC",serif;font-size:13px;color:#1565C0;letter-spacing:3px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #e3f2fd;}
-.med-status-badge{display:inline-block;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:1px;}
+.med-section-title{font-family:"Noto Serif TC",serif;font-size:18px;color:#1565C0;letter-spacing:3px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #e3f2fd;}
+.med-status-badge{display:inline-block;padding:5px 14px;border-radius:20px;font-size:18px;font-weight:700;letter-spacing:1px;}
 .med-status-badge.pending{background:#FFF8E1;color:#F57F17;}
 .med-status-badge.sent{background:#E3F2FD;color:#1565C0;}
 .med-status-badge.issued{background:#E8F5E9;color:#1B5E20;}
 .med-status-badge.declined{background:#FFEBEE;color:#B71C1C;}
-.med-apply-btn{width:100%;padding:15px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;}
+.med-apply-btn{width:100%;padding:15px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:2px;cursor:pointer;min-height:55px;}
 .med-apply-btn:disabled{background:#90CAF9;cursor:not-allowed;}
 .med-form{display:none;margin-top:16px;}
 .med-form.open{display:block;}
 .med-field{margin-bottom:14px;}
-.med-field label{display:block;font-size:13px;color:#1565C0;font-weight:700;margin-bottom:5px;font-family:"Noto Serif TC",serif;}
-.med-field input{width:100%;padding:12px 14px;border:2px solid #90CAF9;border-radius:6px;font-size:16px;font-family:inherit;color:#333;}
+.med-field label{display:block;font-size:18px;color:#1565C0;font-weight:700;margin-bottom:5px;font-family:"Noto Serif TC",serif;}
+.med-field input{width:100%;padding:12px 14px;border:2px solid #90CAF9;border-radius:6px;font-size:20px;font-family:inherit;color:#333;min-height:55px;}
 .med-field input:focus{outline:0;border-color:#1565C0;}
-.med-submit-btn{width:100%;padding:14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:4px;}
+.med-submit-btn{width:100%;padding:14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:4px;min-height:55px;}
 .med-submit-btn:disabled{background:#90CAF9;cursor:not-allowed;}
-.med-err{color:#C62828;font-size:13px;margin-top:8px;display:none;}
+.med-err{color:#C62828;font-size:20px;margin-top:8px;display:none;font-weight:700;}
 .med-err.show{display:block;}
-.med-success{background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:6px;padding:12px 14px;font-size:13px;color:#1B5E20;display:none;margin-top:12px;}
+.med-success{background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:6px;padding:12px 14px;font-size:20px;color:#1B5E20;display:none;margin-top:12px;line-height:1.7;}
 .med-success.show{display:block;}
 
 /* ── Family linking block ── */
 .fam-section{background:#fff;border-radius:8px;padding:20px;margin-bottom:14px;border:1.5px solid #A5D6A7;}
-.fam-section-title{font-family:"Noto Serif TC",serif;font-size:13px;color:${forestDeep};letter-spacing:3px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #E8F5E9;}
+.fam-section-title{font-family:"Noto Serif TC",serif;font-size:18px;color:${forestDeep};letter-spacing:3px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #E8F5E9;}
 .fam-tab-bar{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:16px;border-radius:6px;overflow:hidden;border:1.5px solid #A5D6A7;}
-.fam-tab{padding:10px 4px;text-align:center;font-family:"Noto Serif TC",serif;font-size:13px;font-weight:700;cursor:pointer;border:none;background:#F1F8E9;color:${forestDeep};letter-spacing:1px;transition:all 0.15s;}
+.fam-tab{padding:10px 4px;text-align:center;font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;cursor:pointer;border:none;background:#F1F8E9;color:${forestDeep};letter-spacing:1px;transition:all 0.15s;min-height:55px;}
 .fam-tab.active{background:${forestDeep};color:#fff;}
 .fam-panel{display:none;}
 .fam-panel.active{display:block;}
 .fam-field{margin-bottom:14px;}
-.fam-field label{display:block;font-size:13px;color:${forestDeep};font-weight:700;margin-bottom:5px;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;}
-.fam-field input,.fam-field select{width:100%;padding:12px 14px;border:2px solid #C8E6C9;border-radius:6px;font-size:16px;font-family:inherit;color:#333;}
+.fam-field label{display:block;font-size:18px;color:${forestDeep};font-weight:700;margin-bottom:5px;font-family:"Noto Serif TC",serif;letter-spacing:0.5px;}
+.fam-field input,.fam-field select{width:100%;padding:12px 14px;border:2px solid #C8E6C9;border-radius:6px;font-size:20px;font-family:inherit;color:#333;min-height:55px;}
 .fam-field input:focus,.fam-field select:focus{outline:0;border-color:${forestDeep};}
-.fam-submit-btn{width:100%;padding:14px;background:${forestDeep};color:#fff;border:0;border-radius:6px;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:4px;}
+.fam-submit-btn{width:100%;padding:14px;background:${forestDeep};color:#fff;border:0;border-radius:6px;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:4px;min-height:55px;}
 .fam-submit-btn:disabled{background:#A5D6A7;cursor:not-allowed;}
-.fam-open-btn{width:100%;padding:14px;background:#fff;color:${forestDeep};border:2px solid ${forestDeep};border-radius:6px;font-family:"Noto Serif TC",serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;}
-.fam-err{color:#C62828;font-size:13px;margin-top:8px;display:none;}
+.fam-open-btn{width:100%;padding:14px;background:#fff;color:${forestDeep};border:2px solid ${forestDeep};border-radius:6px;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:1px;cursor:pointer;min-height:55px;}
+.fam-err{color:#C62828;font-size:20px;margin-top:8px;display:none;font-weight:700;}
 .fam-err.show{display:block;}
-.fam-success{background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:6px;padding:12px 14px;font-size:13px;color:#1B5E20;display:none;margin-top:12px;line-height:1.7;}
+.fam-success{background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:6px;padding:12px 14px;font-size:20px;color:#1B5E20;display:none;margin-top:12px;line-height:1.7;}
 .fam-success.show{display:block;}
-.fam-linked-info{background:#F1F8E9;border:1.5px solid #A5D6A7;border-radius:6px;padding:12px 14px;font-size:14px;color:${forestDeep};line-height:1.7;}
+.fam-linked-info{background:#F1F8E9;border:1.5px solid #A5D6A7;border-radius:6px;padding:12px 14px;font-size:20px;color:${forestDeep};line-height:1.7;}
 </style>
 </head>
 <body>
@@ -4121,30 +4120,30 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
     <img id="cardImg" alt="會員卡" style="opacity:0;transition:opacity 0.3s;">
     <!-- Pending verification watermark overlay — hidden if wa_clicked_at set AND not re_verify -->
     <div id="pendingWatermark" style="position:absolute;inset:0;border-radius:14px;display:${showWatermark ? 'flex' : 'none'};flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.38);pointer-events:none;">
-      <div style="color:#fff;font-size:17px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
-      <div style="color:#ffe082;font-size:11px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
+      <div style="color:#fff;font-size:18px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
+      <div style="color:#ffe082;font-size:18px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
     </div>
   </div>
   <!-- WA Verification block — shown only when watermark is showing -->
   <div id="waVerifyBlock" style="display:${showWatermark ? 'block' : 'none'};margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px;">
-    <div style="font-size:13px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
-    <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:13px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
+    <div style="font-size:20px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
+    <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:18px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
     <!-- Button 1: Normal WhatsApp — open WA, records channel=ICON, visibilitychange/pageshow hides watermark -->
     <button id="waVerifyBtn" onclick="openWA()"
-      style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:16px;font-weight:700;padding:14px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;">
+      style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:20px;font-weight:700;padding:16px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;min-height:55px;">
       💬 我有 WhatsApp — 發送驗證訊息
     </button>
     <!-- Button 2: WA Business — fake 2.5s flow, records channel=BIZ -->
     <button id="waBizBtn" onclick="openWABiz()"
-      style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:14px;font-weight:700;padding:12px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;">
+      style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:18px;font-weight:700;padding:14px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;min-height:55px;">
       📱 我用 WhatsApp Business
     </button>
-    <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:13px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
+    <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:18px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
   </div>
   <!-- Banner: after WA sent (icon or biz) -->
   <div id="waSentBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
-    <div style="font-size:14px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發送！</div>
-    <div style="font-size:12px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
+    <div style="font-size:20px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發送！</div>
+    <div style="font-size:18px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
   </div>
 
   <!-- ── 卡片操作 ── -->
@@ -4261,7 +4260,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
   <div class="section">
     <div class="section-title">◆ 家庭同行卡</div>
     <div id="familyList">
-      <div style="text-align:center;color:#aaa;padding:10px;font-size:13px;">載入中…</div>
+      <div style="text-align:center;color:#aaa;padding:10px;font-size:18px;">載入中…</div>
     </div>
     <a href="/membership/join-family?parent=${m.member_no}" class="add-family-btn">＋ 為家人申請家庭同行卡</a>
   </div>` : ''}
@@ -4270,16 +4269,16 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
   <div class="med-section">
     <div class="med-section-title">🏥 醫健卡</div>
     ${medStatus !== null ? `
-    <div style="font-size:14px;color:#37474F;margin-bottom:10px;">你的醫健卡申請狀態：</div>
+    <div style="font-size:18px;color:#37474F;margin-bottom:10px;">你的醫健卡申請狀態：</div>
     <span class="med-status-badge ${medStatus.toLowerCase()}">${
       medStatus === 'PENDING'  ? '⏳ 審核中 PENDING'  :
       medStatus === 'SENT'     ? '📮 已發送 SENT'      :
       medStatus === 'ISSUED'   ? '✅ 已發出 ISSUED'    :
       medStatus === 'DECLINED' ? '❌ 未批准 DECLINED'  : medStatus
     }</span>
-    <div style="font-size:12px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<a href="https://wa.me/85291477341" style="color:#1565C0;">9147-7341</a></div>
+    <div style="font-size:18px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<a href="https://wa.me/85291477341" style="color:#1565C0;">9147-7341</a></div>
     ` : `
-    <div style="font-size:13px;color:#546E7A;margin-bottom:14px;line-height:1.6;">
+    <div style="font-size:18px;color:#546E7A;margin-bottom:14px;line-height:1.6;">
       由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>
       申請後職員將以 WhatsApp 聯絡辦理。
     </div>
@@ -4301,8 +4300,8 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
       <button class="med-submit-btn" id="medSubmitBtn" onclick="submitMedical()">提交申請</button>
     </div>
     <div class="med-success" id="medSuccess">
-      ✅ 醫健卡申請已提交！狀態：<strong>PENDING</strong><br>
-      <span style="font-size:12px;">職員將以 WhatsApp 聯絡你安排發卡手續。</span>
+      ✅ 醫健卡申請已提交！<br>
+      你的醫健卡申請已記錄，<strong>香港商貿慈善基金</strong>職員將會以<strong>電話或 WhatsApp</strong> 聯絡你安排發卡手續。如有查詢請致電或 WhatsApp：<strong>9888 5708</strong>
     </div>
     `}
   </div>
@@ -4409,7 +4408,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:16px;font-family:"Noto Sans T
   </div>
 
   <!-- ── 底部連結 ── -->
-  <div style="text-align:center;margin-top:20px;font-size:12px;color:#aaa;line-height:2;">
+  <div style="text-align:center;margin-top:20px;font-size:18px;color:#aaa;line-height:2;">
     <a href="/membership/join" style="color:${accentMid};">← 返回登記頁</a>
     &nbsp;·&nbsp;
     如有疑問 WhatsApp：<a href="https://wa.me/85291477341" style="color:${accentMid};">9147-7341</a>
@@ -4534,7 +4533,7 @@ async function loadFamily() {
     var data = await res.json();
     var el = document.getElementById('familyList');
     if(!data.family || data.family.length === 0){
-      el.innerHTML = '<div style="text-align:center;color:#aaa;padding:10px;font-size:13px;">暫無家庭同行卡</div>';
+      el.innerHTML = '<div style="text-align:center;color:#aaa;padding:10px;font-size:18px;">暫無家庭同行卡</div>';
       return;
     }
     el.innerHTML = data.family.map(function(f){
@@ -4909,7 +4908,7 @@ function notifyParentWAClicked() {
 // ─── Home HTML (統一登入/登記入口) ───────────────────────────────────────────────
 function homeHtml() {
   return htmlHead('老有聯盟 CoEldery 85', `<style>
-body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
+body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-height:1.6;}
 .container{max-width:420px;margin:0 auto;}
 /* Hero */
 .hero{text-align:center;padding:28px 0 20px;}
@@ -4917,10 +4916,10 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .hero-logo .l-co{font-family:"Noto Serif TC",serif;font-size:26px;font-weight:900;color:var(--forest-deep);letter-spacing:1px;}
 .hero-logo .l-85{font-family:"Noto Serif TC",serif;font-size:36px;font-weight:900;color:var(--ferrari);line-height:1;margin:0 4px;}
 .hero-logo .l-org{font-family:"Noto Serif TC",serif;font-size:14px;font-weight:700;color:var(--forest-deep);letter-spacing:3px;border-left:2px solid var(--line);padding-left:10px;margin-left:6px;line-height:1.2;}
-.hero-sub{font-size:12px;color:var(--grey-3);letter-spacing:3px;}
+.hero-sub{font-size:18px;color:var(--grey-3);letter-spacing:3px;}
 /* Tabs */
 .tab-bar{display:grid;grid-template-columns:1fr 1fr;border-radius:6px 6px 0 0;overflow:hidden;margin-bottom:0;}
-.tab-btn{padding:14px 8px;text-align:center;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;border:none;transition:all 0.2s;}
+.tab-btn{padding:14px 8px;text-align:center;font-family:"Noto Serif TC",serif;font-size:18px;font-weight:700;letter-spacing:2px;cursor:pointer;border:none;transition:all 0.2s;}
 .tab-btn.login{background:#fff;color:var(--forest-deep);}
 .tab-btn.register{background:var(--forest-pale);color:var(--forest-deep);}
 .tab-btn.active.login{background:var(--forest-deep);color:#fff;}
@@ -4931,42 +4930,42 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .panel-section.active{display:block;}
 /* Fields */
 .field{margin-bottom:18px;}
-.field label{display:block;font-family:"Noto Serif TC",serif;font-size:14px;color:var(--grey-1);font-weight:700;letter-spacing:1px;margin-bottom:7px;}
-.field input,.field select{width:100%;padding:14px;border:2px solid var(--line);border-radius:4px;font-size:17px;font-family:inherit;color:var(--ink);background:#fff;transition:border 0.2s;}
+.field label{display:block;font-family:"Noto Serif TC",serif;font-size:18px;color:var(--grey-1);font-weight:700;letter-spacing:1px;margin-bottom:7px;}
+.field input,.field select{width:100%;padding:14px;border:2px solid var(--line);border-radius:4px;font-size:20px;font-family:inherit;color:var(--ink);background:#fff;transition:border 0.2s;min-height:55px;}
 .field input:focus,.field select:focus{outline:0;border-color:var(--forest);}
 .field .hint{font-size:11px;color:var(--grey-3);margin-top:5px;line-height:1.5;}
 .field .g-row{display:flex;gap:8px;}
-.field .g-btn{flex:1;padding:12px 4px;border:2px solid var(--line);border-radius:4px;font-size:14px;font-family:"Noto Serif TC",serif;font-weight:700;cursor:pointer;background:#fff;color:var(--grey-1);transition:all 0.15s;}
+.field .g-btn{flex:1;padding:14px 4px;border:2px solid var(--line);border-radius:4px;font-size:18px;font-family:"Noto Serif TC",serif;font-weight:700;cursor:pointer;background:#fff;color:var(--grey-1);transition:all 0.15s;min-height:55px;}
 .field .g-btn.active{border-color:var(--forest);background:var(--forest-pale);color:var(--forest-deep);}
 .optional{font-size:11px;color:var(--grey-3);font-weight:400;margin-left:4px;}
-.section-divider{padding:10px 0 8px;font-size:12px;color:var(--grey-3);letter-spacing:3px;border-top:1px dashed var(--line);margin-top:4px;}
+.section-divider{padding:10px 0 8px;font-size:18px;color:var(--grey-3);letter-spacing:3px;border-top:1px dashed var(--line);margin-top:4px;}
 /* Buttons */
 .submit-btn{width:100%;padding:18px;background:var(--forest-deep);color:#fff;border:0;border-radius:4px;font-size:18px;font-family:"Noto Serif TC",sans-serif;font-weight:700;letter-spacing:4px;cursor:pointer;box-shadow:0 4px 0 var(--forest);transition:all 0.1s;margin-top:4px;}
 .submit-btn:disabled{background:var(--grey-3);box-shadow:0 4px 0 var(--grey-2);cursor:not-allowed;}
 .submit-btn.red{background:var(--ferrari);box-shadow:0 4px 0 var(--ferrari-deep);}
 /* Consent */
-.consent{padding:12px 14px;background:var(--forest-pale);border-radius:4px;font-size:12px;color:var(--grey-1);line-height:1.7;margin-bottom:18px;}
+.consent{padding:12px 14px;background:var(--forest-pale);border-radius:4px;font-size:18px;color:var(--grey-1);line-height:1.7;margin-bottom:18px;}
 .consent label{display:flex;gap:10px;cursor:pointer;align-items:flex-start;}
 .consent input{width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:var(--forest);}
 /* Error */
-.err-msg{background:var(--ferrari-pale);border:1px solid var(--ferrari);color:var(--ferrari-deep);padding:12px 16px;border-radius:4px;font-size:13px;margin-bottom:16px;display:none;}
+.err-msg{background:var(--ferrari-pale);border:1px solid var(--ferrari);color:var(--ferrari-deep);padding:12px 16px;border-radius:4px;font-size:20px;font-weight:700;margin-bottom:16px;display:none;}
 .err-msg.show{display:block;}
 /* Login result */
 .result-block{background:#E8F5E9;border:2px solid var(--forest);border-radius:6px;padding:20px;margin-bottom:14px;display:none;}
 .result-block.show{display:block;}
 .rb-name{font-family:"Noto Serif TC",serif;font-size:28px;font-weight:900;color:var(--forest-deep);}
-.rb-no{font-family:"Space Grotesk",monospace;font-size:14px;color:var(--grey-2);margin-bottom:14px;}
-.rb-go{display:block;width:100%;padding:15px;background:var(--forest-deep);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:8px;}
-.rb-family-title{font-family:"Noto Serif TC",serif;font-size:12px;color:var(--ferrari-deep);letter-spacing:2px;font-weight:700;margin:14px 0 8px;padding-top:12px;border-top:1px solid #c8e6c9;}
+.rb-no{font-family:"Space Grotesk",monospace;font-size:18px;color:var(--grey-2);margin-bottom:14px;}
+.rb-go{display:block;width:100%;padding:15px;background:var(--forest-deep);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:8px;min-height:55px;}
+.rb-family-title{font-family:"Noto Serif TC",serif;font-size:18px;color:var(--ferrari-deep);letter-spacing:2px;font-weight:700;margin:14px 0 8px;padding-top:12px;border-top:1px solid #c8e6c9;}
 .fc-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e0f0e0;}
 .fc-row:last-child{border-bottom:none;}
-.fc-row .fn{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;color:var(--ferrari-deep);}
-.fc-row .fno{font-size:11px;color:#aaa;}
-.fc-row a{padding:5px 12px;background:var(--ferrari);color:#fff;border-radius:4px;font-size:11px;font-weight:700;text-decoration:none;}
+.fc-row .fn{font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;color:var(--ferrari-deep);}
+.fc-row .fno{font-size:18px;color:#aaa;}
+.fc-row a{padding:5px 12px;background:var(--ferrari);color:#fff;border-radius:4px;font-size:18px;font-weight:700;text-decoration:none;}
 /* Footer */
-.footer-links{text-align:center;margin-top:6px;font-size:11px;color:var(--grey-3);line-height:2;}
+.footer-links{text-align:center;margin-top:6px;font-size:18px;color:var(--grey-3);line-height:2;}
 .footer-links a{color:var(--forest);text-decoration:none;}
-.footer-note{text-align:center;margin-top:20px;font-size:11px;color:var(--grey-3);line-height:2;}
+.footer-note{text-align:center;margin-top:20px;font-size:18px;color:var(--grey-3);line-height:2;}
 .footer-note a{color:var(--grey-2);text-decoration:none;}
 </style>`) + `
 <body>
@@ -5072,7 +5071,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
     <div style="text-align:center;padding:10px 0 20px;">
       <div style="width:64px;height:64px;background:var(--forest);color:#fff;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:36px;">✓</div>
       <h2 style="font-family:'Noto Serif TC',serif;font-size:24px;color:var(--forest-deep);letter-spacing:3px;margin-bottom:6px;">登記成功！</h2>
-      <p style="font-size:13px;color:var(--grey-2);margin-bottom:20px;">你的老有卡已發出</p>
+      <p style="font-size:18px;color:var(--grey-2);margin-bottom:20px;">你的老有卡已發出</p>
     </div>
     <!-- CSS card preview -->
     <div class="gen-card" id="genCard" style="width:340px;height:215px;margin:0 auto 16px;background:linear-gradient(150deg,#FDFAF3 0%,#F0EBD8 100%);border-radius:12px;position:relative;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,0.18);">
@@ -5083,10 +5082,10 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
       <div style="position:absolute;bottom:52px;left:16px;">
         <div style="font-size:11px;color:#aaa;letter-spacing:3px;margin-bottom:6px;">MEMBER NAME · 姓名</div>
         <div id="cardZh" style="font-family:'Noto Serif TC',serif;font-size:40px;font-weight:900;color:#0d3e12;letter-spacing:4px;line-height:1;"></div>
-        <div id="cardEn" style="font-size:13px;font-weight:700;color:#0d3e12;margin-top:6px;letter-spacing:1px;"></div>
+        <div id="cardEn" style="font-size:16px;font-weight:700;color:#0d3e12;margin-top:6px;letter-spacing:1px;"></div>
       </div>
       <div style="position:absolute;bottom:14px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:flex-end;">
-        <div><div style="font-size:9px;color:#aaa;letter-spacing:2px;">MEMBER NO.</div><div id="cardNo" style="font-family:'Space Grotesk',monospace;font-size:15px;font-weight:700;color:#0d3e12;"></div></div>
+        <div><div style="font-size:9px;color:#aaa;letter-spacing:2px;">MEMBER NO.</div><div id="cardNo" style="font-family:'Space Grotesk',monospace;font-size:18px;font-weight:700;color:#0d3e12;"></div></div>
         <div style="width:42px;height:42px;background:#fff;padding:2px;border:1.5px solid var(--forest);border-radius:3px;"><canvas id="cardQr" style="width:100%;height:100%;"></canvas></div>
       </div>
     </div>
@@ -5334,16 +5333,16 @@ async function shareCardToWA(){
 // ─── Login HTML ───────────────────────────────────────────────────────────────
 function loginHtml() {
   return htmlHead('會員登入', `<style>
-body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
+body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-height:1.6;}
 .container{max-width:420px;margin:0 auto;}
 .brand-strip{display:flex;align-items:center;gap:12px;margin-bottom:24px;}
 .brand-strip .mark{width:44px;height:44px;background:var(--forest-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Noto Serif TC",serif;font-weight:900;font-size:18px;border-radius:6px;}
-.brand-strip .name .zh{font-family:"Noto Serif TC",serif;font-size:16px;color:var(--forest-deep);font-weight:700;letter-spacing:2px;}
+.brand-strip .name .zh{font-family:"Noto Serif TC",serif;font-size:18px;color:var(--forest-deep);font-weight:700;letter-spacing:2px;}
 .brand-strip .name .en{font-size:11px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
 .header-card{background:linear-gradient(135deg,var(--forest-deep) 0%,var(--forest) 100%);color:#fff;padding:28px 22px;border-radius:4px;margin-bottom:20px;position:relative;overflow:hidden;}
 .header-card::before{content:"老";position:absolute;right:-10px;bottom:-40px;font-family:"Noto Serif TC",serif;font-size:180px;font-weight:900;color:rgba(255,255,255,0.08);line-height:1;}
 .header-card h1{font-family:"Noto Serif TC",serif;font-size:28px;font-weight:900;letter-spacing:3px;margin-bottom:8px;position:relative;z-index:2;}
-.header-card p{font-size:13px;opacity:0.85;line-height:1.6;position:relative;z-index:2;}
+.header-card p{font-size:18px;opacity:0.85;line-height:1.6;position:relative;z-index:2;}
 .form-card{background:#fff;padding:28px 22px;border-radius:4px;margin-bottom:16px;}
 .field{margin-bottom:20px;}
 .field label{display:block;font-family:"Noto Serif TC",serif;font-size:15px;color:var(--forest-deep);font-weight:700;letter-spacing:1px;margin-bottom:8px;}
@@ -5354,13 +5353,13 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:16px;}
 .submit-btn:disabled{background:var(--grey-3);box-shadow:0 4px 0 var(--grey-2);cursor:not-allowed;}
 .err-msg{background:var(--ferrari-pale);border:1px solid var(--ferrari);color:var(--ferrari-deep);padding:12px 16px;border-radius:4px;font-size:13px;margin-bottom:16px;display:none;}
 .err-msg.show{display:block;}
-.footer-links{text-align:center;margin-top:20px;font-size:12px;color:var(--grey-3);line-height:2;}
+.footer-links{text-align:center;margin-top:20px;font-size:18px;color:var(--grey-3);line-height:2;}
 .footer-links a{color:var(--forest);text-decoration:none;font-weight:700;}
 .result-card{background:#fff;border-radius:8px;padding:24px 20px;border-left:4px solid var(--forest);display:none;margin-bottom:16px;}
 .result-card.show{display:block;}
 .rc-name{font-family:"Noto Serif TC",serif;font-size:32px;font-weight:900;color:var(--forest-deep);margin-bottom:4px;}
-.rc-no{font-family:"Space Grotesk",monospace;font-size:16px;color:var(--grey-2);margin-bottom:16px;}
-.rc-go-btn{display:block;width:100%;padding:16px;background:var(--forest-deep);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:17px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:10px;}
+.rc-no{font-family:"Space Grotesk",monospace;font-size:18px;color:var(--grey-2);margin-bottom:16px;}
+.rc-go-btn{display:block;width:100%;padding:16px;background:var(--forest-deep);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:10px;min-height:55px;}
 .rc-family{background:#fff;border-radius:8px;padding:20px;border-left:4px solid var(--ferrari);display:none;margin-bottom:16px;}
 .rc-family.show{display:block;}
 .fc-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5;}
@@ -6290,7 +6289,7 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 .topbar{background:var(--green-dark);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;}
 .topbar img{width:44px;height:44px;border-radius:8px;}
 .topbar .brand{font-size:22px;font-weight:900;letter-spacing:1px;}
-.topbar .sub{font-size:14px;opacity:0.8;margin-top:2px;}
+.topbar .sub{font-size:18px;opacity:0.8;margin-top:2px;}
 
 /* ── 主內容 ── */
 .wrap{max-width:480px;margin:0 auto;padding:28px 18px 80px;}
@@ -6330,7 +6329,7 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 
 /* ── 換人連結 ── */
 .switch-wrap{text-align:center;margin-top:28px;}
-.switch-link{font-size:16px;color:#888;cursor:pointer;background:none;border:none;text-decoration:underline;padding:8px;}
+.switch-link{font-size:18px;color:#888;cursor:pointer;background:none;border:none;text-decoration:underline;padding:8px;}
 
 /* ── 卡片框架 ── */
 .card-frame{width:100%;border:none;min-height:600px;background:transparent;}
@@ -6345,13 +6344,13 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
   box-shadow:0 -2px 10px rgba(0,0,0,0.08);}
 .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:none;border:none;cursor:pointer;padding:6px 2px;
-  color:#888;font-family:inherit;transition:color 0.15s;min-height:60px;gap:2px;}
+  color:#888;font-family:inherit;transition:color 0.15s;min-height:60px;gap:5px;}
 .tab-btn .tab-icon{font-size:26px;line-height:1;}
-.tab-btn .tab-label{font-size:13px;font-weight:600;line-height:1;letter-spacing:0.3px;}
+.tab-btn .tab-label{font-size:13px;font-weight:600;line-height:1;letter-spacing:0.3px;margin-top:1px;}
 .tab-btn.active{color:var(--green);}
 .tab-btn.tab-card-btn{color:var(--green-dark);}
 .tab-btn.tab-card-btn .tab-icon{font-size:30px;}
-.tab-btn.tab-card-btn .tab-label{font-size:14px;font-weight:900;}
+.tab-btn.tab-card-btn .tab-label{font-size:14px;font-weight:900;margin-top:1px;}
 .tab-btn.tab-card-btn.active{color:var(--green);}
 
 /* ── Coming soon panel ── */
