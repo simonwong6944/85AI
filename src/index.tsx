@@ -1159,6 +1159,87 @@ app.get('/api/admin/source-stats', async (c) => {
   return c.json({ ok: true, stats: rows.results })
 })
 
+// ─── Useful Links: Public API ────────────────────────────────────────────────
+
+// GET /api/useful-links — 公開，只回傳啟用項目，依 sort_order 排序
+app.get('/api/useful-links', async (c) => {
+  const db = c.env.DB
+  const rows = await db.prepare(
+    'SELECT id, title, link_type, content, sort_order FROM useful_links WHERE is_active=1 ORDER BY sort_order ASC, id ASC'
+  ).all()
+  return c.json({ ok: true, links: rows.results })
+})
+
+// ─── Useful Links: Admin APIs ─────────────────────────────────────────────────
+
+// GET /api/admin/useful-links — 列出全部（包括隱藏）
+app.get('/api/admin/useful-links', async (c) => {
+  const db = c.env.DB
+  const rows = await db.prepare(
+    'SELECT * FROM useful_links ORDER BY sort_order ASC, id ASC'
+  ).all()
+  return c.json({ ok: true, links: rows.results })
+})
+
+// POST /api/admin/useful-links — 新增
+app.post('/api/admin/useful-links', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json<{
+    title?: string; link_type?: string; content?: string;
+    sort_order?: number; is_active?: number
+  }>()
+  if (!body.title || !body.link_type || !body.content) {
+    return c.json({ ok: false, error: 'title, link_type, content 必填' }, 400)
+  }
+  const valid = ['phone', 'whatsapp', 'url', 'text']
+  if (!valid.includes(body.link_type)) {
+    return c.json({ ok: false, error: 'link_type 必須為 phone/whatsapp/url/text' }, 400)
+  }
+  const sort = body.sort_order ?? 0
+  const active = body.is_active ?? 1
+  const result = await db.prepare(
+    'INSERT INTO useful_links (title, link_type, content, sort_order, is_active) VALUES (?,?,?,?,?)'
+  ).bind(body.title, body.link_type, body.content, sort, active).run()
+  return c.json({ ok: true, id: result.meta.last_row_id })
+})
+
+// PUT /api/admin/useful-links/:id — 更新
+app.put('/api/admin/useful-links/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const body = await c.req.json<{
+    title?: string; link_type?: string; content?: string;
+    sort_order?: number; is_active?: number
+  }>()
+  const allowed = ['title', 'link_type', 'content', 'sort_order', 'is_active']
+  const fields: string[] = []
+  const vals: any[] = []
+  for (const key of allowed) {
+    if (body[key as keyof typeof body] !== undefined) {
+      fields.push(`${key} = ?`)
+      vals.push(body[key as keyof typeof body])
+    }
+  }
+  if (!fields.length) return c.json({ ok: false, error: 'Nothing to update' }, 400)
+  if (body.link_type !== undefined) {
+    const valid = ['phone', 'whatsapp', 'url', 'text']
+    if (!valid.includes(body.link_type)) {
+      return c.json({ ok: false, error: 'link_type 必須為 phone/whatsapp/url/text' }, 400)
+    }
+  }
+  vals.push(id)
+  await db.prepare(`UPDATE useful_links SET ${fields.join(', ')} WHERE id = ?`).bind(...vals).run()
+  return c.json({ ok: true })
+})
+
+// DELETE /api/admin/useful-links/:id — 刪除
+app.delete('/api/admin/useful-links/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  await db.prepare('DELETE FROM useful_links WHERE id = ?').bind(id).run()
+  return c.json({ ok: true })
+})
+
 // ─── Root: 85 AI Technology Limited Dashboard ────────────────────────────────
 app.get('/', (c) => c.html(dashboardHtml()))
 
@@ -5614,6 +5695,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="nav-item" onclick="switchMod('mod-products')">
         <i class="fas fa-box"></i> 產品管理
       </div>
+      <div class="nav-item" onclick="switchMod('mod-useful-links')">
+        <i class="fas fa-info-circle"></i> 有用資訊管理
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doAdminLogout()">
@@ -5818,6 +5902,63 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="store-grid" id="prod-grid"></div>
 </div>
 
+<!-- Useful Links Module -->
+<div id="mod-useful-links" class="mod-page">
+  <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <h3 style="font-size:16px;font-weight:700;color:#111827">有用資訊管理</h3>
+      <p style="font-size:12px;color:#6B7280;margin-top:2px" id="ul-count-label"></p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateUsefulLink()">
+      <i class="fas fa-plus"></i> 新增資訊
+    </button>
+  </div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:14px" id="ul-table">
+      <thead>
+        <tr style="background:#F3F4F6;text-align:left">
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">標題</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">類型</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">內容</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">排序</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">狀態</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">操作</th>
+        </tr>
+      </thead>
+      <tbody id="ul-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Useful Links Create/Edit Modal -->
+<div class="modal-overlay" id="modal-useful-link">
+  <div class="modal">
+    <h3 id="ul-modal-title"><i class="fas fa-info-circle" style="margin-right:8px;color:var(--brand)"></i>新增有用資訊</h3>
+    <input type="hidden" id="ul-id">
+    <div class="form-field"><label>標題 <span style="color:#EF4444">*</span></label><input type="text" id="ul-title" placeholder="例：長者熱線"></div>
+    <div class="form-field">
+      <label>類型 <span style="color:#EF4444">*</span></label>
+      <select id="ul-link-type">
+        <option value="phone">phone（電話）</option>
+        <option value="whatsapp">whatsapp（WhatsApp）</option>
+        <option value="url">url（網址）</option>
+        <option value="text">text（純文字）</option>
+      </select>
+    </div>
+    <div class="form-field"><label>內容 <span style="color:#EF4444">*</span></label><input type="text" id="ul-content" placeholder="電話號碼 / WhatsApp號碼 / 網址 / 純文字"></div>
+    <div class="form-field"><label>排序（細數排前）</label><input type="number" id="ul-sort-order" value="0" min="0"></div>
+    <div class="form-field" id="ul-active-field" style="display:none">
+      <label>狀態</label>
+      <select id="ul-is-active"><option value="1">顯示</option><option value="0">隱藏</option></select>
+    </div>
+    <div id="ul-modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-useful-link')">取消</button>
+      <button class="btn btn-primary" onclick="submitUsefulLink()"><i class="fas fa-save"></i> 儲存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Product Create/Edit Modal -->
 <div class="modal-overlay" id="modal-product">
   <div class="modal">
@@ -5907,7 +6048,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -5916,6 +6057,7 @@ function switchMod(id){
   }
   document.querySelector('.page-area').style.padding = (id==='mod-membership') ? '10px' : '24px';
   if(id==='mod-products'){ loadProductCategories(); loadProducts(); }
+  if(id==='mod-useful-links') loadUsefulLinks();
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
@@ -6259,6 +6401,106 @@ function submitProduct(){
       else{errEl.textContent=d.error||'儲存失敗';errEl.style.display='';}
     }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
 }
+
+// ── Useful Links ──
+function loadUsefulLinks(){
+  fetch('/api/admin/useful-links').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('ul-tbody').innerHTML='<tr><td colspan="6" style="padding:20px;text-align:center;color:#DC2626">讀取失敗</td></tr>';return;}
+    var links = d.links||[];
+    document.getElementById('ul-count-label').textContent='共 '+links.length+' 項';
+    if(!links.length){
+      document.getElementById('ul-tbody').innerHTML='<tr><td colspan="6" style="padding:30px;text-align:center;color:#9CA3AF">尚未有資訊，請新增</td></tr>';
+      return;
+    }
+    var typeLabel={'phone':'📞 電話','whatsapp':'💬 WhatsApp','url':'🔗 網址','text':'📝 文字'};
+    document.getElementById('ul-tbody').innerHTML=links.map(function(l){
+      return '<tr style="border-bottom:1px solid #F3F4F6">'+
+        '<td style="padding:10px 12px;font-weight:600">'+esc(l.title)+'</td>'+
+        '<td style="padding:10px 12px">'+esc(typeLabel[l.link_type]||l.link_type)+'</td>'+
+        '<td style="padding:10px 12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(l.content)+'</td>'+
+        '<td style="padding:10px 12px">'+l.sort_order+'</td>'+
+        '<td style="padding:10px 12px">'+
+          '<span style="padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;background:'+(l.is_active?'#D1FAE5':'#F3F4F6')+';color:'+(l.is_active?'#065F46':'#6B7280')+'">'+
+            (l.is_active?'顯示':'隱藏')+
+          '</span>'+
+        '</td>'+
+        '<td style="padding:10px 12px;white-space:nowrap">'+
+          '<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;margin-right:4px" onclick="openEditUsefulLink('+l.id+')"><i class="fas fa-edit"></i> 編輯</button>'+
+          '<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;margin-right:4px;background:'+(l.is_active?'#FEF3C7':'#D1FAE5')+';color:'+(l.is_active?'#92400E':'#065F46')+'" onclick="toggleUsefulLinkActive('+l.id+','+(l.is_active?0:1)+')">'+
+            (l.is_active?'隱藏':'顯示')+
+          '</button>'+
+          '<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;background:#FEE2E2;color:#DC2626" onclick="deleteUsefulLink('+l.id+')"><i class="fas fa-trash"></i></button>'+
+        '</td>'+
+      '</tr>';
+    }).join('');
+  }).catch(function(e){console.error('loadUsefulLinks',e);});
+}
+function openCreateUsefulLink(){
+  document.getElementById('ul-modal-title').innerHTML='<i class="fas fa-info-circle" style="margin-right:8px;color:var(--brand)"></i>新增有用資訊';
+  document.getElementById('ul-id').value='';
+  document.getElementById('ul-title').value='';
+  document.getElementById('ul-link-type').value='phone';
+  document.getElementById('ul-content').value='';
+  document.getElementById('ul-sort-order').value='0';
+  document.getElementById('ul-active-field').style.display='none';
+  document.getElementById('ul-modal-err').style.display='none';
+  document.getElementById('modal-useful-link').classList.add('open');
+}
+function openEditUsefulLink(id){
+  fetch('/api/admin/useful-links').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){alert(d.error||'讀取失敗');return;}
+    var l=(d.links||[]).find(function(x){return x.id===id;});
+    if(!l){alert('找不到此項目');return;}
+    document.getElementById('ul-modal-title').innerHTML='<i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯有用資訊';
+    document.getElementById('ul-id').value=l.id;
+    document.getElementById('ul-title').value=l.title||'';
+    document.getElementById('ul-link-type').value=l.link_type||'phone';
+    document.getElementById('ul-content').value=l.content||'';
+    document.getElementById('ul-sort-order').value=l.sort_order||0;
+    document.getElementById('ul-is-active').value=String(l.is_active);
+    document.getElementById('ul-active-field').style.display='';
+    document.getElementById('ul-modal-err').style.display='none';
+    document.getElementById('modal-useful-link').classList.add('open');
+  });
+}
+function submitUsefulLink(){
+  var id=document.getElementById('ul-id').value;
+  var body={
+    title:document.getElementById('ul-title').value.trim(),
+    link_type:document.getElementById('ul-link-type').value,
+    content:document.getElementById('ul-content').value.trim(),
+    sort_order:parseInt(document.getElementById('ul-sort-order').value)||0
+  };
+  var errEl=document.getElementById('ul-modal-err');
+  if(!body.title||!body.content){errEl.textContent='標題和內容必填';errEl.style.display='';return;}
+  if(id) body.is_active=parseInt(document.getElementById('ul-is-active').value);
+  errEl.style.display='none';
+  var url=id?'/api/admin/useful-links/'+id:'/api/admin/useful-links';
+  var method=id?'PUT':'POST';
+  fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-useful-link');loadUsefulLinks();}
+      else{errEl.textContent=d.error||'儲存失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
+function deleteUsefulLink(id){
+  if(!confirm('確定刪除？此操作不可還原。'))return;
+  fetch('/api/admin/useful-links/'+id,{method:'DELETE'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){loadUsefulLinks();}
+      else{alert(d.error||'刪除失敗');}
+    }).catch(function(){alert('網絡錯誤');});
+}
+function toggleUsefulLinkActive(id,newActive){
+  fetch('/api/admin/useful-links/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_active:newActive})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){loadUsefulLinks();}
+      else{alert(d.error||'更新失敗');}
+    }).catch(function(){alert('網絡錯誤');});
+}
 </script>
 </body>
 </html>`
@@ -6367,6 +6609,10 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
     <div class="brand">CoEldery 85</div>
     <div class="sub">老有聯盟 85</div>
   </div>
+  <button id="useful-links-btn" onclick="openUsefulLinksPanel()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 10px;color:#fff;min-width:52px">
+    <span style="font-size:28px;line-height:1">&#x2139;&#xFE0F;</span>
+    <span style="font-size:12px;font-weight:600;margin-top:2px;white-space:nowrap">有用資訊</span>
+  </button>
 </div>
 
 <!-- ── Tab 面板：購物 ── -->
@@ -6448,6 +6694,17 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 <div id="tabWork" class="coming-soon-panel">
   <div class="coming-icon">💼</div>
   <div class="coming-text">🚧 即將推出，敬請期待 🙏</div>
+</div>
+
+<!-- ── 有用資訊 Panel (overlay) ── -->
+<div id="useful-links-panel" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.5);flex-direction:column;align-items:center;justify-content:flex-end">
+  <div style="background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:0 0 env(safe-area-inset-bottom,16px);max-height:85vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1.5px solid #E5E7EB">
+      <div style="font-size:22px;font-weight:800;color:#111827">&#x2139;&#xFE0F; 有用資訊</div>
+      <button onclick="closeUsefulLinksPanel()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#6B7280;padding:4px 8px;line-height:1">&times;</button>
+    </div>
+    <div id="ul-panel-list" style="overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch"></div>
+  </div>
 </div>
 
 <!-- ── 底部 5-tab 導航列 ── -->
@@ -6717,6 +6974,64 @@ function switchUser() {
       .catch(function() { /* ignore refresh error */ });
   }
 })();
+
+// ── 有用資訊 Modal ──
+function openUsefulLinksPanel(){
+  var panel = document.getElementById('useful-links-panel');
+  var list = document.getElementById('ul-panel-list');
+  panel.style.display='flex';
+  list.innerHTML='<div style="text-align:center;padding:40px;font-size:18px;color:#6B7280">載入中...</div>';
+  fetch('/api/useful-links')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok||!d.links||!d.links.length){
+        list.innerHTML='<div style="text-align:center;padding:40px;font-size:18px;color:#6B7280">暫無資訊</div>';
+        return;
+      }
+      list.innerHTML=d.links.map(function(l){
+        var inner='';
+        if(l.link_type==='phone'){
+          inner='<a href="tel:'+encodeURIComponent(l.content)+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%">'+
+            '<span style="font-size:26px">📞</span>'+
+            '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
+            '<div style="font-size:17px;color:#059669;margin-top:2px">'+escHtml(l.content)+'</div></span>'+
+            '<span style="font-size:22px;color:#059669">›</span>'+
+          '</a>';
+        } else if(l.link_type==='whatsapp'){
+          var waNum=l.content.replace(/[^0-9]/g,'');
+          inner='<a href="https://wa.me/'+waNum+'" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%">'+
+            '<span style="font-size:26px">💬</span>'+
+            '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
+            '<div style="font-size:17px;color:#059669;margin-top:2px">WhatsApp: '+escHtml(l.content)+'</div></span>'+
+            '<span style="font-size:22px;color:#059669">›</span>'+
+          '</a>';
+        } else if(l.link_type==='url'){
+          inner='<a href="'+escHtml(l.content)+'" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%">'+
+            '<span style="font-size:26px">🔗</span>'+
+            '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
+            '<div style="font-size:17px;color:#059669;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">'+escHtml(l.content)+'</div></span>'+
+            '<span style="font-size:22px;color:#059669">›</span>'+
+          '</a>';
+        } else {
+          inner='<div style="display:flex;align-items:center;gap:10px;width:100%">'+
+            '<span style="font-size:26px">📝</span>'+
+            '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
+            '<div style="font-size:17px;color:#374151;margin-top:2px;white-space:pre-wrap">'+escHtml(l.content)+'</div></span>'+
+          '</div>';
+        }
+        return '<div style="background:#fff;border-radius:12px;padding:14px 16px;min-height:55px;display:flex;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,0.08);border:1.5px solid #D1FAE5">'+inner+'</div>';
+      }).join('');
+    })
+    .catch(function(){
+      list.innerHTML='<div style="text-align:center;padding:40px;font-size:18px;color:#DC2626">載入失敗，請稍後再試</div>';
+    });
+}
+function closeUsefulLinksPanel(){
+  document.getElementById('useful-links-panel').style.display='none';
+}
+function escHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 </body>
 </html>`
