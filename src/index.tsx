@@ -4266,7 +4266,7 @@ tr.inactive td{opacity:0.45;}
     <!-- 新增/編輯 表單 (inline, 預設隱藏) -->
     <div id="contentFormWrap" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:2000;display:none;align-items:center;justify-content:center;">
       <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:520px;max-height:90vh;overflow-y:auto;">
-        <h3 id="cFormTitle" style="margin:0 0 18px;font-size:15px;font-weight:700;">＋ 新增內容</h3>
+        <h3 id="cFormHeading" style="margin:0 0 18px;font-size:15px;font-weight:700;">＋ 新增內容</h3>
         <input type="hidden" id="cFormId">
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div>
@@ -4278,7 +4278,7 @@ tr.inactive td{opacity:0.45;}
           </div>
           <div>
             <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">標題 *</label>
-            <input id="cFormTitle" type="text" maxlength="100" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;" placeholder="例：限時特惠套餐">
+            <input id="cFormTitleInput" type="text" maxlength="100" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;" placeholder="例：限時特惠套餐">
           </div>
           <div>
             <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">內容 *</label>
@@ -4441,7 +4441,8 @@ function escHtml(s) {
 
 function openAddContent() {
   document.getElementById('cFormId').value = '';
-  document.getElementById('cFormTitle').value = '';
+  var heading = document.getElementById('cFormHeading'); if (heading) heading.textContent = '＋ 新增內容';
+  document.getElementById('cFormTitleInput').value = '';
   document.getElementById('cFormBody').value = '';
   document.getElementById('cFormAddress').value = '';
   document.getElementById('cFormSort').value = '0';
@@ -4455,7 +4456,8 @@ function openEditContent(i) {
   if (!item) return;
   document.getElementById('cFormId').value = item.id;
   document.getElementById('cFormSection').value = item.section;
-  document.getElementById('cFormTitle').value = item.title;
+  var heading = document.getElementById('cFormHeading'); if (heading) heading.textContent = '✏️ 編輯內容';
+  document.getElementById('cFormTitleInput').value = item.title;
   document.getElementById('cFormBody').value = item.body;
   document.getElementById('cFormAddress').value = item.address || '';
   document.getElementById('cFormSort').value = item.sort_order;
@@ -4471,7 +4473,7 @@ function saveContent() {
   var id = document.getElementById('cFormId').value;
   var payload = {
     section: document.getElementById('cFormSection').value,
-    title: document.getElementById('cFormTitle').value.trim(),
+    title: document.getElementById('cFormTitleInput').value.trim(),
     body: document.getElementById('cFormBody').value,
     address: document.getElementById('cFormAddress').value.trim() || null,
     sort_order: parseInt(document.getElementById('cFormSort').value) || 0,
