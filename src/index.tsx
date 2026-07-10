@@ -4979,8 +4979,8 @@ function memberProfileHtml(m: any, medStatus: string | null = null, medCardNo: s
   const expDisp = expMonth && expYear ? `${expMonth} / ${expYear}` : '—'
   const kycLabel: Record<string,string> = { PENDING:'待核實', VERIFIED:'已核實', REJECTED:'未通過' }
   const roleLabel: Record<string,string> = { CoExplorery:'探索者', CoFounder:'創始人', CoChampion:'支持者' }
-  // Watermark: show if user has NOT clicked any WA button, OR admin flagged re_verify
-  const showWatermark = !m.wa_clicked_at || (m.re_verify === 1 || m.re_verify === true)
+  // Watermark: show unless admin has VERIFIED (kyc_status=VERIFIED), OR admin flagged re_verify
+  const showWatermark = m.kyc_status !== 'VERIFIED' || (m.re_verify === 1 || m.re_verify === true)
 
   return `<!DOCTYPE html>
 <html lang="zh-HK">
@@ -8359,7 +8359,7 @@ function switchUser() {
   var saved = localStorage.getItem('ce85_member_no');
   if (saved) {
     var savedWaClicked = localStorage.getItem('ce85_wa_clicked') === '1';
-    showCard(saved, savedWaClicked);
+    // Verify member still exists before showing card
     fetch('/api/members/lookup?q=' + encodeURIComponent(saved))
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -8367,13 +8367,22 @@ function switchUser() {
           var latestWaClickedAt = data.wa_clicked_at || (data.member && data.member.wa_clicked_at) || null;
           if (latestWaClickedAt && !savedWaClicked) {
             localStorage.setItem('ce85_wa_clicked', '1');
-            showInstallBanner();
+            savedWaClicked = true;
           }
+          showCard(saved, savedWaClicked);
+          // 頁面載入時檢查心聲紅點
+          setTimeout(function() { loadVoiceRedDot(); }, 500);
+        } else {
+          // Member no longer exists — clear localStorage and show login
+          localStorage.removeItem('ce85_member_no');
+          localStorage.removeItem('ce85_wa_clicked');
         }
       })
-      .catch(function() { /* ignore refresh error */ });
-    // 頁面載入時檢查心聲紅點
-    setTimeout(function() { loadVoiceRedDot(); }, 500);
+      .catch(function() {
+        // Network error — still show cached card but don't crash
+        showCard(saved, savedWaClicked);
+        setTimeout(function() { loadVoiceRedDot(); }, 500);
+      });
   }
 })();
 
