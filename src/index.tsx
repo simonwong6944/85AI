@@ -3329,6 +3329,68 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
       <div style="font-size:18px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
     </div>
 
+    <!-- ══ Master Card Linking Section ══ -->
+    <!-- Only shown when family card was registered without a pre-linked parent -->
+    <div id="masterCardSection" style="display:none;margin:0 0 16px;border:2px solid #b71c1c;border-radius:10px;overflow:hidden;">
+      <div style="background:#b71c1c;color:#fff;padding:12px 16px;font-size:19px;font-weight:700;text-align:center;">
+        🔗 連結長輩主卡
+      </div>
+      <div style="padding:14px 16px;background:#fff8f8;">
+        <p style="font-size:16px;color:#555;margin:0 0 14px;line-height:1.6;">家庭同行卡需連結長輩主卡方可完整使用。請選擇以下方式：</p>
+
+        <!-- Tab buttons -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+          <button id="tabLinkBtn" onclick="showMasterTab('link')"
+            style="padding:12px 6px;background:#b71c1c;color:#fff;border:2px solid #b71c1c;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">
+            📱 連結已有主卡
+          </button>
+          <button id="tabAddBtn" onclick="showMasterTab('add')"
+            style="padding:12px 6px;background:#fff;color:#b71c1c;border:2px solid #b71c1c;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">
+            ➕ 為長輩申請主卡
+          </button>
+        </div>
+
+        <!-- Tab A: Link existing primary card by phone -->
+        <div id="tabLinkPanel" style="display:block;">
+          <p style="font-size:15px;color:#444;margin:0 0 8px;">輸入長輩的香港電話號碼，系統會自動找到其主卡並連結。</p>
+          <input id="linkParentPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="長輩電話（8位）"
+            style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:18px;border:1.5px solid #ccc;border-radius:6px;margin-bottom:10px;"/>
+          <div id="linkParentErr" style="display:none;color:#c62828;font-size:15px;font-weight:600;margin-bottom:8px;"></div>
+          <div id="linkParentSuccess" style="display:none;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:6px;padding:10px 12px;font-size:16px;color:#2E7D32;font-weight:700;margin-bottom:10px;"></div>
+          <button onclick="doLinkParent()"
+            style="width:100%;padding:14px;background:#b71c1c;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;min-height:52px;">
+            🔗 確認連結主卡
+          </button>
+        </div>
+
+        <!-- Tab B: Register new primary card for elder -->
+        <div id="tabAddPanel" style="display:none;">
+          <p style="font-size:15px;color:#444;margin:0 0 10px;">為長輩登記新主卡（需年滿55歲），完成後自動連結到此家庭卡。</p>
+          <input id="addParentName" type="text" placeholder="長輩中文姓名"
+            style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:18px;border:1.5px solid #ccc;border-radius:6px;margin-bottom:10px;"/>
+          <input id="addParentPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="長輩電話（8位）"
+            style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:18px;border:1.5px solid #ccc;border-radius:6px;margin-bottom:10px;"/>
+          <select id="addParentYear"
+            style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:18px;border:1.5px solid #ccc;border-radius:6px;margin-bottom:10px;background:#fff;">
+            <option value="">長輩出生年份</option>
+          </select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <button id="addGenderM" onclick="setAddGender('M',this)"
+              style="padding:13px;background:#fff;border:2px solid #ccc;border-radius:6px;font-size:17px;font-weight:700;cursor:pointer;">男 M</button>
+            <button id="addGenderF" onclick="setAddGender('F',this)"
+              style="padding:13px;background:#fff;border:2px solid #ccc;border-radius:6px;font-size:17px;font-weight:700;cursor:pointer;">女 F</button>
+          </div>
+          <div id="addParentErr" style="display:none;color:#c62828;font-size:15px;font-weight:600;margin-bottom:8px;"></div>
+          <div id="addParentSuccess" style="display:none;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:6px;padding:10px 12px;font-size:16px;color:#2E7D32;font-weight:700;margin-bottom:10px;"></div>
+          <button onclick="doAddParent()"
+            style="width:100%;padding:14px;background:#b71c1c;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;min-height:52px;">
+            ➕ 為長輩申請主卡並連結
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- ══ End Master Card Linking Section ══ -->
+
     <div class="action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
       <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;cursor:pointer;border-radius:4px;min-height:55px;" onclick="saveCardImage()">💾 儲存卡圖</button>
       <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;cursor:pointer;border-radius:4px;min-height:55px;" onclick="window.location.href='/membership/join'">← 返回主卡</button>
@@ -3437,6 +3499,13 @@ async function submitForm(){
     // Save to sessionStorage so WA redirect + return can restore this page
     sessionStorage.setItem('successData', JSON.stringify(data));
     sessionStorage.setItem('successTier', data.tier||'FAMILY');
+    // Show master card linking section if no parent linked yet
+    if(!data.parentNo){
+      var mcs=document.getElementById('masterCardSection');
+      if(mcs){mcs.style.display='block';}
+      // Pre-populate add-parent year dropdown
+      initAddParentYearDropdown();
+    }
     // Load admin WhatsApp and inject verification block
     fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
       var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
@@ -3455,6 +3524,104 @@ async function submitForm(){
     }).catch(function(){});
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
 }
+
+// ══ Master Card Linking JS ══
+var _addParentGender='';
+
+function showMasterTab(tab){
+  var linkPanel=document.getElementById('tabLinkPanel');
+  var addPanel=document.getElementById('tabAddPanel');
+  var linkBtn=document.getElementById('tabLinkBtn');
+  var addBtn=document.getElementById('tabAddBtn');
+  if(tab==='link'){
+    linkPanel.style.display='block'; addPanel.style.display='none';
+    linkBtn.style.background='#b71c1c'; linkBtn.style.color='#fff';
+    addBtn.style.background='#fff'; addBtn.style.color='#b71c1c';
+  } else {
+    linkPanel.style.display='none'; addPanel.style.display='block';
+    addBtn.style.background='#b71c1c'; addBtn.style.color='#fff';
+    linkBtn.style.background='#fff'; linkBtn.style.color='#b71c1c';
+  }
+}
+
+function initAddParentYearDropdown(){
+  var sel=document.getElementById('addParentYear');
+  if(!sel||sel.options.length>1)return;
+  var curYear=new Date().getFullYear();
+  // Primary card must be 55+ so max birth year = curYear - 55
+  for(var y=curYear-55;y>=1930;y--){
+    var opt=document.createElement('option');
+    opt.value=y; opt.textContent=y+'年';
+    sel.appendChild(opt);
+  }
+}
+
+function setAddGender(v,btn){
+  _addParentGender=v;
+  document.getElementById('addGenderM').style.background='#fff';
+  document.getElementById('addGenderM').style.borderColor='#ccc';
+  document.getElementById('addGenderM').style.color='#333';
+  document.getElementById('addGenderF').style.background='#fff';
+  document.getElementById('addGenderF').style.borderColor='#ccc';
+  document.getElementById('addGenderF').style.color='#333';
+  btn.style.background='#b71c1c'; btn.style.borderColor='#b71c1c'; btn.style.color='#fff';
+}
+
+async function doLinkParent(){
+  var no=window._verifyMemberNo;
+  if(!no)return;
+  var phone=document.getElementById('linkParentPhone').value.replace(/[^0-9]/g,'');
+  var errEl=document.getElementById('linkParentErr');
+  var sucEl=document.getElementById('linkParentSuccess');
+  errEl.style.display='none'; sucEl.style.display='none';
+  if(phone.length!==8){errEl.textContent='請輸入正確的8位電話號碼';errEl.style.display='block';return;}
+  try{
+    var res=await fetch('/api/members/'+encodeURIComponent(no)+'/link-parent',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({parentPhone:phone})
+    });
+    var d=await res.json();
+    if(!d.ok){errEl.textContent=d.error||'連結失敗，請確認電話號碼';errEl.style.display='block';return;}
+    sucEl.textContent='✅ 成功連結主卡：'+d.parent_no+(d.parent_name?' （'+d.parent_name+'）':'');
+    sucEl.style.display='block';
+    // Hide the section after 3s
+    setTimeout(function(){
+      var mcs=document.getElementById('masterCardSection');
+      if(mcs)mcs.style.display='none';
+    },3000);
+  }catch(e){errEl.textContent='網絡錯誤，請再試一次';errEl.style.display='block';}
+}
+
+async function doAddParent(){
+  var no=window._verifyMemberNo;
+  if(!no)return;
+  var nameZh=document.getElementById('addParentName').value.trim();
+  var phone=document.getElementById('addParentPhone').value.replace(/[^0-9]/g,'');
+  var birthYear=document.getElementById('addParentYear').value;
+  var errEl=document.getElementById('addParentErr');
+  var sucEl=document.getElementById('addParentSuccess');
+  errEl.style.display='none'; sucEl.style.display='none';
+  if(!nameZh){errEl.textContent='請填寫長輩中文姓名';errEl.style.display='block';return;}
+  if(phone.length!==8){errEl.textContent='請輸入正確的8位電話號碼';errEl.style.display='block';return;}
+  if(!birthYear){errEl.textContent='請選擇長輩出生年份';errEl.style.display='block';return;}
+  if(!_addParentGender){errEl.textContent='請選擇長輩性別';errEl.style.display='block';return;}
+  try{
+    var res=await fetch('/api/members/'+encodeURIComponent(no)+'/add-parent',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nameZh:nameZh,phone:phone,birthYear:birthYear,gender:_addParentGender})
+    });
+    var d=await res.json();
+    if(!d.ok){errEl.textContent=d.error||'申請失敗，請再試一次';errEl.style.display='block';return;}
+    sucEl.textContent='✅ 長輩主卡已申請：'+d.parent_no+'，已自動連結到此家庭卡！';
+    sucEl.style.display='block';
+    // Hide the section after 3s
+    setTimeout(function(){
+      var mcs=document.getElementById('masterCardSection');
+      if(mcs)mcs.style.display='none';
+    },3000);
+  }catch(e){errEl.textContent='網絡錯誤，請再試一次';errEl.style.display='block';}
+}
+// ══ End Master Card Linking JS ══
 
 // ── Button 1: Normal WhatsApp — open WA, visibilitychange/pageshow triggers markWASent on return ──
 function openWA(){
