@@ -5306,7 +5306,66 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       <button type="button" id="afSubmitBtn" onclick="submitAfForm()" style="width:100%;padding:14px;background:#C62828;color:#fff;border:0;border-radius:6px;font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:4px;min-height:55px;">新增家庭同行卡</button>
     </div>
     <div id="afSuccess" style="display:none;background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:6px;padding:12px 14px;font-size:20px;color:#1B5E20;margin-top:12px;line-height:1.7;"></div>
-  </div>` : ''}
+  </div>` : `
+  <!-- ── 家庭卡：連結／申請主卡 ── -->
+  <div class="section">
+    <div class="section-title">◆ 主卡連結</div>
+    ${m.parent_no ? `
+    <div style="background:#f0f7f0;border:1.5px solid #4caf50;border-radius:8px;padding:14px 16px;font-size:20px;color:#1B5E20;font-weight:700;">
+      ✅ 已綁定主卡：${m.parent_name || ''}（${m.parent_no}）
+    </div>` : `
+    <p style="font-size:18px;color:#555;margin:0 0 14px;line-height:1.6;">此家庭卡未連結主卡，請選擇以下方式：</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <button id="tabLink" onclick="switchFamTab('link')"
+        style="padding:13px 6px;background:#C62828;color:#fff;border:2px solid #C62828;border-radius:6px;font-size:17px;font-weight:700;cursor:pointer;min-height:55px;">
+        📱 綁定已有主卡
+      </button>
+      <button id="tabNew" onclick="switchFamTab('new')"
+        style="padding:13px 6px;background:#fff;color:#C62828;border:2px solid #C62828;border-radius:6px;font-size:17px;font-weight:700;cursor:pointer;min-height:55px;">
+        ➕ 為長輩開主卡
+      </button>
+    </div>
+
+    <!-- Panel A: 綁定已有主卡 -->
+    <div id="panelLink" style="display:block;">
+      <p style="font-size:16px;color:#444;margin:0 0 10px;">輸入長輩的香港電話，系統自動搜尋其主卡並連結。</p>
+      <input id="lpPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="長輩電話（8位）"
+        style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:20px;border:2px solid #FFCDD2;border-radius:6px;margin-bottom:10px;">
+      <div id="linkErr" style="display:none;color:#C62828;font-size:17px;font-weight:700;margin-bottom:8px;"></div>
+      <button id="linkSubmitBtn" onclick="submitLinkParent()"
+        style="width:100%;padding:14px;background:#C62828;color:#fff;border:0;border-radius:6px;font-size:20px;font-weight:700;cursor:pointer;min-height:55px;">
+        🔗 確認綁定主卡
+      </button>
+    </div>
+
+    <!-- Panel B: 為長輩開主卡 -->
+    <div id="panelNew" style="display:none;margin-top:4px;">
+      <p style="font-size:16px;color:#444;margin:0 0 10px;">為長輩（須年滿55歲）登記新主卡，完成後自動連結此家庭卡。</p>
+      <input id="npNameZh" type="text" placeholder="長輩中文姓名"
+        style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:20px;border:2px solid #FFCDD2;border-radius:6px;margin-bottom:10px;">
+      <input id="npPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="長輩電話（8位）"
+        style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:20px;border:2px solid #FFCDD2;border-radius:6px;margin-bottom:10px;">
+      <select id="npBirthYear"
+        style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:20px;border:2px solid #FFCDD2;border-radius:6px;margin-bottom:10px;background:#fff;">
+        <option value="">長輩出生年份（1971或之前）</option>
+        ${(()=>{const o=[];for(let y=new Date().getFullYear()-55;y>=1930;y--){o.push(`<option value="${y}">${y}年</option>`);}return o.join('');})()}
+      </select>
+      <select id="npGender"
+        style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:20px;border:2px solid #FFCDD2;border-radius:6px;margin-bottom:10px;background:#fff;">
+        <option value="">性別（選填）</option>
+        <option value="M">男 M</option>
+        <option value="F">女 F</option>
+      </select>
+      <div id="newErr" style="display:none;color:#C62828;font-size:17px;font-weight:700;margin-bottom:8px;"></div>
+      <button id="newSubmitBtn" onclick="submitAddParent()"
+        style="width:100%;padding:14px;background:#C62828;color:#fff;border:0;border-radius:6px;font-size:20px;font-weight:700;cursor:pointer;min-height:55px;">
+        ➕ 為長輩開主卡並連結
+      </button>
+    </div>
+
+    <div id="famLinkSuccess" style="display:none;background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:8px;padding:14px 16px;font-size:20px;color:#1B5E20;margin-top:14px;line-height:1.7;font-weight:700;"></div>
+    `}
+  </div>`}
 
   <!-- ── 醫健卡區塊 ── -->
   <div class="med-section">
@@ -5859,11 +5918,25 @@ async function submitAfForm() {
     } else { errEl.textContent = data.error||'新增失敗'; errEl.style.display='block'; btn.disabled=false; btn.textContent='新增家庭同行卡'; }
   } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.style.display='block'; btn.disabled=false; btn.textContent='新增家庭同行卡'; }
 }
+function switchFamTab(tab) {
+  var tl=document.getElementById('tabLink'), tn=document.getElementById('tabNew');
+  var pl=document.getElementById('panelLink'), pn=document.getElementById('panelNew');
+  if(!tl||!tn||!pl||!pn) return;
+  if(tab==='link'){
+    pl.style.display='block'; pn.style.display='none';
+    tl.style.background='#C62828'; tl.style.color='#fff';
+    tn.style.background='#fff'; tn.style.color='#C62828';
+  } else {
+    pl.style.display='none'; pn.style.display='block';
+    tn.style.background='#C62828'; tn.style.color='#fff';
+    tl.style.background='#fff'; tl.style.color='#C62828';
+  }
+}
 async function submitLinkParent() {
   var phone = document.getElementById('lpPhone').value.replace(/[^0-9]/g,'');
   var errEl = document.getElementById('linkErr');
-  errEl.classList.remove('show');
-  if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.classList.add('show'); return; }
+  errEl.style.display='none';
+  if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.style.display='block'; return; }
   var btn = document.getElementById('linkSubmitBtn');
   btn.disabled=true; btn.textContent='綁定中…';
   try {
@@ -5875,43 +5948,42 @@ async function submitLinkParent() {
     if (data.ok) {
       var s = document.getElementById('famLinkSuccess');
       s.innerHTML = '✅ 已成功綁定主卡！<br><strong>'+data.parent_name+'（'+data.parent_no+'）</strong>';
-      s.classList.add('show');
+      s.style.display='block';
       document.getElementById('tabLink').style.display='none';
       document.getElementById('tabNew').style.display='none';
       document.getElementById('panelLink').style.display='none';
       document.getElementById('panelNew').style.display='none';
-    } else { errEl.textContent=data.error||'綁定失敗'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='確認綁定'; }
-  } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='確認綁定'; }
+    } else { errEl.textContent=data.error||'綁定失敗'; errEl.style.display='block'; btn.disabled=false; btn.textContent='確認綁定'; }
+  } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.style.display='block'; btn.disabled=false; btn.textContent='確認綁定'; }
 }
 async function submitAddParent() {
   var nameZh = document.getElementById('npNameZh').value.trim();
   var phone = document.getElementById('npPhone').value.replace(/[^0-9]/g,'');
   var birthYear = document.getElementById('npBirthYear').value;
   var gender = document.getElementById('npGender').value;
-  var district = document.getElementById('npDistrict').value;
   var errEl = document.getElementById('newErr');
-  errEl.classList.remove('show');
-  if (!nameZh) { errEl.textContent='請填寫中文姓名'; errEl.classList.add('show'); return; }
-  if (!birthYear) { errEl.textContent='請填寫出生年份'; errEl.classList.add('show'); return; }
-  if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.classList.add('show'); return; }
+  errEl.style.display='none';
+  if (!nameZh) { errEl.textContent='請填寫中文姓名'; errEl.style.display='block'; return; }
+  if (!birthYear) { errEl.textContent='請填寫出生年份'; errEl.style.display='block'; return; }
+  if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.style.display='block'; return; }
   var btn = document.getElementById('newSubmitBtn');
   btn.disabled=true; btn.textContent='開卡中…';
   try {
     var res = await fetch('/api/members/'+MEMBER_NO+'/add-parent', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ nameZh, phone, birthYear, gender: gender||undefined, district: district||undefined })
+      body: JSON.stringify({ nameZh: nameZh, phone: phone, birthYear: birthYear, gender: gender||undefined })
     });
     var data = await res.json();
     if (data.ok) {
       var s = document.getElementById('famLinkSuccess');
       s.innerHTML = '✅ 已成功為長輩開主卡！<br><strong>主卡編號：'+data.parent_no+'</strong>';
-      s.classList.add('show');
+      s.style.display='block';
       document.getElementById('tabLink').style.display='none';
       document.getElementById('tabNew').style.display='none';
       document.getElementById('panelLink').style.display='none';
       document.getElementById('panelNew').style.display='none';
-    } else { errEl.textContent=data.error||'開卡失敗'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='為長輩開主卡'; }
-  } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='為長輩開主卡'; }
+    } else { errEl.textContent=data.error||'開卡失敗'; errEl.style.display='block'; btn.disabled=false; btn.textContent='為長輩開主卡'; }
+  } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.style.display='block'; btn.disabled=false; btn.textContent='為長輩開主卡'; }
 }
 // ── WA Verification (card page) ───────────────────────────────────────────────
 // Button 1: Normal WhatsApp — records channel=ICON via /verify endpoint
