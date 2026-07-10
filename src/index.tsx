@@ -3233,15 +3233,9 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
             <button type="button" class="g-btn" id="gBtnF" data-v="F" onclick="setFamilyGender('F',this)">女 F</button>
           </div>
         </div>
-        <div class="field" id="parentPhoneField">
-          <div class="label-row"><label for="parentPhone">長輩的 WhatsApp 電話</label><span class="req">✽ 必填</span></div>
-          <input id="parentPhone" type="tel" placeholder="長輩已登記的電話" inputmode="numeric" maxlength="8">
-          <div class="hint">長輩需先持有主卡，才可申請家庭同行卡</div>
-        </div>
         <div class="field" id="parentLinkedField" style="display:none;">
           <div class="label-row"><label>已連結主卡</label></div>
           <div id="parentLinkedInfo" style="padding:12px 14px;background:#f0f7f0;border:2px solid #4caf50;border-radius:4px;font-size:18px;font-weight:700;color:#2e7d32;">✅ 已連結</div>
-          <div class="hint">長輩的電話已自動填入，無需再輸入</div>
         </div>
         <div class="field">
           <div class="label-row"><label for="relation">你與長輩的關係</label><span style="color:var(--grey-3);font-size:18px;">選填</span></div>
@@ -3433,13 +3427,7 @@ window.addEventListener('beforeinstallprompt', function(e) {
       var m = d.member;
       document.getElementById('linkedParentNo').value = m.member_no;
       document.getElementById('parentLinkedInfo').textContent = '✅ ' + m.name_zh + '　' + m.member_no + (m.phone ? '　📱 ' + m.phone : '');
-      document.getElementById('parentPhoneField').style.display = 'none';
       document.getElementById('parentLinkedField').style.display = 'block';
-      // Auto-fill primary member's phone into parentPhone field
-      if (m.phone) {
-        var parentPhoneInput = document.getElementById('parentPhone');
-        if (parentPhoneInput) parentPhoneInput.value = m.phone;
-      }
     })
     .catch(function(e){ console.warn('parent lookup failed', e); });
 })();
@@ -3464,19 +3452,18 @@ async function submitForm(){
   var phone=document.getElementById('phone').value.replace(/[^0-9]/g,'');
   var birthYear=document.getElementById('birthYear').value;
   var linkedParentNo=document.getElementById('linkedParentNo').value.trim();
-  var parentPhone=document.getElementById('parentPhone').value.replace(/[^0-9]/g,'');
   if(!nameZh){showErr('請填寫姓名／稱呼');return;}
   if(!birthYear){showErr('請選擇出生年份');return;}
   if(!_familyGender){showErr('請選擇性別');return;}
   var phoneErr=validateHKPhone(phone);
   if(phoneErr){showErr(phoneErr);return;}
-  if(!linkedParentNo){var ppErr=validateHKPhone(parentPhone);if(ppErr){showErr('長輩電話：'+ppErr);return;}}
+  // parentPhone is now optional — linking happens after registration via masterCardSection
   if(!document.getElementById('consent').checked){showErr('請同意私隱政策');return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.textContent='處理中…';
   var params=new URLSearchParams(location.search);
   var payload={tier:'FAMILY',nameZh,phone,birthYear:birthYear,gender:_familyGender,relation:document.getElementById('relation').value,roadshow:params.get('rs')||'walk-in',source:params.get('src')||(params.get('rs')?'roadshow':params.get('ref')?'referral':'walk-in'),referrerNo:params.get('ref')||'',roadshowLocation:params.get('loc')||''};
-  if(linkedParentNo){payload.parentNo=linkedParentNo;}else{payload.parentPhone=parentPhone;}
+  if(linkedParentNo){payload.parentNo=linkedParentNo;}
   try{
     var res=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var data=await res.json();
