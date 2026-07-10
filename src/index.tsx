@@ -4507,7 +4507,55 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
     <div id="familyList">
       <div style="text-align:center;color:#aaa;padding:10px;font-size:18px;">載入中…</div>
     </div>
-    <a href="/membership/join-family?parent=${m.member_no}" class="add-family-btn">＋ 為家人申請家庭同行卡</a>
+
+    <!-- 新增家庭同行卡表單 -->
+    <button class="add-family-btn" id="addFamBtn" onclick="toggleAddFamForm()">＋ 為家人申請家庭同行卡</button>
+    <div id="addFamForm" style="display:none;margin-top:16px;">
+      <div class="fam-field">
+        <label>家人姓名／稱呼 <span style="color:#C62828;">✽ 必填</span></label>
+        <input id="afNameZh" type="text" placeholder="填佢嘅名或稱呼（中英文都得）" style="border-color:#FFCDD2;">
+      </div>
+      <div class="fam-field">
+        <label>WhatsApp 電話 <span style="color:#C62828;">✽ 必填</span></label>
+        <input id="afPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="例：91234567" style="border-color:#FFCDD2;">
+      </div>
+      <div class="fam-field">
+        <label>性別 <span style="color:#C62828;">✽ 必填</span></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button type="button" id="afGenderM" onclick="setAfGender('M',this)" style="padding:14px 4px;min-height:55px;border:2px solid #FFCDD2;background:#fff;text-align:center;cursor:pointer;font-size:20px;font-family:inherit;color:#333;border-radius:6px;font-weight:600;">男 M</button>
+          <button type="button" id="afGenderF" onclick="setAfGender('F',this)" style="padding:14px 4px;min-height:55px;border:2px solid #FFCDD2;background:#fff;text-align:center;cursor:pointer;font-size:20px;font-family:inherit;color:#333;border-radius:6px;font-weight:600;">女 F</button>
+        </div>
+      </div>
+      <div class="fam-field">
+        <label>出生年份 <span style="color:#C62828;">✽ 必填</span></label>
+        <select id="afBirthYear" style="border-color:#FFCDD2;">
+          <option value="">— 請選擇 —</option>
+          ${(()=>{const opts=[];for(let y=2010;y>=1930;y--){opts.push(`<option value="${y}">${y}</option>`);}return opts.join('');})()}
+        </select>
+      </div>
+      <div class="fam-field">
+        <label>居住地區 <span style="color:#C62828;">✽ 必填</span></label>
+        <select id="afDistrict" style="border-color:#FFCDD2;">
+          <option value="">— 請選擇 —</option>
+          ${['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','荃灣','屯門','元朗','北區','大埔','沙田','西貢','葵青','離島'].map(d=>`<option value="${d}">${d}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fam-field" id="afParentLinkedField" style="display:none;">
+        <label>已連結主卡</label>
+        <div style="padding:12px 14px;background:#fff9f9;border:2px solid #FFCDD2;border-radius:6px;font-size:18px;font-weight:700;color:#8B0000;">✅ 已連結：${m.name_zh}（${m.member_no}）</div>
+      </div>
+      <div class="fam-field">
+        <label>你與家人的關係 <span style="color:#C62828;">✽ 必填</span></label>
+        <select id="afRelation" style="border-color:#FFCDD2;">
+          <option value="">— 請選擇 —</option>
+          <option>子女</option><option>配偶</option><option>孫</option>
+          <option>外孫</option><option>兄弟姊妹</option><option>其他</option>
+        </select>
+      </div>
+      <div class="fam-err" id="afErr" style="color:#C62828;font-size:20px;margin-top:8px;display:none;font-weight:700;"></div>
+      <button type="button" id="afSubmitBtn" onclick="submitAfForm()" style="width:100%;padding:14px;background:#C62828;color:#fff;border:0;border-radius:6px;font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:4px;min-height:55px;">新增家庭同行卡</button>
+    </div>
+    <div id="afSuccess" style="display:none;background:#E8F5E9;border:1.5px solid #4CAF50;border-radius:6px;padding:12px 14px;font-size:20px;color:#1B5E20;margin-top:12px;line-height:1.7;"></div>
   </div>` : ''}
 
   <!-- ── 醫健卡區塊 ── -->
@@ -4548,107 +4596,6 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       ✅ 醫健卡申請已提交！<br>
       你的醫健卡申請已記錄，<strong>香港商貿慈善基金</strong>職員將會以<strong>電話或 WhatsApp</strong> 聯絡你安排發卡手續。如有查詢請致電或 WhatsApp：<strong>9888 5708</strong>
     </div>
-    `}
-  </div>
-
-  <!-- ── 家庭成員區塊 ── -->
-  <div class="fam-section">
-    <div class="fam-section-title">👨‍👩‍👧 家庭成員</div>
-    ${isPrimary ? `
-    <!-- 主卡：幫家人加家庭卡 -->
-    <button class="fam-open-btn" id="famOpenBtn" onclick="toggleFamForm()">＋ 幫家人加家庭同行卡</button>
-    <div class="fam-panel active" id="famFormWrap" style="display:none;margin-top:16px;">
-      <div class="fam-field">
-        <label>家人中文姓名 <span style="color:#C62828;">✽</span></label>
-        <input id="ffNameZh" type="text" placeholder="例：陳小文">
-      </div>
-      <div class="fam-field">
-        <label>WhatsApp 電話 <span style="color:#C62828;">✽</span></label>
-        <input id="ffPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="例：91234567">
-      </div>
-      <div class="fam-field">
-        <label>性別</label>
-        <select id="ffGender">
-          <option value="">— 請選擇（選填）—</option>
-          <option value="M">男 M</option>
-          <option value="F">女 F</option>
-          <option value="X">其他</option>
-        </select>
-      </div>
-      <div class="fam-field">
-        <label>出生年份</label>
-        <input id="ffBirthYear" type="number" placeholder="例：1985（選填）" min="1920" max="2010">
-      </div>
-      <div class="fam-field">
-        <label>居住地區</label>
-        <select id="ffDistrict">
-          <option value="">— 請選擇（選填）—</option>
-          ${['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','荃灣','屯門','元朗','北區','大埔','沙田','西貢','葵青','離島'].map(d=>`<option value="${d}">${d}</option>`).join('')}
-        </select>
-      </div>
-      <div class="fam-err" id="famErr"></div>
-      <button class="fam-submit-btn" id="famSubmitBtn" onclick="submitAddFamily()">新增家庭同行卡</button>
-    </div>
-    <div class="fam-success" id="famSuccess"></div>
-    ` : `
-    <!-- 家庭卡：綁主卡 or 開主卡 -->
-    ${m.parent_no ? `
-    <div class="fam-linked-info">
-      ✅ 已綁定主卡：<strong>${m.parent_name || ''}</strong>（<a href="/membership/card/${m.parent_no}" style="color:${forestDeep};font-weight:700;">${m.parent_no}</a>）
-    </div>
-    ` : `
-    <div class="fam-tab-bar">
-      <button class="fam-tab active" id="tabLink" onclick="switchFamTab('link')">🔗 綁定已有主卡</button>
-      <button class="fam-tab" id="tabNew" onclick="switchFamTab('new')">➕ 幫長輩開主卡</button>
-    </div>
-
-    <!-- Panel 1: 綁定已有主卡 -->
-    <div class="fam-panel active" id="panelLink">
-      <div class="fam-field">
-        <label>主卡持有人電話 <span style="color:#C62828;">✽</span></label>
-        <input id="lpPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="例：91234567">
-      </div>
-      <div class="fam-err" id="linkErr"></div>
-      <button class="fam-submit-btn" id="linkSubmitBtn" onclick="submitLinkParent()">確認綁定</button>
-    </div>
-
-    <!-- Panel 2: 幫長輩開主卡 -->
-    <div class="fam-panel" id="panelNew">
-      <div class="fam-field">
-        <label>長輩中文姓名 <span style="color:#C62828;">✽</span></label>
-        <input id="npNameZh" type="text" placeholder="例：陳大文">
-      </div>
-      <div class="fam-field">
-        <label>長輩 WhatsApp 電話 <span style="color:#C62828;">✽</span></label>
-        <input id="npPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="例：91234567">
-      </div>
-      <div class="fam-field">
-        <label>出生年份 <span style="color:#C62828;">✽</span>（需年滿 55 歲）</label>
-        <input id="npBirthYear" type="number" placeholder="例：1960" min="1920" max="1971">
-        <div style="font-size:11px;color:#78909C;margin-top:4px;">主卡需年滿 55 歲</div>
-      </div>
-      <div class="fam-field">
-        <label>性別</label>
-        <select id="npGender">
-          <option value="">— 請選擇（選填）—</option>
-          <option value="M">男 M</option>
-          <option value="F">女 F</option>
-          <option value="X">其他</option>
-        </select>
-      </div>
-      <div class="fam-field">
-        <label>居住地區</label>
-        <select id="npDistrict">
-          <option value="">— 請選擇（選填）—</option>
-          ${['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','荃灣','屯門','元朗','北區','大埔','沙田','西貢','葵青','離島'].map(d=>`<option value="${d}">${d}</option>`).join('')}
-        </select>
-      </div>
-      <div class="fam-err" id="newErr"></div>
-      <button class="fam-submit-btn" id="newSubmitBtn" onclick="submitAddParent()">為長輩開主卡</button>
-    </div>
-
-    <div class="fam-success" id="famLinkSuccess"></div>
-    `}
     `}
   </div>
 
@@ -4784,7 +4731,7 @@ async function loadFamily() {
     el.innerHTML = data.family.map(function(f){
       return '<div class="family-card">' +
         '<div><div class="fc-name">'+f.name_zh+'</div><div class="fc-no">'+f.member_no+'</div></div>' +
-        '<a href="/membership/card/'+f.member_no+'" class="fc-link">查看</a>' +
+        '<span style="font-size:16px;color:#aaa;padding:6px 10px;">家庭同行卡</span>' +
         '</div>';
     }).join('');
   } catch(e){ console.warn('family load error', e); }
@@ -4974,47 +4921,69 @@ async function submitMedical() {
     btn.disabled = false; btn.textContent = '提交申請';
   }
 }
-// ── Family card management (Batch 3) ─────────────────────────────────────────
-function toggleFamForm() {
-  var wrap = document.getElementById('famFormWrap');
-  var btn = document.getElementById('famOpenBtn');
-  if (!wrap) return;
-  var isOpen = wrap.style.display !== 'none';
-  wrap.style.display = isOpen ? 'none' : 'block';
-  if(btn) btn.textContent = isOpen ? '＋ 幫家人加家庭同行卡' : '✕ 收起';
+// ── 「◆ 家庭同行卡」section — Add family form ──────────────────────────────────
+var _afGender = '';
+function setAfGender(v, btn) {
+  _afGender = v;
+  var m = document.getElementById('afGenderM');
+  var f = document.getElementById('afGenderF');
+  if(m){ m.style.background='#fff'; m.style.borderColor='#FFCDD2'; m.style.color='#333'; m.style.fontWeight='600'; }
+  if(f){ f.style.background='#fff'; f.style.borderColor='#FFCDD2'; f.style.color='#333'; f.style.fontWeight='600'; }
+  btn.style.background='#8B0000'; btn.style.borderColor='#8B0000'; btn.style.color='#fff'; btn.style.fontWeight='700';
 }
-function switchFamTab(tab) {
-  document.getElementById('tabLink').classList.toggle('active', tab === 'link');
-  document.getElementById('tabNew').classList.toggle('active', tab === 'new');
-  document.getElementById('panelLink').classList.toggle('active', tab === 'link');
-  document.getElementById('panelNew').classList.toggle('active', tab === 'new');
+function toggleAddFamForm() {
+  var form = document.getElementById('addFamForm');
+  var btn = document.getElementById('addFamBtn');
+  var linked = document.getElementById('afParentLinkedField');
+  if (!form) return;
+  var isOpen = form.style.display !== 'none';
+  form.style.display = isOpen ? 'none' : 'block';
+  if(btn) btn.textContent = isOpen ? '＋ 為家人申請家庭同行卡' : '✕ 收起';
+  if(!isOpen && linked) linked.style.display = 'block';
 }
-async function submitAddFamily() {
-  var nameZh = document.getElementById('ffNameZh').value.trim();
-  var phone = document.getElementById('ffPhone').value.replace(/[^0-9]/g,'');
-  var gender = document.getElementById('ffGender').value;
-  var birthYear = document.getElementById('ffBirthYear').value;
-  var district = document.getElementById('ffDistrict').value;
-  var errEl = document.getElementById('famErr');
-  errEl.classList.remove('show');
-  if (!nameZh) { errEl.textContent='請填寫中文姓名'; errEl.classList.add('show'); return; }
-  if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.classList.add('show'); return; }
-  var btn = document.getElementById('famSubmitBtn');
+async function submitAfForm() {
+  var nameZh = document.getElementById('afNameZh').value.trim();
+  var phone = document.getElementById('afPhone').value.replace(/[^0-9]/g,'');
+  var birthYear = document.getElementById('afBirthYear').value;
+  var district = document.getElementById('afDistrict').value;
+  var relation = document.getElementById('afRelation').value;
+  var errEl = document.getElementById('afErr');
+  errEl.style.display = 'none';
+  if (!nameZh) { errEl.textContent='請填寫姓名／稱呼'; errEl.style.display='block'; return; }
+  if (phone.length !== 8) { errEl.textContent='請填寫正確8位電話'; errEl.style.display='block'; return; }
+  if (!_afGender) { errEl.textContent='請選擇性別'; errEl.style.display='block'; return; }
+  if (!birthYear) { errEl.textContent='請選擇出生年份'; errEl.style.display='block'; return; }
+  if (!district) { errEl.textContent='請選擇居住地區'; errEl.style.display='block'; return; }
+  if (!relation) { errEl.textContent='請選擇你與家人的關係'; errEl.style.display='block'; return; }
+  var btn = document.getElementById('afSubmitBtn');
   btn.disabled = true; btn.textContent = '新增中…';
   try {
     var res = await fetch('/api/members/'+MEMBER_NO+'/add-family', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ nameZh, phone, gender, birthYear: birthYear||undefined, district: district||undefined })
+      body: JSON.stringify({ nameZh: nameZh, phone: phone, gender: _afGender, birthYear: birthYear, district: district, relation: relation })
     });
     var data = await res.json();
     if (data.ok) {
-      document.getElementById('famFormWrap').style.display='none';
-      document.getElementById('famOpenBtn').style.display='none';
-      var s = document.getElementById('famSuccess');
-      s.innerHTML = '✅ 已成功新增家庭同行卡！<br><strong>會員編號：'+data.member_no+'</strong>';
-      s.classList.add('show');
-    } else { errEl.textContent = data.error||'新增失敗'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='新增家庭同行卡'; }
-  } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.classList.add('show'); btn.disabled=false; btn.textContent='新增家庭同行卡'; }
+      document.getElementById('addFamForm').style.display='none';
+      document.getElementById('addFamBtn').textContent='＋ 為家人申請家庭同行卡';
+      var s = document.getElementById('afSuccess');
+      s.innerHTML = '✅ 已成功新增！<br><strong>'+nameZh+'</strong> 的家庭同行卡已發出<br>會員編號：<strong>'+data.member_no+'</strong><br><span style="font-size:18px;color:#388E3C;">請家人登入自己的會員卡頁完成 WhatsApp 驗證。</span>';
+      s.style.display = 'block';
+      _afGender = '';
+      // Reset form fields
+      document.getElementById('afNameZh').value='';
+      document.getElementById('afPhone').value='';
+      document.getElementById('afBirthYear').value='';
+      document.getElementById('afDistrict').value='';
+      document.getElementById('afRelation').value='';
+      var gm=document.getElementById('afGenderM'); var gf=document.getElementById('afGenderF');
+      if(gm){gm.style.background='#fff';gm.style.borderColor='#FFCDD2';gm.style.color='#333';gm.style.fontWeight='600';}
+      if(gf){gf.style.background='#fff';gf.style.borderColor='#FFCDD2';gf.style.color='#333';gf.style.fontWeight='600';}
+      btn.disabled=false; btn.textContent='新增家庭同行卡';
+      // Reload family list to show new member
+      loadFamily();
+    } else { errEl.textContent = data.error||'新增失敗'; errEl.style.display='block'; btn.disabled=false; btn.textContent='新增家庭同行卡'; }
+  } catch(e) { errEl.textContent='網絡錯誤，請重試'; errEl.style.display='block'; btn.disabled=false; btn.textContent='新增家庭同行卡'; }
 }
 async function submitLinkParent() {
   var phone = document.getElementById('lpPhone').value.replace(/[^0-9]/g,'');
