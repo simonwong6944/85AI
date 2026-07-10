@@ -2472,7 +2472,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 
       <div class="footer-links">
         <a href="/membership/join-family">家庭同行卡申請 →</a><br>
-        如有疑問 WhatsApp：<a href="https://wa.me/85291477341" target="_blank">9147-7341</a>
+        如有疑問 WhatsApp：<a href="https://wa.me/85254429749" target="_blank">5442-9749</a>
       </div>
     </form>
   </div>
@@ -2817,7 +2817,7 @@ function showSuccess(data, appliedMedical) {
   setTimeout(function(){ renderCardImage(data, data.tier || 'PRIMARY'); }, 100);
   // Load admin WhatsApp and inject verification block
   fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
-    var waNum = (s.settings && s.settings.admin_whatsapp) ? s.settings.admin_whatsapp : '85291477341';
+    var waNum = (s.settings && s.settings.admin_whatsapp) ? s.settings.admin_whatsapp : '85254429749';
     var msgText = '你好，我剛登記了老有卡，會員編號：' + data.memberNo + '，請幫我確認。';
     var msgEnc = encodeURIComponent(msgText);
     // Build deep link URLs for direct WA app launch (bypass wa.me interstitial page)
@@ -4315,7 +4315,7 @@ tr.inactive td{opacity:0.45;}
             📱 WhatsApp 管理員號碼
           </label>
           <div style="display:flex;gap:8px;align-items:center;">
-            <input id="settingWaNum" type="tel" maxlength="15" placeholder="例：85291477341"
+            <input id="settingWaNum" type="tel" maxlength="15" placeholder="例：85254429749"
               style="flex:1;border:1px solid #ddd;border-radius:5px;padding:10px 12px;font-size:14px;font-family:monospace;letter-spacing:1px;"
               oninput="settingsDirty()">
             <button onclick="saveWaNum()" id="saveWaBtn"
@@ -4324,7 +4324,7 @@ tr.inactive td{opacity:0.45;}
             </button>
           </div>
           <div style="font-size:11px;color:#888;margin-top:6px;line-height:1.6;">
-            包含國家碼，例如香港號碼 91477341 填入 <strong>85291477341</strong><br>
+            包含國家碼，例如香港號碼 54429749 填入 <strong>85254429749</strong><br>
             會員登記成功後，WhatsApp 驗證按鈕會連到這個號碼。
           </div>
           <div id="settingWaStatus" style="margin-top:8px;font-size:12px;font-weight:700;display:none;"></div>
@@ -4876,7 +4876,7 @@ body{background:#333;padding:24px 0;}
   </div>
   <div class="poster-footer">
     <div><div class="brand">CoEldery <em>85</em> 老有聯盟</div><div class="site" style="opacity:0.85;font-size:11px;margin-top:4px;">www.coeldery85.com</div></div>
-    <div class="hotline">☎ 有疑問？WhatsApp: 9147-7341</div>
+    <div class="hotline">☎ 有疑問？WhatsApp: 5442-9749</div>
   </div>
 </div>
 </div>
@@ -4942,7 +4942,7 @@ function sopHtml() {
   <div style="background:var(--ferrari);color:#fff;padding:24px 32px;border-radius:4px;">
     <div style="font-size:11px;letter-spacing:3px;margin-bottom:8px;opacity:0.8;">◆ 緊急聯絡</div>
     <div style="font-family:'Noto Serif TC',serif;font-size:18px;font-weight:700;">技術問題 / 系統故障</div>
-    <div style="margin-top:8px;font-size:14px;opacity:0.9;">WhatsApp 技術支援：<strong>9147-7341</strong><br>後台管理：<a href="/membership/admin" style="color:#FFD86B;">coeldery85.com/admin</a></div>
+    <div style="margin-top:8px;font-size:14px;opacity:0.9;">WhatsApp 技術支援：<strong>5442-9749</strong><br>後台管理：<a href="/membership/admin" style="color:#FFD86B;">coeldery85.com/admin</a></div>
   </div>
 </div>
 </body></html>`
@@ -5483,7 +5483,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       medStatus === 'ISSUED'   ? '✅ 已發出 ISSUED'    :
       medStatus === 'DECLINED' ? '❌ 未批准 DECLINED'  : medStatus
     }</span>
-    <div style="font-size:18px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<a href="https://wa.me/85291477341" style="color:#1565C0;">9147-7341</a></div>
+    <div style="font-size:18px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<a href="https://wa.me/85254429749" style="color:#1565C0;">5442-9749</a></div>
     ` : `
     <div style="font-size:18px;color:#546E7A;margin-bottom:14px;line-height:1.6;">
       由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>
@@ -5517,7 +5517,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
   <div style="text-align:center;margin-top:20px;font-size:18px;color:#aaa;line-height:2;">
     <a href="/membership/join" style="color:${accentMid};">← 返回登記頁</a>
     &nbsp;·&nbsp;
-    如有疑問 WhatsApp：<a href="https://wa.me/85291477341" style="color:${accentMid};">9147-7341</a>
+    如有疑問 WhatsApp：<a href="https://wa.me/85254429749" style="color:${accentMid};">5442-9749</a>
   </div>
 </div>
 
@@ -5547,7 +5547,7 @@ window.addEventListener('load', function(){
   // If watermark shown, load admin WA number and inject preview
   if(SHOW_WATERMARK) {
     fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
-      var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
+      var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85254429749';
       var msgText='你好，我的老有卡會員編號：'+MEMBER_NO+'，請幫我確認。';
       var msgEnc=encodeURIComponent(msgText);
       var phoneDigits=waNum.replace(/[^0-9]/g,'');
@@ -6247,7 +6247,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
   </div>
 
   <div class="footer-note">
-    如有疑問 WhatsApp：<a href="https://wa.me/85291477341">9147-7341</a> ·
+    如有疑問 WhatsApp：<a href="https://wa.me/85254429749">5442-9749</a> ·
     <a href="/membership/admin">後台</a>
   </div>
 </div>
