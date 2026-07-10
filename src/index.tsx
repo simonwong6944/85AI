@@ -4979,8 +4979,8 @@ function memberProfileHtml(m: any, medStatus: string | null = null, medCardNo: s
   const expDisp = expMonth && expYear ? `${expMonth} / ${expYear}` : '—'
   const kycLabel: Record<string,string> = { PENDING:'待核實', VERIFIED:'已核實', REJECTED:'未通過' }
   const roleLabel: Record<string,string> = { CoExplorery:'探索者', CoFounder:'創始人', CoChampion:'支持者' }
-  // Watermark: show unless admin has VERIFIED (kyc_status=VERIFIED), OR admin flagged re_verify
-  const showWatermark = m.kyc_status !== 'VERIFIED' || (m.re_verify === 1 || m.re_verify === true)
+  // Watermark: show if user has NOT clicked any WA button, OR admin flagged re_verify
+  const showWatermark = !m.wa_clicked_at || (m.re_verify === 1 || m.re_verify === true)
 
   return `<!DOCTYPE html>
 <html lang="zh-HK">
@@ -5369,7 +5369,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
 
   <!-- ── 醫健卡區塊 ── -->
   <div class="med-section">
-    <div class="med-section-title" style="display:flex;align-items:center;justify-content:space-between;">🏥 醫健卡<span style="font-size:13px;font-weight:700;background:#2E7D32;color:#fff;border-radius:20px;padding:3px 10px;letter-spacing:1px;">✅ 有效</span></div>
+    <div class="med-section-title" style="display:flex;align-items:center;justify-content:space-between;">🏥 醫健卡${medCardNo ? '<span style="font-size:13px;font-weight:700;background:#2E7D32;color:#fff;border-radius:20px;padding:3px 10px;letter-spacing:1px;">✅ 有效</span>' : ''}</div>
     ${medCardNo ? (() => {
       // Split name_en into surname / given name
       const nameEnFull = (m.name_en || '').trim().toUpperCase()
