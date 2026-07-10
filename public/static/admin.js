@@ -952,24 +952,57 @@ async function loadMedical(){
   var r=await fetch(url); var d=await r.json(); if(!d.ok)return;
   document.getElementById('medicalCount').textContent='共 '+d.total+' 筆申請';
   window._medical=d.applications;
+  // Update thead to include card_no column
+  var thead=document.querySelector('#page-medical thead tr');
+  if(thead && !document.getElementById('medThCardNo')){
+    var th=document.createElement('th');
+    th.id='medThCardNo';
+    th.textContent='卡號';
+    thead.insertBefore(th, thead.querySelector('th:last-child'));
+  }
   document.getElementById('medicalTbody').innerHTML=d.applications.map(function(m,i){
     var col=medStatusColor[m.status]||'#888';
     var lbl=medStatusLabel[m.status]||m.status;
-    return `<tr>
-      <td style="font-size:11px;color:#aaa;">#${m.id}</td>
-      <td><a href="/membership/card/${m.member_no}" target="_blank" style="color:var(--forest);font-weight:700;">${m.member_no}</a></td>
-      <td style="font-weight:700;">${m.name_zh_full}</td>
-      <td style="font-size:12px;letter-spacing:1px;">${m.name_en_full}</td>
-      <td style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:4px;">${m.hkid_prefix}</td>
-      <td><a href="tel:+852${m.phone}">${m.phone}</a></td>
-      <td><span style="color:${col};font-weight:700;font-size:12px;">${lbl}</span></td>
-      <td style="font-size:11px;">${(m.applied_at||'').slice(0,16).replace('T',' ')}</td>
-      <td>
-        ${m.status==='PENDING'?'<button class="act-btn act-kyc" onclick="markMedSent('+i+')">標記已傳送</button>':''}
-        ${m.status==='SENT'?'<button class="act-btn act-react" onclick="markMedIssued('+i+')">標記已發卡</button>':''}
-      </td>
-    </tr>`;
+    var cardNoDisplay=m.card_no
+      ? '<span style="font-family:monospace;font-weight:700;color:#1B5E20;letter-spacing:2px;">'+m.card_no+'</span>'
+      : '<span style="color:#aaa;font-size:11px;">未填</span>';
+    var cardNoInput='<div style="display:flex;gap:4px;align-items:center;margin-top:4px;">'
+      +'<input id="cardNoInput'+i+'" type="text" value="'+(m.card_no||'')+'" placeholder="例：CF 100 130" '
+      +'style="width:120px;padding:4px 6px;border:1px solid #90CAF9;border-radius:4px;font-size:12px;font-family:monospace;letter-spacing:1px;">'
+      +'<button class="act-btn" style="background:#1565C0;color:#fff;font-size:11px;" onclick="saveCardNo('+i+')">儲存卡號</button>'
+      +'</div>';
+    return '<tr>'
+      +'<td style="font-size:11px;color:#aaa;">#'+m.id+'</td>'
+      +'<td><a href="/membership/card/'+m.member_no+'" target="_blank" style="color:var(--forest);font-weight:700;">'+m.member_no+'</a></td>'
+      +'<td style="font-weight:700;">'+m.name_zh_full+'</td>'
+      +'<td style="font-size:12px;letter-spacing:1px;">'+m.name_en_full+'</td>'
+      +'<td style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:4px;">'+m.hkid_prefix+'</td>'
+      +'<td><a href="tel:+852'+m.phone+'">'+m.phone+'</a></td>'
+      +'<td><span style="color:'+col+';font-weight:700;font-size:12px;">'+lbl+'</span></td>'
+      +'<td style="font-size:11px;">'+(m.applied_at||'').slice(0,16).replace('T',' ')+'</td>'
+      +'<td>'+cardNoDisplay+cardNoInput+'</td>'
+      +'<td>'
+      +(m.status==='PENDING'?'<button class="act-btn act-kyc" onclick="markMedSent('+i+')">標記已傳送</button>':'')
+      +(m.status==='SENT'?'<button class="act-btn act-react" onclick="markMedIssued('+i+')">標記已發卡</button>':'')
+      +'</td>'
+      +'</tr>';
   }).join('');
+}
+
+async function saveCardNo(i){
+  var m=window._medical[i];
+  var input=document.getElementById('cardNoInput'+i);
+  var cardNo=(input?input.value:'').trim();
+  if(!cardNo){ alert('請輸入卡號'); return; }
+  var btn=input?input.nextElementSibling:null;
+  if(btn){ btn.disabled=true; btn.textContent='儲存中…'; }
+  var r=await fetch('/api/admin/medical/'+m.id+'/card-no',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({card_no:cardNo})
+  });
+  var d=await r.json();
+  if(d.ok){ loadMedical(); }
+  else { alert('儲存失敗：'+(d.error||'未知錯誤')); if(btn){btn.disabled=false;btn.textContent='儲存卡號';} }
 }
 
 async function markMedSent(i){
