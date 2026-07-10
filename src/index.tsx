@@ -3468,47 +3468,22 @@ async function submitForm(){
     var res=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var data=await res.json();
     if(!data.ok){showErr(data.error||'申請失敗，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';return;}
+    // ── Registration success: redirect to card page which has full WA verify + master-card linking UI ──
     document.getElementById('formSection').style.display='none';
-    document.getElementById('cardZh').textContent=data.nameZh;
-    document.getElementById('cardEn').textContent=data.nameEn||'';
-    document.getElementById('cardNo').textContent=data.memberNo;
-    var cardUrl=location.origin+'/membership/card/'+data.memberNo;
-    try{QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'});}catch(e){console.warn('QR error (non-fatal):',e);}
-    document.getElementById('successSection').classList.add('show');
+    var ss=document.getElementById('successSection');
+    ss.innerHTML='<div style="padding:40px 20px;text-align:center;">'
+      +'<div style="font-size:60px;margin-bottom:16px;">✅</div>'
+      +'<div style="font-family:\'Noto Serif TC\',serif;font-size:26px;font-weight:900;color:#8B0000;margin-bottom:10px;">申請成功！</div>'
+      +'<div style="font-size:20px;color:#444;margin-bottom:8px;">會員編號：<strong style="color:#C62828;">'+data.memberNo+'</strong></div>'
+      +'<div style="font-size:18px;color:#666;margin-bottom:24px;">正在跳轉到你的會員卡頁面…</div>'
+      +'<div style="font-size:15px;color:#999;">（如未自動跳轉，請<a href="/membership/card/'+data.memberNo+'" style="color:#C62828;font-weight:700;">點此進入</a>）</div>'
+      +'</div>';
+    ss.classList.add('show');
     window.scrollTo(0,0);
-    var mySubLink=document.getElementById('mySubPageLink');
-    var mySubSep=document.getElementById('mySubPageSep');
-    if(mySubLink){mySubLink.href='/membership/card/'+data.memberNo;mySubLink.style.display='inline';}
-    if(mySubSep){mySubSep.style.display='inline';}
-    setTimeout(function(){renderCardImage(data, data.tier||'FAMILY');},100);
-    // Store member no for verify
-    window._verifyMemberNo=data.memberNo;
-    // Save to sessionStorage so WA redirect + return can restore this page
-    sessionStorage.setItem('successData', JSON.stringify(data));
-    sessionStorage.setItem('successTier', data.tier||'FAMILY');
-    // Show master card linking section if no parent linked yet
-    if(!data.parentNo){
-      var mcs=document.getElementById('masterCardSection');
-      if(mcs){mcs.style.display='block';}
-      // Pre-populate add-parent year dropdown
-      initAddParentYearDropdown();
-    }
-    // Load admin WhatsApp and inject verification block
-    fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(s){
-      var waNum=(s.settings&&s.settings.admin_whatsapp)?s.settings.admin_whatsapp:'85291477341';
-      var msgText='你好，我剛登記了老有卡家庭同行卡，會員編號：'+data.memberNo+'，請幫我確認。';
-      var msgEnc=encodeURIComponent(msgText);
-      var phoneDigits=waNum.replace(/[^0-9]/g,'');
-      var isMobile=/iphone|ipad|ipod|android/i.test(navigator.userAgent);
-      var waUrl=isMobile
-        ?'whatsapp://send?phone='+phoneDigits+'&text='+msgEnc
-        :'https://wa.me/'+phoneDigits+'?text='+msgEnc;
-      window._waUrl=waUrl;
-      var block=document.getElementById('waVerifyBlock');
-      var preview=document.getElementById('waVerifyMsgPreview');
-      if(block)block.style.display='block';
-      if(preview)preview.textContent=msgText;
-    }).catch(function(){});
+    // Redirect to card page after 2s
+    setTimeout(function(){
+      window.location.href='/membership/card/'+data.memberNo;
+    },2000);
   }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
 }
 
@@ -3760,6 +3735,12 @@ document.addEventListener('DOMContentLoaded',function(){
         window._verifyMemberNo=data.memberNo;
         window.scrollTo(0,0);
         setTimeout(function(){renderCardImage(data,'FAMILY');},100);
+        // Show master card linking section if no parent linked
+        if(!data.parentNo){
+          var mcs=document.getElementById('masterCardSection');
+          if(mcs){mcs.style.display='block';}
+          initAddParentYearDropdown();
+        }
         // Full reload after normal WA: watermark gone, verified_at set
         setTimeout(function(){
           var wm=document.getElementById('pendingWatermark');
