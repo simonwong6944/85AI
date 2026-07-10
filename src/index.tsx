@@ -4612,50 +4612,90 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       const surnamePart  = hasTwoParts ? nameParts[0] : ''
       const givenPart    = hasTwoParts ? nameParts.slice(1).join(' ') : ''
       return `
-    <div style="font-size:20px;font-weight:700;color:#1565C0;margin-bottom:10px;">你的醫健卡號碼</div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
-      <span id="medCardNoDisplay" style="font-size:28px;font-weight:900;color:#1B5E20;letter-spacing:3px;font-family:'Space Grotesk',monospace;">${medCardNo}</span>
-      <button onclick="copyMedCardNo()" id="copyMedCardBtn" style="padding:10px 18px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;min-height:44px;white-space:nowrap;">複製卡號</button>
+    <!-- 兩個摺疊按鈕：一卡資料 / 查看醫生 -->
+    <div style="display:flex;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+      <button onclick="toggleMedPanel('medCardPanel')" id="btnMedCard"
+        style="flex:1;min-height:55px;padding:12px 10px;background:#1565C0;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;cursor:pointer;line-height:1.3;">
+        💳 一卡資料
+      </button>
+      <button onclick="toggleMedPanel('medDoctorPanel')" id="btnMedDoctor"
+        style="flex:1;min-height:55px;padding:12px 10px;background:#2E7D32;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;cursor:pointer;line-height:1.3;">
+        🩺 查看醫生
+      </button>
     </div>
-    <div style="font-size:18px;color:#546E7A;margin-bottom:16px;line-height:1.6;">你的醫健卡會透過 WhatsApp 發送給你</div>
-    <a href="https://www.hmmp.com.hk/DefaultDoctorList_cn.aspx" target="_blank" rel="noopener"
-      style="display:block;width:100%;min-height:55px;padding:14px;background:#2E7D32;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;line-height:1.4;margin-bottom:18px;">
-      🩺 查睇醫生名單
-    </a>
-    <div style="background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:8px;padding:16px 18px;">
-      <div style="font-size:20px;font-weight:700;color:#1B5E20;margin-bottom:12px;">🔐 HMMP 系統登入步驟</div>
-      <ol style="padding-left:20px;font-size:20px;line-height:2;color:#1B5E20;">
-        <li style="margin-bottom:10px;">
-          <span style="font-weight:700;">登入名稱：</span>你的醫健卡號碼<br>
-          <div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;">
-            <span style="font-size:22px;font-weight:900;letter-spacing:3px;color:#0D47A1;font-family:'Space Grotesk',monospace;">${medCardNo}</span>
-            <button onclick="copyMedCardNo2()" id="copyMedCardBtn2" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">複製</button>
-          </div>
-        </li>
-        ${hasTwoParts ? `
-        <li style="margin-bottom:10px;">
-          <span style="font-weight:700;">姓氏：</span>${surnamePart}<br>
-          <button onclick="copySurname()" id="copySurnameBtn" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">複製</button>
-        </li>
-        <li style="margin-bottom:10px;">
-          <span style="font-weight:700;">名稱：</span>${givenPart}<br>
-          <button onclick="copyGivenName()" id="copyGivenBtn" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">複製</button>
-        </li>
-        ` : `
-        <li style="margin-bottom:10px;">
-          <span style="font-weight:700;">英文全名：</span>${nameEnFull}<br>
-          <button onclick="copyFullEnName()" id="copyFullEnBtn" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">複製</button>
-        </li>
-        `}
-        <li style="margin-bottom:10px;"><span style="font-weight:700;">電郵地址：</span><span style="color:#78909C;">不用填</span></li>
-        <li><span style="font-weight:700;">按「登入」</span></li>
-      </ol>
+
+    <!-- 面板一：卡號 + 登入資料 (預設隱藏) -->
+    <div id="medCardPanel" style="display:none;margin-top:10px;">
+      <div style="font-size:18px;font-weight:700;color:#1565C0;margin-bottom:10px;">你的醫健卡號碼</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+        <span id="medCardNoDisplay" style="font-size:28px;font-weight:900;color:#1B5E20;letter-spacing:3px;font-family:'Space Grotesk',monospace;">${medCardNo}</span>
+        <button onclick="copyMedCardNo()" id="copyMedCardBtn" style="padding:10px 18px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;min-height:44px;white-space:nowrap;">複製卡號</button>
+      </div>
+      <div style="background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:8px;padding:16px 18px;">
+        <div style="font-size:18px;font-weight:700;color:#1B5E20;margin-bottom:12px;">🔐 HMMP 系統登入資料</div>
+        <ol style="padding-left:20px;font-size:18px;line-height:2;color:#1B5E20;">
+          <li style="margin-bottom:10px;">
+            <span style="font-weight:700;">登入名稱：</span>你的醫健卡號碼<br>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;">
+              <span style="font-size:22px;font-weight:900;letter-spacing:3px;color:#0D47A1;font-family:'Space Grotesk',monospace;">${medCardNo}</span>
+              <button onclick="copyMedCardNo2()" id="copyMedCardBtn2" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">複製</button>
+            </div>
+          </li>
+          ${hasTwoParts ? `
+          <li style="margin-bottom:10px;">
+            <span style="font-weight:700;">姓氏：</span>${surnamePart}<br>
+            <button onclick="copySurname()" id="copySurnameBtn" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">複製</button>
+          </li>
+          <li style="margin-bottom:10px;">
+            <span style="font-weight:700;">名稱：</span>${givenPart}<br>
+            <button onclick="copyGivenName()" id="copyGivenBtn" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">複製</button>
+          </li>
+          ` : `
+          <li style="margin-bottom:10px;">
+            <span style="font-weight:700;">英文全名：</span>${nameEnFull}<br>
+            <button onclick="copyFullEnName()" id="copyFullEnBtn" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">複製</button>
+          </li>
+          `}
+          <li style="margin-bottom:10px;"><span style="font-weight:700;">電郵地址：</span><span style="color:#78909C;">不用填</span></li>
+          <li><span style="font-weight:700;">按「登入」</span></li>
+        </ol>
+      </div>
     </div>
+
+    <!-- 面板二：醫生名單連結 (預設隱藏) -->
+    <div id="medDoctorPanel" style="display:none;margin-top:10px;">
+      <a href="https://www.hmmp.com.hk/DefaultDoctorList_cn.aspx" target="_blank" rel="noopener"
+        style="display:block;width:100%;min-height:55px;padding:14px;background:#2E7D32;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;line-height:1.4;">
+        🩺 開啟 HMMP 醫生名單
+      </a>
+      <div style="margin-top:14px;font-size:16px;color:#546E7A;line-height:1.6;">
+        點擊上方按鈕前往 HMMP 官網查看網絡醫生名單，<br>登入時使用左方「一卡資料」的登入資料。
+      </div>
+    </div>
+
     <script>
     var _medCardNo = '${medCardNo.replace(/'/g, "\\'")}';
     var _medSurname = '${surnamePart.replace(/'/g, "\\'")}';
     var _medGiven = '${givenPart.replace(/'/g, "\\'")}';
     var _medFullEn = '${nameEnFull.replace(/'/g, "\\'")}';
+    function toggleMedPanel(panelId) {
+      var panels = ["medCardPanel", "medDoctorPanel"];
+      var btns = { "medCardPanel": "btnMedCard", "medDoctorPanel": "btnMedDoctor" };
+      var activeColors = { "medCardPanel": "#1565C0", "medDoctorPanel": "#2E7D32" };
+      var dimColors = { "medCardPanel": "#5C8FC7", "medDoctorPanel": "#5A9E63" };
+      panels.forEach(function(id) {
+        var el = document.getElementById(id);
+        var btn = document.getElementById(btns[id]);
+        if (id === panelId) {
+          var isOpen = el && el.style.display !== "none";
+          if (el) el.style.display = isOpen ? "none" : "block";
+          if (btn) btn.style.background = isOpen ? activeColors[id] : "#37474F";
+        } else {
+          if (el) el.style.display = "none";
+          if (btn) btn.style.background = activeColors[id];
+        }
+      });
+    }
     function copyMedCardNo() {
       navigator.clipboard.writeText(_medCardNo).then(function() {
         var b = document.getElementById("copyMedCardBtn");
