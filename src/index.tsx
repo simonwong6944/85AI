@@ -4603,7 +4603,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
 
   <!-- ── 醫健卡區塊 ── -->
   <div class="med-section">
-    <div class="med-section-title">🏥 醫健卡</div>
+    <div class="med-section-title" style="display:flex;align-items:center;justify-content:space-between;">🏥 醫健卡<span style="font-size:13px;font-weight:700;background:#2E7D32;color:#fff;border-radius:20px;padding:3px 10px;letter-spacing:1px;">✅ 有效</span></div>
     ${medCardNo ? (() => {
       // Split name_en into surname / given name
       const nameEnFull = (m.name_en || '').trim().toUpperCase()
@@ -4616,7 +4616,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
     <div style="display:flex;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
       <button onclick="toggleMedPanel('medCardPanel')" id="btnMedCard"
         style="flex:1;min-height:55px;padding:12px 10px;background:#1565C0;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;cursor:pointer;line-height:1.3;">
-        💳 一卡資料
+        💳 卡資料
       </button>
       <button onclick="toggleMedPanel('medDoctorPanel')" id="btnMedDoctor"
         style="flex:1;min-height:55px;padding:12px 10px;background:#2E7D32;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;cursor:pointer;line-height:1.3;">
@@ -4626,6 +4626,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
 
     <!-- 面板一：卡號 + 登入資料 (預設隱藏) -->
     <div id="medCardPanel" style="display:none;margin-top:10px;">
+      <div style="font-size:15px;color:#546E7A;margin-bottom:12px;line-height:1.6;">你的醫健卡已透過 WhatsApp 發送給你，以下為你的卡號及登入資料。</div>
       <div style="font-size:18px;font-weight:700;color:#1565C0;margin-bottom:10px;">你的醫健卡號碼</div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
         <span id="medCardNoDisplay" style="font-size:28px;font-weight:900;color:#1B5E20;letter-spacing:3px;font-family:'Space Grotesk',monospace;">${medCardNo}</span>
@@ -4669,7 +4670,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
         🩺 開啟 HMMP 醫生名單
       </a>
       <div style="margin-top:14px;font-size:16px;color:#546E7A;line-height:1.6;">
-        點擊上方按鈕前往 HMMP 官網查看網絡醫生名單，<br>登入時使用左方「一卡資料」的登入資料。
+        點擊上方按鈕前往 HMMP 官網查看網絡醫生名單，<br>登入時使用「卡資料」內的登入資料。
       </div>
     </div>
 
