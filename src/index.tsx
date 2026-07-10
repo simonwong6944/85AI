@@ -582,15 +582,29 @@ app.get('/api/admin/medical', async (c) => {
   const params: string[] = []
   if (status) { where += ' AND m.status = ?'; params.push(status) }
 
-  const rows = await db.prepare(`
-    SELECT m.id, m.member_no, m.name_zh_full, m.name_en_full, m.hkid_prefix,
-           m.phone, m.status, m.applied_at, m.sent_at, m.notes, m.card_no,
-           mb.name_zh as member_name_zh, mb.district
-    FROM medical_card_applications m
-    LEFT JOIN members mb ON mb.member_no = m.member_no
-    ${where}
-    ORDER BY m.applied_at DESC
-  `).bind(...params).all()
+  // Try with card_no column; fall back to without if column not yet migrated
+  let rows: any
+  try {
+    rows = await db.prepare(`
+      SELECT m.id, m.member_no, m.name_zh_full, m.name_en_full, m.hkid_prefix,
+             m.phone, m.status, m.applied_at, m.sent_at, m.notes, m.card_no,
+             mb.name_zh as member_name_zh, mb.district
+      FROM medical_card_applications m
+      LEFT JOIN members mb ON mb.member_no = m.member_no
+      ${where}
+      ORDER BY m.applied_at DESC
+    `).bind(...params).all()
+  } catch (_) {
+    rows = await db.prepare(`
+      SELECT m.id, m.member_no, m.name_zh_full, m.name_en_full, m.hkid_prefix,
+             m.phone, m.status, m.applied_at, m.sent_at, m.notes, NULL AS card_no,
+             mb.name_zh as member_name_zh, mb.district
+      FROM medical_card_applications m
+      LEFT JOIN members mb ON mb.member_no = m.member_no
+      ${where}
+      ORDER BY m.applied_at DESC
+    `).bind(...params).all()
+  }
 
   if (exportCsv) {
     const BOM = '\uFEFF'
@@ -638,9 +652,18 @@ app.post('/api/admin/medical/:id/card-no', async (c) => {
   const body = await c.req.json<{ card_no: string }>()
   const cardNo = (body.card_no || '').trim()
   if (!cardNo) return c.json({ ok: false, error: 'card_no 不能為空' }, 400)
-  await db.prepare(
-    'UPDATE medical_card_applications SET card_no = ?, status = ? WHERE id = ?'
-  ).bind(cardNo, 'ISSUED', id).run()
+  // Auto-run migration if column not yet added
+  try {
+    await db.prepare(
+      'UPDATE medical_card_applications SET card_no = ?, status = ? WHERE id = ?'
+    ).bind(cardNo, 'ISSUED', id).run()
+  } catch (_) {
+    // Column missing — add it first, then update
+    await db.prepare('ALTER TABLE medical_card_applications ADD COLUMN card_no TEXT').run()
+    await db.prepare(
+      'UPDATE medical_card_applications SET card_no = ?, status = ? WHERE id = ?'
+    ).bind(cardNo, 'ISSUED', id).run()
+  }
   return c.json({ ok: true })
 })
 
@@ -1409,10 +1432,17 @@ app.get('/membership/card/:no', async (c) => {
   const db = c.env.DB
   const row = await db.prepare('SELECT * FROM members WHERE member_no = ?').bind(no).first<any>()
   if (!row) return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>查無此會員</h2><p>${no}</p><a href="/membership/join">立即登記</a></body></html>`, 404)
-  // Check medical card application status + card_no
-  const medApp = await db.prepare(
-    'SELECT status, card_no FROM medical_card_applications WHERE member_no = ? LIMIT 1'
-  ).bind(no).first<{ status: string; card_no: string | null }>()
+  // Check medical card application status + card_no (defensive: card_no column may not exist yet)
+  let medApp: { status: string; card_no: string | null } | null = null
+  try {
+    medApp = await db.prepare(
+      'SELECT status, card_no FROM medical_card_applications WHERE member_no = ? LIMIT 1'
+    ).bind(no).first<{ status: string; card_no: string | null }>()
+  } catch (_) {
+    medApp = await db.prepare(
+      'SELECT status, NULL AS card_no FROM medical_card_applications WHERE member_no = ? LIMIT 1'
+    ).bind(no).first<{ status: string; card_no: string | null }>()
+  }
   return c.html(memberProfileHtml(row, medApp?.status ?? null, medApp?.card_no ?? null))
 })
 
