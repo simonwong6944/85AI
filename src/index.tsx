@@ -3472,11 +3472,11 @@ async function submitForm(){
     document.getElementById('formSection').style.display='none';
     var ss=document.getElementById('successSection');
     ss.innerHTML='<div style="padding:40px 20px;text-align:center;">'
-      +'<div style="font-size:60px;margin-bottom:16px;">✅</div>'
-      +'<div style="font-family:\'Noto Serif TC\',serif;font-size:26px;font-weight:900;color:#8B0000;margin-bottom:10px;">申請成功！</div>'
-      +'<div style="font-size:20px;color:#444;margin-bottom:8px;">會員編號：<strong style="color:#C62828;">'+data.memberNo+'</strong></div>'
-      +'<div style="font-size:18px;color:#666;margin-bottom:24px;">正在跳轉到你的會員卡頁面…</div>'
-      +'<div style="font-size:15px;color:#999;">（如未自動跳轉，請<a href="/membership/card/'+data.memberNo+'" style="color:#C62828;font-weight:700;">點此進入</a>）</div>'
+      +'<div style="font-size:60px;margin-bottom:16px;">\u2705</div>'
+      +'<div style="font-size:26px;font-weight:900;color:#8B0000;margin-bottom:10px;">\u7533\u8acb\u6210\u529f\uff01</div>'
+      +'<div style="font-size:20px;color:#444;margin-bottom:8px;">\u6703\u54e1\u7de8\u865f\uff1a<strong style="color:#C62828;">'+data.memberNo+'</strong></div>'
+      +'<div style="font-size:18px;color:#666;margin-bottom:24px;">\u6b63\u5728\u8df3\u8f49\u5230\u4f60\u7684\u6703\u54e1\u5361\u9801\u9762\u2026</div>'
+      +'<div style="font-size:15px;color:#999;">\uff08\u5982\u672a\u81ea\u52d5\u8df3\u8f49\uff0c\u8acb<a href="/membership/card/'+data.memberNo+'" style="color:#C62828;font-weight:700;">\u9ede\u6b64\u9032\u5165</a>\uff09</div>'
       +'</div>';
     ss.classList.add('show');
     window.scrollTo(0,0);
