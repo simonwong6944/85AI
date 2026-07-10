@@ -1463,19 +1463,25 @@ app.get('/api/admin/contents', async (c) => {
 // POST /api/admin/contents — create
 app.post('/api/admin/contents', async (c) => {
   const db = c.env.DB
-  const body = await c.req.json<{ section: string; title: string; body: string; address?: string; sort_order?: number; status?: string }>()
-  const { section, title, body: bodyText, address, sort_order, status } = body
+  let reqBody: any
+  try { reqBody = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效 JSON' }, 400) }
+  const section   = String(reqBody.section   || '')
+  const title     = String(reqBody.title     || '').trim()
+  const bodyText  = String(reqBody.body      || '')
+  const address   = reqBody.address ? String(reqBody.address) : null
+  const sortOrder = Number(reqBody.sort_order ?? 0)
+  const status    = String(reqBody.status    || 'OPEN')
   if (!['shopping', 'news'].includes(section)) return c.json({ ok: false, error: '無效 section' }, 400)
-  if (!title || !title.trim()) return c.json({ ok: false, error: 'title 不能為空' }, 400)
+  if (!title) return c.json({ ok: false, error: 'title 不能為空' }, 400)
   const now = new Date().toISOString()
   try {
     const r = await db.prepare(
       `INSERT INTO app_contents (section, title, body, address, sort_order, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(section, title.trim(), bodyText || '', address || null, sort_order ?? 0, status || 'OPEN', now, now).run()
+    ).bind(section, title, bodyText, address, sortOrder, status, now, now).run()
     return c.json({ ok: true, id: r.meta.last_row_id })
-  } catch (_) {
-    return c.json({ ok: false, error: '資料表未建立，請先執行 migration 0016' }, 500)
+  } catch (err: any) {
+    return c.json({ ok: false, error: String(err?.message || err) }, 500)
   }
 })
 
@@ -1483,20 +1489,25 @@ app.post('/api/admin/contents', async (c) => {
 app.put('/api/admin/contents/:id', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
-  const body = await c.req.json<{ section?: string; title?: string; body?: string; address?: string; sort_order?: number; status?: string }>()
+  let rb: any
+  try { rb = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效 JSON' }, 400) }
   const fields: string[] = []
   const vals: any[] = []
-  if (body.section !== undefined) { fields.push('section=?'); vals.push(body.section) }
-  if (body.title   !== undefined) { fields.push('title=?');   vals.push(body.title) }
-  if (body.body    !== undefined) { fields.push('body=?');     vals.push(body.body) }
-  if (body.address !== undefined) { fields.push('address=?'); vals.push(body.address) }
-  if (body.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(body.sort_order) }
-  if (body.status  !== undefined) { fields.push('status=?');  vals.push(body.status) }
+  if (rb.section    !== undefined) { fields.push('section=?');    vals.push(rb.section) }
+  if (rb.title      !== undefined) { fields.push('title=?');      vals.push(rb.title) }
+  if (rb.body       !== undefined) { fields.push('body=?');       vals.push(rb.body) }
+  if (rb.address    !== undefined) { fields.push('address=?');    vals.push(rb.address) }
+  if (rb.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(rb.sort_order) }
+  if (rb.status     !== undefined) { fields.push('status=?');     vals.push(rb.status) }
   if (!fields.length) return c.json({ ok: false, error: '無更新欄位' }, 400)
   fields.push('updated_at=?'); vals.push(new Date().toISOString())
   vals.push(id)
-  await db.prepare(`UPDATE app_contents SET ${fields.join(', ')} WHERE id=?`).bind(...vals).run()
-  return c.json({ ok: true })
+  try {
+    await db.prepare(`UPDATE app_contents SET ${fields.join(', ')} WHERE id=?`).bind(...vals).run()
+    return c.json({ ok: true })
+  } catch (err: any) {
+    return c.json({ ok: false, error: String(err?.message || err) }, 500)
+  }
 })
 
 // DELETE /api/admin/contents/:id — delete
@@ -4403,7 +4414,7 @@ function loadContents() {
   var section = document.getElementById('cFilterSection') ? document.getElementById('cFilterSection').value : '';
   var url = '/api/admin/contents' + (section ? '?section=' + section : '');
   document.getElementById('contentsList').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:13px;">載入中…</div>';
-  fetch(url).then(function(r){ return r.json(); }).then(function(d) {
+  fetch(url, { credentials: 'include' }).then(function(r){ return r.json(); }).then(function(d) {
     _contentsData = d.items || [];
     if (!_contentsData.length) {
       document.getElementById('contentsList').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:13px;">暫無內容</div>';
@@ -4484,20 +4495,20 @@ function saveContent() {
   btn.disabled = true; btn.textContent = '儲存中…';
   var url = id ? '/api/admin/contents/'+id : '/api/admin/contents';
   var method = id ? 'PUT' : 'POST';
-  fetch(url, { method: method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+  fetch(url, { method: method, headers: {'Content-Type':'application/json'}, credentials: 'include', body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
     .then(function(d) {
       btn.disabled = false; btn.textContent = '儲存';
       if (d.ok) { closeContentForm(); loadContents(); }
       else { alert('儲存失敗：'+(d.error||'未知錯誤')); }
-    }).catch(function(){ btn.disabled=false; btn.textContent='儲存'; alert('網絡錯誤'); });
+    }).catch(function(e){ btn.disabled=false; btn.textContent='儲存'; alert('網絡錯誤: '+String(e)); });
 }
 
 function toggleContentStatus(i) {
   var item = _contentsData[i];
   if (!item) return;
   var newStatus = item.status === 'OPEN' ? 'HIDDEN' : 'OPEN';
-  fetch('/api/admin/contents/'+item.id, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status:newStatus}) })
+  fetch('/api/admin/contents/'+item.id, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials: 'include', body:JSON.stringify({status:newStatus}) })
     .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) loadContents(); });
 }
 
@@ -4505,7 +4516,7 @@ function deleteContent(i) {
   var item = _contentsData[i];
   if (!item) return;
   if (!confirm('確認刪除「'+item.title+'」？')) return;
-  fetch('/api/admin/contents/'+item.id, { method:'DELETE' })
+  fetch('/api/admin/contents/'+item.id, { method:'DELETE', credentials: 'include' })
     .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) loadContents(); });
 }
 
@@ -4518,7 +4529,7 @@ function loadAdminFeedback() {
   document.getElementById('adminFeedbackDetail').style.display = 'none';
   document.getElementById('adminFeedbackList').style.display = 'flex';
   document.getElementById('adminFeedbackList').style.flexDirection = 'column';
-  fetch('/api/admin/feedback').then(function(r){ return r.json(); }).then(function(d) {
+  fetch('/api/admin/feedback', { credentials: 'include' }).then(function(r){ return r.json(); }).then(function(d) {
     _adminFeedbackThreads = d.threads || [];
     if (!_adminFeedbackThreads.length) {
       document.getElementById('adminFeedbackList').innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;font-size:13px;">暫無意見</div>';
@@ -4556,7 +4567,7 @@ function openAdminFeedbackThread(i) {
     '<strong>會員：</strong>' + escHtml(t.member_no) + ' ' + escHtml(t.member_name) + '<br>' +
     '<strong>狀態：</strong>' + t.status;
   document.getElementById('adminFeedbackMsgs').innerHTML = '<div style="color:#aaa;font-size:13px;">載入中…</div>';
-  fetch('/api/admin/feedback/' + t.id).then(function(r){ return r.json(); }).then(function(d) {
+  fetch('/api/admin/feedback/' + t.id, { credentials: 'include' }).then(function(r){ return r.json(); }).then(function(d) {
     if (!d.ok) { document.getElementById('adminFeedbackMsgs').innerHTML = '<div style="color:#e53935;">載入失敗</div>'; return; }
     document.getElementById('adminFeedbackMsgs').innerHTML = (d.messages || []).map(function(msg) {
       var isAdmin = msg.sender === 'admin';
@@ -4585,7 +4596,7 @@ function adminReplyFeedback() {
   var content = document.getElementById('adminReplyText').value.trim();
   if (!content) { alert('請輸入回覆內容'); return; }
   fetch('/api/admin/feedback/' + _adminCurrentThreadId + '/reply', {
-    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content: content})
+    method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'include', body: JSON.stringify({content: content})
   }).then(function(r){ return r.json(); }).then(function(d) {
     if (d.ok) {
       document.getElementById('adminReplyText').value = '';
@@ -4599,7 +4610,7 @@ function adminCloseFeedback() {
   if (!_adminCurrentThreadId) return;
   if (!confirm('確認將此對話標記為已關閉？')) return;
   fetch('/api/admin/feedback/' + _adminCurrentThreadId + '/status', {
-    method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({status: 'closed'})
+    method: 'PATCH', headers: {'Content-Type':'application/json'}, credentials: 'include', body: JSON.stringify({status: 'closed'})
   }).then(function(r){ return r.json(); }).then(function(d) {
     if (d.ok) closeAdminFeedbackDetail();
   });
