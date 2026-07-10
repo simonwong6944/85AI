@@ -1418,6 +1418,235 @@ app.put('/api/admin/applications/:id', async (c) => {
   return c.json({ ok: true })
 })
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── app_contents APIs (shopping / news) ────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/contents?section=shopping|news — public, only OPEN items
+app.get('/api/contents', async (c) => {
+  const section = c.req.query('section') || ''
+  if (!['shopping', 'news'].includes(section)) return c.json({ ok: false, error: '無效 section' }, 400)
+  const db = c.env.DB
+  let rows: any
+  try {
+    rows = await db.prepare(
+      `SELECT id, section, title, body, address, sort_order, created_at, updated_at
+       FROM app_contents WHERE section=? AND status='OPEN' ORDER BY sort_order ASC, id ASC`
+    ).bind(section).all()
+  } catch (_) {
+    return c.json({ ok: true, items: [] })
+  }
+  return c.json({ ok: true, items: rows.results })
+})
+
+// GET /api/admin/contents — admin: all items
+app.get('/api/admin/contents', async (c) => {
+  const db = c.env.DB
+  const section = c.req.query('section') || ''
+  let rows: any
+  try {
+    if (section) {
+      rows = await db.prepare(
+        `SELECT * FROM app_contents WHERE section=? ORDER BY sort_order ASC, id ASC`
+      ).bind(section).all()
+    } else {
+      rows = await db.prepare(
+        `SELECT * FROM app_contents ORDER BY section ASC, sort_order ASC, id ASC`
+      ).all()
+    }
+  } catch (_) {
+    return c.json({ ok: true, items: [] })
+  }
+  return c.json({ ok: true, items: rows.results })
+})
+
+// POST /api/admin/contents — create
+app.post('/api/admin/contents', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json<{ section: string; title: string; body: string; address?: string; sort_order?: number; status?: string }>()
+  const { section, title, body: bodyText, address, sort_order, status } = body
+  if (!['shopping', 'news'].includes(section)) return c.json({ ok: false, error: '無效 section' }, 400)
+  if (!title || !title.trim()) return c.json({ ok: false, error: 'title 不能為空' }, 400)
+  const now = new Date().toISOString()
+  try {
+    const r = await db.prepare(
+      `INSERT INTO app_contents (section, title, body, address, sort_order, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(section, title.trim(), bodyText || '', address || null, sort_order ?? 0, status || 'OPEN', now, now).run()
+    return c.json({ ok: true, id: r.meta.last_row_id })
+  } catch (_) {
+    return c.json({ ok: false, error: '資料表未建立，請先執行 migration 0016' }, 500)
+  }
+})
+
+// PUT /api/admin/contents/:id — update
+app.put('/api/admin/contents/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  const body = await c.req.json<{ section?: string; title?: string; body?: string; address?: string; sort_order?: number; status?: string }>()
+  const fields: string[] = []
+  const vals: any[] = []
+  if (body.section !== undefined) { fields.push('section=?'); vals.push(body.section) }
+  if (body.title   !== undefined) { fields.push('title=?');   vals.push(body.title) }
+  if (body.body    !== undefined) { fields.push('body=?');     vals.push(body.body) }
+  if (body.address !== undefined) { fields.push('address=?'); vals.push(body.address) }
+  if (body.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(body.sort_order) }
+  if (body.status  !== undefined) { fields.push('status=?');  vals.push(body.status) }
+  if (!fields.length) return c.json({ ok: false, error: '無更新欄位' }, 400)
+  fields.push('updated_at=?'); vals.push(new Date().toISOString())
+  vals.push(id)
+  await db.prepare(`UPDATE app_contents SET ${fields.join(', ')} WHERE id=?`).bind(...vals).run()
+  return c.json({ ok: true })
+})
+
+// DELETE /api/admin/contents/:id — delete
+app.delete('/api/admin/contents/:id', async (c) => {
+  const id = c.req.param('id')
+  const db = c.env.DB
+  await db.prepare('DELETE FROM app_contents WHERE id=?').bind(id).run()
+  return c.json({ ok: true })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feedback (心聲) APIs ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// POST /api/feedback — create thread + first message (member)
+app.post('/api/feedback', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json<{ member_no: string; subject: string; content: string }>()
+  const { member_no, subject, content } = body
+  if (!member_no || !subject || !content) return c.json({ ok: false, error: '缺少必要欄位' }, 400)
+  // verify member exists
+  const member = await db.prepare('SELECT name_zh FROM members WHERE member_no=?').bind(member_no).first<{ name_zh: string }>()
+  if (!member) return c.json({ ok: false, error: '找不到會員' }, 403)
+  const now = new Date().toISOString()
+  try {
+    const thread = await db.prepare(
+      `INSERT INTO feedback_threads (member_no, member_name, subject, status, has_unread_for_member, created_at, updated_at)
+       VALUES (?, ?, ?, 'new', 0, ?, ?)`
+    ).bind(member_no, member.name_zh || '', subject.trim(), now, now).run()
+    const threadId = thread.meta.last_row_id
+    await db.prepare(
+      `INSERT INTO feedback_messages (thread_id, sender, content, created_at) VALUES (?, 'member', ?, ?)`
+    ).bind(threadId, content.trim(), now).run()
+    return c.json({ ok: true, thread_id: threadId })
+  } catch (_) {
+    return c.json({ ok: false, error: '資料表未建立，請先執行 migration 0017' }, 500)
+  }
+})
+
+// GET /api/feedback?m=member_no — list own threads only
+app.get('/api/feedback', async (c) => {
+  const memberNo = c.req.query('m') || ''
+  if (!memberNo) return c.json({ ok: false, error: '缺少 m 參數' }, 400)
+  const db = c.env.DB
+  // verify member
+  const member = await db.prepare('SELECT member_no FROM members WHERE member_no=?').bind(memberNo).first<{ member_no: string }>()
+  if (!member) return c.json({ ok: false, error: '找不到會員' }, 403)
+  try {
+    const rows = await db.prepare(
+      `SELECT id, subject, status, has_unread_for_member, created_at, updated_at
+       FROM feedback_threads WHERE member_no=? ORDER BY updated_at DESC`
+    ).bind(memberNo).all()
+    return c.json({ ok: true, threads: rows.results })
+  } catch (_) {
+    return c.json({ ok: true, threads: [] })
+  }
+})
+
+// GET /api/feedback/:threadId?m=member_no — thread messages (own only)
+app.get('/api/feedback/:threadId', async (c) => {
+  const threadId = c.req.param('threadId')
+  const memberNo = c.req.query('m') || ''
+  if (!memberNo) return c.json({ ok: false, error: '缺少 m 參數' }, 400)
+  const db = c.env.DB
+  const thread = await db.prepare('SELECT * FROM feedback_threads WHERE id=?').bind(threadId).first<any>()
+  if (!thread) return c.json({ ok: false, error: '找不到對話' }, 404)
+  if (thread.member_no !== memberNo) return c.json({ ok: false, error: '無權查閱' }, 403)
+  // mark as read for member
+  await db.prepare('UPDATE feedback_threads SET has_unread_for_member=0 WHERE id=?').bind(threadId).run()
+  const msgs = await db.prepare(
+    `SELECT id, sender, content, created_at FROM feedback_messages WHERE thread_id=? ORDER BY created_at ASC`
+  ).bind(threadId).all()
+  return c.json({ ok: true, thread, messages: msgs.results })
+})
+
+// POST /api/feedback/:threadId/reply — member reply
+app.post('/api/feedback/:threadId/reply', async (c) => {
+  const threadId = c.req.param('threadId')
+  const db = c.env.DB
+  const body = await c.req.json<{ member_no: string; content: string }>()
+  const { member_no, content } = body
+  if (!member_no || !content) return c.json({ ok: false, error: '缺少必要欄位' }, 400)
+  const thread = await db.prepare('SELECT * FROM feedback_threads WHERE id=?').bind(threadId).first<any>()
+  if (!thread) return c.json({ ok: false, error: '找不到對話' }, 404)
+  if (thread.member_no !== member_no) return c.json({ ok: false, error: '無權回覆' }, 403)
+  if (thread.status === 'closed') return c.json({ ok: false, error: '對話已關閉' }, 400)
+  const now = new Date().toISOString()
+  await db.prepare(
+    `INSERT INTO feedback_messages (thread_id, sender, content, created_at) VALUES (?, 'member', ?, ?)`
+  ).bind(threadId, content.trim(), now).run()
+  await db.prepare(
+    `UPDATE feedback_threads SET updated_at=?, status='new' WHERE id=?`
+  ).bind(now, threadId).run()
+  return c.json({ ok: true })
+})
+
+// GET /api/admin/feedback — admin: all threads
+app.get('/api/admin/feedback', async (c) => {
+  const db = c.env.DB
+  try {
+    const rows = await db.prepare(
+      `SELECT id, member_no, member_name, subject, status, has_unread_for_member, created_at, updated_at
+       FROM feedback_threads ORDER BY CASE status WHEN 'new' THEN 0 WHEN 'replied' THEN 1 ELSE 2 END ASC, updated_at DESC`
+    ).all()
+    return c.json({ ok: true, threads: rows.results })
+  } catch (_) {
+    return c.json({ ok: true, threads: [] })
+  }
+})
+
+// GET /api/admin/feedback/:threadId — admin: read thread messages
+app.get('/api/admin/feedback/:threadId', async (c) => {
+  const threadId = c.req.param('threadId')
+  const db = c.env.DB
+  const thread = await db.prepare('SELECT * FROM feedback_threads WHERE id=?').bind(threadId).first<any>()
+  if (!thread) return c.json({ ok: false, error: '找不到對話' }, 404)
+  const msgs = await db.prepare(
+    `SELECT id, sender, content, created_at FROM feedback_messages WHERE thread_id=? ORDER BY created_at ASC`
+  ).bind(threadId).all()
+  return c.json({ ok: true, thread, messages: msgs.results })
+})
+
+// POST /api/admin/feedback/:threadId/reply — admin reply
+app.post('/api/admin/feedback/:threadId/reply', async (c) => {
+  const threadId = c.req.param('threadId')
+  const db = c.env.DB
+  const body = await c.req.json<{ content: string }>()
+  if (!body.content) return c.json({ ok: false, error: '內容不能為空' }, 400)
+  const thread = await db.prepare('SELECT id FROM feedback_threads WHERE id=?').bind(threadId).first<any>()
+  if (!thread) return c.json({ ok: false, error: '找不到對話' }, 404)
+  const now = new Date().toISOString()
+  await db.prepare(
+    `INSERT INTO feedback_messages (thread_id, sender, content, created_at) VALUES (?, 'admin', ?, ?)`
+  ).bind(threadId, body.content.trim(), now).run()
+  await db.prepare(
+    `UPDATE feedback_threads SET status='replied', has_unread_for_member=1, updated_at=? WHERE id=?`
+  ).bind(now, threadId).run()
+  return c.json({ ok: true })
+})
+
+// PATCH /api/admin/feedback/:threadId/status — close thread
+app.patch('/api/admin/feedback/:threadId/status', async (c) => {
+  const threadId = c.req.param('threadId')
+  const db = c.env.DB
+  const body = await c.req.json<{ status: string }>()
+  if (!['new', 'replied', 'closed'].includes(body.status)) return c.json({ ok: false, error: '無效 status' }, 400)
+  await db.prepare('UPDATE feedback_threads SET status=?, updated_at=? WHERE id=?').bind(body.status, new Date().toISOString(), threadId).run()
+  return c.json({ ok: true })
+})
+
 // ─── Root: 85 AI Technology Limited Dashboard ────────────────────────────────
 app.get('/', (c) => c.html(dashboardHtml()))
 
@@ -3648,6 +3877,8 @@ tr.inactive td{opacity:0.45;}
     <div class="nav-tab active" onclick="switchTab('dashboard',this)">📊 Dashboard</div>
     <div class="nav-tab" onclick="switchTab('members',this)">👥 會員管理</div>
     <div class="nav-tab" onclick="switchTab('medical',this)">🏥 醫健卡申請</div>
+    <div class="nav-tab" onclick="switchTab('contents',this)">📢 內容管理</div>
+    <div class="nav-tab" id="navFeedback" onclick="switchTab('feedback',this)">💬 心聲意見</div>
     <div class="nav-tab" onclick="switchTab('qrgen',this)">🔗 QR 連結</div>
     <div class="nav-tab" onclick="switchTab('settings',this)">⚙️ 設定</div>
   </div>
@@ -4013,6 +4244,99 @@ tr.inactive td{opacity:0.45;}
     </div>
   </div>
 
+  <!-- ── 內容管理 PAGE ── -->
+  <div class="page" id="page-contents">
+    <div style="max-width:700px;margin:0 auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <h2 style="font-size:16px;font-weight:700;color:#222;margin:0;">📢 內容管理（購物 / 消息）</h2>
+        <div style="display:flex;gap:8px;">
+          <select id="cFilterSection" onchange="loadContents()" style="border:1px solid #ddd;border-radius:5px;padding:6px 10px;font-size:13px;background:#fff;">
+            <option value="">全部</option>
+            <option value="shopping">購物</option>
+            <option value="news">消息</option>
+          </select>
+          <button class="btn btn-green" onclick="openAddContent()" style="font-size:13px;padding:7px 14px;">＋ 新增</button>
+        </div>
+      </div>
+      <div id="contentsList" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="text-align:center;padding:40px;color:#aaa;font-size:13px;">載入中…</div>
+      </div>
+    </div>
+
+    <!-- 新增/編輯 表單 (inline, 預設隱藏) -->
+    <div id="contentFormWrap" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:2000;display:none;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:520px;max-height:90vh;overflow-y:auto;">
+        <h3 id="cFormTitle" style="margin:0 0 18px;font-size:15px;font-weight:700;">＋ 新增內容</h3>
+        <input type="hidden" id="cFormId">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">類別 *</label>
+            <select id="cFormSection" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;">
+              <option value="shopping">購物</option>
+              <option value="news">消息</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">標題 *</label>
+            <input id="cFormTitle" type="text" maxlength="100" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;" placeholder="例：限時特惠套餐">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">內容 *</label>
+            <textarea id="cFormBody" rows="5" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;resize:vertical;" placeholder="可多行，Roadshow 詳情、套餐說明等"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">地址（選填，購物 Roadshow 用）</label>
+            <input id="cFormAddress" type="text" maxlength="200" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;" placeholder="例：九龍灣德福廣場 L1 大堂">
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;">
+              <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">排序（數字越小越前）</label>
+              <input id="cFormSort" type="number" value="0" min="0" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">狀態</label>
+              <select id="cFormStatus" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;">
+                <option value="OPEN">顯示 OPEN</option>
+                <option value="HIDDEN">隱藏 HIDDEN</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+            <button onclick="closeContentForm()" style="padding:9px 18px;background:#f5f5f5;border:1px solid #ddd;border-radius:5px;font-size:13px;cursor:pointer;">取消</button>
+            <button onclick="saveContent()" id="cFormSaveBtn" style="padding:9px 18px;background:#228B22;color:#fff;border:0;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;">儲存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 心聲意見 PAGE ── -->
+  <div class="page" id="page-feedback">
+    <div style="max-width:700px;margin:0 auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <h2 style="font-size:16px;font-weight:700;color:#222;margin:0;">💬 心聲意見（會員一對一）</h2>
+        <button class="btn btn-green" onclick="loadAdminFeedback()" style="font-size:13px;padding:7px 14px;">🔄 重新整理</button>
+      </div>
+
+      <!-- Thread list -->
+      <div id="adminFeedbackList" style="display:flex;flex-direction:column;gap:10px;"></div>
+
+      <!-- Thread detail (hidden by default) -->
+      <div id="adminFeedbackDetail" style="display:none;">
+        <button onclick="closeAdminFeedbackDetail()" style="margin-bottom:12px;background:none;border:none;font-size:14px;color:#1565C0;cursor:pointer;">← 返回列表</button>
+        <div id="adminFeedbackInfo" style="background:#f5f5f5;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;"></div>
+        <div id="adminFeedbackMsgs" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
+        <div style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;">
+          <textarea id="adminReplyText" rows="3" style="width:100%;border:1.5px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;resize:vertical;" placeholder="輸入回覆內容…"></textarea>
+          <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end;">
+            <button onclick="adminCloseFeedback()" style="padding:9px 14px;background:#fff;border:1.5px solid #888;border-radius:5px;font-size:13px;cursor:pointer;">🔒 標記已關閉</button>
+            <button onclick="adminReplyFeedback()" style="padding:9px 18px;background:#228B22;color:#fff;border:0;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;">📤 發送回覆</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ── EDIT MODAL ── -->
@@ -4071,6 +4395,222 @@ tr.inactive td{opacity:0.45;}
 </div>
 
 <script src="/static/admin.js"></script>
+<script>
+// ── 內容管理 (Contents) ──────────────────────────────────────────────────────
+var _contentsData = [];
+
+function loadContents() {
+  var section = document.getElementById('cFilterSection') ? document.getElementById('cFilterSection').value : '';
+  var url = '/api/admin/contents' + (section ? '?section=' + section : '');
+  document.getElementById('contentsList').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:13px;">載入中…</div>';
+  fetch(url).then(function(r){ return r.json(); }).then(function(d) {
+    _contentsData = d.items || [];
+    if (!_contentsData.length) {
+      document.getElementById('contentsList').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:13px;">暫無內容</div>';
+      return;
+    }
+    document.getElementById('contentsList').innerHTML = _contentsData.map(function(item, i) {
+      var sectionLabel = item.section === 'shopping' ? '🛒 購物' : '📢 消息';
+      var statusBadge = item.status === 'OPEN'
+        ? '<span style="background:#e8f5e9;color:#2E7D32;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;">顯示</span>'
+        : '<span style="background:#fafafa;color:#999;border:1px solid #ddd;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;">隱藏</span>';
+      return '<div style="background:#fff;border-radius:8px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            '<span style="font-size:11px;color:#666;">'+sectionLabel+'</span>' +
+            statusBadge +
+            '<span style="font-size:11px;color:#999;">排序:'+item.sort_order+'</span>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px;">' +
+            '<button onclick="openEditContent('+i+')" style="padding:5px 12px;background:#1565C0;color:#fff;border:0;border-radius:4px;font-size:12px;cursor:pointer;">✏️ 編輯</button>' +
+            '<button onclick="toggleContentStatus('+i+')" style="padding:5px 10px;background:#f5f5f5;border:1px solid #ddd;border-radius:4px;font-size:12px;cursor:pointer;">'+(item.status==='OPEN'?'隱藏':'顯示')+'</button>' +
+            '<button onclick="deleteContent('+i+')" style="padding:5px 10px;background:#fff;border:1px solid #e53935;color:#e53935;border-radius:4px;font-size:12px;cursor:pointer;">刪除</button>' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:14px;font-weight:700;color:#222;margin-bottom:4px;">'+escHtml(item.title)+'</div>' +
+        (item.address ? '<div style="font-size:12px;color:#555;margin-bottom:4px;">📍 '+escHtml(item.address)+'</div>' : '') +
+        '<div style="font-size:12px;color:#444;white-space:pre-wrap;line-height:1.6;">'+escHtml(item.body)+'</div>' +
+      '</div>';
+    }).join('');
+  }).catch(function(){ document.getElementById('contentsList').innerHTML = '<div style="text-align:center;padding:40px;color:#e53935;font-size:13px;">載入失敗</div>'; });
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function openAddContent() {
+  document.getElementById('cFormId').value = '';
+  document.getElementById('cFormTitle').value = '';
+  document.getElementById('cFormBody').value = '';
+  document.getElementById('cFormAddress').value = '';
+  document.getElementById('cFormSort').value = '0';
+  document.getElementById('cFormStatus').value = 'OPEN';
+  var wrap = document.getElementById('contentFormWrap');
+  wrap.style.display = 'flex';
+}
+
+function openEditContent(i) {
+  var item = _contentsData[i];
+  if (!item) return;
+  document.getElementById('cFormId').value = item.id;
+  document.getElementById('cFormSection').value = item.section;
+  document.getElementById('cFormTitle').value = item.title;
+  document.getElementById('cFormBody').value = item.body;
+  document.getElementById('cFormAddress').value = item.address || '';
+  document.getElementById('cFormSort').value = item.sort_order;
+  document.getElementById('cFormStatus').value = item.status;
+  document.getElementById('contentFormWrap').style.display = 'flex';
+}
+
+function closeContentForm() {
+  document.getElementById('contentFormWrap').style.display = 'none';
+}
+
+function saveContent() {
+  var id = document.getElementById('cFormId').value;
+  var payload = {
+    section: document.getElementById('cFormSection').value,
+    title: document.getElementById('cFormTitle').value.trim(),
+    body: document.getElementById('cFormBody').value,
+    address: document.getElementById('cFormAddress').value.trim() || null,
+    sort_order: parseInt(document.getElementById('cFormSort').value) || 0,
+    status: document.getElementById('cFormStatus').value
+  };
+  if (!payload.title) { alert('請填寫標題'); return; }
+  var btn = document.getElementById('cFormSaveBtn');
+  btn.disabled = true; btn.textContent = '儲存中…';
+  var url = id ? '/api/admin/contents/'+id : '/api/admin/contents';
+  var method = id ? 'PUT' : 'POST';
+  fetch(url, { method: method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      btn.disabled = false; btn.textContent = '儲存';
+      if (d.ok) { closeContentForm(); loadContents(); }
+      else { alert('儲存失敗：'+(d.error||'未知錯誤')); }
+    }).catch(function(){ btn.disabled=false; btn.textContent='儲存'; alert('網絡錯誤'); });
+}
+
+function toggleContentStatus(i) {
+  var item = _contentsData[i];
+  if (!item) return;
+  var newStatus = item.status === 'OPEN' ? 'HIDDEN' : 'OPEN';
+  fetch('/api/admin/contents/'+item.id, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status:newStatus}) })
+    .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) loadContents(); });
+}
+
+function deleteContent(i) {
+  var item = _contentsData[i];
+  if (!item) return;
+  if (!confirm('確認刪除「'+item.title+'」？')) return;
+  fetch('/api/admin/contents/'+item.id, { method:'DELETE' })
+    .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) loadContents(); });
+}
+
+// ── 心聲管理 (Admin Feedback) ─────────────────────────────────────────────────
+var _adminFeedbackThreads = [];
+var _adminCurrentThreadId = null;
+
+function loadAdminFeedback() {
+  document.getElementById('adminFeedbackList').innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;font-size:13px;">載入中…</div>';
+  document.getElementById('adminFeedbackDetail').style.display = 'none';
+  document.getElementById('adminFeedbackList').style.display = 'flex';
+  document.getElementById('adminFeedbackList').style.flexDirection = 'column';
+  fetch('/api/admin/feedback').then(function(r){ return r.json(); }).then(function(d) {
+    _adminFeedbackThreads = d.threads || [];
+    if (!_adminFeedbackThreads.length) {
+      document.getElementById('adminFeedbackList').innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;font-size:13px;">暫無意見</div>';
+      var nav = document.getElementById('navFeedback');
+      if (nav) nav.textContent = '💬 心聲意見';
+      return;
+    }
+    var unread = _adminFeedbackThreads.filter(function(t){ return t.status === 'new'; }).length;
+    var nav = document.getElementById('navFeedback');
+    if (nav) nav.textContent = unread > 0 ? '💬 心聲意見 (' + unread + ')' : '💬 心聲意見';
+    document.getElementById('adminFeedbackList').innerHTML = _adminFeedbackThreads.map(function(t, i) {
+      var statusColor = t.status === 'new' ? '#e53935' : t.status === 'replied' ? '#1565C0' : '#888';
+      var statusLabel = t.status === 'new' ? '🆕 新' : t.status === 'replied' ? '✅ 已回覆' : '🔒 已關閉';
+      var dt = t.updated_at ? t.updated_at.slice(0,16).replace('T',' ') : '';
+      return '<div onclick="openAdminFeedbackThread(' + i + ')" style="background:#fff;border-radius:8px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);cursor:pointer;border-left:4px solid ' + statusColor + ';">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">' +
+          '<div style="font-size:14px;font-weight:700;color:#222;">' + escHtml(t.subject) + '</div>' +
+          '<span style="font-size:11px;font-weight:700;color:' + statusColor + ';">' + statusLabel + '</span>' +
+        '</div>' +
+        '<div style="font-size:12px;color:#666;margin-top:4px;">' + escHtml(t.member_no) + ' ' + escHtml(t.member_name) + '</div>' +
+        '<div style="font-size:11px;color:#aaa;margin-top:4px;">' + dt + '</div>' +
+      '</div>';
+    }).join('');
+  }).catch(function(){ document.getElementById('adminFeedbackList').innerHTML = '<div style="color:#e53935;padding:20px;font-size:13px;">載入失敗</div>'; });
+}
+
+function openAdminFeedbackThread(i) {
+  var t = _adminFeedbackThreads[i];
+  if (!t) return;
+  _adminCurrentThreadId = t.id;
+  document.getElementById('adminFeedbackList').style.display = 'none';
+  document.getElementById('adminFeedbackDetail').style.display = 'block';
+  document.getElementById('adminFeedbackInfo').innerHTML =
+    '<strong>主題：</strong>' + escHtml(t.subject) + '<br>' +
+    '<strong>會員：</strong>' + escHtml(t.member_no) + ' ' + escHtml(t.member_name) + '<br>' +
+    '<strong>狀態：</strong>' + t.status;
+  document.getElementById('adminFeedbackMsgs').innerHTML = '<div style="color:#aaa;font-size:13px;">載入中…</div>';
+  fetch('/api/admin/feedback/' + t.id).then(function(r){ return r.json(); }).then(function(d) {
+    if (!d.ok) { document.getElementById('adminFeedbackMsgs').innerHTML = '<div style="color:#e53935;">載入失敗</div>'; return; }
+    document.getElementById('adminFeedbackMsgs').innerHTML = (d.messages || []).map(function(msg) {
+      var isAdmin = msg.sender === 'admin';
+      var dt = msg.created_at ? msg.created_at.slice(0,16).replace('T',' ') : '';
+      return '<div style="display:flex;flex-direction:column;align-items:' + (isAdmin ? 'flex-end' : 'flex-start') + ';gap:2px;">' +
+        '<div style="max-width:85%;background:' + (isAdmin ? '#e3f2fd' : '#f5f5f5') + ';border-radius:10px;padding:10px 14px;">' +
+          '<div style="font-size:11px;font-weight:700;color:' + (isAdmin ? '#1565C0' : '#555') + ';margin-bottom:4px;">' + (isAdmin ? '🔧 管理員' : '👤 會員') + ' ' + dt + '</div>' +
+          '<div style="font-size:13px;color:#222;white-space:pre-wrap;">' + escHtml(msg.content) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  });
+}
+
+function closeAdminFeedbackDetail() {
+  document.getElementById('adminFeedbackDetail').style.display = 'none';
+  document.getElementById('adminFeedbackList').style.display = 'flex';
+  document.getElementById('adminFeedbackList').style.flexDirection = 'column';
+  document.getElementById('adminReplyText').value = '';
+  _adminCurrentThreadId = null;
+  loadAdminFeedback();
+}
+
+function adminReplyFeedback() {
+  if (!_adminCurrentThreadId) return;
+  var content = document.getElementById('adminReplyText').value.trim();
+  if (!content) { alert('請輸入回覆內容'); return; }
+  fetch('/api/admin/feedback/' + _adminCurrentThreadId + '/reply', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content: content})
+  }).then(function(r){ return r.json(); }).then(function(d) {
+    if (d.ok) {
+      document.getElementById('adminReplyText').value = '';
+      var idx = _adminFeedbackThreads.findIndex(function(t){ return t.id === _adminCurrentThreadId; });
+      openAdminFeedbackThread(idx);
+    } else { alert('回覆失敗：' + (d.error || '')); }
+  });
+}
+
+function adminCloseFeedback() {
+  if (!_adminCurrentThreadId) return;
+  if (!confirm('確認將此對話標記為已關閉？')) return;
+  fetch('/api/admin/feedback/' + _adminCurrentThreadId + '/status', {
+    method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({status: 'closed'})
+  }).then(function(r){ return r.json(); }).then(function(d) {
+    if (d.ok) closeAdminFeedbackDetail();
+  });
+}
+
+// ── switchTab hook for contents & feedback ───────────────────────────────────
+var _origAdminSwitch = switchTab;
+switchTab = function(name, el) {
+  _origAdminSwitch(name, el);
+  if (name === 'contents') loadContents();
+  if (name === 'feedback') loadAdminFeedback();
+};
+</script>
 </body></html>`
 }
 
@@ -7140,15 +7680,25 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 </div>
 
 <!-- ── Tab 面板：購物 ── -->
-<div id="tabShop" class="coming-soon-panel">
-  <div class="coming-icon">🛒</div>
-  <div class="coming-text">🚧 即將推出，敬請期待 🙏</div>
+<div id="tabShop" style="display:none;padding:18px 16px 90px;">
+  <div style="font-size:26px;font-weight:900;color:#1a6b1a;margin-bottom:16px;letter-spacing:1px;">🛒 購物優惠</div>
+  <div id="shopLoadingMsg" style="text-align:center;padding:50px 20px;font-size:20px;color:#6B7280;">載入中…</div>
+  <div id="shopEmptyMsg" style="display:none;text-align:center;padding:50px 20px;">
+    <div style="font-size:52px;margin-bottom:14px;">🙏</div>
+    <div style="font-size:22px;font-weight:700;color:#555;">暫時未有內容，敬請期待 🙏</div>
+  </div>
+  <div id="shopCards" style="display:flex;flex-direction:column;gap:16px;"></div>
 </div>
 
 <!-- ── Tab 面板：消息 ── -->
-<div id="tabNews" class="coming-soon-panel">
-  <div class="coming-icon">📢</div>
-  <div class="coming-text">🚧 即將推出，敬請期待 🙏</div>
+<div id="tabNews" style="display:none;padding:18px 16px 90px;">
+  <div style="font-size:26px;font-weight:900;color:#1a6b1a;margin-bottom:16px;letter-spacing:1px;">📢 最新消息</div>
+  <div id="newsLoadingMsg" style="text-align:center;padding:50px 20px;font-size:20px;color:#6B7280;">載入中…</div>
+  <div id="newsEmptyMsg" style="display:none;text-align:center;padding:50px 20px;">
+    <div style="font-size:52px;margin-bottom:14px;">🙏</div>
+    <div style="font-size:22px;font-weight:700;color:#555;">暫時未有消息 🙏</div>
+  </div>
+  <div id="newsCards" style="display:flex;flex-direction:column;gap:16px;"></div>
 </div>
 
 <!-- ── Tab 面板：我的卡（預設顯示）── -->
@@ -7209,9 +7759,71 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 </div>
 
 <!-- ── Tab 面板：心聲 ── -->
-<div id="tabVoice" class="coming-soon-panel">
-  <div class="coming-icon">💬</div>
-  <div class="coming-text">🚧 即將推出，敬請期待 🙏</div>
+<div id="tabVoice" style="display:none;padding:18px 16px 90px;">
+  <!-- 未登入提示 -->
+  <div id="voiceNoLogin" style="display:none;text-align:center;padding:60px 20px;">
+    <div style="font-size:52px;margin-bottom:16px;">🔐</div>
+    <div style="font-size:22px;font-weight:700;color:#333;margin-bottom:14px;line-height:1.5;">請先登入 / 註冊會員<br>才可以使用心聲功能</div>
+    <button onclick="switchTab('card')" style="min-height:55px;padding:14px 28px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:20px;font-weight:700;cursor:pointer;">
+      💳 前往登入 / 查閱我的卡
+    </button>
+  </div>
+
+  <!-- 已登入：列表頁 -->
+  <div id="voiceListView" style="display:none;">
+    <div style="font-size:26px;font-weight:900;color:#1a6b1a;margin-bottom:16px;letter-spacing:1px;">💬 我的心聲</div>
+    <button onclick="openNewFeedbackForm()" style="display:block;width:100%;min-height:55px;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:20px;font-weight:900;cursor:pointer;margin-bottom:20px;letter-spacing:1px;">
+      ＋ 我要留言 / 提意見
+    </button>
+    <div id="voiceThreads" style="display:flex;flex-direction:column;gap:14px;">
+      <div style="text-align:center;padding:30px;font-size:20px;color:#888;">載入中…</div>
+    </div>
+  </div>
+
+  <!-- 新增意見表單 (hidden) -->
+  <div id="voiceNewForm" style="display:none;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+      <button onclick="closeNewFeedbackForm()" style="background:none;border:none;font-size:28px;cursor:pointer;color:#228B22;padding:0;line-height:1;">&#8592;</button>
+      <div style="font-size:24px;font-weight:900;color:#1a6b1a;">提交意見</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div>
+        <label style="font-size:20px;font-weight:700;color:#222;display:block;margin-bottom:8px;">主題 *</label>
+        <input id="vSubject" type="text" maxlength="80" placeholder="簡短描述你的意見主題"
+          style="width:100%;padding:14px;font-size:20px;border:2.5px solid #388e3c;border-radius:10px;font-family:inherit;min-height:55px;">
+      </div>
+      <div>
+        <label style="font-size:20px;font-weight:700;color:#222;display:block;margin-bottom:8px;">內容 *</label>
+        <textarea id="vContent" rows="5" placeholder="詳細說明你的意見或建議…"
+          style="width:100%;padding:14px;font-size:20px;border:2.5px solid #388e3c;border-radius:10px;font-family:inherit;resize:vertical;line-height:1.6;"></textarea>
+      </div>
+      <button onclick="submitNewFeedback()" id="vSubmitBtn"
+        style="width:100%;min-height:58px;padding:16px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:22px;font-weight:900;cursor:pointer;letter-spacing:1px;">
+        📤 提交意見
+      </button>
+    </div>
+  </div>
+
+  <!-- Thread 詳情頁 (hidden) -->
+  <div id="voiceThreadDetail" style="display:none;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <button onclick="closeVoiceThread()" style="background:none;border:none;font-size:28px;cursor:pointer;color:#228B22;padding:0;line-height:1;">&#8592;</button>
+      <div id="voiceDetailSubject" style="font-size:22px;font-weight:900;color:#1a6b1a;flex:1;"></div>
+    </div>
+    <div id="voiceMsgList" style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;"></div>
+    <div id="voiceReplyBox" style="background:#fff;border:2px solid #388e3c;border-radius:10px;padding:16px;">
+      <label style="font-size:20px;font-weight:700;color:#222;display:block;margin-bottom:8px;">繼續回覆</label>
+      <textarea id="vReplyText" rows="3" placeholder="輸入你的回覆…"
+        style="width:100%;padding:12px;font-size:20px;border:1.5px solid #ddd;border-radius:8px;font-family:inherit;resize:vertical;line-height:1.6;margin-bottom:10px;"></textarea>
+      <button onclick="submitVoiceReply()" id="vReplyBtn"
+        style="width:100%;min-height:55px;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:20px;font-weight:900;cursor:pointer;">
+        📤 發送
+      </button>
+    </div>
+    <div id="voiceClosedNote" style="display:none;text-align:center;padding:14px;font-size:18px;color:#888;background:#f5f5f5;border-radius:8px;margin-top:10px;">
+      🔒 此對話已關閉，如有需要請新開意見
+    </div>
+  </div>
 </div>
 
 <!-- ── Tab 面板：工作 ── -->
@@ -7269,9 +7881,10 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
     <span class="tab-icon">💳</span>
     <span class="tab-label">我的卡</span>
   </button>
-  <button class="tab-btn" id="tabBtnVoice" onclick="switchTab('voice')">
+  <button class="tab-btn" id="tabBtnVoice" onclick="switchTab('voice')" style="position:relative;">
     <span class="tab-icon">💬</span>
     <span class="tab-label">心聲</span>
+    <span id="voiceRedDot" style="display:none;position:absolute;top:8px;right:14px;width:10px;height:10px;background:#e53935;border-radius:50%;border:2px solid #fff;"></span>
   </button>
   <button class="tab-btn" id="tabBtnWork" onclick="switchTab('work')">
     <span class="tab-icon">💼</span>
@@ -7520,6 +8133,8 @@ function switchUser() {
         }
       })
       .catch(function() { /* ignore refresh error */ });
+    // 頁面載入時檢查心聲紅點
+    setTimeout(function() { loadVoiceRedDot(); }, 500);
   }
 })();
 
@@ -7585,11 +8200,234 @@ function escHtml(s){
 var _jobsLoaded = false;
 var _currentJobId = null;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── 購物 / 消息 内容 ──────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+var _shopLoaded = false;
+var _newsLoaded = false;
+
+function loadAppContents(section) {
+  var prefix = section === 'shopping' ? 'shop' : 'news';
+  var loadingEl = document.getElementById(prefix + 'LoadingMsg');
+  var emptyEl   = document.getElementById(prefix + 'EmptyMsg');
+  var cardsEl   = document.getElementById(prefix + 'Cards');
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (emptyEl)   emptyEl.style.display   = 'none';
+  if (cardsEl)   cardsEl.innerHTML       = '';
+  fetch('/api/contents?section=' + section)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (loadingEl) loadingEl.style.display = 'none';
+      var items = (d.ok && d.items) ? d.items : [];
+      if (!items.length) {
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+      }
+      if (cardsEl) {
+        cardsEl.innerHTML = items.map(function(item) {
+          var dt = item.updated_at ? item.updated_at.slice(0,10) : '';
+          return '<div style="background:#fff;border-radius:14px;padding:22px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.08);border-left:5px solid #228B22;">' +
+            '<div style="font-size:24px;font-weight:900;color:#1a6b1a;margin-bottom:10px;line-height:1.3;">' + escAppHtml(item.title) + '</div>' +
+            (item.address ? '<div style="font-size:20px;color:#555;margin-bottom:10px;font-weight:600;">📍 地址：' + escAppHtml(item.address) + '</div>' : '') +
+            '<div style="font-size:20px;color:#333;white-space:pre-wrap;line-height:1.7;margin-bottom:' + (dt ? '12px' : '0') + ';">' + escAppHtml(item.body) + '</div>' +
+            (section === 'news' && dt ? '<div style="font-size:16px;color:#aaa;margin-top:8px;">📅 ' + dt + '</div>' : '') +
+          '</div>';
+        }).join('');
+      }
+    })
+    .catch(function() {
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (emptyEl) { emptyEl.style.display = 'block'; }
+    });
+}
+
+function escAppHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── 心聲 (Voice / Feedback) ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+var _voiceMemberNo = null;
+var _voiceCurrentThreadId = null;
+var _voiceCurrentThreadStatus = null;
+
+function initVoiceTab() {
+  _voiceMemberNo = localStorage.getItem('ce85_member_no');
+  if (!_voiceMemberNo) {
+    document.getElementById('voiceNoLogin').style.display = 'block';
+    document.getElementById('voiceListView').style.display = 'none';
+    document.getElementById('voiceNewForm').style.display = 'none';
+    document.getElementById('voiceThreadDetail').style.display = 'none';
+    return;
+  }
+  document.getElementById('voiceNoLogin').style.display = 'none';
+  showVoiceList();
+}
+
+function showVoiceList() {
+  document.getElementById('voiceListView').style.display = 'block';
+  document.getElementById('voiceNewForm').style.display = 'none';
+  document.getElementById('voiceThreadDetail').style.display = 'none';
+  loadVoiceThreads();
+}
+
+function loadVoiceThreads() {
+  if (!_voiceMemberNo) return;
+  var container = document.getElementById('voiceThreads');
+  container.innerHTML = '<div style="text-align:center;padding:30px;font-size:20px;color:#888;">載入中…</div>';
+  fetch('/api/feedback?m=' + encodeURIComponent(_voiceMemberNo))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var threads = (d.ok && d.threads) ? d.threads : [];
+      // update red dot on tab
+      var hasUnread = threads.some(function(t) { return t.has_unread_for_member; });
+      var dot = document.getElementById('voiceRedDot');
+      if (dot) dot.style.display = hasUnread ? 'block' : 'none';
+      if (!threads.length) {
+        container.innerHTML = '<div style="text-align:center;padding:40px 20px;font-size:20px;color:#888;">暫無意見記錄，歡迎提交你的心聲！</div>';
+        return;
+      }
+      container.innerHTML = threads.map(function(t) {
+        var statusColor = t.status === 'replied' ? '#1565C0' : t.status === 'closed' ? '#888' : '#228B22';
+        var statusLabel = t.status === 'replied' ? '✅ 已回覆' : t.status === 'closed' ? '🔒 已關閉' : '⏳ 等待回覆';
+        var unreadBadge = t.has_unread_for_member ? '<span style="background:#e53935;color:#fff;border-radius:20px;font-size:14px;font-weight:700;padding:2px 9px;margin-left:8px;">新回覆</span>' : '';
+        var dt = t.updated_at ? t.updated_at.slice(0,16).replace('T',' ') : '';
+        return '<div onclick="openVoiceThread(' + t.id + ')" style="background:#fff;border-radius:14px;padding:18px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.08);cursor:pointer;border-left:5px solid ' + statusColor + ';">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">' +
+            '<div style="font-size:20px;font-weight:700;color:#111;flex:1;">' + escAppHtml(t.subject) + unreadBadge + '</div>' +
+            '<span style="font-size:16px;font-weight:700;color:' + statusColor + ';">' + statusLabel + '</span>' +
+          '</div>' +
+          '<div style="font-size:16px;color:#888;margin-top:6px;">📅 ' + dt + '</div>' +
+        '</div>';
+      }).join('');
+    })
+    .catch(function() {
+      container.innerHTML = '<div style="text-align:center;padding:30px;font-size:20px;color:#e53935;">載入失敗，請重試</div>';
+    });
+}
+
+function openNewFeedbackForm() {
+  document.getElementById('voiceListView').style.display = 'none';
+  document.getElementById('voiceNewForm').style.display = 'block';
+  document.getElementById('vSubject').value = '';
+  document.getElementById('vContent').value = '';
+}
+
+function closeNewFeedbackForm() {
+  document.getElementById('voiceNewForm').style.display = 'none';
+  document.getElementById('voiceListView').style.display = 'block';
+}
+
+function submitNewFeedback() {
+  var subject = document.getElementById('vSubject').value.trim();
+  var content = document.getElementById('vContent').value.trim();
+  if (!subject) { alert('請填寫主題'); return; }
+  if (!content) { alert('請填寫內容'); return; }
+  if (!_voiceMemberNo) { alert('請先登入'); return; }
+  var btn = document.getElementById('vSubmitBtn');
+  btn.disabled = true; btn.textContent = '提交中…';
+  fetch('/api/feedback', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ member_no: _voiceMemberNo, subject: subject, content: content })
+  }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false; btn.textContent = '📤 提交意見';
+      if (d.ok) {
+        closeNewFeedbackForm();
+        loadVoiceThreads();
+      } else { alert('提交失敗：' + (d.error || '請稍後再試')); }
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = '📤 提交意見'; alert('網絡錯誤，請稍後再試'); });
+}
+
+function openVoiceThread(threadId) {
+  _voiceCurrentThreadId = threadId;
+  document.getElementById('voiceListView').style.display = 'none';
+  document.getElementById('voiceThreadDetail').style.display = 'block';
+  document.getElementById('voiceMsgList').innerHTML = '<div style="text-align:center;padding:30px;font-size:20px;color:#888;">載入中…</div>';
+  fetch('/api/feedback/' + threadId + '?m=' + encodeURIComponent(_voiceMemberNo))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) {
+        document.getElementById('voiceMsgList').innerHTML = '<div style="color:#e53935;padding:20px;font-size:18px;">載入失敗</div>';
+        return;
+      }
+      _voiceCurrentThreadStatus = d.thread ? d.thread.status : 'new';
+      document.getElementById('voiceDetailSubject').textContent = d.thread ? d.thread.subject : '';
+      var msgs = d.messages || [];
+      document.getElementById('voiceMsgList').innerHTML = msgs.length ? msgs.map(function(msg) {
+        var isMember = msg.sender === 'member';
+        var dt = msg.created_at ? msg.created_at.slice(0,16).replace('T',' ') : '';
+        return '<div style="display:flex;flex-direction:column;align-items:' + (isMember ? 'flex-end' : 'flex-start') + ';gap:4px;">' +
+          '<div style="max-width:88%;background:' + (isMember ? '#e8f5e9' : '#e3f2fd') + ';border-radius:12px;padding:14px 16px;">' +
+            '<div style="font-size:16px;font-weight:700;color:' + (isMember ? '#1B5E20' : '#1565C0') + ';margin-bottom:6px;">' + (isMember ? '👤 我' : '🔧 管理員') + ' · ' + dt + '</div>' +
+            '<div style="font-size:20px;color:#222;white-space:pre-wrap;line-height:1.6;">' + escAppHtml(msg.content) + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') : '<div style="text-align:center;padding:20px;font-size:18px;color:#888;">暫無訊息</div>';
+      // update red dot since we just read it
+      loadVoiceRedDot();
+      // show/hide reply box
+      var closed = _voiceCurrentThreadStatus === 'closed';
+      document.getElementById('voiceReplyBox').style.display = closed ? 'none' : 'block';
+      document.getElementById('voiceClosedNote').style.display = closed ? 'block' : 'none';
+    })
+    .catch(function() {
+      document.getElementById('voiceMsgList').innerHTML = '<div style="color:#e53935;padding:20px;font-size:18px;">網絡錯誤，請稍後再試</div>';
+    });
+}
+
+function closeVoiceThread() {
+  _voiceCurrentThreadId = null;
+  _voiceCurrentThreadStatus = null;
+  document.getElementById('voiceThreadDetail').style.display = 'none';
+  document.getElementById('voiceReplyBox').style.display = 'block';
+  document.getElementById('voiceClosedNote').style.display = 'none';
+  document.getElementById('vReplyText').value = '';
+  showVoiceList();
+}
+
+function submitVoiceReply() {
+  var content = document.getElementById('vReplyText').value.trim();
+  if (!content) { alert('請輸入回覆內容'); return; }
+  if (!_voiceMemberNo || !_voiceCurrentThreadId) { alert('錯誤，請重試'); return; }
+  var btn = document.getElementById('vReplyBtn');
+  btn.disabled = true; btn.textContent = '發送中…';
+  fetch('/api/feedback/' + _voiceCurrentThreadId + '/reply', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ member_no: _voiceMemberNo, content: content })
+  }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false; btn.textContent = '📤 發送';
+      if (d.ok) {
+        document.getElementById('vReplyText').value = '';
+        openVoiceThread(_voiceCurrentThreadId);
+      } else { alert('發送失敗：' + (d.error || '請稍後再試')); }
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = '📤 發送'; alert('網絡錯誤'); });
+}
+
+function loadVoiceRedDot() {
+  if (!_voiceMemberNo) return;
+  fetch('/api/feedback?m=' + encodeURIComponent(_voiceMemberNo))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var threads = (d.ok && d.threads) ? d.threads : [];
+      var hasUnread = threads.some(function(t) { return t.has_unread_for_member; });
+      var dot = document.getElementById('voiceRedDot');
+      if (dot) dot.style.display = hasUnread ? 'block' : 'none';
+    }).catch(function() {});
+}
+
 // switchTab 切到 work 時自動載入
 var _origSwitchTab = switchTab;
 switchTab = function(name) {
   _origSwitchTab(name);
   if (name === 'work' && !_jobsLoaded) { loadJobList(); }
+  if (name === 'shop') { loadAppContents('shopping'); }
+  if (name === 'news') { loadAppContents('news'); }
+  if (name === 'voice') { initVoiceTab(); }
 };
 
 function loadJobList() {
