@@ -8134,6 +8134,83 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div id="cwPayrollTotals" style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px"></div>
     <div id="cwPayrollBox">\u8acb\u5148\u9078\u64c7\u5834\u6b21</div>
   </div>
+
+  <!-- ── 開卡 Modal ───────────────────────────────────────────────── -->
+  <div id="cwRegModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:14px;max-width:520px;width:92%;max-height:90vh;overflow-y:auto;padding:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0">&#xFF0B; \u958b\u5361\uff08\u65b0\u589e CoWorkery\uff09</h3>
+        <button class="btn btn-sm" onclick="cwCloseRegister()" style="line-height:1">&#x2715;</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="grid-column:1/3">
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u6703\u54e1\u7de8\u865f <span style="color:#dc2626">*</span></label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input id="regMemberNo" placeholder="\u8001\u6709\u5361\u6703\u54e1\u7de8\u865f" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+            <button class="btn btn-sm btn-secondary" onclick="cwCheckMember()">\u67e5\u6703\u54e1</button>
+          </div>
+          <span id="regMemberHint" style="font-size:13px;margin-top:4px;display:block"></span>
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u4e2d\u6587\u59d3\u540d <span style="color:#dc2626">*</span></label>
+          <input id="regNameZh" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u82f1\u6587\u59d3\u540d</label>
+          <input id="regNameEn" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u96fb\u8a71 <span style="color:#dc2626">*</span></label>
+          <input id="regPhone" inputmode="numeric" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u6027\u5225</label>
+          <select id="regGender" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+            <option value="">\u2014</option><option value="M">\u7537</option><option value="F">\u5973</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u5730\u5340</label>
+          <input id="regDistrict" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">HKID \u982d 4 \u4f4d</label>
+          <input id="regHkid" maxlength="4" placeholder="\u4f8b\u5982 A123" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div style="grid-column:1/3">
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u5730\u5740</label>
+          <input id="regAddress" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u9280\u884c\u540d\u7a31</label>
+          <input id="regBankName" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u6236\u540d</label>
+          <input id="regBankAcctName" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u9280\u884c\u8cec\u865f</label>
+          <input id="regBankAcctNo" inputmode="numeric" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u9810\u8a2d\u6642\u85aa\uff08\u5143/\u5c0f\u6642\uff09</label>
+          <input id="regRate" inputmode="decimal" placeholder="0" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div style="grid-column:1/3">
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u8eab\u4efd\u8b49\u6b63\u672c\uff08\u5716\u7247\uff0c\u53ef\u9078\uff09</label>
+          <input type="file" accept="image/*" id="regIdFront" onchange="cwPreviewId()" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:13px">
+          <img id="regIdPreview" style="max-width:100%;margin-top:8px;border-radius:8px;display:none" alt="\u8eab\u4efd\u8b49\u9810\u89bd">
+          <div style="font-size:12px;color:#6b7280;margin-top:4px">\u4e0a\u50b3\u5f8c\u53ea\u6709\u5f8c\u53f0\u53ef\u8b80\uff0c\u524d\u7aef\u906e\u853d\uff08PDPO \u5408\u898f\uff09</div>
+        </div>
+      </div>
+      <div id="regMsg" style="margin-top:12px;font-size:14px;min-height:20px"></div>
+      <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="cwCloseRegister()">\u53d6\u6d88</button>
+        <button class="btn btn-primary" id="regSubmitBtn" onclick="cwSubmitRegister()">\u78ba\u8a8d\u958b\u5361</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -8895,17 +8972,111 @@ async function cwLoadApproval(){
   document.getElementById('cwApprovalBox').innerHTML=d.ok?cwBuildTable(d.list,true):'\u8f09\u5165\u5931\u6557';
 }
 
+// ── 開卡 Modal 控制 ─────────────────────────────────────────────────────────
 function cwOpenRegister(){
-  var mn=prompt('\u6703\u54e1\u7de8\u865f(member_no):');if(!mn)return;
-  var nz=prompt('\u4e2d\u6587\u59d3\u540d:');if(!nz)return;
-  var ph=prompt('\u96fb\u8a71:');if(!ph)return;
-  var rt=prompt('\u9810\u8a2d\u6642\u85aa(\u5143/\u5c0f\u6642,\u53ef\u7a7a):','0')||'0';
-  var fd=new FormData();
-  fd.append('member_no',mn);fd.append('name_zh',nz);fd.append('phone',ph);
-  fd.append('default_hourly_rate',String(Math.round(parseFloat(rt)*100)||0));
-  fetch(CW_API+'/register',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(d){
-    if(d.ok){alert('\u958b\u5361\u6210\u529f\uff1a'+d.cw_no);cwLoadList();}else alert('\u5931\u6557\uff1a'+d.error);
+  // 清空所有欄位
+  ['regMemberNo','regNameZh','regNameEn','regPhone','regDistrict','regHkid',
+   'regAddress','regBankName','regBankAcctName','regBankAcctNo','regRate'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.value='';
   });
+  document.getElementById('regGender').value='';
+  document.getElementById('regIdFront').value='';
+  document.getElementById('regIdPreview').style.display='none';
+  document.getElementById('regMemberHint').textContent='';
+  document.getElementById('regMsg').textContent='';
+  document.getElementById('regSubmitBtn').disabled=false;
+  document.getElementById('cwRegModal').style.display='flex';
+}
+function cwCloseRegister(){ document.getElementById('cwRegModal').style.display='none'; }
+
+// 查會員（防重複開卡提示）
+async function cwCheckMember(){
+  var no=document.getElementById('regMemberNo').value.trim();
+  var hint=document.getElementById('regMemberHint');
+  if(!no){ hint.textContent=''; return; }
+  hint.style.color='#6b7280'; hint.textContent='\u67e5\u8a62\u4e2d\u2026';
+  try{
+    var d=await cwGet(CW_API+'/list?q='+encodeURIComponent(no));
+    var existed=(d.list||[]).find(function(x){ return x.member_no===no; });
+    if(existed){
+      hint.style.color='#dc2626';
+      hint.textContent='\u26a0 \u6b64\u6703\u54e1\u5df2\u6709 '+existed.cw_no;
+    }else{
+      hint.style.color='#16a34a';
+      hint.textContent='\u2713 \u672a\u958b\u904e\u5361\uff0c\u53ef\u7e7c\u7e8c\uff08\u63d0\u4ea4\u6642\u7cfb\u7d71\u6703\u518d\u9a57\u8b49\u6703\u54e1\u8cc7\u683c\uff09';
+    }
+  }catch(e){ hint.style.color='#dc2626'; hint.textContent='\u67e5\u8a62\u5931\u6557'; }
+}
+
+// 身份證預覽
+function cwPreviewId(){
+  var f=document.getElementById('regIdFront').files[0];
+  var img=document.getElementById('regIdPreview');
+  if(!f){ img.style.display='none'; return; }
+  img.src=URL.createObjectURL(f); img.style.display='block';
+}
+
+// 前端壓縮（≤1280px JPEG 0.8，與長者端同邏輯）
+async function cwCompressImg(file){
+  if(!file) return null;
+  return new Promise(function(res){
+    var img=new Image();
+    img.onload=function(){
+      var max=1280,w=img.width,h=img.height;
+      if(w>max||h>max){ var r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); }
+      var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      cv.toBlob(function(b){ res(b||file); },'image/jpeg',0.8);
+    };
+    img.onerror=function(){ res(file); };
+    img.src=URL.createObjectURL(file);
+  });
+}
+
+// 提交開卡（multipart/form-data，含身份證圖）
+async function cwSubmitRegister(){
+  var memberNo=document.getElementById('regMemberNo').value.trim();
+  var nameZh=document.getElementById('regNameZh').value.trim();
+  var phone=document.getElementById('regPhone').value.trim();
+  var msg=document.getElementById('regMsg');
+  if(!memberNo||!nameZh||!phone){
+    msg.style.color='#dc2626'; msg.textContent='\u8acb\u586b\u5beb\u6703\u54e1\u7de8\u865f\u3001\u4e2d\u6587\u59d3\u540d\u3001\u96fb\u8a71'; return;
+  }
+  var btn=document.getElementById('regSubmitBtn');
+  btn.disabled=true; msg.style.color='#6b7280'; msg.textContent='\u8655\u7406\u4e2d\u2026';
+  try{
+    var fd=new FormData();
+    fd.append('member_no',memberNo);
+    fd.append('name_zh',nameZh);
+    fd.append('name_en',document.getElementById('regNameEn').value.trim());
+    fd.append('phone',phone);
+    fd.append('gender',document.getElementById('regGender').value);
+    fd.append('district',document.getElementById('regDistrict').value.trim());
+    fd.append('hkid_prefix',document.getElementById('regHkid').value.trim());
+    fd.append('address',document.getElementById('regAddress').value.trim());
+    fd.append('bank_name',document.getElementById('regBankName').value.trim());
+    fd.append('bank_account_name',document.getElementById('regBankAcctName').value.trim());
+    fd.append('bank_account_no',document.getElementById('regBankAcctNo').value.trim());
+    var rate=parseFloat(document.getElementById('regRate').value)||0;
+    fd.append('default_hourly_rate',String(Math.round(rate*100)));
+    var idFile=document.getElementById('regIdFront').files[0];
+    if(idFile){
+      var compressed=await cwCompressImg(idFile);
+      if(compressed) fd.append('id_front',compressed,'id_front.jpg');
+    }
+    var r=await fetch(CW_API+'/register',{method:'POST',body:fd});
+    var d=await r.json();
+    if(d.ok){
+      msg.style.color='#16a34a'; msg.textContent='\u2705 \u958b\u5361\u6210\u529f\uff1a'+d.cw_no;
+      setTimeout(function(){ cwCloseRegister(); cwLoadList(); },1200);
+    }else{
+      msg.style.color='#dc2626'; msg.textContent='\u274c '+(d.error||'\u958b\u5361\u5931\u6557');
+      btn.disabled=false;
+    }
+  }catch(e){
+    msg.style.color='#dc2626'; msg.textContent='\u274c \u7db2\u7d61\u932f\u8aa4\uff1a'+e;
+    btn.disabled=false;
+  }
 }
 
 var _cwSessions=[];
