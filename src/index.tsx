@@ -9397,15 +9397,20 @@ function coworkeryAppHtml(): string {
 <body>
 <div class="wrap">
 
-  <!-- 返回掣 -->
-  <a href="/app" class="back-bar">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-    返回主頁
-  </a>
+  <!-- 頂部導航列 -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <a href="/app" class="back-bar" style="margin-bottom:0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      返回主頁
+    </a>
+    <button onclick="cwSwitchAccount()" style="background:none;border:1px solid #d1d5db;border-radius:20px;padding:6px 14px;font-size:14px;color:#6b7280;cursor:pointer;font-family:inherit">
+      🔄 切換帳號
+    </button>
+  </div>
 
   <div class="card">
     <h1>👷 CoWorkery 打卡</h1>
-    <div class="sub">老有聯盟85 · 工作打卡系統</div>
+    <div class="sub" id="cwCurrentUser" style="margin-top:4px">老有聯盟85 · 工作打卡系統</div>
   </div>
 
   <!-- 分頁切換 -->
@@ -9841,27 +9846,42 @@ async function refreshShifts(){
 
 function cwLogout(){
   sessionStorage.removeItem('cw_session')
-  // 重置 CW 物件
   CW={cw_no:'',phone:'',name:''}
-  // 清除 _apMember 緩存，避免舊會員資料被保留
   _apMember=null
-  // 清空 CW 登入欄位（讓用戶輸入新帳號，不自動填入）
   var cwNoEl=document.getElementById('cwNo')
   var cwPhoneEl=document.getElementById('cwPhone')
   if(cwNoEl)cwNoEl.value=''
   if(cwPhoneEl)cwPhoneEl.value=''
-  // 隱藏登入訊息
   hideMsg('loginMsg')
   hideMsg('clockMsg')
-  // 還原 UI：隱藏主區，顯示登入卡
   document.getElementById('mainCard').classList.add('hide')
   document.getElementById('loginCard').classList.remove('hide')
-  // 回到打卡登入 tab，不自動填入 CW 資料
   cwSwitchTab('login')
+  // 清除 auto-fill 狀態，重新查詢（因為打卡登出不代表換帳號）
+  cwAutoFillApply()
 }
 
-// ── 自動復原 sessionStorage ──
+// 切換會員帳號：清除所有 session 後跳回 /app 讓用戶重新登入
+function cwSwitchAccount(){
+  if(!confirm('確定要切換帳號？\n將會清除目前的會員登入紀錄。'))return
+  // 清除 CoWorkery session
+  sessionStorage.removeItem('cw_session')
+  // 清除 PWA App 的 member localStorage（讓 /app 頁面顯示電話輸入框）
+  localStorage.removeItem('ce85_member_no')
+  localStorage.removeItem('ce85_wa_clicked')
+  // 跳回 /app 重新登入
+  window.location.href='/app'
+}
+
+// ── 自動復原 sessionStorage + 顯示當前會員帳號 ──
 (function(){
+  // 顯示當前 /app 登入的會員號碼在副標題
+  var memberNo=localStorage.getItem('ce85_member_no')||''
+  var subEl=document.getElementById('cwCurrentUser')
+  if(subEl&&memberNo){
+    subEl.textContent='老有聯盟85 · 會員：'+memberNo
+  }
+
   var saved=sessionStorage.getItem('cw_session')
   if(saved){
     try{
