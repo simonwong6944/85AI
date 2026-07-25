@@ -2163,6 +2163,448 @@ app.get('/api/admin/coworkery/export/csv', async (c) => {
   }
 })
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CoWorkery 打卡（半公開，內建 phone+cw_no 自足驗證）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 自足驗證：核對 cw_no + phone 相符且狀態 ACTIVE。
+ * 回傳 co_workery 該筆，或 null。
+ */
+async function verifyCw(db: D1Database, cw_no: string, phone: string) {
+  if (!cw_no || !phone) return null
+  const row = await db
+    .prepare('SELECT cw_no, member_no, name_zh, status FROM co_workery WHERE cw_no = ? AND phone = ?')
+    .bind(cw_no, phone)
+    .first<{ cw_no: string; member_no: string; name_zh: string; status: string }>()
+  if (!row || row.status !== 'ACTIVE') return null
+  return row
+}
+
+// ── 3B-1. 上班打卡 ──────────────────────────────────────────────────────────
+app.post('/api/coworkery/clock-in', async (c) => {
+  try {
+    const form = await c.req.formData()
+    const get = (k: string) => { const v = form.get(k); return v === null ? '' : String(v).trim() }
+
+    const cw_no         = get('cw_no')
+    const phone         = get('phone')
+    const roadshow_code = get('roadshow_code')   // 對應 roadshows.code
+    const lat           = parseFloat(get('lat'))
+    const lng           = parseFloat(get('lng'))
+
+    const cw = await verifyCw(c.env.DB, cw_no, phone)
+    if (!cw) return c.json({ ok: false, error: '\u8eab\u4efd\u9a57\u8b49\u5931\u6557\uff0c\u8acb\u78ba\u8a8d CW \u7de8\u865f\u8207\u96fb\u8a71' }, 401)
+    if (!roadshow_code) return c.json({ ok: false, error: '\u7f3a\u5c11\u5834\u6b21' }, 400)
+    if (isNaN(lat) || isNaN(lng)) return c.json({ ok: false, error: '\u672a\u80fd\u53d6\u5f97\u5b9a\u4f4d\uff0c\u8acb\u958b\u555f\u5b9a\u4f4d\u6b0a\u9650' }, 400)
+
+    // 必須已被派更到此場次
+    const assign = await c.env.DB
+      .prepare('SELECT cw_no FROM session_assignments WHERE roadshow_code = ? AND cw_no = ?')
+      .bind(roadshow_code, cw_no).first()
+    if (!assign) return c.json({ ok: false, error: '\u4f60\u672a\u88ab\u6d3e\u66f4\u81f3\u6b64\u5834\u6b21\uff0c\u7121\u6cd5\u6253\u5361' }, 403)
+
+    // 硬性 geofence（roadshow_geo.roadshow_code = roadshows.code）
+    const geo = await c.env.DB
+      .prepare('SELECT latitude, longitude, geofence_radius FROM roadshow_geo WHERE roadshow_code = ?')
+      .bind(roadshow_code)
+      .first<{ latitude: number; longitude: number; geofence_radius: number }>()
+    if (!geo || geo.latitude == null || geo.longitude == null) {
+      return c.json({ ok: false, error: '\u6b64\u5834\u6b21\u672a\u8a2d\u5b9a\u5ea7\u6a19\uff0c\u8acb\u806f\u7d61\u7ba1\u7406\u54e1' }, 400)
+    }
+    const dist   = haversineMeters(lat, lng, geo.latitude, geo.longitude)
+    const radius = geo.geofence_radius || 250
+    if (dist > radius) {
+      return c.json({ ok: false, error: `\u4f60\u8ddd\u96e2\u5834\u5730\u7d04 ${dist} \u7c73\uff0c\u8d85\u51fa ${radius} \u7c73\u7bc4\u570d\uff0c\u7121\u6cd5\u6253\u5361`, dist }, 403)
+    }
+
+    // 防重複打卡
+    const exist = await c.env.DB
+      .prepare('SELECT clock_in_at FROM attendance_records WHERE roadshow_code = ? AND cw_no = ?')
+      .bind(roadshow_code, cw_no)
+      .first<{ clock_in_at: string }>()
+    if (exist && exist.clock_in_at) {
+      return c.json({ ok: false, error: '\u4f60\u5df2\u65bc\u6b64\u5834\u6b21\u6253\u5361\u4e0a\u73ed' }, 409)
+    }
+
+    // 自拍（可選；R2 無綁定時 graceful skip）
+    let selfieKey: string | null = null
+    const selfie = form.get('selfie')
+    if (selfie && selfie instanceof File && selfie.size > 0 && c.env.FILES) {
+      selfieKey = `attendance/${roadshow_code}_${cw_no}_in.jpg`
+      await c.env.FILES.put(selfieKey, await selfie.arrayBuffer(), {
+        httpMetadata: { contentType: selfie.type || 'image/jpeg' },
+      })
+    }
+
+    await c.env.DB.prepare(`
+      INSERT INTO attendance_records
+        (roadshow_code, cw_no, clock_in_at, clock_in_lat, clock_in_lng, clock_in_dist, clock_in_selfie)
+      VALUES (?, ?, datetime('now'), ?, ?, ?, ?)
+      ON CONFLICT(roadshow_code, cw_no) DO UPDATE SET
+        clock_in_at     = datetime('now'),
+        clock_in_lat    = excluded.clock_in_lat,
+        clock_in_lng    = excluded.clock_in_lng,
+        clock_in_dist   = excluded.clock_in_dist,
+        clock_in_selfie = excluded.clock_in_selfie,
+        updated_at      = datetime('now')
+    `).bind(roadshow_code, cw_no, lat, lng, dist, selfieKey).run()
+
+    return c.json({ ok: true, dist, name: cw.name_zh })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3B-2. 下班打卡 ──────────────────────────────────────────────────────────
+app.post('/api/coworkery/clock-out', async (c) => {
+  try {
+    const form = await c.req.formData()
+    const get = (k: string) => { const v = form.get(k); return v === null ? '' : String(v).trim() }
+
+    const cw_no         = get('cw_no')
+    const phone         = get('phone')
+    const roadshow_code = get('roadshow_code')
+    const lat           = parseFloat(get('lat'))
+    const lng           = parseFloat(get('lng'))
+
+    const cw = await verifyCw(c.env.DB, cw_no, phone)
+    if (!cw) return c.json({ ok: false, error: '\u8eab\u4efd\u9a57\u8b49\u5931\u6557' }, 401)
+    if (!roadshow_code) return c.json({ ok: false, error: '\u7f3a\u5c11\u5834\u6b21' }, 400)
+    if (isNaN(lat) || isNaN(lng)) return c.json({ ok: false, error: '\u672a\u80fd\u53d6\u5f97\u5b9a\u4f4d\uff0c\u8acb\u958b\u555f\u5b9a\u4f4d\u6b0a\u9650' }, 400)
+
+    const rec = await c.env.DB
+      .prepare('SELECT clock_in_at, clock_out_at FROM attendance_records WHERE roadshow_code = ? AND cw_no = ?')
+      .bind(roadshow_code, cw_no)
+      .first<{ clock_in_at: string; clock_out_at: string }>()
+    if (!rec || !rec.clock_in_at) return c.json({ ok: false, error: '\u4f60\u5c1a\u672a\u6253\u5361\u4e0a\u73ed' }, 400)
+    if (rec.clock_out_at)         return c.json({ ok: false, error: '\u4f60\u5df2\u6253\u5361\u4e0b\u73ed' }, 409)
+
+    // 硬性 geofence（下班亦需在範圍內）
+    const geo = await c.env.DB
+      .prepare('SELECT latitude, longitude, geofence_radius FROM roadshow_geo WHERE roadshow_code = ?')
+      .bind(roadshow_code)
+      .first<{ latitude: number; longitude: number; geofence_radius: number }>()
+    if (!geo || geo.latitude == null) return c.json({ ok: false, error: '\u5834\u6b21\u672a\u8a2d\u5ea7\u6a19' }, 400)
+    const dist   = haversineMeters(lat, lng, geo.latitude, geo.longitude)
+    const radius = geo.geofence_radius || 250
+    if (dist > radius) {
+      return c.json({ ok: false, error: `\u4f60\u8ddd\u96e2\u5834\u5730\u7d04 ${dist} \u7c73\uff0c\u8d85\u51fa\u7bc4\u570d\uff0c\u7121\u6cd5\u6253\u5361\u4e0b\u73ed`, dist }, 403)
+    }
+
+    // 計算工時（julianday 差轉分鐘，server 時鐘為準）
+    const diff = await c.env.DB
+      .prepare(`SELECT CAST((julianday('now') - julianday(clock_in_at)) * 24 * 60 AS INTEGER) AS mins
+                FROM attendance_records WHERE roadshow_code = ? AND cw_no = ?`)
+      .bind(roadshow_code, cw_no)
+      .first<{ mins: number }>()
+    const worked = Math.max(0, diff?.mins || 0)
+
+    // 每週 20 小時（1200 分）上限警示
+    const weekSum = await c.env.DB
+      .prepare(`SELECT COALESCE(SUM(worked_minutes),0) AS total
+                FROM attendance_records
+                WHERE cw_no = ? AND clock_in_at >= datetime('now','-7 days')`)
+      .bind(cw_no)
+      .first<{ total: number }>()
+    const weekTotal = (weekSum?.total || 0) + worked
+    const flag = weekTotal > 1200 ? 'OVER_WEEKLY' : null
+
+    // 下班自拍（可選；R2 無綁定時 skip）
+    let selfieKey: string | null = null
+    const selfie = form.get('selfie')
+    if (selfie && selfie instanceof File && selfie.size > 0 && c.env.FILES) {
+      selfieKey = `attendance/${roadshow_code}_${cw_no}_out.jpg`
+      await c.env.FILES.put(selfieKey, await selfie.arrayBuffer(), {
+        httpMetadata: { contentType: selfie.type || 'image/jpeg' },
+      })
+    }
+
+    await c.env.DB.prepare(`
+      UPDATE attendance_records
+      SET clock_out_at   = datetime('now'),
+          clock_out_lat  = ?, clock_out_lng = ?,
+          clock_out_dist = ?, worked_minutes = ?, flag = ?,
+          clock_out_selfie = COALESCE(?, clock_out_selfie),
+          updated_at     = datetime('now')
+      WHERE roadshow_code = ? AND cw_no = ?
+    `).bind(lat, lng, dist, worked, flag, selfieKey, roadshow_code, cw_no).run()
+
+    return c.json({ ok: true, worked_minutes: worked, flag })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CoWorkery 出糧（後台，受 /api/admin/* middleware 保護）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── 3B-3. 出糧計算（按場次結算，pay_due_date = 完場 +7 天）─────────────────
+app.post('/api/admin/coworkery/payroll/calculate', async (c) => {
+  try {
+    const b = await c.req.json<{ roadshow_code: string }>()
+    if (!b.roadshow_code) return c.json({ ok: false, error: '\u7f3a\u5c11 roadshow_code' }, 400)
+
+    // 場次資訊（roadshows.code = roadshow_code）
+    const sess = await c.env.DB.prepare(`
+      SELECT g.session_hourly_rate, g.transport_allowance, g.meal_allowance, g.brand_ref, r.end_date
+      FROM roadshows r
+      LEFT JOIN roadshow_geo g ON g.roadshow_code = r.code
+      WHERE r.code = ?
+    `).bind(b.roadshow_code).first<{
+      session_hourly_rate: number; transport_allowance: number
+      meal_allowance: number; brand_ref: string | null; end_date: string | null
+    }>()
+    if (!sess) return c.json({ ok: false, error: '\u627e\u4e0d\u5230\u5834\u6b21' }, 404)
+
+    // pay_due_date = end_date + 7 天（fallback: now + 7）
+    const dueDateExpr = sess.end_date
+      ? `date('${sess.end_date}','+7 days')`
+      : `date('now','+7 days')`
+
+    // 只計「已 clock-out」的派更人員 + 各自時薪
+    const { results } = await c.env.DB.prepare(`
+      SELECT a.cw_no, a.worked_minutes,
+             sg.assigned_hourly_rate, cw.default_hourly_rate
+      FROM attendance_records a
+      JOIN session_assignments sg ON sg.roadshow_code = a.roadshow_code AND sg.cw_no = a.cw_no
+      JOIN co_workery cw ON cw.cw_no = a.cw_no
+      WHERE a.roadshow_code = ? AND a.clock_out_at IS NOT NULL
+    `).bind(b.roadshow_code).all<{
+      cw_no: string; worked_minutes: number
+      assigned_hourly_rate: number; default_hourly_rate: number
+    }>()
+
+    let count = 0
+    for (const r of results) {
+      const rate      = resolveRate(r.assigned_hourly_rate, sess.session_hourly_rate, r.default_hourly_rate)
+      const wage      = Math.round((r.worked_minutes / 60) * rate)   // 分
+      const transport = sess.transport_allowance || 0                 // 分
+      const meal      = sess.meal_allowance || 0                      // 分
+      const total     = wage + transport + meal
+
+      await c.env.DB.prepare(`
+        INSERT INTO payroll_records
+          (roadshow_code, cw_no, total_minutes, hourly_rate, wage_amount,
+           transport_total, meal_total, total_payable, brand_ref, status, pay_due_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ${dueDateExpr})
+        ON CONFLICT(roadshow_code, cw_no) DO UPDATE SET
+          total_minutes   = excluded.total_minutes,
+          hourly_rate     = excluded.hourly_rate,
+          wage_amount     = excluded.wage_amount,
+          transport_total = excluded.transport_total,
+          meal_total      = excluded.meal_total,
+          total_payable   = excluded.total_payable,
+          brand_ref       = excluded.brand_ref,
+          pay_due_date    = excluded.pay_due_date,
+          updated_at      = datetime('now')
+      `).bind(
+        b.roadshow_code, r.cw_no, r.worked_minutes, rate, wage,
+        transport, meal, total, sess.brand_ref || null
+      ).run()
+      count++
+    }
+
+    return c.json({ ok: true, generated: count })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3B-4. 出糧單列表（支援 ?roadshow_code= ?status= ?export=csv）─────────
+app.get('/api/admin/coworkery/payroll', async (c) => {
+  try {
+    const code     = c.req.query('roadshow_code') || ''
+    const status   = c.req.query('status') || ''
+    const isExport = c.req.query('export') === 'csv'
+
+    let sql = `
+      SELECT p.roadshow_code, p.cw_no,
+             cw.name_zh, cw.bank_name, cw.bank_account_name, cw.bank_account_no,
+             p.total_minutes, p.hourly_rate, p.wage_amount,
+             p.transport_total, p.meal_total, p.total_payable,
+             p.brand_ref, p.status, p.pay_due_date, p.paid_at
+      FROM payroll_records p
+      JOIN co_workery cw ON cw.cw_no = p.cw_no
+      WHERE 1=1`
+    const binds: unknown[] = []
+    if (code)   { sql += ' AND p.roadshow_code = ?'; binds.push(code) }
+    if (status) { sql += ' AND p.status = ?';        binds.push(status) }
+    sql += ' ORDER BY p.roadshow_code DESC, p.cw_no ASC'
+
+    const { results } = await c.env.DB.prepare(sql).bind(...binds).all<Record<string, unknown>>()
+
+    if (isExport) {
+      const headers = [
+        '\u5834\u6b21', 'CW\u7de8\u865f', '\u59d3\u540d', '\u9280\u884c', '\u6236\u540d', '\u8cec\u865f',
+        '\u5de5\u6642(\u5206)', '\u6642\u85aa(\u5143)', '\u5de5\u8cc7(\u5143)',
+        '\u8eca\u99ac\u8cbb(\u5143)', '\u81b3\u98df(\u5143)', '\u7e3d\u61c9\u4ed8(\u5143)',
+        '\u54c1\u724c', '\u72c0\u614b', '\u51fa\u7cae\u9650\u671f', '\u5df2\u4ed8\u6642\u9593'
+      ]
+      const lines = [headers.map(csvCell).join(',')]
+      for (const r of results) {
+        lines.push([
+          csvCell(r.roadshow_code), csvCell(r.cw_no), csvCell(r.name_zh),
+          csvCell(r.bank_name), csvCell(r.bank_account_name), csvCell(r.bank_account_no),
+          csvCell(r.total_minutes),
+          csvCell(centsToStr(r.hourly_rate as number)),
+          csvCell(centsToStr(r.wage_amount as number)),
+          csvCell(centsToStr(r.transport_total as number)),
+          csvCell(centsToStr(r.meal_total as number)),
+          csvCell(centsToStr(r.total_payable as number)),
+          csvCell(r.brand_ref), csvCell(r.status),
+          csvCell(r.pay_due_date), csvCell(r.paid_at),
+        ].join(','))
+      }
+      const csv = '\uFEFF' + lines.join('\r\n')
+      return new Response(csv, {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="coworkery_payroll.csv"',
+        },
+      })
+    }
+
+    const totals = results.reduce(
+      (acc, r) => {
+        acc.total_payable += (r.total_payable as number) || 0
+        acc.total_minutes += (r.total_minutes as number) || 0
+        return acc
+      },
+      { total_payable: 0, total_minutes: 0, count: results.length }
+    )
+
+    return c.json({ ok: true, list: results, totals })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3B-5. 出糧審批 / 標記已付 ───────────────────────────────────────────────
+app.patch('/api/admin/coworkery/payroll', async (c) => {
+  try {
+    const b = await c.req.json<{
+      roadshow_code: string
+      cw_no: string
+      action: 'APPROVE' | 'PAID' | 'REVERT'
+    }>()
+    if (!b.roadshow_code || !b.cw_no || !b.action) {
+      return c.json({ ok: false, error: '\u7f3a\u5c11\u53c3\u6578' }, 400)
+    }
+
+    if (b.action === 'APPROVE') {
+      await c.env.DB.prepare(`
+        UPDATE payroll_records SET status='APPROVED', updated_at=datetime('now')
+        WHERE roadshow_code=? AND cw_no=? AND status='PENDING'
+      `).bind(b.roadshow_code, b.cw_no).run()
+
+    } else if (b.action === 'PAID') {
+      await c.env.DB.prepare(`
+        UPDATE payroll_records
+        SET status='PAID', paid_at=datetime('now'), paid_by='admin', updated_at=datetime('now')
+        WHERE roadshow_code=? AND cw_no=? AND status='APPROVED'
+      `).bind(b.roadshow_code, b.cw_no).run()
+
+    } else if (b.action === 'REVERT') {
+      await c.env.DB.prepare(`
+        UPDATE payroll_records
+        SET status='PENDING', paid_at=NULL, paid_by=NULL, updated_at=datetime('now')
+        WHERE roadshow_code=? AND cw_no=?
+      `).bind(b.roadshow_code, b.cw_no).run()
+    }
+
+    return c.json({ ok: true })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3B-6. 後台手動補打卡 ────────────────────────────────────────────────────
+// is_manual=1, 記錄 manual_by / manual_reason
+app.post('/api/admin/coworkery/manual-clock', async (c) => {
+  try {
+    const b = await c.req.json<{
+      roadshow_code: string; cw_no: string
+      clock_in_at?: string; clock_out_at?: string
+      reason?: string
+    }>()
+    if (!b.roadshow_code || !b.cw_no) {
+      return c.json({ ok: false, error: '\u7f3a\u5c11 roadshow_code / cw_no' }, 400)
+    }
+    if (!b.clock_in_at && !b.clock_out_at) {
+      return c.json({ ok: false, error: '\u81f3\u5c11\u8981\u63d0\u4f9b clock_in_at \u6216 clock_out_at' }, 400)
+    }
+
+    const reason = b.reason || '\u5f8c\u53f0\u88dc\u6253\u5361'
+
+    // 計算 worked_minutes（若兩者都有）
+    let worked: number | null = null
+    if (b.clock_in_at && b.clock_out_at) {
+      const diff = await c.env.DB
+        .prepare(`SELECT CAST((julianday(?) - julianday(?)) * 24 * 60 AS INTEGER) AS mins`)
+        .bind(b.clock_out_at, b.clock_in_at)
+        .first<{ mins: number }>()
+      worked = Math.max(0, diff?.mins || 0)
+    }
+
+    // UPSERT：若無記錄則新建，若有則只更新指定欄
+    const exist = await c.env.DB
+      .prepare('SELECT id FROM attendance_records WHERE roadshow_code=? AND cw_no=?')
+      .bind(b.roadshow_code, b.cw_no).first()
+
+    if (!exist) {
+      await c.env.DB.prepare(`
+        INSERT INTO attendance_records
+          (roadshow_code, cw_no, clock_in_at, clock_out_at, worked_minutes,
+           is_manual, manual_by, manual_reason)
+        VALUES (?, ?, ?, ?, ?, 1, 'admin', ?)
+      `).bind(
+        b.roadshow_code, b.cw_no,
+        b.clock_in_at || null, b.clock_out_at || null,
+        worked ?? 0, reason
+      ).run()
+    } else {
+      const sets: string[] = ["is_manual=1", "manual_by='admin'", "manual_reason=?", "updated_at=datetime('now')"]
+      const binds: unknown[] = [reason]
+      if (b.clock_in_at)  { sets.unshift('clock_in_at=?');  binds.unshift(b.clock_in_at) }
+      if (b.clock_out_at) { sets.unshift('clock_out_at=?'); binds.unshift(b.clock_out_at) }
+      if (worked !== null){ sets.push('worked_minutes=?');   binds.push(worked) }
+      binds.push(b.roadshow_code, b.cw_no)
+      await c.env.DB.prepare(
+        `UPDATE attendance_records SET ${sets.join(',')} WHERE roadshow_code=? AND cw_no=?`
+      ).bind(...binds).run()
+    }
+
+    return c.json({ ok: true, worked_minutes: worked })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3B-7. R2 檔案代理（後台限定，含本地 fallback 說明）─────────────────────
+app.get('/api/admin/coworkery/files/*', async (c) => {
+  try {
+    if (!c.env.FILES) {
+      return c.json({ ok: false, error: 'R2 \u672a\u7dae\u5b9a\uff08\u672c\u5730\u74b0\u5883\uff09\uff0c\u7121\u6cd5\u8b80\u53d6\u6a94\u6848' }, 503)
+    }
+    const key = c.req.path.replace('/api/admin/coworkery/files/', '')
+    if (!key) return c.json({ ok: false, error: '\u7f3a\u5c11\u6a94\u6848 key' }, 400)
+
+    const obj = await c.env.FILES.get(key)
+    if (!obj) return c.json({ ok: false, error: '\u6a94\u6848\u4e0d\u5b58\u5728' }, 404)
+
+    return new Response(obj.body, {
+      headers: {
+        'Content-Type': obj.httpMetadata?.contentType || 'image/jpeg',
+        'Cache-Control': 'private, no-store',
+      },
+    })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
 // ─── /admin — New unified admin shell with login protection ─────────────────
 app.get('/admin', (c) => c.html(newAdminShellHtml()))
 
