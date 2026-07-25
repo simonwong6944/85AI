@@ -9384,37 +9384,61 @@ function coworkeryAppHtml(): string {
 
   <!-- 申請加入區 -->
   <div class="apply-section" id="tabApply">
-  <div class="card">
+  <div class="card" id="applyCard">
     <h2 style="font-size:18px;font-weight:700;color:#0369a1;margin-bottom:4px">申請成為 CoWorkery</h2>
-    <div class="sub" style="margin-bottom:12px">填妥資料後提交，管理員審批後會以電話通知你</div>
+    <div class="sub" style="margin-bottom:16px">管理員審批後會以電話通知你</div>
 
-    <label for="apMemberNo">會員編號 <span style="color:#dc2626">*</span></label>
-    <input id="apMemberNo" placeholder="例如 85-00001" autocomplete="off">
+    <!-- Loading state -->
+    <div id="apAutoLoading" style="text-align:center;padding:20px;color:#6b7280;font-size:15px">
+      ⏳ 正在讀取你的會員資料…
+    </div>
 
-    <label for="apPhone">聯絡電話 <span style="color:#dc2626">*</span></label>
-    <input id="apPhone" inputmode="numeric" placeholder="8 位香港電話號碼" autocomplete="off">
+    <!-- Auto-filled (logged in) state -->
+    <div id="apAutoFilled" style="display:none">
+      <div id="apMemberBanner" style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-size:13px;color:#1d4ed8;font-weight:600;margin-bottom:6px">✅ 已自動填入你的會員資料</div>
+        <div style="font-size:16px;font-weight:700" id="apBannerName"></div>
+        <div style="font-size:14px;color:#374151;margin-top:2px" id="apBannerInfo"></div>
+      </div>
 
-    <label for="apName">中文姓名 <span style="color:#dc2626">*</span></label>
-    <input id="apName" placeholder="請輸入全名" autocomplete="off">
+      <label for="apBank">出糧銀行戶口 <span style="font-size:13px;color:#6b7280;font-weight:400">（可選，審批後補填亦可）</span></label>
+      <input id="apBank" placeholder="例如：恒生 012-345678-001" autocomplete="off" style="font-size:16px">
 
-    <label for="apDistrict">居住地區</label>
-    <select id="apDistrict">
-      <option value="">— 請選擇 —</option>
-      <option>中西區</option><option>灣仔</option><option>東區</option><option>南區</option>
-      <option>油尖旺</option><option>深水埗</option><option>九龍城</option><option>黃大仙</option>
-      <option>觀塘</option><option>葵青</option><option>荃灣</option><option>屯門</option>
-      <option>元朗</option><option>北區</option><option>大埔</option><option>沙田</option>
-      <option>西貢</option><option>離島</option>
-    </select>
+      <button class="btn btn-login" onclick="cwApply()" style="margin-top:20px;font-size:18px">提交申請</button>
+      <div class="msg" id="applyMsg"></div>
+    </div>
 
-    <label for="apBank">銀行戶口（可選，供出糧用）</label>
-    <input id="apBank" placeholder="例如：恒生 012-345678-001" autocomplete="off">
+    <!-- Manual (not logged in) state -->
+    <div id="apManual" style="display:none">
+      <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:14px;color:#92400e">
+        ⚠️ 未偵測到登入狀態，請手動填寫資料
+      </div>
 
-    <label for="apIdNo">身份證號碼（可選）</label>
-    <input id="apIdNo" placeholder="例如：A123456(7)" autocapitalize="characters" autocomplete="off">
+      <label for="apMemberNo">會員編號 <span style="color:#dc2626">*</span></label>
+      <input id="apMemberNo" placeholder="例如 85-00001" autocomplete="off">
 
-    <button class="btn btn-login" onclick="cwApply()" style="margin-top:18px">提交申請</button>
-    <div class="msg" id="applyMsg"></div>
+      <label for="apPhone">登記電話 <span style="color:#dc2626">*</span></label>
+      <input id="apPhone" inputmode="numeric" placeholder="8 位數字電話" autocomplete="off">
+
+      <label for="apName">中文姓名 <span style="color:#dc2626">*</span></label>
+      <input id="apName" placeholder="請輸入全名" autocomplete="off">
+
+      <label for="apDistrict">居住地區</label>
+      <select id="apDistrict">
+        <option value="">— 請選擇 —</option>
+        <option>中西區</option><option>灣仔</option><option>東區</option><option>南區</option>
+        <option>油尖旺</option><option>深水埗</option><option>九龍城</option><option>黃大仙</option>
+        <option>觀塘</option><option>葵青</option><option>荃灣</option><option>屯門</option>
+        <option>元朗</option><option>北區</option><option>大埔</option><option>沙田</option>
+        <option>西貢</option><option>離島</option>
+      </select>
+
+      <label for="apBankManual">出糧銀行戶口（可選）</label>
+      <input id="apBankManual" placeholder="例如：恒生 012-345678-001" autocomplete="off">
+
+      <button class="btn btn-login" onclick="cwApply()" style="margin-top:18px">提交申請</button>
+      <div class="msg" id="applyMsg"></div>
+    </div>
   </div>
   </div>
 
@@ -9448,6 +9472,7 @@ function coworkeryAppHtml(): string {
 <script>
 var API='/api/coworkery'
 var CW={cw_no:'',phone:'',name:''}
+var _apMember=null  // cached member data for apply form
 
 function cwSwitchTab(tab){
   ['login','apply'].forEach(function(t){
@@ -9457,23 +9482,75 @@ function cwSwitchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(function(b,i){
     b.classList.toggle('active',(tab==='login'&&i===0)||(tab==='apply'&&i===1))
   })
+  if(tab==='apply') cwAutoFillApply()
+}
+
+// ── 自動填入申請表（從 localStorage 讀取 member_no，再 call API 取資料）──
+async function cwAutoFillApply(){
+  if(_apMember) return  // already loaded
+  var memberNo=localStorage.getItem('ce85_member_no')||''
+  var loading=document.getElementById('apAutoLoading')
+  var autoDiv=document.getElementById('apAutoFilled')
+  var manualDiv=document.getElementById('apManual')
+  if(!memberNo){
+    // No session → show manual form
+    if(loading)loading.style.display='none'
+    if(manualDiv)manualDiv.style.display='block'
+    return
+  }
+  try{
+    var r=await fetch('/api/members/'+encodeURIComponent(memberNo))
+    var d=await r.json()
+    if(d.ok&&d.member){
+      var m=d.member
+      _apMember=m
+      // Show auto-filled banner
+      var bannerName=document.getElementById('apBannerName')
+      var bannerInfo=document.getElementById('apBannerInfo')
+      if(bannerName)bannerName.textContent=m.name_zh+' ('+m.member_no+')'
+      if(bannerInfo)bannerInfo.textContent='電話：'+m.phone+(m.district?' ｜ 地區：'+m.district:'')
+      if(loading)loading.style.display='none'
+      if(autoDiv)autoDiv.style.display='block'
+    } else {
+      // Member not found → manual
+      if(loading)loading.style.display='none'
+      if(manualDiv)manualDiv.style.display='block'
+    }
+  }catch(e){
+    if(loading)loading.style.display='none'
+    if(manualDiv)manualDiv.style.display='block'
+  }
 }
 
 async function cwApply(){
-  var memberNo=document.getElementById('apMemberNo').value.trim()
-  var phone=document.getElementById('apPhone').value.trim()
-  var name=document.getElementById('apName').value.trim()
-  var district=document.getElementById('apDistrict').value
-  var bank=document.getElementById('apBank').value.trim()
-  var idNo=document.getElementById('apIdNo').value.trim()
-  if(!memberNo||!phone||!name){showMsg('applyMsg','err','請填寫會員編號、電話及姓名');return}
+  var isAuto=_apMember!==null
+  var memberNo, phone, name_zh, district, bank
+  if(isAuto){
+    memberNo=_apMember.member_no
+    phone=_apMember.phone
+    name_zh=_apMember.name_zh
+    district=_apMember.district||null
+    bank=(document.getElementById('apBank').value||'').trim()||null
+  } else {
+    memberNo=(document.getElementById('apMemberNo').value||'').trim()
+    phone=(document.getElementById('apPhone').value||'').trim()
+    name_zh=(document.getElementById('apName').value||'').trim()
+    district=(document.getElementById('apDistrict').value||'')||null
+    bank=(document.getElementById('apBankManual').value||'').trim()||null
+    if(!memberNo||!phone||!name_zh){showMsg('applyMsg','err','請填寫會員編號、電話及姓名');return}
+  }
   showMsg('applyMsg','info','提交中…')
   try{
     var r=await fetch(API+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({member_no:memberNo,phone:phone,name_zh:name,district:district||null,bank_account:bank||null,id_no:idNo||null})})
+      body:JSON.stringify({member_no:memberNo,phone:phone,name_zh:name_zh,district:district,bank_account:bank})})
     var d=await r.json()
-    if(d.ok){showMsg('applyMsg','ok','申請已提交！管理員審批後會通知你，請耐心等候。')}
-    else{showMsg('applyMsg','err',d.error||'提交失敗，請重試')}
+    if(d.ok){
+      showMsg('applyMsg','ok','申請已提交！管理員審批後會電話通知你，請耐心等候。')
+      // Disable submit button to prevent double submit
+      document.querySelectorAll('#tabApply .btn-login').forEach(function(b){b.disabled=true})
+    } else {
+      showMsg('applyMsg','err',d.error||'提交失敗，請重試')
+    }
   }catch(e){showMsg('applyMsg','err','網絡錯誤，請重試')}
 }
 
