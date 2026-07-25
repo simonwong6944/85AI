@@ -1766,6 +1766,403 @@ app.get('/governance',  (c) => c.html(comingSoonHtml('Governance', '治理管理
 app.get('/events',      (c) => c.html(comingSoonHtml('Events', '活動管理')))
 app.get('/volunteers',  (c) => c.html(comingSoonHtml('Volunteers', '義工管理')))
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CoWorkery 後台管理 API（受既有 /api/admin/* middleware 保護）
+// Schema 確認：
+//   roadshows.code（主鍵）、roadshows.name、roadshows.store_code（去正規化）
+//   jhc_stores JOIN: s.store_code = r.store_code
+//   members.tier = 'PRIMARY' | 'FAMILY'
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── 3A-1. 開卡（註冊）+ 上傳身份證正本 ──────────────────────────────────────
+// multipart/form-data：文字欄位 + id_front 檔案（可選）
+app.post('/api/admin/coworkery/register', async (c) => {
+  try {
+    const form = await c.req.formData()
+    const get = (k: string) => {
+      const v = form.get(k)
+      return v === null ? '' : String(v).trim()
+    }
+
+    const member_no = get('member_no')
+    const name_zh   = get('name_zh')
+    const phone     = get('phone')
+    if (!member_no || !name_zh || !phone) {
+      return c.json({ ok: false, error: '缺少必填欄位（member_no / name_zh / phone）' }, 400)
+    }
+
+    // 驗證會員存在、為主卡（tier = PRIMARY）、年齡 >= 55
+    const member = await c.env.DB
+      .prepare('SELECT member_no, birth_year, tier FROM members WHERE member_no = ?')
+      .bind(member_no)
+      .first<{ member_no: string; birth_year: number | null; tier: string }>()
+    if (!member) {
+      return c.json({ ok: false, error: '找不到對應會員，請確認老有卡編號' }, 404)
+    }
+    if (member.tier !== 'PRIMARY') {
+      return c.json({ ok: false, error: '只有主卡會員可申請 CoWorkery' }, 400)
+    }
+    const thisYear = new Date().getFullYear()
+    if (member.birth_year && thisYear - member.birth_year < 55) {
+      return c.json({ ok: false, error: '該會員未滿 55 歲，不符合 CoWorkery 資格' }, 400)
+    }
+
+    // 防重複開卡
+    const dup = await c.env.DB
+      .prepare('SELECT cw_no FROM co_workery WHERE member_no = ?')
+      .bind(member_no)
+      .first<{ cw_no: string }>()
+    if (dup) {
+      return c.json({ ok: false, error: `該會員已有 CoWorkery 編號 ${dup.cw_no}` }, 409)
+    }
+
+    // 取新 CW 編號（atomic RETURNING）
+    const cw_no = await nextCwNo(c.env.DB)
+
+    // 上傳身份證正本（可選；R2 無綁定時 graceful skip）
+    let id_front_key: string | null = null
+    const idFile = form.get('id_front')
+    if (idFile && idFile instanceof File && idFile.size > 0) {
+      if (!c.env.FILES) {
+        return c.json({ ok: false, error: 'R2 未綁定，無法上傳身份證。請先不附圖開卡，或 deploy 時加 --with-r2。' }, 503)
+      }
+      id_front_key = `coworkery/${cw_no}/id_front.jpg`
+      await c.env.FILES.put(id_front_key, await idFile.arrayBuffer(), {
+        httpMetadata: { contentType: idFile.type || 'image/jpeg' },
+      })
+    }
+
+    await c.env.DB.prepare(`
+      INSERT INTO co_workery
+        (cw_no, member_no, name_zh, name_en, phone, gender, birth_year, address, district,
+         hkid_prefix, id_front_key, bank_name, bank_account_name, bank_account_no,
+         default_hourly_rate, status, approved_by, approved_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 'admin', datetime('now'))
+    `).bind(
+      cw_no, member_no, name_zh,
+      get('name_en') || null, phone,
+      get('gender') || null,
+      member.birth_year ?? null,
+      get('address') || null,
+      get('district') || null,
+      get('hkid_prefix') || null,
+      id_front_key,
+      get('bank_name') || null,
+      get('bank_account_name') || null,
+      get('bank_account_no') || null,
+      parseInt(get('default_hourly_rate')) || 0
+    ).run()
+
+    return c.json({ ok: true, cw_no })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3A-2. 列表 + 統計 ──────────────────────────────────────────────────────
+app.get('/api/admin/coworkery/list', async (c) => {
+  try {
+    const status = c.req.query('status') || ''
+    const q      = (c.req.query('q') || '').trim()
+
+    let sql = `SELECT id, cw_no, member_no, name_zh, name_en, phone, gender, district,
+                      hkid_prefix, bank_name, bank_account_no, default_hourly_rate,
+                      status, reject_reason, id_front_key, created_at
+               FROM co_workery WHERE 1=1`
+    const binds: unknown[] = []
+    if (status) { sql += ' AND status = ?'; binds.push(status) }
+    if (q) {
+      sql += ' AND (cw_no LIKE ? OR name_zh LIKE ? OR phone LIKE ? OR member_no LIKE ?)'
+      const like = `%${q}%`
+      binds.push(like, like, like, like)
+    }
+    sql += ' ORDER BY id DESC LIMIT 500'
+
+    const { results } = await c.env.DB.prepare(sql).bind(...binds).all()
+
+    const stat = await c.env.DB.prepare(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status='ACTIVE'    THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN status='PENDING'   THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN status='REJECTED'  THEN 1 ELSE 0 END) AS rejected,
+        SUM(CASE WHEN status='SUSPENDED' THEN 1 ELSE 0 END) AS suspended
+      FROM co_workery
+    `).first()
+
+    return c.json({ ok: true, list: results, stat })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3A-3. 審批 / 拒絕 / 停牌 / 更新資料 ────────────────────────────────────
+app.patch('/api/admin/coworkery/list', async (c) => {
+  try {
+    const body = await c.req.json<{
+      cw_no: string
+      action?: 'APPROVE' | 'REJECT' | 'SUSPEND' | 'REACTIVATE'
+      reject_reason?: string
+      default_hourly_rate?: number
+      bank_name?: string
+      bank_account_name?: string
+      bank_account_no?: string
+    }>()
+    if (!body.cw_no) return c.json({ ok: false, error: '缺少 cw_no' }, 400)
+
+    if (body.action) {
+      const statusMap: Record<string, string> = {
+        APPROVE: 'ACTIVE', REJECT: 'REJECTED', SUSPEND: 'SUSPENDED', REACTIVATE: 'ACTIVE',
+      }
+      const newStatus = statusMap[body.action]
+      if (!newStatus) return c.json({ ok: false, error: '未知 action' }, 400)
+
+      await c.env.DB.prepare(`
+        UPDATE co_workery
+        SET status = ?, reject_reason = ?,
+            approved_by = 'admin', approved_at = datetime('now'),
+            updated_at = datetime('now')
+        WHERE cw_no = ?
+      `).bind(
+        newStatus,
+        body.action === 'REJECT' ? (body.reject_reason || '') : null,
+        body.cw_no
+      ).run()
+    }
+
+    // 更新可編輯欄位（只更新有傳嘅）
+    const sets: string[] = []
+    const binds: unknown[] = []
+    if (typeof body.default_hourly_rate === 'number') { sets.push('default_hourly_rate = ?'); binds.push(body.default_hourly_rate) }
+    if (typeof body.bank_name === 'string')           { sets.push('bank_name = ?');           binds.push(body.bank_name) }
+    if (typeof body.bank_account_name === 'string')   { sets.push('bank_account_name = ?');   binds.push(body.bank_account_name) }
+    if (typeof body.bank_account_no === 'string')     { sets.push('bank_account_no = ?');     binds.push(body.bank_account_no) }
+    if (sets.length) {
+      sets.push("updated_at = datetime('now')")
+      binds.push(body.cw_no)
+      await c.env.DB.prepare(
+        `UPDATE co_workery SET ${sets.join(', ')} WHERE cw_no = ?`
+      ).bind(...binds).run()
+    }
+
+    return c.json({ ok: true })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3A-4. 場次 geo / 時薪 / 津貼 設定 ──────────────────────────────────────
+// GET：JOIN roadshows（r.code）+ jhc_stores（s.store_code = r.store_code）+ roadshow_geo
+app.get('/api/admin/coworkery/sessions', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT
+        r.code            AS roadshow_code,
+        r.name            AS roadshow_name,
+        r.start_date,
+        r.end_date,
+        r.status          AS roadshow_status,
+        s.district        AS store_district,
+        s.address         AS store_address,
+        g.latitude,
+        g.longitude,
+        g.geofence_radius,
+        g.headcount_needed,
+        g.session_hourly_rate,
+        g.transport_allowance,
+        g.meal_allowance,
+        g.brand_ref
+      FROM roadshows r
+      LEFT JOIN jhc_stores s  ON s.store_code = r.store_code
+      LEFT JOIN roadshow_geo g ON g.roadshow_code = r.code
+      ORDER BY r.start_date DESC
+      LIMIT 300
+    `).all()
+    return c.json({ ok: true, list: results })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// POST：upsert 某場次的 geo / 時薪 / 津貼 / 品牌設定
+// roadshow_code 對應 roadshows.code
+app.post('/api/admin/coworkery/sessions', async (c) => {
+  try {
+    const b = await c.req.json<{
+      roadshow_code: string
+      latitude?: number; longitude?: number; geofence_radius?: number
+      headcount_needed?: number; session_hourly_rate?: number
+      transport_allowance?: number; meal_allowance?: number; brand_ref?: string
+    }>()
+    if (!b.roadshow_code) return c.json({ ok: false, error: '缺少 roadshow_code（即 roadshows.code）' }, 400)
+
+    // 確認 roadshow 存在（roadshows.code）
+    const rs = await c.env.DB
+      .prepare('SELECT code FROM roadshows WHERE code = ?')
+      .bind(b.roadshow_code).first()
+    if (!rs) return c.json({ ok: false, error: `找不到 roadshow code: ${b.roadshow_code}` }, 404)
+
+    await c.env.DB.prepare(`
+      INSERT INTO roadshow_geo
+        (roadshow_code, latitude, longitude, geofence_radius, headcount_needed,
+         session_hourly_rate, transport_allowance, meal_allowance, brand_ref, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(roadshow_code) DO UPDATE SET
+        latitude            = excluded.latitude,
+        longitude           = excluded.longitude,
+        geofence_radius     = excluded.geofence_radius,
+        headcount_needed    = excluded.headcount_needed,
+        session_hourly_rate = excluded.session_hourly_rate,
+        transport_allowance = excluded.transport_allowance,
+        meal_allowance      = excluded.meal_allowance,
+        brand_ref           = excluded.brand_ref,
+        updated_at          = datetime('now')
+    `).bind(
+      b.roadshow_code,
+      b.latitude ?? null, b.longitude ?? null,
+      b.geofence_radius ?? 250,
+      b.headcount_needed ?? 0,
+      b.session_hourly_rate ?? 0,
+      b.transport_allowance ?? 0,
+      b.meal_allowance ?? 0,
+      b.brand_ref ?? null
+    ).run()
+
+    return c.json({ ok: true })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3A-5. 派更 ──────────────────────────────────────────────────────────────
+// GET：某場次的報名 + 已派更名單（roadshow_code = roadshows.code）
+app.get('/api/admin/coworkery/assign', async (c) => {
+  try {
+    const code = (c.req.query('roadshow_code') || '').trim()
+    if (!code) return c.json({ ok: false, error: '缺少 roadshow_code' }, 400)
+
+    const apps = await c.env.DB.prepare(`
+      SELECT sa.cw_no, sa.status, sa.created_at,
+             cw.name_zh, cw.phone, cw.district, cw.default_hourly_rate
+      FROM session_applications sa
+      JOIN co_workery cw ON cw.cw_no = sa.cw_no
+      WHERE sa.roadshow_code = ?
+      ORDER BY sa.created_at ASC
+    `).bind(code).all()
+
+    const assigned = await c.env.DB.prepare(`
+      SELECT sg.cw_no, sg.assigned_hourly_rate, sg.assigned_by, sg.created_at,
+             cw.name_zh, cw.phone
+      FROM session_assignments sg
+      JOIN co_workery cw ON cw.cw_no = sg.cw_no
+      WHERE sg.roadshow_code = ?
+      ORDER BY sg.created_at ASC
+    `).bind(code).all()
+
+    return c.json({ ok: true, applications: apps.results, assignments: assigned.results })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// POST：派更（可設特別時薪）；或取消派更
+app.post('/api/admin/coworkery/assign', async (c) => {
+  try {
+    const b = await c.req.json<{
+      roadshow_code: string
+      cw_no: string
+      assigned_hourly_rate?: number
+      remove?: boolean
+    }>()
+    if (!b.roadshow_code || !b.cw_no) {
+      return c.json({ ok: false, error: '缺少 roadshow_code / cw_no' }, 400)
+    }
+
+    if (b.remove) {
+      await c.env.DB
+        .prepare('DELETE FROM session_assignments WHERE roadshow_code = ? AND cw_no = ?')
+        .bind(b.roadshow_code, b.cw_no).run()
+      return c.json({ ok: true, removed: true })
+    }
+
+    // 確認 CW 為 ACTIVE 狀態
+    const cw = await c.env.DB
+      .prepare('SELECT status FROM co_workery WHERE cw_no = ?')
+      .bind(b.cw_no).first<{ status: string }>()
+    if (!cw || cw.status !== 'ACTIVE') {
+      return c.json({ ok: false, error: '該 CoWorkery 非 ACTIVE 狀態，不可派更' }, 400)
+    }
+
+    await c.env.DB.prepare(`
+      INSERT INTO session_assignments (roadshow_code, cw_no, assigned_hourly_rate, assigned_by)
+      VALUES (?, ?, ?, 'admin')
+      ON CONFLICT(roadshow_code, cw_no) DO UPDATE SET
+        assigned_hourly_rate = excluded.assigned_hourly_rate,
+        assigned_by          = 'admin'
+    `).bind(b.roadshow_code, b.cw_no, b.assigned_hourly_rate ?? 0).run()
+
+    // 同步：有報名記錄的標為 APPROVED
+    await c.env.DB.prepare(`
+      UPDATE session_applications
+      SET status = 'APPROVED', updated_at = datetime('now')
+      WHERE roadshow_code = ? AND cw_no = ?
+    `).bind(b.roadshow_code, b.cw_no).run()
+
+    return c.json({ ok: true })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3A-6. CSV 匯出（CoWorkery 名冊）──────────────────────────────────────
+app.get('/api/admin/coworkery/export/csv', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT cw_no, member_no, name_zh, name_en, phone, gender, district,
+             hkid_prefix, bank_name, bank_account_name, bank_account_no,
+             default_hourly_rate, status, created_at
+      FROM co_workery ORDER BY id ASC
+    `).all<Record<string, unknown>>()
+
+    const headers = [
+      'CW\u7de8\u865f', '\u6703\u54e1\u7de8\u865f', '\u4e2d\u6587\u59d3\u540d', '\u82f1\u6587\u59d3\u540d',
+      '\u96fb\u8a71', '\u6027\u5225', '\u5730\u5340', 'HKID\u982d4\u4f4d',
+      '\u9280\u884c', '\u6236\u540d', '\u8cec\u865f', '\u9810\u8a2d\u6642\u85aa(\u5143)',
+      '\u72c0\u614b', '\u767b\u8a18\u6642\u9593'
+    ]
+    const lines = [headers.map(csvCell).join(',')]
+    for (const r of results) {
+      lines.push([
+        csvCell(r.cw_no),
+        csvCell(r.member_no),
+        csvCell(r.name_zh),
+        csvCell(r.name_en),
+        csvCell(r.phone),
+        csvCell(r.gender),
+        csvCell(r.district),
+        csvCell(r.hkid_prefix),
+        csvCell(r.bank_name),
+        csvCell(r.bank_account_name),
+        csvCell(r.bank_account_no),
+        csvCell(centsToStr(r.default_hourly_rate as number)),
+        csvCell(r.status),
+        csvCell(r.created_at),
+      ].join(','))
+    }
+    // BOM 令 Excel 正確顯示中文
+    const csv = '\uFEFF' + lines.join('\r\n')
+
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="coworkery_list.csv"',
+      },
+    })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
 // ─── /admin — New unified admin shell with login protection ─────────────────
 app.get('/admin', (c) => c.html(newAdminShellHtml()))
 
