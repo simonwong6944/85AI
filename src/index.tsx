@@ -2187,21 +2187,21 @@ app.post('/api/coworkery/apply', async (c) => {
   try {
     const { DB } = c.env as Env
     const body = await c.req.json() as {
-      member_no?: string; phone?: string; name_zh?: string;
-      district?: string; bank_account?: string; id_no?: string;
+      member_no?: string; phone?: string; name_zh?: string; district?: string;
+      bank_name?: string; bank_account_name?: string; bank_account_no?: string; bank_account?: string;
     }
     const member_no = (body.member_no ?? '').trim()
     const phone     = (body.phone ?? '').trim()
     const name_zh   = (body.name_zh ?? '').trim()
     if (!member_no || !phone || !name_zh) return c.json({ ok: false, error: '請填寫會員編號、電話及姓名' })
 
-    // 1. 確認係會員（member_no 存在於 members 表）
+    // 1. 確認係會員
     const member = await DB.prepare(
       `SELECT id FROM members WHERE member_no=? LIMIT 1`
     ).bind(member_no).first<{ id: number }>()
     if (!member) return c.json({ ok: false, error: `找不到會員編號 ${member_no}，請確認編號正確` })
 
-    // 2. 檢查係咪已有申請（避免重複）
+    // 2. 檢查有冇重複申請
     const existing = await DB.prepare(
       `SELECT cw_no, status FROM co_workery WHERE member_no=? LIMIT 1`
     ).bind(member_no).first<{ cw_no: string; status: string }>()
@@ -2212,19 +2212,31 @@ app.post('/api/coworkery/apply', async (c) => {
       if (existing.status === 'SUSPENDED') return c.json({ ok: false, error: '你的帳戶已被暫停，如有疑問請聯絡管理員' })
     }
 
-    // 3. 生成臨時 CW 編號（PENDING 狀態，審批後才正式）
-    //    取現有最大 counter 值 +1，padding 6 位
+    // 3. 生成 CW 編號
     const counter = await DB.prepare(
       `SELECT COALESCE(MAX(CAST(SUBSTR(cw_no,3) AS INTEGER)),0)+1 AS next FROM co_workery`
     ).first<{ next: number }>()
-    const nextNum = counter?.next ?? 1
-    const cw_no = 'CW' + String(nextNum).padStart(6, '0')
+    const cw_no = 'CW' + String(counter?.next ?? 1).padStart(6, '0')
 
-    // 4. Insert
+    // 4. 銀行資料
+    const bank_name         = body.bank_name?.trim() || null
+    const bank_account_name = body.bank_account_name?.trim() || name_zh   // 默認用申請人姓名
+    const bank_account_no   = body.bank_account_no?.trim() || null
+    const bank_account      = bank_name && bank_account_no
+      ? `${bank_name} ${bank_account_no}`
+      : (body.bank_account?.trim() || null)
+
+    // 5. Insert
     await DB.prepare(`
-      INSERT INTO co_workery (cw_no, member_no, phone, name_zh, district, bank_account, id_no, status, default_hourly_rate)
-      VALUES (?,?,?,?,?,?,?,'PENDING',0)
-    `).bind(cw_no, member_no, phone, name_zh, body.district||null, body.bank_account||null, body.id_no||null).run()
+      INSERT INTO co_workery
+        (cw_no, member_no, phone, name_zh, district,
+         bank_name, bank_account_name, bank_account_no, bank_account,
+         status, default_hourly_rate)
+      VALUES (?,?,?,?,?, ?,?,?,?, 'PENDING',0)
+    `).bind(
+      cw_no, member_no, phone, name_zh, body.district || null,
+      bank_name, bank_account_name, bank_account_no, bank_account
+    ).run()
 
     return c.json({ ok: true, cw_no })
   } catch (e: any) {
@@ -9401,8 +9413,16 @@ function coworkeryAppHtml(): string {
         <div style="font-size:14px;color:#374151;margin-top:2px" id="apBannerInfo"></div>
       </div>
 
-      <label for="apBank">出糧銀行戶口 <span style="font-size:13px;color:#6b7280;font-weight:400">（可選，審批後補填亦可）</span></label>
-      <input id="apBank" placeholder="例如：恒生 012-345678-001" autocomplete="off" style="font-size:16px">
+      <label>出糧銀行資料 <span style="font-size:13px;color:#6b7280;font-weight:400">（可選，審批後補填亦可）</span></label>
+      <select id="apBankName" style="margin-bottom:8px;font-size:16px">
+        <option value="">— 選擇銀行 —</option>
+        <option>恒生銀行</option><option>滙豐銀行</option><option>中國銀行(香港)</option>
+        <option>渣打銀行</option><option>東亞銀行</option><option>工商銀行</option>
+        <option>建設銀行</option><option>農業銀行</option><option>招商銀行</option>
+        <option>花旗銀行</option><option>大新銀行</option><option>創興銀行</option>
+        <option>永隆銀行</option><option>轉數快/FPS</option><option>其他</option>
+      </select>
+      <input id="apBankNo" placeholder="戶口號碼（例如 123-456789-001）" autocomplete="off" inputmode="numeric" style="font-size:16px">
 
       <button class="btn btn-login" onclick="cwApply()" style="margin-top:20px;font-size:18px">提交申請</button>
       <div class="msg" id="applyMsg"></div>
@@ -9433,8 +9453,16 @@ function coworkeryAppHtml(): string {
         <option>西貢</option><option>離島</option>
       </select>
 
-      <label for="apBankManual">出糧銀行戶口（可選）</label>
-      <input id="apBankManual" placeholder="例如：恒生 012-345678-001" autocomplete="off">
+      <label>出糧銀行資料（可選）</label>
+      <select id="apBankNameManual" style="margin-bottom:8px">
+        <option value="">— 選擇銀行 —</option>
+        <option>恒生銀行</option><option>滙豐銀行</option><option>中國銀行(香港)</option>
+        <option>渣打銀行</option><option>東亞銀行</option><option>工商銀行</option>
+        <option>建設銀行</option><option>農業銀行</option><option>招商銀行</option>
+        <option>花旗銀行</option><option>大新銀行</option><option>創興銀行</option>
+        <option>永隆銀行</option><option>轉數快/FPS</option><option>其他</option>
+      </select>
+      <input id="apBankNoManual" placeholder="戶口號碼（例如 123-456789-001）" autocomplete="off" inputmode="numeric">
 
       <button class="btn btn-login" onclick="cwApply()" style="margin-top:18px">提交申請</button>
       <div class="msg" id="applyMsg"></div>
@@ -9524,29 +9552,35 @@ async function cwAutoFillApply(){
 
 async function cwApply(){
   var isAuto=_apMember!==null
-  var memberNo, phone, name_zh, district, bank
+  var memberNo, phone, name_zh, district, bankName, bankNo
   if(isAuto){
     memberNo=_apMember.member_no
     phone=_apMember.phone
     name_zh=_apMember.name_zh
     district=_apMember.district||null
-    bank=(document.getElementById('apBank').value||'').trim()||null
+    bankName=(document.getElementById('apBankName').value||'').trim()||null
+    bankNo=(document.getElementById('apBankNo').value||'').trim()||null
   } else {
     memberNo=(document.getElementById('apMemberNo').value||'').trim()
     phone=(document.getElementById('apPhone').value||'').trim()
     name_zh=(document.getElementById('apName').value||'').trim()
     district=(document.getElementById('apDistrict').value||'')||null
-    bank=(document.getElementById('apBankManual').value||'').trim()||null
+    bankName=(document.getElementById('apBankNameManual').value||'').trim()||null
+    bankNo=(document.getElementById('apBankNoManual').value||'').trim()||null
     if(!memberNo||!phone||!name_zh){showMsg('applyMsg','err','請填寫會員編號、電話及姓名');return}
   }
+  // Validate: if one bank field filled, require the other
+  if(bankName&&!bankNo){showMsg('applyMsg','err','請填寫戶口號碼');return}
+  if(bankNo&&!bankName){showMsg('applyMsg','err','請選擇銀行名稱');return}
   showMsg('applyMsg','info','提交中…')
   try{
-    var r=await fetch(API+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({member_no:memberNo,phone:phone,name_zh:name_zh,district:district,bank_account:bank})})
+    var payload={member_no:memberNo,phone:phone,name_zh:name_zh,district:district,
+      bank_name:bankName,bank_account_name:name_zh,bank_account_no:bankNo,
+      bank_account:bankName&&bankNo?bankName+' '+bankNo:null}
+    var r=await fetch(API+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     var d=await r.json()
     if(d.ok){
       showMsg('applyMsg','ok','申請已提交！管理員審批後會電話通知你，請耐心等候。')
-      // Disable submit button to prevent double submit
       document.querySelectorAll('#tabApply .btn-login').forEach(function(b){b.disabled=true})
     } else {
       showMsg('applyMsg','err',d.error||'提交失敗，請重試')
