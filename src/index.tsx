@@ -9289,17 +9289,38 @@ function coworkeryAppHtml(): string {
   .shift b{font-size:19px}
   .selfie-preview{width:100%;border-radius:12px;margin-top:10px;display:none}
   .status-line{font-size:16px;color:#374151;margin-top:8px;min-height:24px}
+  .back-bar{display:flex;align-items:center;gap:8px;color:#0369a1;font-size:17px;font-weight:600;margin-bottom:12px;cursor:pointer;text-decoration:none}
+  .back-bar svg{flex-shrink:0}
+  .tab-bar{display:flex;gap:0;border-bottom:2px solid #e5e7eb;margin-bottom:16px}
+  .tab-btn{flex:1;padding:12px 4px;font-size:15px;font-weight:600;border:none;background:transparent;color:#6b7280;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+  .tab-btn.active{color:#0284c7;border-bottom-color:#0284c7}
+  .apply-section{display:none}
+  .apply-section.show{display:block}
+  input[type=file]{padding:8px;font-size:15px}
 </style>
 </head>
 <body>
 <div class="wrap">
+
+  <!-- 返回掣 -->
+  <a href="/app" class="back-bar">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    返回主頁
+  </a>
 
   <div class="card">
     <h1>👷 CoWorkery 打卡</h1>
     <div class="sub">老有聯盟85 · 工作打卡系統</div>
   </div>
 
+  <!-- 分頁切換 -->
+  <div class="tab-bar" id="mainTabBar">
+    <button class="tab-btn active" onclick="cwSwitchTab('login')">🔑 打卡登入</button>
+    <button class="tab-btn" onclick="cwSwitchTab('apply')">📝 申請加入</button>
+  </div>
+
   <!-- 登入區 -->
+  <div class="apply-section show" id="tabLogin">
   <div class="card" id="loginCard">
     <label for="cwNo">CW 編號</label>
     <input id="cwNo" placeholder="例如 CW000001" autocomplete="off" autocapitalize="characters">
@@ -9307,6 +9328,43 @@ function coworkeryAppHtml(): string {
     <input id="cwPhone" inputmode="numeric" placeholder="8 位數字電話" autocomplete="off">
     <button class="btn btn-login" onclick="cwLogin()">登入</button>
     <div class="msg" id="loginMsg"></div>
+  </div>
+  </div>
+
+  <!-- 申請加入區 -->
+  <div class="apply-section" id="tabApply">
+  <div class="card">
+    <h2 style="font-size:18px;font-weight:700;color:#0369a1;margin-bottom:4px">申請成為 CoWorkery</h2>
+    <div class="sub" style="margin-bottom:12px">填妥資料後提交，管理員審批後會以電話通知你</div>
+
+    <label for="apMemberNo">會員編號 <span style="color:#dc2626">*</span></label>
+    <input id="apMemberNo" placeholder="例如 85-00001" autocomplete="off">
+
+    <label for="apPhone">聯絡電話 <span style="color:#dc2626">*</span></label>
+    <input id="apPhone" inputmode="numeric" placeholder="8 位香港電話號碼" autocomplete="off">
+
+    <label for="apName">中文姓名 <span style="color:#dc2626">*</span></label>
+    <input id="apName" placeholder="請輸入全名" autocomplete="off">
+
+    <label for="apDistrict">居住地區</label>
+    <select id="apDistrict">
+      <option value="">— 請選擇 —</option>
+      <option>中西區</option><option>灣仔</option><option>東區</option><option>南區</option>
+      <option>油尖旺</option><option>深水埗</option><option>九龍城</option><option>黃大仙</option>
+      <option>觀塘</option><option>葵青</option><option>荃灣</option><option>屯門</option>
+      <option>元朗</option><option>北區</option><option>大埔</option><option>沙田</option>
+      <option>西貢</option><option>離島</option>
+    </select>
+
+    <label for="apBank">銀行戶口（可選，供出糧用）</label>
+    <input id="apBank" placeholder="例如：恒生 012-345678-001" autocomplete="off">
+
+    <label for="apIdNo">身份證號碼（可選）</label>
+    <input id="apIdNo" placeholder="例如：A123456(7)" autocapitalize="characters" autocomplete="off">
+
+    <button class="btn btn-login" onclick="cwApply()" style="margin-top:18px">提交申請</button>
+    <div class="msg" id="applyMsg"></div>
+  </div>
   </div>
 
   <!-- 主區（登入後顯示）-->
@@ -9339,6 +9397,35 @@ function coworkeryAppHtml(): string {
 <script>
 var API='/api/coworkery'
 var CW={cw_no:'',phone:'',name:''}
+
+function cwSwitchTab(tab){
+  ['login','apply'].forEach(function(t){
+    var el=document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1))
+    if(el)el.classList.toggle('show',t===tab)
+  })
+  document.querySelectorAll('.tab-btn').forEach(function(b,i){
+    b.classList.toggle('active',(tab==='login'&&i===0)||(tab==='apply'&&i===1))
+  })
+}
+
+async function cwApply(){
+  var memberNo=document.getElementById('apMemberNo').value.trim()
+  var phone=document.getElementById('apPhone').value.trim()
+  var name=document.getElementById('apName').value.trim()
+  var district=document.getElementById('apDistrict').value
+  var bank=document.getElementById('apBank').value.trim()
+  var idNo=document.getElementById('apIdNo').value.trim()
+  if(!memberNo||!phone||!name){showMsg('applyMsg','err','請填寫會員編號、電話及姓名');return}
+  showMsg('applyMsg','info','提交中…')
+  try{
+    var r=await fetch(API+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({member_no:memberNo,phone:phone,name_zh:name,district:district||null,bank_account:bank||null,id_no:idNo||null})})
+    var d=await r.json()
+    if(d.ok){showMsg('applyMsg','ok','申請已提交！管理員審批後會通知你。
+你的申請已登記，請耐心等候。')}
+    else{showMsg('applyMsg','err',d.error||'提交失敗，請重試')}
+  }catch(e){showMsg('applyMsg','err','網絡錯誤，請重試')}
+}
 
 function showMsg(el,type,text){
   var e=document.getElementById(el)
