@@ -6557,10 +6557,15 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
   </div>
 
   <!-- ── 底部連結 ── -->
-  <div style="text-align:center;margin-top:20px;font-size:18px;color:#aaa;line-height:2;">
-    <a href="/membership/join" style="color:${accentMid};">← 返回登記頁</a>
-    &nbsp;·&nbsp;
-    如有疑問 WhatsApp：<a href="https://wa.me/85254429749" style="color:${accentMid};">5442-9749</a>
+  <div style="text-align:center;margin-top:20px;font-size:18px;line-height:2.4;">
+    <div>
+      <button onclick="ceLogout()" style="background:none;border:none;cursor:pointer;color:${accentMid};font-size:18px;font-family:inherit;text-decoration:underline;padding:0;">
+        ← 登出
+      </button>
+    </div>
+    <div style="color:#aaa;font-size:16px;">
+      如有疑問 WhatsApp：<a href="https://wa.me/85254429749" style="color:${accentMid};">5442-9749</a>
+    </div>
   </div>
 </div>
 
@@ -7084,6 +7089,17 @@ function notifyParentWAClicked() {
       window.parent.postMessage({type:'ce85_wa_clicked', memberNo: MEMBER_NO}, '*');
     }
   } catch(e) {}
+}
+function ceLogout() {
+  localStorage.removeItem('ce85_member_no');
+  localStorage.removeItem('ce85_wa_clicked');
+  sessionStorage.removeItem('cw_session');
+  // 如果係在 /app 的 iframe 內，通知 parent 登出；否則直接跳轉
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({type:'ce85_logout'}, '*');
+  } else {
+    window.location.href = '/app';
+  }
 }
 </script>
 </body></html>`
@@ -10261,11 +10277,18 @@ window.addEventListener('beforeinstallprompt', function(e) {
   }
 });
 
-// ── 接收 card iframe 的 postMessage（用戶在卡頁點咗 WA 按鈕）──
+// ── 接收 card iframe 的 postMessage ──
 window.addEventListener('message', function(e) {
   if (e.data && e.data.type === 'ce85_wa_clicked') {
     localStorage.setItem('ce85_wa_clicked', '1');
     showInstallBanner();
+  }
+  if (e.data && e.data.type === 'ce85_logout') {
+    // 卡頁按登出 → 清除所有 session 並重新載入 /app 顯示輸入框
+    localStorage.removeItem('ce85_member_no');
+    localStorage.removeItem('ce85_wa_clicked');
+    sessionStorage.removeItem('cw_session');
+    window.location.reload();
   }
 });
 
