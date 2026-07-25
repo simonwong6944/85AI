@@ -7671,6 +7671,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* ── Module Pages ── */
 .mod-page{display:none;}
 .mod-page.active{display:block;}
+
 /* ── Roadshow Module ── */
 .rs-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
 .rs-tabs{display:flex;gap:8px;border-bottom:2px solid #E5E7EB;margin-bottom:20px;}
@@ -7854,97 +7855,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           <div class="store-grid" id="store-grid"></div>
         </div>
       </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- Create Roadshow Modal -->
-<div class="modal-overlay" id="modal-create-rs">
-  <div class="modal">
-    <h3><i class="fas fa-plus-circle" style="margin-right:8px;color:var(--brand)"></i>新增 Roadshow 活動</h3>
-    <div class="form-field">
-      <label>Roadshow Code <span style="color:#EF4444">*</span></label>
-      <input type="text" id="new-rs-code" placeholder="例: RS2024-001" style="font-family:monospace">
-    </div>
-    <div class="form-field">
-      <label>活動名稱 <span style="color:#EF4444">*</span></label>
-      <input type="text" id="new-rs-name" placeholder="例: 北角健威坊 Roadshow">
-    </div>
-    <div class="form-field">
-      <label>選擇商店 (選填)</label>
-      <select id="new-rs-store">
-        <option value="">-- 不指定商店 --</option>
-      </select>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-field">
-        <label>開始日期</label>
-        <input type="date" id="new-rs-start">
-      </div>
-      <div class="form-field">
-        <label>結束日期</label>
-        <input type="date" id="new-rs-end">
-      </div>
-    </div>
-    <div class="form-field">
-      <label>備註</label>
-      <textarea id="new-rs-notes" rows="2" style="resize:vertical" placeholder="選填備註"></textarea>
-    </div>
-    <div id="modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-create-rs')">取消</button>
-      <button class="btn btn-primary" onclick="submitCreateRs()">
-        <i class="fas fa-save"></i> 儲存
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Edit Roadshow Modal -->
-<div class="modal-overlay" id="modal-edit-rs">
-  <div class="modal">
-    <h3><i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯 Roadshow</h3>
-    <input type="hidden" id="edit-rs-id">
-    <div class="form-field">
-      <label>活動名稱 <span style="color:#EF4444">*</span></label>
-      <input type="text" id="edit-rs-name">
-    </div>
-    <div class="form-field">
-      <label>選擇商店</label>
-      <select id="edit-rs-store"></select>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-field">
-        <label>開始日期</label>
-        <input type="date" id="edit-rs-start">
-      </div>
-      <div class="form-field">
-        <label>結束日期</label>
-        <input type="date" id="edit-rs-end">
-      </div>
-    </div>
-    <div class="form-field">
-      <label>狀態</label>
-      <select id="edit-rs-status">
-        <option value="active">進行中</option>
-        <option value="inactive">暫停</option>
-        <option value="ended">已結束</option>
-      </select>
-    </div>
-    <div class="form-field">
-      <label>備註</label>
-      <textarea id="edit-rs-notes" rows="2" style="resize:vertical"></textarea>
-    </div>
-    <div id="modal-edit-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-edit-rs')">取消</button>
-      <button class="btn btn-primary" onclick="submitEditRs()">
-        <i class="fas fa-save"></i> 儲存
-      </button>
-    </div>
-  </div>
-</div>
 
 <!-- Products Module (Batch 3) -->
 <div id="mod-products" class="mod-page">
@@ -8262,6 +8172,97 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <button class="btn btn-secondary" onclick="cwCloseRegister()">\u53d6\u6d88</button>
         <button class="btn btn-primary" id="regSubmitBtn" onclick="cwSubmitRegister()">\u78ba\u8a8d\u958b\u5361</button>
       </div>
+    </div>
+  </div>
+</div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Create Roadshow Modal -->
+<div class="modal-overlay" id="modal-create-rs">
+  <div class="modal">
+    <h3><i class="fas fa-plus-circle" style="margin-right:8px;color:var(--brand)"></i>新增 Roadshow 活動</h3>
+    <div class="form-field">
+      <label>Roadshow Code <span style="color:#EF4444">*</span></label>
+      <input type="text" id="new-rs-code" placeholder="例: RS2024-001" style="font-family:monospace">
+    </div>
+    <div class="form-field">
+      <label>活動名稱 <span style="color:#EF4444">*</span></label>
+      <input type="text" id="new-rs-name" placeholder="例: 北角健威坊 Roadshow">
+    </div>
+    <div class="form-field">
+      <label>選擇商店 (選填)</label>
+      <select id="new-rs-store">
+        <option value="">-- 不指定商店 --</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field">
+        <label>開始日期</label>
+        <input type="date" id="new-rs-start">
+      </div>
+      <div class="form-field">
+        <label>結束日期</label>
+        <input type="date" id="new-rs-end">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>備註</label>
+      <textarea id="new-rs-notes" rows="2" style="resize:vertical" placeholder="選填備註"></textarea>
+    </div>
+    <div id="modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-create-rs')">取消</button>
+      <button class="btn btn-primary" onclick="submitCreateRs()">
+        <i class="fas fa-save"></i> 儲存
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Roadshow Modal -->
+<div class="modal-overlay" id="modal-edit-rs">
+  <div class="modal">
+    <h3><i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯 Roadshow</h3>
+    <input type="hidden" id="edit-rs-id">
+    <div class="form-field">
+      <label>活動名稱 <span style="color:#EF4444">*</span></label>
+      <input type="text" id="edit-rs-name">
+    </div>
+    <div class="form-field">
+      <label>選擇商店</label>
+      <select id="edit-rs-store"></select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field">
+        <label>開始日期</label>
+        <input type="date" id="edit-rs-start">
+      </div>
+      <div class="form-field">
+        <label>結束日期</label>
+        <input type="date" id="edit-rs-end">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>狀態</label>
+      <select id="edit-rs-status">
+        <option value="active">進行中</option>
+        <option value="inactive">暫停</option>
+        <option value="ended">已結束</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>備註</label>
+      <textarea id="edit-rs-notes" rows="2" style="resize:vertical"></textarea>
+    </div>
+    <div id="modal-edit-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit-rs')">取消</button>
+      <button class="btn btn-primary" onclick="submitEditRs()">
+        <i class="fas fa-save"></i> 儲存
+      </button>
     </div>
   </div>
 </div>
@@ -9471,8 +9472,7 @@ async function cwApply(){
     var r=await fetch(API+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({member_no:memberNo,phone:phone,name_zh:name,district:district||null,bank_account:bank||null,id_no:idNo||null})})
     var d=await r.json()
-    if(d.ok){showMsg('applyMsg','ok','申請已提交！管理員審批後會通知你。
-你的申請已登記，請耐心等候。')}
+    if(d.ok){showMsg('applyMsg','ok','申請已提交！管理員審批後會通知你，請耐心等候。')}
     else{showMsg('applyMsg','err',d.error||'提交失敗，請重試')}
   }catch(e){showMsg('applyMsg','err','網絡錯誤，請重試')}
 }
