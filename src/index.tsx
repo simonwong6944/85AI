@@ -8034,6 +8034,68 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- ── CoWorkery Module ── -->
+<div id="mod-coworkery" class="mod-page">
+  <style>
+    .cw-tab{padding:8px 16px;border:1.5px solid #D1D5DB;background:#fff;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;color:#374151;transition:all 0.15s;}
+    .cw-tab.active{background:var(--brand);color:#fff;border-color:var(--brand);}
+    .cw-tab-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #E5E7EB;}
+    .cw-panel{display:none;}
+    .cw-stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+    .cw-stat{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:14px 18px;min-width:100px;text-align:center;}
+    .cw-stat .n{font-size:28px;font-weight:700;color:var(--brand);}
+    .cw-stat .l{font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+  </style>
+  <div class="cw-tab-bar">
+    <button class="cw-tab active" data-tab="cw-overview" onclick="cwTab('cw-overview')">\u7e3d\u89bd</button>
+    <button class="cw-tab" data-tab="cw-approval" onclick="cwTab('cw-approval')">\u5f85\u5be9\u6279</button>
+    <button class="cw-tab" data-tab="cw-sessions" onclick="cwTab('cw-sessions')">\u5834\u6b21\u8a2d\u5b9a</button>
+    <button class="cw-tab" data-tab="cw-assign" onclick="cwTab('cw-assign')">\u6d3e\u66f4</button>
+    <button class="cw-tab" data-tab="cw-payroll" onclick="cwTab('cw-payroll')">\u6253\u5361\u51fa\u7cae</button>
+  </div>
+  <!-- Tab 1: 總覽 -->
+  <div id="cw-overview" class="cw-panel" style="display:block">
+    <div class="cw-stat-row">
+      <div class="cw-stat"><div class="n" id="cwStatTotal">-</div><div class="l">\u7e3d\u6578</div></div>
+      <div class="cw-stat"><div class="n" id="cwStatActive">-</div><div class="l">ACTIVE</div></div>
+      <div class="cw-stat"><div class="n" id="cwStatPending">-</div><div class="l">\u5f85\u5be9\u6279</div></div>
+      <div class="cw-stat"><div class="n" id="cwStatSusp">-</div><div class="l">\u505c\u724c</div></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input id="cwSearch" placeholder="\u641c\u5c0b CW\u7de8\u865f/\u59d3\u540d/\u96fb\u8a71/\u6703\u54e1\u865f" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px" onkeydown="if(event.key==='Enter')cwLoadList()">
+      <button class="btn btn-secondary" onclick="cwLoadList()">\u641c\u5c0b</button>
+      <button class="btn btn-secondary" onclick="location.href='/api/admin/coworkery/export/csv'">\u5305\u51faCSV</button>
+      <button class="btn btn-primary" onclick="cwOpenRegister()">\uff0b \u958b\u5361</button>
+    </div>
+    <div id="cwListBox">\u8f09\u5165\u4e2d\u2026</div>
+  </div>
+  <!-- Tab 2: 待審批 -->
+  <div id="cw-approval" class="cw-panel">
+    <div id="cwApprovalBox">\u8f09\u5165\u4e2d\u2026</div>
+  </div>
+  <!-- Tab 3: 場次設定 -->
+  <div id="cw-sessions" class="cw-panel">
+    <div id="cwSessionsBox">\u8f09\u5165\u4e2d\u2026</div>
+  </div>
+  <!-- Tab 4: 派更 -->
+  <div id="cw-assign" class="cw-panel">
+    <div style="margin-bottom:12px">
+      <select id="cwAssignSession" style="padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;min-width:300px" onchange="cwLoadAssign()"></select>
+    </div>
+    <div id="cwAssignBox">\u8acb\u5148\u9078\u64c7\u5834\u6b21</div>
+  </div>
+  <!-- Tab 5: 打卡出糧 -->
+  <div id="cw-payroll" class="cw-panel">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+      <select id="cwPayrollSession" style="padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;min-width:300px" onchange="cwLoadPayroll()"></select>
+      <button class="btn btn-primary" onclick="cwCalcPayroll()">\u8a08\u7b97\u51fa\u7cae</button>
+      <button class="btn btn-secondary" onclick="cwExportPayroll()">\u5305\u51faCSV</button>
+    </div>
+    <div id="cwPayrollTotals" style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px"></div>
+    <div id="cwPayrollBox">\u8acb\u5148\u9078\u64c7\u5834\u6b21</div>
+  </div>
+</div>
+
 <script>
 // ── State ──
 var allStores = [];
@@ -8094,7 +8156,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -8105,6 +8167,7 @@ function switchMod(id){
   if(id==='mod-products'){ loadProductCategories(); loadProducts(); }
   if(id==='mod-useful-links') loadUsefulLinks();
   if(id==='mod-jobs') loadJobs();
+  if(id==='mod-coworkery') cwTab('cw-overview');
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
@@ -8697,6 +8760,273 @@ function toggleAppStatus(appId,newStatus){
         loadJobs();
       }else{alert(d.error||'更新失敗');}
     }).catch(function(){alert('網絡錯誤');});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CoWorkery 後台 JS
+// ═══════════════════════════════════════════════════════════════════════════════
+var CW_API='/api/admin/coworkery';
+async function cwGet(url){var r=await fetch(url);return r.json();}
+async function cwSend(url,method,body){
+  var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  return r.json();
+}
+function cwEsc(s){return String(s??'').replace(/[&<>"']/g,function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];});}
+function cwCents(v){return '$'+((Number(v)||0)/100).toFixed(2);}
+function cwMin(v){var m=Number(v)||0;return Math.floor(m/60)+'h'+(m%60)+'m';}
+
+function cwTab(id){
+  document.querySelectorAll('.cw-panel').forEach(function(p){p.style.display='none';});
+  document.querySelectorAll('.cw-tab').forEach(function(t){t.classList.remove('active');});
+  var el=document.getElementById(id);if(el)el.style.display='block';
+  var tb=document.querySelector('.cw-tab[data-tab="'+id+'"]');if(tb)tb.classList.add('active');
+  if(id==='cw-overview') cwLoadList();
+  if(id==='cw-approval') cwLoadApproval();
+  if(id==='cw-sessions') cwLoadSessions();
+  if(id==='cw-assign')   cwLoadSessionOptions('cwAssignSession');
+  if(id==='cw-payroll')  cwLoadSessionOptions('cwPayrollSession');
+}
+
+async function cwLoadList(){
+  var q=encodeURIComponent(document.getElementById('cwSearch')?.value||'');
+  var d=await cwGet(CW_API+'/list?q='+q);
+  if(!d.ok){document.getElementById('cwListBox').innerHTML='\u8f09\u5165\u5931\u6557\uff1a'+cwEsc(d.error);return;}
+  var s=d.stat||{};
+  ['cwStatTotal','cwStatActive','cwStatPending','cwStatSusp'].forEach(function(id,i){
+    var el=document.getElementById(id);if(el)el.textContent=[s.total,s.active,s.pending,s.suspended][i]??0;
+  });
+  document.getElementById('cwListBox').innerHTML=cwBuildTable(d.list,false);
+}
+
+function cwBuildTable(list,approvalMode){
+  if(!list||!list.length)return '<p style="color:#888">\u6c92\u6709\u8cc7\u6599</p>';
+  var cols=['\u6703\u54e1\u7de8\u865f','\u59d3\u540d','\u96fb\u8a71','\u5730\u5340','\u9810\u8a2d\u6642\u85aa','\u72c0\u614b','\u64cd\u4f5c'];
+  var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6;text-align:left">';
+  cols.forEach(function(c){h+='<th style="padding:8px 10px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">'+c+'</th>';});
+  h+='</tr></thead><tbody>';
+  list.forEach(function(r){
+    h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+      '<td style="padding:8px 10px;font-family:monospace">'+cwEsc(r.cw_no)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(r.name_zh)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(r.phone)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(r.district||'')+'</td>'+
+      '<td style="padding:8px 10px">'+cwCents(r.default_hourly_rate)+'/h</td>'+
+      '<td style="padding:8px 10px">'+cwBadge(r.status)+'</td>'+
+      '<td style="padding:8px 10px">'+cwRowBtns(r,approvalMode)+'</td>'+
+      '</tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+function cwBadge(s){
+  var m={ACTIVE:'#16a34a',PENDING:'#d97706',REJECTED:'#dc2626',SUSPENDED:'#6b7280'};
+  return '<span style="padding:2px 8px;border-radius:10px;color:#fff;font-size:11px;background:'+(m[s]||'#999')+'">'+cwEsc(s)+'</span>';
+}
+function cwRowBtns(r,approvalMode){
+  if(approvalMode){
+    return '<button class="btn btn-primary btn-sm" onclick="cwAction(\''+r.cw_no+'\',\'APPROVE\')">\u6279\u51c6</button> '+
+           '<button class="btn btn-danger btn-sm" onclick="cwReject(\''+r.cw_no+'\')">\u62d2\u7d55</button>';
+  }
+  var b='<button class="btn btn-secondary btn-sm" onclick="cwEditRate(\''+r.cw_no+'\','+(r.default_hourly_rate||0)+')">\u6539\u6642\u85aa</button>';
+  if(r.status==='ACTIVE')    b+=' <button class="btn btn-secondary btn-sm" onclick="cwAction(\''+r.cw_no+'\',\'SUSPEND\')">\u505c\u724c</button>';
+  if(r.status==='SUSPENDED') b+=' <button class="btn btn-secondary btn-sm" onclick="cwAction(\''+r.cw_no+'\',\'REACTIVATE\')">\u5fa9\u724c</button>';
+  if(r.id_front_key)         b+=' <button class="btn btn-secondary btn-sm" onclick="cwViewFile(\''+cwEsc(r.id_front_key)+'\')">\u8b49\u4ef6</button>';
+  return b;
+}
+async function cwAction(cw_no,action){
+  if(!confirm('\u78ba\u5b9a '+action+'?')) return;
+  var d=await cwSend(CW_API+'/list','PATCH',{cw_no:cw_no,action:action});
+  if(d.ok){cwLoadList();cwLoadApproval();}else alert('\u5931\u6557\uff1a'+d.error);
+}
+async function cwReject(cw_no){
+  var reason=prompt('\u62d2\u7d55\u539f\u56e0?')||'';
+  var d=await cwSend(CW_API+'/list','PATCH',{cw_no:cw_no,action:'REJECT',reject_reason:reason});
+  if(d.ok){cwLoadList();cwLoadApproval();}else alert('\u5931\u6557\uff1a'+d.error);
+}
+async function cwEditRate(cw_no,cur){
+  var v=prompt('\u9810\u8a2d\u6642\u85aa(\u5143/\u5c0f\u6642):',((cur||0)/100).toFixed(2));
+  if(v===null)return;
+  var d=await cwSend(CW_API+'/list','PATCH',{cw_no:cw_no,default_hourly_rate:Math.round(parseFloat(v)*100)||0});
+  if(d.ok)cwLoadList();else alert('\u5931\u6557\uff1a'+d.error);
+}
+function cwViewFile(key){window.open(CW_API+'/files/'+key,'_blank');}
+
+async function cwLoadApproval(){
+  var d=await cwGet(CW_API+'/list?status=PENDING');
+  document.getElementById('cwApprovalBox').innerHTML=d.ok?cwBuildTable(d.list,true):'\u8f09\u5165\u5931\u6557';
+}
+
+function cwOpenRegister(){
+  var mn=prompt('\u6703\u54e1\u7de8\u865f(member_no):');if(!mn)return;
+  var nz=prompt('\u4e2d\u6587\u59d3\u540d:');if(!nz)return;
+  var ph=prompt('\u96fb\u8a71:');if(!ph)return;
+  var rt=prompt('\u9810\u8a2d\u6642\u85aa(\u5143/\u5c0f\u6642,\u53ef\u7a7a):','0')||'0';
+  var fd=new FormData();
+  fd.append('member_no',mn);fd.append('name_zh',nz);fd.append('phone',ph);
+  fd.append('default_hourly_rate',String(Math.round(parseFloat(rt)*100)||0));
+  fetch(CW_API+'/register',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){alert('\u958b\u5361\u6210\u529f\uff1a'+d.cw_no);cwLoadList();}else alert('\u5931\u6557\uff1a'+d.error);
+  });
+}
+
+var _cwSessions=[];
+async function cwLoadSessionOptions(selId){
+  var d=await cwGet(CW_API+'/sessions');if(!d.ok)return;
+  _cwSessions=d.list||[];
+  var sel=document.getElementById(selId);if(!sel)return;
+  sel.innerHTML='<option value="">\u2014 \u9078\u64c7\u5834\u6b21 \u2014</option>'+
+    _cwSessions.map(function(s){
+      return '<option value="'+cwEsc(s.roadshow_code)+'">'+cwEsc(s.roadshow_code)+'\uff5c'+cwEsc(s.roadshow_name||'')+'</option>';
+    }).join('');
+}
+
+async function cwLoadSessions(){
+  var d=await cwGet(CW_API+'/sessions');
+  if(!d.ok){document.getElementById('cwSessionsBox').innerHTML='\u8f09\u5165\u5931\u6557';return;}
+  var cols=['\u5834\u6b21\u78bc','\u540d\u7a31','\u5ea7\u6a19','\u534a\u5f91(m)','\u9700\u6c42','\u6642\u85aa','\u8eca\u99ac','\u81b3\u98df','\u54c1\u724c','\u64cd\u4f5c'];
+  var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6;text-align:left">';
+  cols.forEach(function(c){h+='<th style="padding:8px 10px;font-weight:600;border-bottom:1px solid #E5E7EB;white-space:nowrap">'+c+'</th>';});
+  h+='</tr></thead><tbody>';
+  (d.list||[]).forEach(function(s){
+    var hasGeo=s.latitude!=null&&s.longitude!=null;
+    var safe=JSON.stringify(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+      '<td style="padding:8px 10px;font-family:monospace">'+cwEsc(s.roadshow_code)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(s.roadshow_name||'')+'</td>'+
+      '<td style="padding:8px 10px">'+(hasGeo?s.latitude.toFixed(4)+','+s.longitude.toFixed(4):'<span style="color:#dc2626">\u672a\u8a2d</span>')+'</td>'+
+      '<td style="padding:8px 10px">'+(s.geofence_radius||'-')+'</td>'+
+      '<td style="padding:8px 10px">'+(s.headcount_needed||0)+'</td>'+
+      '<td style="padding:8px 10px">'+cwCents(s.session_hourly_rate)+'</td>'+
+      '<td style="padding:8px 10px">'+cwCents(s.transport_allowance)+'</td>'+
+      '<td style="padding:8px 10px">'+cwCents(s.meal_allowance)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(s.brand_ref||'')+'</td>'+
+      '<td style="padding:8px 10px"><button class="btn btn-secondary btn-sm" onclick=\'cwEditSession('+safe+')\'>\u8a2d\u5b9a</button></td>'+
+      '</tr>';
+  });
+  document.getElementById('cwSessionsBox').innerHTML=h+'</tbody></table></div>';
+}
+function cwEditSession(s){
+  var lat=prompt('\u7def\u5ea6 latitude:',s.latitude??'');if(lat===null)return;
+  var lng=prompt('\u7d93\u5ea6 longitude:',s.longitude??'');if(lng===null)return;
+  var radius=prompt('Geofence \u534a\u5f91(\u7c73):',s.geofence_radius??250);
+  var head=prompt('\u9700\u6c42\u4eba\u6578:',s.headcount_needed??0);
+  var rate=prompt('\u5834\u6b21\u6642\u85aa(\u5143/\u5c0f\u6642):',((s.session_hourly_rate||0)/100).toFixed(2));
+  var tr=prompt('\u8eca\u99ac\u8cbb(\u5143/\u6b21):',((s.transport_allowance||0)/100).toFixed(2));
+  var meal=prompt('\u81b3\u98df\u6d25\u8cbc(\u5143/\u6b21):',((s.meal_allowance||0)/100).toFixed(2));
+  var brand=prompt('\u54c1\u724c\u65b9\u6a19\u8a18:',s.brand_ref||'');
+  cwSend(CW_API+'/sessions','POST',{
+    roadshow_code:s.roadshow_code,
+    latitude:parseFloat(lat)||null,longitude:parseFloat(lng)||null,
+    geofence_radius:parseInt(radius)||250,headcount_needed:parseInt(head)||0,
+    session_hourly_rate:Math.round(parseFloat(rate)*100)||0,
+    transport_allowance:Math.round(parseFloat(tr)*100)||0,
+    meal_allowance:Math.round(parseFloat(meal)*100)||0,
+    brand_ref:brand||null
+  }).then(function(d){if(d.ok)cwLoadSessions();else alert('\u5931\u6557\uff1a'+d.error);});
+}
+
+async function cwLoadAssign(){
+  var code=(document.getElementById('cwAssignSession')||{}).value||'';
+  if(!code){document.getElementById('cwAssignBox').innerHTML='\u8acb\u5148\u9078\u64c7\u5834\u6b21';return;}
+  var d=await cwGet(CW_API+'/assign?roadshow_code='+encodeURIComponent(code));
+  if(!d.ok){document.getElementById('cwAssignBox').innerHTML='\u8f09\u5165\u5931\u6557';return;}
+  var h='<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">\u5831\u540d\u540d\u55ae</h4>';
+  if(!d.applications||!d.applications.length)h+='<p style="color:#888;margin-bottom:12px">\u66ab\u7121\u5831\u540d</p>';
+  else{
+    h+='<div style="overflow-x:auto;margin-bottom:12px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6">';
+    ['\u5831\u540d\u540d\u55ae — CW\u7de8\u865f','\u59d3\u540d','\u96fb\u8a71','\u5730\u5340','\u72c0\u614b','\u64cd\u4f5c'].forEach(function(x){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB">'+x+'</th>';});
+    h+='</tr></thead><tbody>';
+    d.applications.forEach(function(a){
+      h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+        '<td style="padding:7px 9px;font-family:monospace">'+cwEsc(a.cw_no)+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.name_zh)+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.phone)+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.district||'')+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.status)+'</td>'+
+        '<td style="padding:7px 9px"><button class="btn btn-primary btn-sm" onclick="cwAssign(\''+code+'\',\''+a.cw_no+'\')">\u6d3e\u66f4</button></td>'+
+        '</tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  h+='<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">\u5df2\u6d3e\u66f4</h4>';
+  if(!d.assignments||!d.assignments.length)h+='<p style="color:#888;margin-bottom:12px">\u66ab\u7121\u6d3e\u66f4</p>';
+  else{
+    h+='<div style="overflow-x:auto;margin-bottom:12px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6">';
+    ['CW\u7de8\u865f','\u59d3\u540d','\u7279\u5225\u6642\u85aa','\u64cd\u4f5c'].forEach(function(x){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB">'+x+'</th>';});
+    h+='</tr></thead><tbody>';
+    d.assignments.forEach(function(a){
+      h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+        '<td style="padding:7px 9px;font-family:monospace">'+cwEsc(a.cw_no)+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.name_zh)+'</td>'+
+        '<td style="padding:7px 9px">'+(a.assigned_hourly_rate?cwCents(a.assigned_hourly_rate)+'\uff08\u7279\u5225\uff09':'\uff08\u6cbf\u7528 fallback\uff09')+'</td>'+
+        '<td style="padding:7px 9px"><button class="btn btn-danger btn-sm" onclick="cwUnassign(\''+code+'\',\''+a.cw_no+'\')">\u53d6\u6d88</button></td>'+
+        '</tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  h+='<button class="btn btn-secondary" onclick="cwManualAssign(\''+code+'\')">\uff0b \u76f4\u63a5\u6d3e\u66f4\uff08\u8f38\u5165CW\u7de8\u865f\uff09</button>';
+  document.getElementById('cwAssignBox').innerHTML=h;
+}
+async function cwAssign(code,cw_no){
+  var v=prompt('\u7279\u5225\u6642\u85aa(\u5143/\u5c0f\u6642,\u7559\u7a7a=fallback):','');
+  var rate=(v===''||v===null)?0:Math.round(parseFloat(v)*100)||0;
+  var d=await cwSend(CW_API+'/assign','POST',{roadshow_code:code,cw_no:cw_no,assigned_hourly_rate:rate});
+  if(d.ok)cwLoadAssign();else alert('\u5931\u6557\uff1a'+d.error);
+}
+function cwManualAssign(code){var cw_no=prompt('CW\u7de8\u865f:');if(!cw_no)return;cwAssign(code,cw_no);}
+async function cwUnassign(code,cw_no){
+  if(!confirm('\u53d6\u6d88\u6b64\u6d3e\u66f4?'))return;
+  var d=await cwSend(CW_API+'/assign','POST',{roadshow_code:code,cw_no:cw_no,remove:true});
+  if(d.ok)cwLoadAssign();else alert('\u5931\u6557\uff1a'+d.error);
+}
+
+async function cwLoadPayroll(){
+  var code=(document.getElementById('cwPayrollSession')||{}).value||'';
+  var totEl=document.getElementById('cwPayrollTotals');
+  var boxEl=document.getElementById('cwPayrollBox');
+  if(!code){boxEl.innerHTML='\u8acb\u5148\u9078\u64c7\u5834\u6b21';totEl.textContent='';return;}
+  var d=await cwGet(CW_API+'/payroll?roadshow_code='+encodeURIComponent(code));
+  if(!d.ok){boxEl.innerHTML='\u8f09\u5165\u5931\u6557';return;}
+  var t=d.totals||{};
+  totEl.textContent='\u4eba\u6578 '+(t.count||0)+'\uff5c\u7e3d\u5de5\u6642 '+cwMin(t.total_minutes)+'\uff5c\u7e3d\u61c9\u4ed8 '+cwCents(t.total_payable);
+  if(!d.list||!d.list.length){boxEl.innerHTML='<p style="color:#888">\u5c1a\u672a\u8a08\u7b97\u51fa\u7cae\uff0c\u6309\u300c\u8a08\u7b97\u51fa\u7cae\u300d</p>';return;}
+  var cols=['CW\u7de8\u865f','\u59d3\u540d','\u5de5\u6642','\u6642\u85aa','\u5de5\u8cc7','\u8eca\u99ac','\u81b3\u98df','\u7e3d\u61c9\u4ed8','\u72c0\u614b','\u64cd\u4f5c'];
+  var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6">';
+  cols.forEach(function(c){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB;white-space:nowrap">'+c+'</th>';});
+  h+='</tr></thead><tbody>';
+  d.list.forEach(function(r){
+    var btn='';
+    if(r.status==='PENDING')  btn='<button class="btn btn-primary btn-sm" onclick="cwPayAction(\''+code+'\',\''+r.cw_no+'\',\'APPROVE\')">\u6279\u51c6</button>';
+    if(r.status==='APPROVED') btn='<button class="btn btn-primary btn-sm" onclick="cwPayAction(\''+code+'\',\''+r.cw_no+'\',\'PAID\')">\u6a19\u8a18\u5df2\u4ed8</button>';
+    if(r.status==='PAID')     btn='<button class="btn btn-secondary btn-sm" onclick="cwPayAction(\''+code+'\',\''+r.cw_no+'\',\'REVERT\')">\u9084\u539f</button>';
+    h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+      '<td style="padding:7px 9px;font-family:monospace">'+cwEsc(r.cw_no)+'</td>'+
+      '<td style="padding:7px 9px">'+cwEsc(r.name_zh)+'</td>'+
+      '<td style="padding:7px 9px">'+cwMin(r.total_minutes)+'</td>'+
+      '<td style="padding:7px 9px">'+cwCents(r.hourly_rate)+'</td>'+
+      '<td style="padding:7px 9px">'+cwCents(r.wage_amount)+'</td>'+
+      '<td style="padding:7px 9px">'+cwCents(r.transport_total)+'</td>'+
+      '<td style="padding:7px 9px">'+cwCents(r.meal_total)+'</td>'+
+      '<td style="padding:7px 9px"><b>'+cwCents(r.total_payable)+'</b></td>'+
+      '<td style="padding:7px 9px">'+cwBadge(r.status)+'</td>'+
+      '<td style="padding:7px 9px">'+btn+'</td>'+
+      '</tr>';
+  });
+  boxEl.innerHTML=h+'</tbody></table></div>';
+}
+async function cwCalcPayroll(){
+  var code=(document.getElementById('cwPayrollSession')||{}).value||'';
+  if(!code){alert('\u8acb\u5148\u9078\u64c7\u5834\u6b21');return;}
+  if(!confirm('\u8a08\u7b97\u6b64\u5834\u6b21\u51fa\u7cae\uff1f\uff08\u53ea\u8a08\u5df2\u4e0b\u73ed\u6253\u5361\u8005\uff09'))return;
+  var d=await cwSend(CW_API+'/payroll/calculate','POST',{roadshow_code:code});
+  if(d.ok){alert('\u5df2\u7522\u751f '+d.generated+' \u5f35\u7cae\u55ae');cwLoadPayroll();}else alert('\u5931\u6557\uff1a'+d.error);
+}
+async function cwPayAction(code,cw_no,action){
+  var d=await cwSend(CW_API+'/payroll','PATCH',{roadshow_code:code,cw_no:cw_no,action:action});
+  if(d.ok)cwLoadPayroll();else alert('\u5931\u6557\uff1a'+d.error);
+}
+function cwExportPayroll(){
+  var code=(document.getElementById('cwPayrollSession')||{}).value||'';
+  location.href=CW_API+'/payroll?export=csv'+(code?'&roadshow_code='+encodeURIComponent(code):'');
 }
 </script>
 </body>
