@@ -2182,6 +2182,56 @@ async function verifyCw(db: D1Database, cw_no: string, phone: string) {
   return row
 }
 
+// ── 3B-0. 長者自助申請 ────────────────────────────────────────────────────────
+app.post('/api/coworkery/apply', async (c) => {
+  try {
+    const { DB } = c.env as Env
+    const body = await c.req.json() as {
+      member_no?: string; phone?: string; name_zh?: string;
+      district?: string; bank_account?: string; id_no?: string;
+    }
+    const member_no = (body.member_no ?? '').trim()
+    const phone     = (body.phone ?? '').trim()
+    const name_zh   = (body.name_zh ?? '').trim()
+    if (!member_no || !phone || !name_zh) return c.json({ ok: false, error: '請填寫會員編號、電話及姓名' })
+
+    // 1. 確認係會員（member_no 存在於 members 表）
+    const member = await DB.prepare(
+      `SELECT id FROM members WHERE member_no=? LIMIT 1`
+    ).bind(member_no).first<{ id: number }>()
+    if (!member) return c.json({ ok: false, error: `找不到會員編號 ${member_no}，請確認編號正確` })
+
+    // 2. 檢查係咪已有申請（避免重複）
+    const existing = await DB.prepare(
+      `SELECT cw_no, status FROM co_workery WHERE member_no=? LIMIT 1`
+    ).bind(member_no).first<{ cw_no: string; status: string }>()
+    if (existing) {
+      if (existing.status === 'ACTIVE')    return c.json({ ok: false, error: `你已係 CoWorkery，CW 編號：${existing.cw_no}` })
+      if (existing.status === 'PENDING')   return c.json({ ok: false, error: '你的申請正在審批中，請耐心等候' })
+      if (existing.status === 'REJECTED')  return c.json({ ok: false, error: '你的申請已被拒絕，如有疑問請聯絡管理員' })
+      if (existing.status === 'SUSPENDED') return c.json({ ok: false, error: '你的帳戶已被暫停，如有疑問請聯絡管理員' })
+    }
+
+    // 3. 生成臨時 CW 編號（PENDING 狀態，審批後才正式）
+    //    取現有最大 counter 值 +1，padding 6 位
+    const counter = await DB.prepare(
+      `SELECT COALESCE(MAX(CAST(SUBSTR(cw_no,3) AS INTEGER)),0)+1 AS next FROM co_workery`
+    ).first<{ next: number }>()
+    const nextNum = counter?.next ?? 1
+    const cw_no = 'CW' + String(nextNum).padStart(6, '0')
+
+    // 4. Insert
+    await DB.prepare(`
+      INSERT INTO co_workery (cw_no, member_no, phone, name_zh, district, bank_account, id_no, status, default_hourly_rate)
+      VALUES (?,?,?,?,?,?,?,'PENDING',0)
+    `).bind(cw_no, member_no, phone, name_zh, body.district||null, body.bank_account||null, body.id_no||null).run()
+
+    return c.json({ ok: true, cw_no })
+  } catch (e: any) {
+    return c.json({ ok: false, error: e.message ?? '伺服器錯誤' })
+  }
+})
+
 // ── 3B-1. 上班打卡 ──────────────────────────────────────────────────────────
 app.post('/api/coworkery/clock-in', async (c) => {
   try {
