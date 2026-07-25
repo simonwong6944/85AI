@@ -1764,7 +1764,8 @@ app.get('/membership/card/:no', async (c) => {
 app.get('/accounting',  (c) => c.html(comingSoonHtml('Accounting', '財務管理')))
 app.get('/governance',  (c) => c.html(comingSoonHtml('Governance', '治理管理')))
 app.get('/events',      (c) => c.html(comingSoonHtml('Events', '活動管理')))
-app.get('/volunteers',  (c) => c.html(comingSoonHtml('Volunteers', '義工管理')))
+app.get('/volunteers',    (c) => c.html(coworkeryAppHtml()))   // /volunteers → 長者打卡頁
+app.get('/app/coworkery', (c) => c.html(coworkeryAppHtml()))   // 正式打卡頁 URL
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CoWorkery 後台管理 API（受既有 /api/admin/* middleware 保護）
@@ -2331,6 +2332,45 @@ app.post('/api/coworkery/clock-out', async (c) => {
     `).bind(lat, lng, dist, worked, flag, selfieKey, roadshow_code, cw_no).run()
 
     return c.json({ ok: true, worked_minutes: worked, flag })
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ── 3B-5. 長者端：我的今日/近期派更場次（兼登入驗證）─────────────────────────
+// GET /api/coworkery/my-shifts?cw_no=CW000001&phone=12345678
+// 成功回傳 { ok:true, name, shifts:[...] }；失敗 401 { ok:false, error }
+app.get('/api/coworkery/my-shifts', async (c) => {
+  try {
+    const cw_no = (c.req.query('cw_no') || '').trim().toUpperCase()
+    const phone  = (c.req.query('phone')  || '').trim()
+    if (!cw_no || !phone) return c.json({ ok: false, error: '請提供 cw_no 與 phone' }, 400)
+
+    // 自足驗證：phone + cw_no 核對 co_workery 表
+    const cw = await verifyCw(c.env.DB, cw_no, phone)
+    if (!cw) return c.json({ ok: false, error: '身份驗證失敗，請確認 CW 編號與電話' }, 401)
+
+    // 已派更且場次未過期（end_date >= 昨日，兼顧跨夜班）的場次
+    // 同時帶出當日/近期打卡狀態（LEFT JOIN attendance_records）
+    const { results } = await c.env.DB.prepare(`
+      SELECT
+        sg.roadshow_code,
+        r.name,
+        r.start_date,
+        r.end_date,
+        a.clock_in_at,
+        a.clock_out_at
+      FROM session_assignments sg
+      JOIN roadshows r ON r.code = sg.roadshow_code
+      LEFT JOIN attendance_records a
+             ON a.roadshow_code = sg.roadshow_code
+            AND a.cw_no         = sg.cw_no
+      WHERE sg.cw_no = ?
+        AND date(r.end_date) >= date('now', '-1 day')
+      ORDER BY r.start_date ASC
+    `).bind(cw_no).all()
+
+    return c.json({ ok: true, name: cw.name_zh, shifts: results })
   } catch (e) {
     return c.json({ ok: false, error: String(e) }, 500)
   }
@@ -9028,6 +9068,272 @@ function cwExportPayroll(){
   var code=(document.getElementById('cwPayrollSession')||{}).value||'';
   location.href=CW_API+'/payroll?export=csv'+(code?'&roadshow_code='+encodeURIComponent(code):'');
 }
+</script>
+</body>
+</html>`
+}
+
+// ─── CoWorkery 長者手機打卡頁 ──────────────────────────────────────────────────
+function coworkeryAppHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>CoWorkery 打卡 - 老有聯盟85</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang HK","Microsoft JhengHei",sans-serif;background:#f4f6f8;color:#1f2937;font-size:18px;line-height:1.6}
+  .wrap{max-width:480px;margin:0 auto;padding:16px;min-height:100vh}
+  .card{background:#fff;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  h1{font-size:22px;color:#0369a1;margin-bottom:4px}
+  .sub{color:#6b7280;font-size:15px}
+  label{display:block;font-weight:600;margin:12px 0 6px}
+  input,select{width:100%;padding:14px;font-size:18px;border:2px solid #d1d5db;border-radius:12px}
+  input:focus,select:focus{outline:none;border-color:#0284c7}
+  .btn{display:block;width:100%;padding:18px;font-size:20px;font-weight:700;border:none;border-radius:14px;cursor:pointer;margin-top:14px;color:#fff}
+  .btn-in{background:#16a34a}
+  .btn-out{background:#dc2626}
+  .btn-login{background:#0284c7}
+  .btn:disabled{background:#9ca3af;cursor:not-allowed}
+  .msg{padding:14px;border-radius:12px;margin:12px 0;font-size:16px;display:none;white-space:pre-line}
+  .msg.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;display:block}
+  .msg.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;display:block}
+  .msg.info{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;display:block}
+  .hide{display:none}
+  .shift{border:2px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:10px}
+  .shift.sel{border-color:#0284c7;background:#f0f9ff}
+  .shift b{font-size:19px}
+  .selfie-preview{width:100%;border-radius:12px;margin-top:10px;display:none}
+  .status-line{font-size:16px;color:#374151;margin-top:8px;min-height:24px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <h1>👷 CoWorkery 打卡</h1>
+    <div class="sub">老有聯盟85 · 工作打卡系統</div>
+  </div>
+
+  <!-- 登入區 -->
+  <div class="card" id="loginCard">
+    <label for="cwNo">CW 編號</label>
+    <input id="cwNo" placeholder="例如 CW000001" autocomplete="off" autocapitalize="characters">
+    <label for="cwPhone">登記電話</label>
+    <input id="cwPhone" inputmode="numeric" placeholder="8 位數字電話" autocomplete="off">
+    <button class="btn btn-login" onclick="cwLogin()">登入</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+
+  <!-- 主區（登入後顯示）-->
+  <div id="mainCard" class="hide">
+    <div class="card">
+      <div class="sub">你好，<b id="cwName"></b></div>
+      <label for="shiftSelect">選擇今日場次</label>
+      <select id="shiftSelect" onchange="cwPickShift()"><option value="">載入中…</option></select>
+      <div class="status-line" id="shiftStatus"></div>
+    </div>
+
+    <div class="card" id="clockCard">
+      <div class="msg info" id="geoMsg">📍 打卡時會取得你的位置，請允許定位權限</div>
+
+      <label>自拍（可選）</label>
+      <input type="file" accept="image/*" capture="user" id="selfieInput" onchange="cwPreviewSelfie()">
+      <img class="selfie-preview" id="selfiePreview" alt="自拍預覽">
+
+      <button class="btn btn-in"  id="btnIn"  onclick="cwClock('in')"  disabled>🟢 打卡上班</button>
+      <button class="btn btn-out" id="btnOut" onclick="cwClock('out')" disabled>🔴 打卡下班</button>
+      <div class="msg" id="clockMsg"></div>
+    </div>
+
+    <div class="card">
+      <button class="btn" style="background:#6b7280" onclick="cwLogout()">登出</button>
+    </div>
+  </div>
+
+</div>
+<script>
+var API='/api/coworkery'
+var CW={cw_no:'',phone:'',name:''}
+
+function showMsg(el,type,text){
+  var e=document.getElementById(el)
+  e.className='msg '+type
+  e.textContent=text
+}
+function hideMsg(el){document.getElementById(el).className='msg'}
+
+// ── 登入（以 my-shifts 兼任驗證）──
+async function cwLogin(){
+  var cw_no=document.getElementById('cwNo').value.trim().toUpperCase()
+  var phone=document.getElementById('cwPhone').value.trim()
+  if(!cw_no||!phone){showMsg('loginMsg','err','請輸入 CW 編號與電話');return}
+  showMsg('loginMsg','info','驗證中…')
+  try{
+    var r=await fetch(API+'/my-shifts?cw_no='+encodeURIComponent(cw_no)+'&phone='+encodeURIComponent(phone))
+    var d=await r.json()
+    if(!d.ok){showMsg('loginMsg','err',d.error||'驗證失敗');return}
+    CW={cw_no:cw_no,phone:phone,name:d.name||cw_no}
+    sessionStorage.setItem('cw_session',JSON.stringify(CW))
+    document.getElementById('cwName').textContent=CW.name
+    document.getElementById('loginCard').classList.add('hide')
+    document.getElementById('mainCard').classList.remove('hide')
+    fillShifts(d.shifts||[])
+  }catch(e){showMsg('loginMsg','err','網絡錯誤，請重試')}
+}
+
+function fillShifts(shifts){
+  window._cwShifts=shifts
+  var sel=document.getElementById('shiftSelect')
+  if(!shifts.length){
+    sel.innerHTML='<option value="">今日暫無派更場次</option>'
+    cwPickShift()
+    return
+  }
+  sel.innerHTML='<option value="">— 請選擇場次 —</option>'+
+    shifts.map(function(s){
+      var label=s.roadshow_code+'｜'+(s.name||'')+'（'+s.start_date+'～'+s.end_date+'）'
+      return '<option value="'+s.roadshow_code+'">'+label+'</option>'
+    }).join('')
+  // 若只有一個場次，自動選中
+  if(shifts.length===1){sel.value=shifts[0].roadshow_code}
+  cwPickShift()
+}
+
+function cwPickShift(){
+  var code=document.getElementById('shiftSelect').value
+  var s=(window._cwShifts||[]).find(function(x){return x.roadshow_code===code})
+  var btnIn=document.getElementById('btnIn')
+  var btnOut=document.getElementById('btnOut')
+  hideMsg('clockMsg')
+  if(!s){
+    document.getElementById('shiftStatus').textContent=''
+    btnIn.disabled=true;btnOut.disabled=true
+    return
+  }
+  if(s.clock_out_at){
+    document.getElementById('shiftStatus').textContent='✅ 此場次已完成打卡（上班 + 下班）'
+    btnIn.disabled=true;btnOut.disabled=true
+  }else if(s.clock_in_at){
+    document.getElementById('shiftStatus').textContent='🟢 已打卡上班：'+s.clock_in_at+'，可打卡下班'
+    btnIn.disabled=true;btnOut.disabled=false
+  }else{
+    document.getElementById('shiftStatus').textContent='尚未打卡，請先打卡上班'
+    btnIn.disabled=false;btnOut.disabled=true
+  }
+}
+
+function cwPreviewSelfie(){
+  var f=document.getElementById('selfieInput').files[0]
+  if(!f)return
+  var img=document.getElementById('selfiePreview')
+  img.src=URL.createObjectURL(f)
+  img.style.display='block'
+}
+
+// ── 取得定位（Promise）──
+function getPos(){
+  return new Promise(function(resolve,reject){
+    if(!navigator.geolocation){reject('此裝置不支援定位');return}
+    navigator.geolocation.getCurrentPosition(
+      function(p){resolve({lat:p.coords.latitude,lng:p.coords.longitude})},
+      function(e){
+        if(e.code===1) reject('定位權限被拒絕，請於瀏覽器設定開啟')
+        else reject('未能取得定位，請到戶外或開啟 GPS 後重試')
+      },
+      {enableHighAccuracy:true,timeout:15000,maximumAge:0}
+    )
+  })
+}
+
+// ── 前端壓縮圖片（≤1280px JPEG 0.8 quality）──
+function compress(file){
+  return new Promise(function(res){
+    if(!file){res(null);return}
+    var img=new Image()
+    img.onload=function(){
+      var max=1280,w=img.width,h=img.height
+      if(w>max||h>max){var ratio=Math.min(max/w,max/h);w=Math.round(w*ratio);h=Math.round(h*ratio)}
+      var cv=document.createElement('canvas');cv.width=w;cv.height=h
+      cv.getContext('2d').drawImage(img,0,0,w,h)
+      cv.toBlob(function(b){res(b||file)},'image/jpeg',0.8)
+    }
+    img.onerror=function(){res(file)}
+    img.src=URL.createObjectURL(file)
+  })
+}
+
+// ── 打卡（上班/下班）──
+async function cwClock(type){
+  var code=document.getElementById('shiftSelect').value
+  if(!code){showMsg('clockMsg','err','請先選擇場次');return}
+  var btnIn=document.getElementById('btnIn'),btnOut=document.getElementById('btnOut')
+  btnIn.disabled=true;btnOut.disabled=true
+  showMsg('clockMsg','info','📍 正在取得定位，請稍候…')
+  try{
+    var pos=await getPos()
+    showMsg('clockMsg','info','上傳中，請稍候…')
+    var fd=new FormData()
+    fd.append('cw_no',CW.cw_no)
+    fd.append('phone',CW.phone)
+    fd.append('roadshow_code',code)
+    fd.append('lat',String(pos.lat))
+    fd.append('lng',String(pos.lng))
+    var selfie=document.getElementById('selfieInput').files[0]
+    if(selfie){
+      var c=await compress(selfie)
+      if(c) fd.append('selfie',c,'selfie.jpg')
+    }
+    var r=await fetch(API+'/clock-'+type,{method:'POST',body:fd})
+    var d=await r.json()
+    if(!d.ok){
+      showMsg('clockMsg','err','❌ '+(d.error||'打卡失敗'))
+    }else if(type==='in'){
+      showMsg('clockMsg','ok','✅ 上班打卡成功！距場地約 '+d.dist+' 米')
+      await refreshShifts()
+    }else{
+      var hrs=Math.floor((d.worked_minutes||0)/60)
+      var mins=(d.worked_minutes||0)%60
+      var m='✅ 下班打卡成功！本次工時 '+hrs+' 小時 '+mins+' 分'
+      if(d.flag==='OVER_WEEKLY') m+='\\n⚠️ 提醒：你本週工時已超過 20 小時'
+      showMsg('clockMsg','ok',m)
+      await refreshShifts()
+    }
+  }catch(e){showMsg('clockMsg','err','❌ '+String(e))}
+  finally{cwPickShift()}
+}
+
+async function refreshShifts(){
+  try{
+    var r=await fetch(API+'/my-shifts?cw_no='+encodeURIComponent(CW.cw_no)+'&phone='+encodeURIComponent(CW.phone))
+    var d=await r.json()
+    if(d.ok){
+      var cur=document.getElementById('shiftSelect').value
+      fillShifts(d.shifts||[])
+      if(cur) document.getElementById('shiftSelect').value=cur
+    }
+  }catch(e){}
+}
+
+function cwLogout(){
+  sessionStorage.removeItem('cw_session')
+  location.reload()
+}
+
+// ── 自動復原 sessionStorage ──
+(function(){
+  var saved=sessionStorage.getItem('cw_session')
+  if(!saved) return
+  try{
+    var s=JSON.parse(saved)
+    if(s&&s.cw_no&&s.phone){
+      document.getElementById('cwNo').value=s.cw_no
+      document.getElementById('cwPhone').value=s.phone
+      cwLogin()
+    }
+  }catch(e){}
+})()
 </script>
 </body>
 </html>`
