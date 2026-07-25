@@ -9496,7 +9496,7 @@ function coworkeryAppHtml(): string {
       <input id="apBankNoManual" placeholder="戶口號碼（例如 123-456789-001）" autocomplete="off" inputmode="numeric">
 
       <button class="btn btn-login" onclick="cwApply()" style="margin-top:18px">提交申請</button>
-      <div class="msg" id="applyMsg"></div>
+      <div class="msg" id="applyMsgManual"></div>
     </div>
   </div>
   </div>
@@ -9571,12 +9571,10 @@ async function cwAutoFillApply(){
         SUSPENDED:{icon:'⛔',color:'#374151',bg:'#f9fafb',border:'#e5e7eb',txt:'帳戶已被暫停，請聯絡管理員'}
       }
       var st=statusMap[sd.status]||{icon:'❓',color:'#374151',bg:'#f9fafb',border:'#e5e7eb',txt:sd.status}
-      var statusHtml='<div style="background:'+st.bg+';border:1.5px solid '+st.border+';border-radius:12px;padding:16px;margin-top:4px">'
-        +'<div style="font-size:18px;font-weight:700;color:'+st.color+';margin-bottom:6px">'+st.icon+' '+st.txt+(sd.status==='ACTIVE'?'<b style=\'font-family:monospace;font-size:20px\'>'+sd.cw_no+'</b>':'')+'</div>'
-        +'<div style="font-size:14px;color:#374151">姓名：'+sd.name_zh+'</div>'
-        +(sd.status==='ACTIVE'?'<div style="font-size:14px;color:#374151;margin-top:4px">可前往「🔑 打卡登入」tab 開始使用</div>':'')
-        +(sd.status==='REJECTED'&&sd.reject_reason?'<div style="font-size:13px;color:#991b1b;margin-top:4px">原因：'+sd.reject_reason+'</div>':'')
-        +'</div>'
+      var cwNoSpan=sd.status==='ACTIVE'?'<b style="font-family:monospace;font-size:20px">'+sd.cw_no+'</b>':''
+      var activeHint=sd.status==='ACTIVE'?'<div style="font-size:14px;color:#374151;margin-top:4px">可前往「🔑 打卡登入」tab 開始使用</div>':''
+      var rejectNote=sd.status==='REJECTED'&&sd.reject_reason?'<div style="font-size:13px;color:#991b1b;margin-top:4px">原因：'+sd.reject_reason+'</div>':''
+      var statusHtml='<div style="background:'+st.bg+';border:1.5px solid '+st.border+';border-radius:12px;padding:16px;margin-top:4px"><div style="font-size:18px;font-weight:700;color:'+st.color+';margin-bottom:6px">'+st.icon+' '+st.txt+' '+cwNoSpan+'</div><div style="font-size:14px;color:#374151">姓名：'+sd.name_zh+'</div>'+activeHint+rejectNote+'</div>'
       var applyCard=document.getElementById('apAutoFilled')
       if(applyCard){
         applyCard.innerHTML=statusHtml
@@ -9626,6 +9624,7 @@ async function cwAutoFillApply(){
 async function cwApply(){
   var isAuto=_apMember!==null
   var memberNo, phone, name_zh, district, bankName, bankNo
+  var msgId=isAuto?'applyMsg':'applyMsgManual'
   if(isAuto){
     memberNo=_apMember.member_no
     phone=_apMember.phone
@@ -9640,12 +9639,12 @@ async function cwApply(){
     district=(document.getElementById('apDistrict').value||'')||null
     bankName=(document.getElementById('apBankNameManual').value||'').trim()||null
     bankNo=(document.getElementById('apBankNoManual').value||'').trim()||null
-    if(!memberNo||!phone||!name_zh){showMsg('applyMsg','err','請填寫會員編號、電話及姓名');return}
+    if(!memberNo||!phone||!name_zh){showMsg(msgId,'err','請填寫會員編號、電話及姓名');return}
   }
   // Validate: if one bank field filled, require the other
-  if(bankName&&!bankNo){showMsg('applyMsg','err','請填寫戶口號碼');return}
-  if(bankNo&&!bankName){showMsg('applyMsg','err','請選擇銀行名稱');return}
-  showMsg('applyMsg','info','提交中…')
+  if(bankName&&!bankNo){showMsg(msgId,'err','請填寫戶口號碼');return}
+  if(bankNo&&!bankName){showMsg(msgId,'err','請選擇銀行名稱');return}
+  showMsg(msgId,'info','提交中…')
   try{
     var payload={member_no:memberNo,phone:phone,name_zh:name_zh,district:district,
       bank_name:bankName,bank_account_name:name_zh,bank_account_no:bankNo,
@@ -9653,12 +9652,12 @@ async function cwApply(){
     var r=await fetch(API+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     var d=await r.json()
     if(d.ok){
-      showMsg('applyMsg','ok','申請已提交！管理員審批後會電話通知你，請耐心等候。')
+      showMsg(msgId,'ok','申請已提交！管理員審批後會電話通知你，請耐心等候。')
       document.querySelectorAll('#tabApply .btn-login').forEach(function(b){b.disabled=true})
     } else {
-      showMsg('applyMsg','err',d.error||'提交失敗，請重試')
+      showMsg(msgId,'err',d.error||'提交失敗，請重試')
     }
-  }catch(e){showMsg('applyMsg','err','網絡錯誤，請重試')}
+  }catch(e){showMsg(msgId,'err','網絡錯誤，請重試')}
 }
 
 function showMsg(el,type,text){
