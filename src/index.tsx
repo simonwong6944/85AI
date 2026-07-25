@@ -9397,20 +9397,15 @@ function coworkeryAppHtml(): string {
 <body>
 <div class="wrap">
 
-  <!-- 頂部導航列 -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <a href="/app" class="back-bar" style="margin-bottom:0">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-      返回主頁
-    </a>
-    <button onclick="cwSwitchAccount()" style="background:none;border:1px solid #d1d5db;border-radius:20px;padding:6px 14px;font-size:14px;color:#6b7280;cursor:pointer;font-family:inherit">
-      🔄 切換帳號
-    </button>
-  </div>
+  <!-- 頂部返回／登出掣 -->
+  <button onclick="cwFullLogout()" class="back-bar" style="background:none;border:none;cursor:pointer;margin-bottom:12px">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    登出 / 返回
+  </button>
 
   <div class="card">
     <h1>👷 CoWorkery 打卡</h1>
-    <div class="sub" id="cwCurrentUser" style="margin-top:4px">老有聯盟85 · 工作打卡系統</div>
+    <div class="sub">老有聯盟85 · 工作打卡系統</div>
   </div>
 
   <!-- 分頁切換 -->
@@ -9861,27 +9856,16 @@ function cwLogout(){
   cwAutoFillApply()
 }
 
-// 切換會員帳號：清除所有 session 後跳回 /app 讓用戶重新登入
-function cwSwitchAccount(){
-  if(!confirm('確定要切換帳號？\n將會清除目前的會員登入紀錄。'))return
-  // 清除 CoWorkery session
+// 登出並返回 /app：清除所有 session，讓用戶重新選擇帳號
+function cwFullLogout(){
   sessionStorage.removeItem('cw_session')
-  // 清除 PWA App 的 member localStorage（讓 /app 頁面顯示電話輸入框）
   localStorage.removeItem('ce85_member_no')
   localStorage.removeItem('ce85_wa_clicked')
-  // 跳回 /app 重新登入
   window.location.href='/app'
 }
 
-// ── 自動復原 sessionStorage + 顯示當前會員帳號 ──
+// ── 自動復原 sessionStorage ──
 (function(){
-  // 顯示當前 /app 登入的會員號碼在副標題
-  var memberNo=localStorage.getItem('ce85_member_no')||''
-  var subEl=document.getElementById('cwCurrentUser')
-  if(subEl&&memberNo){
-    subEl.textContent='老有聯盟85 · 會員：'+memberNo
-  }
-
   var saved=sessionStorage.getItem('cw_session')
   if(saved){
     try{
