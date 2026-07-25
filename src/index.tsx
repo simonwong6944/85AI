@@ -7714,6 +7714,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="nav-item" onclick="switchMod('mod-jobs')">
         <i class="fas fa-briefcase"></i> 工作管理
       </div>
+      <div class="nav-item" onclick="switchMod('mod-coworkery')">
+        <i class="fas fa-hard-hat"></i> CoWorkery 人手
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doAdminLogout()">
@@ -9771,6 +9774,17 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
   <!-- 工作列表頁 -->
   <div id="jobListView">
     <div style="padding:16px 16px 8px;font-size:22px;font-weight:800;color:#111827">💼 工作市場</div>
+    <!-- CoWorkery 打卡入口 -->
+    <a href="/app/coworkery" style="display:block;margin:4px 12px 16px;padding:20px 20px 18px;background:linear-gradient(135deg,#0369a1 0%,#0284c7 100%);border-radius:16px;color:#fff;text-decoration:none;box-shadow:0 4px 16px rgba(3,105,161,0.25);-webkit-tap-highlight-color:transparent">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:40px;line-height:1">👷</div>
+        <div>
+          <div style="font-size:20px;font-weight:800;letter-spacing:0.5px;margin-bottom:3px">CoWorkery 打卡</div>
+          <div style="font-size:15px;opacity:0.88">上班 / 下班打卡 · 人手管理</div>
+        </div>
+        <div style="margin-left:auto;font-size:26px;opacity:0.7">›</div>
+      </div>
+    </a>
     <div id="job-list-loading" style="text-align:center;padding:60px 20px;font-size:20px;color:#6B7280">載入中...</div>
     <div id="job-list-empty" style="display:none;text-align:center;padding:60px 20px">
       <div style="font-size:56px;margin-bottom:16px">🔍</div>
