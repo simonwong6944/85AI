@@ -9444,6 +9444,16 @@ function coworkeryAppHtml(): string {
         <div style="font-size:14px;color:#374151;margin-top:2px" id="apBannerInfo"></div>
       </div>
 
+      <label for="apDistrictAuto">居住地區</label>
+      <select id="apDistrictAuto" style="margin-bottom:8px;font-size:16px">
+        <option value="">— 請選擇 —</option>
+        <option>中西區</option><option>灣仔</option><option>東區</option><option>南區</option>
+        <option>油尖旺</option><option>深水埗</option><option>九龍城</option><option>黃大仙</option>
+        <option>觀塘</option><option>葵青</option><option>荃灣</option><option>屯門</option>
+        <option>元朗</option><option>北區</option><option>大埔</option><option>沙田</option>
+        <option>西貢</option><option>離島</option>
+      </select>
+
       <label>出糧銀行資料 <span style="font-size:13px;color:#6b7280;font-weight:400">（可選，審批後補填亦可）</span></label>
       <select id="apBankName" style="margin-bottom:8px;font-size:16px">
         <option value="">— 選擇銀行 —</option>
@@ -9581,12 +9591,17 @@ async function cwAutoFillApply(){
         applyCard.style.display='block'
       }
 
-      // 如已批准 → 自動填入打卡登入欄
+      // 如已批准 → 自動填入打卡登入欄（只在欄位為空時填入，避免覆蓋用戶手動輸入的新帳號）
       if(sd.status==='ACTIVE'){
         var cwNoEl=document.getElementById('cwNo')
         var cwPhoneEl=document.getElementById('cwPhone')
-        if(cwNoEl&&!cwNoEl.value) cwNoEl.value=sd.cw_no
-        if(cwPhoneEl&&!cwPhoneEl.value) cwPhoneEl.value=sd.phone
+        var cwNoVal=(cwNoEl?cwNoEl.value:'').trim()
+        var cwPhoneVal=(cwPhoneEl?cwPhoneEl.value:'').trim()
+        // 只有兩欄均空時才自動填入，避免從新登入的用戶被舊帳號覆蓋
+        if(!cwNoVal&&!cwPhoneVal){
+          if(cwNoEl)cwNoEl.value=sd.cw_no
+          if(cwPhoneEl)cwPhoneEl.value=sd.phone
+        }
       }
       return
     }
@@ -9609,6 +9624,9 @@ async function cwAutoFillApply(){
       var bannerInfo=document.getElementById('apBannerInfo')
       if(bannerName)bannerName.textContent=m.name_zh+' ('+m.member_no+')'
       if(bannerInfo)bannerInfo.textContent='電話：'+m.phone+(m.district?' ｜ 地區：'+m.district:'')
+      // 自動選擇地區
+      var distEl=document.getElementById('apDistrictAuto')
+      if(distEl&&m.district)distEl.value=m.district
       if(loading)loading.style.display='none'
       if(autoDiv)autoDiv.style.display='block'
     } else {
@@ -9629,7 +9647,7 @@ async function cwApply(){
     memberNo=_apMember.member_no
     phone=_apMember.phone
     name_zh=_apMember.name_zh
-    district=_apMember.district||null
+    district=(document.getElementById('apDistrictAuto').value||_apMember.district||'')||null
     bankName=(document.getElementById('apBankName').value||'').trim()||null
     bankNo=(document.getElementById('apBankNo').value||'').trim()||null
   } else {
@@ -9665,7 +9683,7 @@ function showMsg(el,type,text){
   e.className='msg '+type
   e.textContent=text
 }
-function hideMsg(el){document.getElementById(el).className='msg'}
+function hideMsg(el){var e=document.getElementById(el);if(e)e.className='msg'}
 
 // ── 登入（以 my-shifts 兼任驗證）──
 async function cwLogin(){
@@ -9821,7 +9839,23 @@ async function refreshShifts(){
 
 function cwLogout(){
   sessionStorage.removeItem('cw_session')
-  location.reload()
+  // 重置 CW 物件
+  CW={cw_no:'',phone:'',name:''}
+  // 清除 _apMember 緩存，避免舊會員資料被保留
+  _apMember=null
+  // 清空 CW 登入欄位（讓用戶輸入新帳號，不自動填入）
+  var cwNoEl=document.getElementById('cwNo')
+  var cwPhoneEl=document.getElementById('cwPhone')
+  if(cwNoEl)cwNoEl.value=''
+  if(cwPhoneEl)cwPhoneEl.value=''
+  // 隱藏登入訊息
+  hideMsg('loginMsg')
+  hideMsg('clockMsg')
+  // 還原 UI：隱藏主區，顯示登入卡
+  document.getElementById('mainCard').classList.add('hide')
+  document.getElementById('loginCard').classList.remove('hide')
+  // 回到打卡登入 tab，不自動填入 CW 資料
+  cwSwitchTab('login')
 }
 
 // ── 自動復原 sessionStorage ──
