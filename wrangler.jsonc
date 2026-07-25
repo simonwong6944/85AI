@@ -10,5 +10,11 @@
       "database_name": "coeldery85-db",
       "database_id": "222f9afc-4312-47a0-8d91-585443cd35c0"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "coeldery85-files"
+    }
   ]
 }
