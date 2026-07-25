@@ -1867,7 +1867,7 @@ app.get('/api/admin/coworkery/list', async (c) => {
     const q      = (c.req.query('q') || '').trim()
 
     let sql = `SELECT id, cw_no, member_no, name_zh, name_en, phone, gender, district,
-                      hkid_prefix, bank_name, bank_account_no, default_hourly_rate,
+                      hkid_prefix, bank_name, bank_account_name, bank_account_no, bank_account, default_hourly_rate,
                       status, reject_reason, id_front_key, created_at
                FROM co_workery WHERE 1=1`
     const binds: unknown[] = []
@@ -2239,6 +2239,33 @@ app.post('/api/coworkery/apply', async (c) => {
     ).run()
 
     return c.json({ ok: true, cw_no })
+  } catch (e: any) {
+    return c.json({ ok: false, error: e.message ?? '伺服器錯誤' })
+  }
+})
+
+// ── 3B-0b. 查詢申請狀態（用 member_no 查，供前端自動填入）──────────────────
+// GET /api/coworkery/my-status?member_no=85-00001
+app.get('/api/coworkery/my-status', async (c) => {
+  try {
+    const { DB } = c.env as Env
+    const member_no = (c.req.query('member_no') || '').trim()
+    if (!member_no) return c.json({ ok: false, error: 'missing member_no' }, 400)
+
+    const row = await DB.prepare(
+      `SELECT cw_no, name_zh, phone, status, reject_reason, bank_name, bank_account_no
+       FROM co_workery WHERE member_no=? LIMIT 1`
+    ).bind(member_no).first<{
+      cw_no: string; name_zh: string; phone: string; status: string;
+      reject_reason: string | null; bank_name: string | null; bank_account_no: string | null;
+    }>()
+
+    if (!row) return c.json({ ok: true, found: false })
+    return c.json({ ok: true, found: true,
+      cw_no: row.cw_no, name_zh: row.name_zh, phone: row.phone,
+      status: row.status, reject_reason: row.reject_reason || null,
+      bank_name: row.bank_name, bank_account_no: row.bank_account_no
+    })
   } catch (e: any) {
     return c.json({ ok: false, error: e.message ?? '伺服器錯誤' })
   }
@@ -8986,16 +9013,20 @@ async function cwLoadList(){
 
 function cwBuildTable(list,approvalMode){
   if(!list||!list.length)return '<p style="color:#888">\u6c92\u6709\u8cc7\u6599</p>';
-  var cols=['\u6703\u54e1\u7de8\u865f','\u59d3\u540d','\u96fb\u8a71','\u5730\u5340','\u9810\u8a2d\u6642\u85aa','\u72c0\u614b','\u64cd\u4f5c'];
+  var cols=['\u6703\u54e1\u7de8\u865f','\u59d3\u540d','\u96fb\u8a71','\u5730\u5340','\u9280\u884c','\u6236\u53e3\u865f\u78bc','\u9810\u8a2d\u6642\u85aa','\u72c0\u614b','\u64cd\u4f5c'];
   var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6;text-align:left">';
-  cols.forEach(function(c){h+='<th style="padding:8px 10px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">'+c+'</th>';});
+  cols.forEach(function(c){h+='<th style="padding:8px 10px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB;white-space:nowrap">'+c+'</th>';});
   h+='</tr></thead><tbody>';
   list.forEach(function(r){
+    var bankCell=r.bank_name?cwEsc(r.bank_name):'<span style="color:#9ca3af">—</span>';
+    var bankNoCell=r.bank_account_no?'<span style="font-family:monospace">'+cwEsc(r.bank_account_no)+'</span>':'<span style="color:#9ca3af">—</span>';
     h+='<tr style="border-bottom:1px solid #F3F4F6">'+
       '<td style="padding:8px 10px;font-family:monospace">'+cwEsc(r.cw_no)+'</td>'+
       '<td style="padding:8px 10px">'+cwEsc(r.name_zh)+'</td>'+
       '<td style="padding:8px 10px">'+cwEsc(r.phone)+'</td>'+
       '<td style="padding:8px 10px">'+cwEsc(r.district||'')+'</td>'+
+      '<td style="padding:8px 10px">'+bankCell+'</td>'+
+      '<td style="padding:8px 10px">'+bankNoCell+'</td>'+
       '<td style="padding:8px 10px">'+cwCents(r.default_hourly_rate)+'/h</td>'+
       '<td style="padding:8px 10px">'+cwBadge(r.status)+'</td>'+
       '<td style="padding:8px 10px">'+cwRowBtns(r,approvalMode)+'</td>'+
@@ -9515,15 +9546,59 @@ function cwSwitchTab(tab){
 
 // ── 自動填入申請表（從 localStorage 讀取 member_no，再 call API 取資料）──
 async function cwAutoFillApply(){
-  if(_apMember) return  // already loaded
   var memberNo=localStorage.getItem('ce85_member_no')||''
   var loading=document.getElementById('apAutoLoading')
   var autoDiv=document.getElementById('apAutoFilled')
   var manualDiv=document.getElementById('apManual')
+
   if(!memberNo){
-    // No session → show manual form
     if(loading)loading.style.display='none'
     if(manualDiv)manualDiv.style.display='block'
+    return
+  }
+
+  // ── 先查 CoWorkery 申請狀態 ──────────────────────────────────────────────
+  try{
+    var sr=await fetch(API+'/my-status?member_no='+encodeURIComponent(memberNo))
+    var sd=await sr.json()
+    if(sd.ok&&sd.found){
+      // 已有申請記錄 → 顯示狀態，唔需要再顯示申請表
+      if(loading)loading.style.display='none'
+      var statusMap={
+        ACTIVE:  {icon:'✅',color:'#15803d',bg:'#f0fdf4',border:'#bbf7d0',txt:'已批准，你的 CW 編號為：'},
+        PENDING: {icon:'⏳',color:'#92400e',bg:'#fffbeb',border:'#fcd34d',txt:'申請審批中，請耐心等候'},
+        REJECTED:{icon:'❌',color:'#991b1b',bg:'#fef2f2',border:'#fecaca',txt:'申請已被拒絕'},
+        SUSPENDED:{icon:'⛔',color:'#374151',bg:'#f9fafb',border:'#e5e7eb',txt:'帳戶已被暫停，請聯絡管理員'}
+      }
+      var st=statusMap[sd.status]||{icon:'❓',color:'#374151',bg:'#f9fafb',border:'#e5e7eb',txt:sd.status}
+      var statusHtml='<div style="background:'+st.bg+';border:1.5px solid '+st.border+';border-radius:12px;padding:16px;margin-top:4px">'
+        +'<div style="font-size:18px;font-weight:700;color:'+st.color+';margin-bottom:6px">'+st.icon+' '+st.txt+(sd.status==='ACTIVE'?'<b style=\'font-family:monospace;font-size:20px\'>'+sd.cw_no+'</b>':'')+'</div>'
+        +'<div style="font-size:14px;color:#374151">姓名：'+sd.name_zh+'</div>'
+        +(sd.status==='ACTIVE'?'<div style="font-size:14px;color:#374151;margin-top:4px">可前往「🔑 打卡登入」tab 開始使用</div>':'')
+        +(sd.status==='REJECTED'&&sd.reject_reason?'<div style="font-size:13px;color:#991b1b;margin-top:4px">原因：'+sd.reject_reason+'</div>':'')
+        +'</div>'
+      var applyCard=document.getElementById('apAutoFilled')
+      if(applyCard){
+        applyCard.innerHTML=statusHtml
+        applyCard.style.display='block'
+      }
+
+      // 如已批准 → 自動填入打卡登入欄
+      if(sd.status==='ACTIVE'){
+        var cwNoEl=document.getElementById('cwNo')
+        var cwPhoneEl=document.getElementById('cwPhone')
+        if(cwNoEl&&!cwNoEl.value) cwNoEl.value=sd.cw_no
+        if(cwPhoneEl&&!cwPhoneEl.value) cwPhoneEl.value=sd.phone
+      }
+      return
+    }
+  }catch(e){}
+
+  // ── 無申請記錄 → 顯示申請表，用會員資料自動填入 ────────────────────────
+  if(_apMember){
+    // already loaded member data previously
+    if(loading)loading.style.display='none'
+    if(autoDiv)autoDiv.style.display='block'
     return
   }
   try{
@@ -9532,7 +9607,6 @@ async function cwAutoFillApply(){
     if(d.ok&&d.member){
       var m=d.member
       _apMember=m
-      // Show auto-filled banner
       var bannerName=document.getElementById('apBannerName')
       var bannerInfo=document.getElementById('apBannerInfo')
       if(bannerName)bannerName.textContent=m.name_zh+' ('+m.member_no+')'
@@ -9540,7 +9614,6 @@ async function cwAutoFillApply(){
       if(loading)loading.style.display='none'
       if(autoDiv)autoDiv.style.display='block'
     } else {
-      // Member not found → manual
       if(loading)loading.style.display='none'
       if(manualDiv)manualDiv.style.display='block'
     }
@@ -9755,15 +9828,19 @@ function cwLogout(){
 // ── 自動復原 sessionStorage ──
 (function(){
   var saved=sessionStorage.getItem('cw_session')
-  if(!saved) return
-  try{
-    var s=JSON.parse(saved)
-    if(s&&s.cw_no&&s.phone){
-      document.getElementById('cwNo').value=s.cw_no
-      document.getElementById('cwPhone').value=s.phone
-      cwLogin()
-    }
-  }catch(e){}
+  if(saved){
+    try{
+      var s=JSON.parse(saved)
+      if(s&&s.cw_no&&s.phone){
+        document.getElementById('cwNo').value=s.cw_no
+        document.getElementById('cwPhone').value=s.phone
+        cwLogin()
+        return
+      }
+    }catch(e){}
+  }
+  // 未登入 → 嘗試以會員身份自動查詢申請狀態，預填 CW 編號及電話
+  cwAutoFillApply()
 })()
 </script>
 </body>
