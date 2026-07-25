@@ -8886,6 +8886,9 @@ function toggleAppStatus(appId,newStatus){
 // CoWorkery 後台 JS
 // ═══════════════════════════════════════════════════════════════════════════════
 var CW_API='/api/admin/coworkery';
+var _cwActs={};var _cwActIdx=0;
+function _cwa(fn){var k='_k'+(++_cwActIdx);_cwActs[k]=fn;return k;}
+function _cwRun(el){var k=el.getAttribute('data-cwk');if(k&&_cwActs[k])_cwActs[k]();}
 async function cwGet(url){var r=await fetch(url);return r.json();}
 async function cwSend(url,method,body){
   var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -8943,13 +8946,16 @@ function cwBadge(s){
 }
 function cwRowBtns(r,approvalMode){
   if(approvalMode){
-    return '<button class="btn btn-primary btn-sm" onclick="cwAction(\''+r.cw_no+'\',\'APPROVE\')">\u6279\u51c6</button> '+
-           '<button class="btn btn-danger btn-sm" onclick="cwReject(\''+r.cw_no+'\')">\u62d2\u7d55</button>';
+    var k1=_cwa(function(){cwAction(r.cw_no,'APPROVE');});
+    var k2=_cwa(function(){cwReject(r.cw_no);});
+    return '<button class="btn btn-primary btn-sm" data-cwk="'+k1+'" onclick="_cwRun(this)">批准</button> '+
+           '<button class="btn btn-danger btn-sm" data-cwk="'+k2+'" onclick="_cwRun(this)">拒絕</button>';
   }
-  var b='<button class="btn btn-secondary btn-sm" onclick="cwEditRate(\''+r.cw_no+'\','+(r.default_hourly_rate||0)+')">\u6539\u6642\u85aa</button>';
-  if(r.status==='ACTIVE')    b+=' <button class="btn btn-secondary btn-sm" onclick="cwAction(\''+r.cw_no+'\',\'SUSPEND\')">\u505c\u724c</button>';
-  if(r.status==='SUSPENDED') b+=' <button class="btn btn-secondary btn-sm" onclick="cwAction(\''+r.cw_no+'\',\'REACTIVATE\')">\u5fa9\u724c</button>';
-  if(r.id_front_key)         b+=' <button class="btn btn-secondary btn-sm" onclick="cwViewFile(\''+cwEsc(r.id_front_key)+'\')">\u8b49\u4ef6</button>';
+  var kb=_cwa(function(){cwEditRate(r.cw_no,r.default_hourly_rate||0);});
+  var b='<button class="btn btn-secondary btn-sm" data-cwk="'+kb+'" onclick="_cwRun(this)">改時薪</button>';
+  if(r.status==='ACTIVE'){var ks=_cwa(function(){cwAction(r.cw_no,'SUSPEND');});b+=' <button class="btn btn-secondary btn-sm" data-cwk="'+ks+'" onclick="_cwRun(this)">停牌</button>';}
+  if(r.status==='SUSPENDED'){var kr=_cwa(function(){cwAction(r.cw_no,'REACTIVATE');});b+=' <button class="btn btn-secondary btn-sm" data-cwk="'+kr+'" onclick="_cwRun(this)">復牌</button>';}
+  if(r.id_front_key){var kf=_cwa(function(){cwViewFile(r.id_front_key);});b+=' <button class="btn btn-secondary btn-sm" data-cwk="'+kf+'" onclick="_cwRun(this)">證件</button>';}
   return b;
 }
 async function cwAction(cw_no,action){
@@ -9095,25 +9101,25 @@ async function cwLoadSessionOptions(selId){
 
 async function cwLoadSessions(){
   var d=await cwGet(CW_API+'/sessions');
-  if(!d.ok){document.getElementById('cwSessionsBox').innerHTML='\u8f09\u5165\u5931\u6557';return;}
-  var cols=['\u5834\u6b21\u78bc','\u540d\u7a31','\u5ea7\u6a19','\u534a\u5f91(m)','\u9700\u6c42','\u6642\u85aa','\u8eca\u99ac','\u81b3\u98df','\u54c1\u724c','\u64cd\u4f5c'];
+  if(!d.ok){document.getElementById('cwSessionsBox').innerHTML='載入失敗';return;}
+  var cols=['場次碼','名稱','座標','半徑(m)','需求','時薪','車馬','膳食','品牌','操作'];
   var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6;text-align:left">';
   cols.forEach(function(c){h+='<th style="padding:8px 10px;font-weight:600;border-bottom:1px solid #E5E7EB;white-space:nowrap">'+c+'</th>';});
   h+='</tr></thead><tbody>';
   (d.list||[]).forEach(function(s){
     var hasGeo=s.latitude!=null&&s.longitude!=null;
-    var safe=JSON.stringify(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var ke=_cwa(function(){cwEditSession(s);});
     h+='<tr style="border-bottom:1px solid #F3F4F6">'+
       '<td style="padding:8px 10px;font-family:monospace">'+cwEsc(s.roadshow_code)+'</td>'+
       '<td style="padding:8px 10px">'+cwEsc(s.roadshow_name||'')+'</td>'+
-      '<td style="padding:8px 10px">'+(hasGeo?s.latitude.toFixed(4)+','+s.longitude.toFixed(4):'<span style="color:#dc2626">\u672a\u8a2d</span>')+'</td>'+
+      '<td style="padding:8px 10px">'+(hasGeo?s.latitude.toFixed(4)+','+s.longitude.toFixed(4):'<span style="color:#dc2626">未設</span>')+'</td>'+
       '<td style="padding:8px 10px">'+(s.geofence_radius||'-')+'</td>'+
       '<td style="padding:8px 10px">'+(s.headcount_needed||0)+'</td>'+
       '<td style="padding:8px 10px">'+cwCents(s.session_hourly_rate)+'</td>'+
       '<td style="padding:8px 10px">'+cwCents(s.transport_allowance)+'</td>'+
       '<td style="padding:8px 10px">'+cwCents(s.meal_allowance)+'</td>'+
       '<td style="padding:8px 10px">'+cwEsc(s.brand_ref||'')+'</td>'+
-      '<td style="padding:8px 10px"><button class="btn btn-secondary btn-sm" onclick=\'cwEditSession('+safe+')\'>\u8a2d\u5b9a</button></td>'+
+      '<td style="padding:8px 10px"><button class="btn btn-secondary btn-sm" data-cwk="'+ke+'" onclick="_cwRun(this)">設定</button></td>'+
       '</tr>';
   });
   document.getElementById('cwSessionsBox').innerHTML=h+'</tbody></table></div>';
@@ -9140,44 +9146,47 @@ function cwEditSession(s){
 
 async function cwLoadAssign(){
   var code=(document.getElementById('cwAssignSession')||{}).value||'';
-  if(!code){document.getElementById('cwAssignBox').innerHTML='\u8acb\u5148\u9078\u64c7\u5834\u6b21';return;}
+  if(!code){document.getElementById('cwAssignBox').innerHTML='請先選擇場次';return;}
   var d=await cwGet(CW_API+'/assign?roadshow_code='+encodeURIComponent(code));
-  if(!d.ok){document.getElementById('cwAssignBox').innerHTML='\u8f09\u5165\u5931\u6557';return;}
-  var h='<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">\u5831\u540d\u540d\u55ae</h4>';
-  if(!d.applications||!d.applications.length)h+='<p style="color:#888;margin-bottom:12px">\u66ab\u7121\u5831\u540d</p>';
+  if(!d.ok){document.getElementById('cwAssignBox').innerHTML='載入失敗';return;}
+  var h='<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">報名名單</h4>';
+  if(!d.applications||!d.applications.length)h+='<p style="color:#888;margin-bottom:12px">暫無報名</p>';
   else{
     h+='<div style="overflow-x:auto;margin-bottom:12px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6">';
-    ['\u5831\u540d\u540d\u55ae — CW\u7de8\u865f','\u59d3\u540d','\u96fb\u8a71','\u5730\u5340','\u72c0\u614b','\u64cd\u4f5c'].forEach(function(x){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB">'+x+'</th>';});
+    ['報名名單 — CW編號','姓名','電話','地區','狀態','操作'].forEach(function(x){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB">'+x+'</th>';});
     h+='</tr></thead><tbody>';
     d.applications.forEach(function(a){
+      var ka=_cwa(function(){cwAssign(code,a.cw_no);});
       h+='<tr style="border-bottom:1px solid #F3F4F6">'+
         '<td style="padding:7px 9px;font-family:monospace">'+cwEsc(a.cw_no)+'</td>'+
         '<td style="padding:7px 9px">'+cwEsc(a.name_zh)+'</td>'+
         '<td style="padding:7px 9px">'+cwEsc(a.phone)+'</td>'+
         '<td style="padding:7px 9px">'+cwEsc(a.district||'')+'</td>'+
         '<td style="padding:7px 9px">'+cwEsc(a.status)+'</td>'+
-        '<td style="padding:7px 9px"><button class="btn btn-primary btn-sm" onclick="cwAssign(\''+code+'\',\''+a.cw_no+'\')">\u6d3e\u66f4</button></td>'+
+        '<td style="padding:7px 9px"><button class="btn btn-primary btn-sm" data-cwk="'+ka+'" onclick="_cwRun(this)">派更</button></td>'+
         '</tr>';
     });
     h+='</tbody></table></div>';
   }
-  h+='<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">\u5df2\u6d3e\u66f4</h4>';
-  if(!d.assignments||!d.assignments.length)h+='<p style="color:#888;margin-bottom:12px">\u66ab\u7121\u6d3e\u66f4</p>';
+  h+='<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">已派更</h4>';
+  if(!d.assignments||!d.assignments.length)h+='<p style="color:#888;margin-bottom:12px">暫無派更</p>';
   else{
     h+='<div style="overflow-x:auto;margin-bottom:12px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6">';
-    ['CW\u7de8\u865f','\u59d3\u540d','\u7279\u5225\u6642\u85aa','\u64cd\u4f5c'].forEach(function(x){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB">'+x+'</th>';});
+    ['CW編號','姓名','特別時薪','操作'].forEach(function(x){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB">'+x+'</th>';});
     h+='</tr></thead><tbody>';
     d.assignments.forEach(function(a){
+      var ku=_cwa(function(){cwUnassign(code,a.cw_no);});
       h+='<tr style="border-bottom:1px solid #F3F4F6">'+
         '<td style="padding:7px 9px;font-family:monospace">'+cwEsc(a.cw_no)+'</td>'+
         '<td style="padding:7px 9px">'+cwEsc(a.name_zh)+'</td>'+
-        '<td style="padding:7px 9px">'+(a.assigned_hourly_rate?cwCents(a.assigned_hourly_rate)+'\uff08\u7279\u5225\uff09':'\uff08\u6cbf\u7528 fallback\uff09')+'</td>'+
-        '<td style="padding:7px 9px"><button class="btn btn-danger btn-sm" onclick="cwUnassign(\''+code+'\',\''+a.cw_no+'\')">\u53d6\u6d88</button></td>'+
+        '<td style="padding:7px 9px">'+(a.assigned_hourly_rate?cwCents(a.assigned_hourly_rate)+'（特別）':'（沿用 fallback）')+'</td>'+
+        '<td style="padding:7px 9px"><button class="btn btn-danger btn-sm" data-cwk="'+ku+'" onclick="_cwRun(this)">取消</button></td>'+
         '</tr>';
     });
     h+='</tbody></table></div>';
   }
-  h+='<button class="btn btn-secondary" onclick="cwManualAssign(\''+code+'\')">\uff0b \u76f4\u63a5\u6d3e\u66f4\uff08\u8f38\u5165CW\u7de8\u865f\uff09</button>';
+  var km=_cwa(function(){cwManualAssign(code);});
+  h+='<button class="btn btn-secondary" data-cwk="'+km+'" onclick="_cwRun(this)">＋ 直接派更（輸入CW編號）</button>';
   document.getElementById('cwAssignBox').innerHTML=h;
 }
 async function cwAssign(code,cw_no){
@@ -9197,21 +9206,21 @@ async function cwLoadPayroll(){
   var code=(document.getElementById('cwPayrollSession')||{}).value||'';
   var totEl=document.getElementById('cwPayrollTotals');
   var boxEl=document.getElementById('cwPayrollBox');
-  if(!code){boxEl.innerHTML='\u8acb\u5148\u9078\u64c7\u5834\u6b21';totEl.textContent='';return;}
+  if(!code){boxEl.innerHTML='請先選擇場次';totEl.textContent='';return;}
   var d=await cwGet(CW_API+'/payroll?roadshow_code='+encodeURIComponent(code));
-  if(!d.ok){boxEl.innerHTML='\u8f09\u5165\u5931\u6557';return;}
+  if(!d.ok){boxEl.innerHTML='載入失敗';return;}
   var t=d.totals||{};
-  totEl.textContent='\u4eba\u6578 '+(t.count||0)+'\uff5c\u7e3d\u5de5\u6642 '+cwMin(t.total_minutes)+'\uff5c\u7e3d\u61c9\u4ed8 '+cwCents(t.total_payable);
-  if(!d.list||!d.list.length){boxEl.innerHTML='<p style="color:#888">\u5c1a\u672a\u8a08\u7b97\u51fa\u7cae\uff0c\u6309\u300c\u8a08\u7b97\u51fa\u7cae\u300d</p>';return;}
-  var cols=['CW\u7de8\u865f','\u59d3\u540d','\u5de5\u6642','\u6642\u85aa','\u5de5\u8cc7','\u8eca\u99ac','\u81b3\u98df','\u7e3d\u61c9\u4ed8','\u72c0\u614b','\u64cd\u4f5c'];
+  totEl.textContent='人數 '+(t.count||0)+'｜總工時 '+cwMin(t.total_minutes)+'｜總應付 '+cwCents(t.total_payable);
+  if(!d.list||!d.list.length){boxEl.innerHTML='<p style="color:#888">尚未計算出粮，按「計算出粮」</p>';return;}
+  var cols=['CW編號','姓名','工時','時薪','工資','車馬','膳食','總應付','狀態','操作'];
   var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6">';
   cols.forEach(function(c){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB;white-space:nowrap">'+c+'</th>';});
   h+='</tr></thead><tbody>';
   d.list.forEach(function(r){
     var btn='';
-    if(r.status==='PENDING')  btn='<button class="btn btn-primary btn-sm" onclick="cwPayAction(\''+code+'\',\''+r.cw_no+'\',\'APPROVE\')">\u6279\u51c6</button>';
-    if(r.status==='APPROVED') btn='<button class="btn btn-primary btn-sm" onclick="cwPayAction(\''+code+'\',\''+r.cw_no+'\',\'PAID\')">\u6a19\u8a18\u5df2\u4ed8</button>';
-    if(r.status==='PAID')     btn='<button class="btn btn-secondary btn-sm" onclick="cwPayAction(\''+code+'\',\''+r.cw_no+'\',\'REVERT\')">\u9084\u539f</button>';
+    if(r.status==='PENDING'){var kp=_cwa(function(){cwPayAction(code,r.cw_no,'APPROVE');});btn='<button class="btn btn-primary btn-sm" data-cwk="'+kp+'" onclick="_cwRun(this)">批准</button>';}
+    if(r.status==='APPROVED'){var kd=_cwa(function(){cwPayAction(code,r.cw_no,'PAID');});btn='<button class="btn btn-primary btn-sm" data-cwk="'+kd+'" onclick="_cwRun(this)">標記已付</button>';}
+    if(r.status==='PAID'){var kv=_cwa(function(){cwPayAction(code,r.cw_no,'REVERT');});btn='<button class="btn btn-secondary btn-sm" data-cwk="'+kv+'" onclick="_cwRun(this)">還原</button>';}
     h+='<tr style="border-bottom:1px solid #F3F4F6">'+
       '<td style="padding:7px 9px;font-family:monospace">'+cwEsc(r.cw_no)+'</td>'+
       '<td style="padding:7px 9px">'+cwEsc(r.name_zh)+'</td>'+
