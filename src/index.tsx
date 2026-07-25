@@ -2253,16 +2253,17 @@ app.get('/api/coworkery/my-status', async (c) => {
     if (!member_no) return c.json({ ok: false, error: 'missing member_no' }, 400)
 
     const row = await DB.prepare(
-      `SELECT cw_no, name_zh, phone, status, reject_reason, bank_name, bank_account_no
+      `SELECT cw_no, name_zh, phone, district, status, reject_reason, bank_name, bank_account_no
        FROM co_workery WHERE member_no=? LIMIT 1`
     ).bind(member_no).first<{
-      cw_no: string; name_zh: string; phone: string; status: string;
+      cw_no: string; name_zh: string; phone: string; district: string | null; status: string;
       reject_reason: string | null; bank_name: string | null; bank_account_no: string | null;
     }>()
 
     if (!row) return c.json({ ok: true, found: false })
     return c.json({ ok: true, found: true,
       cw_no: row.cw_no, name_zh: row.name_zh, phone: row.phone,
+      district: row.district || null,
       status: row.status, reject_reason: row.reject_reason || null,
       bank_name: row.bank_name, bank_account_no: row.bank_account_no
     })
@@ -9584,7 +9585,8 @@ async function cwAutoFillApply(){
       var cwNoSpan=sd.status==='ACTIVE'?'<b style="font-family:monospace;font-size:20px">'+sd.cw_no+'</b>':''
       var activeHint=sd.status==='ACTIVE'?'<div style="font-size:14px;color:#374151;margin-top:4px">可前往「🔑 打卡登入」tab 開始使用</div>':''
       var rejectNote=sd.status==='REJECTED'&&sd.reject_reason?'<div style="font-size:13px;color:#991b1b;margin-top:4px">原因：'+sd.reject_reason+'</div>':''
-      var statusHtml='<div style="background:'+st.bg+';border:1.5px solid '+st.border+';border-radius:12px;padding:16px;margin-top:4px"><div style="font-size:18px;font-weight:700;color:'+st.color+';margin-bottom:6px">'+st.icon+' '+st.txt+' '+cwNoSpan+'</div><div style="font-size:14px;color:#374151">姓名：'+sd.name_zh+'</div>'+activeHint+rejectNote+'</div>'
+      var districtLine=sd.district?'<div style="font-size:14px;color:#374151;margin-top:2px">地區：'+sd.district+'</div>':''
+      var statusHtml='<div style="background:'+st.bg+';border:1.5px solid '+st.border+';border-radius:12px;padding:16px;margin-top:4px"><div style="font-size:18px;font-weight:700;color:'+st.color+';margin-bottom:6px">'+st.icon+' '+st.txt+' '+cwNoSpan+'</div><div style="font-size:14px;color:#374151">姓名：'+sd.name_zh+'</div>'+districtLine+activeHint+rejectNote+'</div>'
       var applyCard=document.getElementById('apAutoFilled')
       if(applyCard){
         applyCard.innerHTML=statusHtml
@@ -10361,6 +10363,8 @@ function doLookup() {
       btn.textContent = '🔍 搵我的卡';
       var memberNo = data.member_no || (data.member && data.member.member_no);
       if (data.ok && memberNo) {
+        // 換新帳號登入時，清除舊的 CoWorkery 打卡 session
+        sessionStorage.removeItem('cw_session');
         localStorage.setItem('ce85_member_no', memberNo);
         var waClickedAt = data.wa_clicked_at || (data.member && data.member.wa_clicked_at) || null;
         if (waClickedAt) {
@@ -10419,11 +10423,13 @@ function showCard(memberNo, waClicked) {
   }
 }
 
-// ── 換人（清除 localStorage）──
+// ── 換人（清除 localStorage + CoWorkery session）──
 function switchUser() {
   if (confirm('確定要換人？將會清除記住的帳號。')) {
     localStorage.removeItem('ce85_member_no');
     localStorage.removeItem('ce85_wa_clicked');
+    // 同時清除 CoWorkery 打卡 session，避免新帳號進入時仍用舊帳號打卡
+    sessionStorage.removeItem('cw_session');
     window.location.reload();
   }
 }
