@@ -9414,9 +9414,9 @@ function coworkeryAppHtml(): string {
 <div class="wrap">
 
   <!-- 頂部返回／登出掣 -->
-  <button onclick="cwFullLogout()" class="back-bar" style="background:none;border:none;cursor:pointer;margin-bottom:12px">
+  <button onclick="window.location.href='/app'" class="back-bar" style="background:none;border:none;cursor:pointer;margin-bottom:12px">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-    登出 / 返回
+    返回
   </button>
 
   <div class="card">
@@ -9872,11 +9872,8 @@ function cwLogout(){
   cwAutoFillApply()
 }
 
-// 登出並返回 /app：清除所有 session，讓用戶重新選擇帳號
+// 純返回 /app，不清除任何 session
 function cwFullLogout(){
-  sessionStorage.removeItem('cw_session')
-  localStorage.removeItem('ce85_member_no')
-  localStorage.removeItem('ce85_wa_clicked')
   window.location.href='/app'
 }
 
