@@ -7727,6 +7727,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* ── Module Pages ── */
 .mod-page{display:none;}
 .mod-page.active{display:block;}
+/* Modules rendered outside .page-area still need sidebar offset + padding */
+#app-shell ~ .mod-page.active {
+  margin-left:220px;
+  padding:24px;
+  min-height:100vh;
+  box-sizing:border-box;
+  background:#F3F4F6;
+}
 
 /* ── Roadshow Module ── */
 .rs-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
