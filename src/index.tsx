@@ -7824,6 +7824,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="nav-item" onclick="switchMod('mod-coworkery')">
         <i class="fas fa-hard-hat"></i> CoWorkery 人手
       </div>
+      <div class="nav-item" onclick="switchMod('mod-revenue')">
+        <i class="fas fa-star"></i> 領航者申請
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doAdminLogout()">
@@ -8323,6 +8326,58 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<div id="mod-revenue" class="mod-page">
+  <style>
+    .app-card{background:#fff;border-radius:10px;border:1.5px solid #E5E7EB;padding:16px 18px;margin-bottom:12px;cursor:pointer;transition:box-shadow 0.15s;}
+    .app-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.09);}
+    .app-card .ac-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+    .app-card .ac-name{font-size:17px;font-weight:700;color:#111;}
+    .app-card .ac-role{font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;}
+    .ac-role.CL{background:#FFF3CD;color:#92400e;}
+    .ac-role.CK{background:#E0F2FE;color:#0369a1;}
+    .app-card .ac-meta{font-size:13px;color:#6B7280;margin-top:4px;}
+    .app-card .ac-detail{font-size:14px;color:#374151;margin-top:8px;line-height:1.6;border-top:1px solid #F3F4F6;padding-top:8px;}
+    .status-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;}
+    .status-PENDING{background:#FFFBEB;color:#92400e;border:1px solid #FCD34D;}
+    .status-APPROVED{background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;}
+    .status-REJECTED{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;}
+    .rev-filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+    .rev-filter-btn{padding:6px 16px;border:1.5px solid #D1D5DB;background:#fff;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;color:#374151;}
+    .rev-filter-btn.active{background:var(--brand);color:#fff;border-color:var(--brand);}
+    .review-actions{display:flex;gap:8px;margin-top:12px;}
+    .btn-approve{padding:9px 20px;background:#065F46;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+    .btn-reject{padding:9px 20px;background:#991B1B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+    .review-notes{width:100%;padding:8px 10px;font-size:14px;border:1.5px solid #D1D5DB;border-radius:6px;resize:vertical;font-family:inherit;margin-top:8px;}
+    .doc-link{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#F3F4F6;border-radius:6px;font-size:13px;font-weight:600;color:#1B4332;text-decoration:none;margin-top:6px;}
+  </style>
+
+  <div style="max-width:700px;">
+    <h2 style="font-size:22px;font-weight:900;color:#1B4332;margin-bottom:16px;">🌟 領航者 / 連結者申請審核</h2>
+
+    <!-- 統計列 -->
+    <div id="revStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;"></div>
+
+    <!-- 篩選按鈕 -->
+    <div class="rev-filter-bar">
+      <button class="rev-filter-btn active" onclick="loadRevApps('PENDING',this)">⏳ 待審批</button>
+      <button class="rev-filter-btn" onclick="loadRevApps('APPROVED',this)">✅ 已批准</button>
+      <button class="rev-filter-btn" onclick="loadRevApps('REJECTED',this)">❌ 已拒絕</button>
+    </div>
+
+    <div id="revAppList">載入中…</div>
+  </div>
+
+  <!-- 審核 Detail Modal -->
+  <div id="revModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;padding:20px;">
+    <div style="background:#fff;border-radius:12px;max-width:560px;margin:0 auto;padding:24px;position:relative;">
+      <button onclick="closeRevModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#6B7280;">✕</button>
+      <h3 style="font-size:20px;font-weight:900;margin-bottom:16px;color:#1B4332;">📋 申請詳情</h3>
+      <div id="revModalBody"></div>
+    </div>
+  </div>
+</div>
+
+
 <script>
 // ── State ──
 var allStores = [];
@@ -8383,7 +8438,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'領航者申請審核'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -8395,6 +8450,7 @@ function switchMod(id){
   if(id==='mod-useful-links') loadUsefulLinks();
   if(id==='mod-jobs') loadJobs();
   if(id==='mod-coworkery') cwTab('cw-overview');
+  if(id==='mod-revenue') { loadRevApps('PENDING'); loadRevStats(); }
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
@@ -9362,6 +9418,158 @@ function cwExportPayroll(){
   var code=(document.getElementById('cwPayrollSession')||{}).value||'';
   location.href=CW_API+'/payroll?export=csv'+(code?'&roadshow_code='+encodeURIComponent(code):'');
 }
+
+// ── Revenue / Partner Applications ──────────────────────────────────────────
+var _revCurrentStatus = 'PENDING';
+
+function loadRevStats() {
+  fetch('/api/admin/rev/dashboard').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    var st = d.stats || {};
+    var el = document.getElementById('revStats');
+    if(!el) return;
+    el.innerHTML = [
+      {label:'待審批申請', val: st.pending_applications||0, color:'#92400e', bg:'#FFFBEB'},
+      {label:'已批准角色持有人', val: st.active_role_holders||0, color:'#065F46', bg:'#D1FAE5'},
+      {label:'累計分成記錄', val: st.total_wallet_entries||0, color:'#1e40af', bg:'#DBEAFE'}
+    ].map(function(s){
+      return '<div style="background:'+s.bg+';border-radius:8px;padding:12px;text-align:center;">' +
+        '<div style="font-size:24px;font-weight:900;color:'+s.color+'">'+s.val+'</div>' +
+        '<div style="font-size:12px;color:#6B7280;margin-top:3px;">'+s.label+'</div>' +
+      '</div>';
+    }).join('');
+  }).catch(function(){});
+}
+
+function loadRevApps(status, btnEl) {
+  _revCurrentStatus = status;
+  // Update filter buttons
+  document.querySelectorAll('.rev-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  if(btnEl) btnEl.classList.add('active');
+  
+  var list = document.getElementById('revAppList');
+  list.innerHTML = '<div style="padding:30px;text-align:center;color:#6B7280;">載入中…</div>';
+  
+  fetch('/api/admin/rev/applications?status=' + status).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok || !d.applications || !d.applications.length) {
+      list.innerHTML = '<div style="padding:30px;text-align:center;color:#6B7280;">暫無' + status + '申請</div>';
+      return;
+    }
+    var roleLabel = {COLEADERY:'🌟 CoLeadery 領航者', COLINKERY:'🤝 CoLinkery 連結者'};
+    var typeLabel = {INDIVIDUAL:'個人', GROUP:'小組', COMPANY:'公司'};
+    list.innerHTML = d.applications.map(function(a){
+      var roleClass = a.role === 'COLEADERY' ? 'CL' : 'CK';
+      var date = (a.created_at||'').slice(0,10);
+      return '<div class="app-card" onclick="openRevModal('+a.id+')">' +
+        '<div class="ac-top">' +
+          '<div class="ac-name">' + esc(a.name_zh||'') + (a.name_en ? ' / '+esc(a.name_en) : '') + '</div>' +
+          '<span class="ac-role '+roleClass+'">' + (roleLabel[a.role]||a.role) + '</span>' +
+        '</div>' +
+        '<div class="ac-meta">' +
+          '會員：' + esc(a.member_no) + ' (' + esc(a.member_name_zh||'') + ') &nbsp;｜&nbsp; ' +
+          '類型：' + (typeLabel[a.applicant_type]||a.applicant_type) + ' &nbsp;｜&nbsp; ' +
+          '申請日：' + date +
+          (a.phone ? ' &nbsp;｜&nbsp; 📞 ' + esc(a.phone) : '') +
+        '</div>' +
+        (a.status !== 'PENDING' ? '<div class="ac-meta" style="margin-top:4px;"><span class="status-badge status-'+a.status+'">' + a.status + '</span>' + (a.review_notes ? ' ' + esc(a.review_notes) : '') + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }).catch(function(){
+    list.innerHTML = '<div style="padding:20px;color:#DC2626;">載入失敗，請重試</div>';
+  });
+}
+
+var _revApps = {};
+function openRevModal(id) {
+  fetch('/api/admin/rev/applications?status='+_revCurrentStatus).then(function(r){return r.json();}).then(function(d){
+    var app = (d.applications||[]).find(function(a){return a.id===id;});
+    if(!app) return;
+    _revApps[id] = app;
+    var roleLabel = {COLEADERY:'🌟 CoLeadery 領航者', COLINKERY:'🤝 CoLinkery 連結者'};
+    var typeLabel = {INDIVIDUAL:'個人', GROUP:'小組', COMPANY:'公司'};
+    var rows = [
+      ['會員號碼', esc(app.member_no)],
+      ['老有卡會員', esc(app.member_name_zh||'')],
+      ['申請角色', roleLabel[app.role]||app.role],
+      ['申請人類型', typeLabel[app.applicant_type]||app.applicant_type],
+      ['中文姓名', esc(app.name_zh||'')],
+      ['英文姓名', esc(app.name_en||'—')],
+      ['聯絡電話', esc(app.phone||'—')],
+      ['地區/地址', esc(app.address||'—')],
+      ['身份證前7位', esc(app.id_prefix||'—')],
+      ['公司名稱', esc(app.company_name||'—')],
+      ['BR號碼', esc(app.company_br||'—')],
+      ['小組人數', app.team_size ? String(app.team_size) : '—'],
+      ['小組簡介', esc(app.team_notes||'—')],
+      ['行業背景', esc(app.industry_background||'—')],
+      ['銀行名稱', esc(app.bank_name||'—')],
+      ['銀行戶口', esc(app.bank_acc_no||'—')],
+      ['申請日期', (app.created_at||'').slice(0,16)],
+      ['狀態', '<span class="status-badge status-'+app.status+'">'+app.status+'</span>'],
+    ].filter(function(r){ return r[1] && r[1] !== '—'; });
+    
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">' +
+      rows.map(function(r){
+        return '<tr style="border-bottom:1px solid #F3F4F6;">' +
+          '<td style="padding:7px 10px;font-weight:700;color:#374151;width:40%;vertical-align:top;">'+r[0]+'</td>' +
+          '<td style="padding:7px 10px;color:#111;word-break:break-all;">'+r[1]+'</td>' +
+        '</tr>';
+      }).join('') +
+    '</table>';
+    
+    if(app.id_doc_r2_key) {
+      html += '<a class="doc-link" href="/api/partner/doc/'+encodeURIComponent(app.id_doc_r2_key)+'" target="_blank">📎 查看上傳文件</a>';
+    }
+    
+    if(app.status === 'PENDING') {
+      html += '<div style="margin-top:16px;border-top:1.5px solid #E5E7EB;padding-top:14px;">' +
+        '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:6px;">審核備注（可選）</div>' +
+        '<textarea id="revNotes" class="review-notes" placeholder="審核備注（批准/拒絕原因，選填）" rows="2"></textarea>' +
+        '<div class="review-actions">' +
+          '<button class="btn-approve" onclick="doRevAction('+id+','APPROVED')">✅ 批准</button>' +
+          '<button class="btn-reject" onclick="doRevAction('+id+','REJECTED')">❌ 拒絕</button>' +
+        '</div>' +
+        '<div id="revActionErr" style="color:#DC2626;font-size:13px;margin-top:8px;display:none;"></div>' +
+      '</div>';
+    }
+    
+    document.getElementById('revModalBody').innerHTML = html;
+    document.getElementById('revModal').style.display = '';
+  });
+}
+
+function closeRevModal() {
+  document.getElementById('revModal').style.display = 'none';
+}
+
+function doRevAction(id, action) {
+  var notes = (document.getElementById('revNotes')||{}).value||'';
+  var errEl = document.getElementById('revActionErr');
+  errEl.style.display='none';
+  var btn = action==='APPROVED' ? document.querySelector('.btn-approve') : document.querySelector('.btn-reject');
+  if(btn){ btn.disabled=true; btn.textContent='處理中…'; }
+  fetch('/api/admin/rev/applications/'+id+'/review', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:action, review_notes:notes})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){
+      errEl.textContent = d.error||'操作失敗';
+      errEl.style.display='';
+      if(btn){ btn.disabled=false; btn.textContent=action==='APPROVED'?'✅ 批准':'❌ 拒絕'; }
+      return;
+    }
+    closeRevModal();
+    loadRevApps(_revCurrentStatus);
+    loadRevStats();
+    alert(action==='APPROVED' ? '✅ 已批准！角色持有人記錄已建立。' : '申請已拒絕。');
+  }).catch(function(){
+    errEl.textContent='網絡錯誤，請重試';
+    errEl.style.display='';
+    if(btn){ btn.disabled=false; btn.textContent=action==='APPROVED'?'✅ 批准':'❌ 拒絕'; }
+  });
+}
+// ── End Revenue ──────────────────────────────────────────────────────────────
 </script>
 </body>
 </html>`
@@ -11118,73 +11326,92 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
 
   <!-- Step 4: 填寫資料 -->
   <div id="step4" class="section" style="display:none;">
-    <div class="section-title">&#x270D;&#xFE0F; \u7b2c\u56db\u6b65\uff1a\u586b\u5beb\u8cc7\u6599</div>
+    <div class="section-title">&#x270D;&#xFE0F; 第四步：填寫資料</div>
     <div class="field-group">
-      <label>\u4e2d\u6587\u59d3\u540d <span class="req">*</span></label>
-      <input type="text" id="applyNameZh" placeholder="\u4e2d\u6587\u59d3\u540d">
+      <label>中文姓名 <span class="req">*</span></label>
+      <input type="text" id="applyNameZh" placeholder="真實中文姓名（對上身份證）">
+      <div class="hint">請使用身份證上的漢字姓名</div>
     </div>
     <div class="field-group">
-      <label>\u82f1\u6587\u59d3\u540d</label>
-      <input type="text" id="applyNameEn" placeholder="English Name (optional)">
+      <label>英文姓名</label>
+      <input type="text" id="applyNameEn" placeholder="English Name (as on HKID)">
     </div>
     <div class="field-group">
-      <label>\u8a1c\u8981\u96fb\u8a71 <span class="req">*</span></label>
-      <input type="tel" id="applyContactPhone" inputmode="numeric" placeholder="\u8a81\u8981\u96fb\u8a71\u865f\u78bc">
+      <label>聯絡電話 <span class="req">*</span></label>
+      <input type="tel" id="applyContactPhone" inputmode="numeric" placeholder="用於聯絡的電話號碼">
     </div>
     <div class="field-group">
-      <label>\u5730\u5740</label>
-      <input type="text" id="applyAddress" placeholder="\u9999\u6e2f\u5730\u5740 (\u5931\u696d)">
+      <label>地區</label>
+      <select id="applyDistrict">
+        <option value="">請揀選地區（可選）</option>
+        <optgroup label="港島">
+          <option>中西區</option><option>灣仔區</option><option>南區</option>
+          <option>東區</option>
+        </optgroup>
+        <optgroup label="九龍">
+          <option>油尖旺區</option><option>深水埗區</option>
+          <option>九龍城區</option><option>黃大仙區</option><option>觀塘區</option>
+        </optgroup>
+        <optgroup label="新界">
+          <option>葵青區</option><option>荃灣區</option><option>屯門區</option>
+          <option>元朗區</option><option>北區</option><option>大埔區</option>
+          <option>西貢區</option><option>沙田區</option><option>離島區</option>
+        </optgroup>
+      </select>
     </div>
-    <!-- 個人：HKID prefix -->
+    <!-- 個人：HKID -->
     <div id="fieldIdPrefix" class="field-group" style="display:none;">
-      <label>\u8eab\u4efd\u8b49\u524d\u7f00 <span class="req">*</span></label>
-      <input type="text" id="applyIdPrefix" placeholder="\u4f8b: A123456" maxlength="8">
-      <div class="hint">\u8eab\u4efd\u8b49\u865f\u78bc\u524d 7 \u4f4d\uff08\u4e0d\u5305\u62ec\u62ec\u865f\u5167\u6578\u5b57\uff09</div>
+      <label>身份證號碼（前 7 位）<span class="req">*</span></label>
+      <input type="text" id="applyIdPrefix" placeholder="例: A123456" maxlength="8" autocapitalize="characters">
+      <div class="hint">填身份證號碼前 7 位，不包括括號內數字。例：A123456（即 A123456(7)）</div>
     </div>
     <!-- 公司：公司名 + BR -->
     <div id="fieldCompany" class="field-group" style="display:none;">
-      <label>\u516c\u53f8\u540d\u7a31 <span class="req">*</span></label>
-      <input type="text" id="applyCompanyName" placeholder="\u6ce8\u518c\u516c\u53f8\u540d\u7a31">
+      <label>公司名稱 <span class="req">*</span></label>
+      <input type="text" id="applyCompanyName" placeholder="注冊公司名稱（中英文）">
     </div>
     <div id="fieldBR" class="field-group" style="display:none;">
-      <label>BR \u865f\u78bc</label>
-      <input type="text" id="applyCompanyBR" placeholder="BR\u767b\u8a18\u865f\u78bc">
+      <label>BR 登記號碼</label>
+      <input type="text" id="applyCompanyBR" placeholder="商業登記証 BR 號碼">
     </div>
     <!-- 小組：人數 + 說明 -->
     <div id="fieldTeam" class="field-group" style="display:none;">
-      <label>\u5c0f\u7d44\u4eba\u6578</label>
-      <input type="number" id="applyTeamSize" min="2" max="50" placeholder="\u5c0f\u7d44\u9810\u671f\u4eba\u6578">
+      <label>小組人數</label>
+      <input type="number" id="applyTeamSize" min="2" max="50" placeholder="預期參與人數">
     </div>
     <div id="fieldTeamNotes" class="field-group" style="display:none;">
-      <label>\u5c0f\u7d44\u610f\u5411\u7c21\u4ecb</label>
-      <textarea id="applyTeamNotes" rows="3" placeholder="\u8acb\u7c21\u8ff0\u5c0f\u7d44\u7684\u80cc\u666f\u548c\u610f\u5411"></textarea>
+      <label>小組簡介</label>
+      <textarea id="applyTeamNotes" rows="3" placeholder="請簡述小組的背景、意向及主要成員構成"></textarea>
     </div>
     <!-- CoLinkery：行業背景 -->
     <div id="fieldIndustry" class="field-group" style="display:none;">
-      <label>\u884c\u696d\u80cc\u666f / \u5e02\u5834\u8cc7\u6e90</label>
-      <textarea id="applyIndustry" rows="3" placeholder="\u8acb\u7c21\u8ff0\u4f60\u7684\u884c\u696d\u80cc\u666f\u53ca\u53ef\u5e36\u4f86\u7684\u5408\u4f5c\u8cc7\u6e90"></textarea>
+      <label>行業背景 / 市場資源</label>
+      <textarea id="applyIndustry" rows="3" placeholder="請簡述你的行業背景及可帶來的合作資源或客户網絡"></textarea>
     </div>
     <!-- 銀行資料 -->
     <div class="field-group">
-      <label>\u9280\u884c\u540d\u7a31</label>
+      <label>銀行名稱</label>
       <select id="applyBankName">
-        <option value="">\u8acb\u64c7\u9078\u9280\u884c</option>
-        <option>\u532f\u8c50\u9280\u884c (HSBC)</option>
-        <option>\u6e63\u6f50\u9280\u884c (Hang Seng)</option>
-        <option>\u4e2d\u570b\u9280\u884c (Bank of China)</option>
-        <option>\u6e23\u6253\u9280\u884c (Standard Chartered)</option>
-        <option>\u4e2d\u4fe1\u9280\u884c\u7586</option>
-        <option>\u8377\u862d\u6613\u9280\u884c (ING)</option>
-        <option>Citibank</option>
-        <option>DBS</option>
-        <option>ZA Bank</option>
+        <option value="">請揀選銀行（可後補）</option>
+        <option>匯豐銀行 (HSBC)</option>
+        <option>恒生銀行 (Hang Seng)</option>
+        <option>中國銀行 (Bank of China)</option>
+        <option>渣打銀行 (Standard Chartered)</option>
+        <option>中信銀行（中信銀行國際）</option>
+        <option>東亞銀行 (Bank of East Asia)</option>
+        <option>星展銀行 (DBS)</option>
+        <option>花旗銀行 (Citibank)</option>
+        <option>ZA Bank（衆安銀行）</option>
         <option>Mox Bank</option>
-        <option>\u5176\u4ed6</option>
+        <option>WeLab Bank（匯立銀行）</option>
+        <option>Livi Bank</option>
+        <option>其他</option>
       </select>
     </div>
     <div class="field-group">
-      <label>\u9280\u884c\u6236\u53e3\u865f\u78bc</label>
-      <input type="text" id="applyBankAcc" placeholder="\u9280\u884c\u6236\u53e3\u865f\u78bc" inputmode="numeric">
+      <label>銀行戶口號碼</label>
+      <input type="text" id="applyBankAcc" placeholder="銀行戶口號碼" inputmode="numeric">
+      <div class="hint">分成款項將存入此戶口，可後補填寫</div>
     </div>
     <div class="err-box" id="s4Err"></div>
   </div>
@@ -11359,6 +11586,10 @@ function verifyPhone(cb) {
     var found = document.getElementById('s1Found');
     found.style.display = '';
     found.textContent = '\u627e\u5230\u6703\u54e1\uff1a' + d.name_zh + '\uff08' + d.member_no + '\uff09';
+    // \u9810\u586b Step 4 \u8cc7\u6599
+    if (d.name_zh) document.getElementById('applyNameZh').value = d.name_zh;
+    if (d.name_en) document.getElementById('applyNameEn').value = d.name_en;
+    if (d.phone) document.getElementById('applyContactPhone').value = d.phone;
     if (d.existing && (d.existing.status === 'PENDING' || d.existing.status === 'APPROVED')) {
       showErr('s1Err', '\u4f60\u5df2\u6709 ' + d.existing.status + ' \u72c0\u614b\u7684\u7533\u8acb\uff08\u89d2\u8272\uff1a' + d.existing.role + '\uff09\uff0c\u8acb\u8010\u5fc3\u7b49\u5019\u5be9\u6838\u3002');
       return;
@@ -11466,7 +11697,7 @@ function submitApplication() {
     name_zh: document.getElementById('applyNameZh').value.trim(),
     name_en: document.getElementById('applyNameEn').value.trim(),
     phone: document.getElementById('applyContactPhone').value.trim(),
-    address: document.getElementById('applyAddress').value.trim(),
+    address: (document.getElementById('applyDistrict') ? document.getElementById('applyDistrict').value.trim() : ''),
     id_prefix: document.getElementById('applyIdPrefix').value.trim(),
     id_doc_r2_key: uploadedKey,
     company_name: document.getElementById('applyCompanyName').value.trim(),
@@ -11828,8 +12059,8 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     const db = c.env.DB
     const digits = String(phone).replace(/\D/g, '')
     const m = await db.prepare(
-      'SELECT member_no, name_zh, tier FROM members WHERE phone = ? AND status = ? LIMIT 1'
-    ).bind(digits, 'ACTIVE').first<{ member_no: string; name_zh: string; tier: string }>()
+      'SELECT member_no, name_zh, name_en, phone, tier FROM members WHERE phone = ? AND status = ? LIMIT 1'
+    ).bind(digits, 'ACTIVE').first<{ member_no: string; name_zh: string; name_en: string; phone: string; tier: string }>()
     if (!m) return c.json({ ok: false, error: '找不到此電話號碼對應的老有卡會員，請確認電話號碼或先登記老有卡。' })
     // ── 55 歲資格限制（創始人 Simon Wong 91477341 豁免）──
     const FOUNDER_PHONE = '91477341'
@@ -11847,7 +12078,7 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     const existing = await db.prepare(
       'SELECT status, role FROM role_applications WHERE member_no = ? ORDER BY created_at DESC LIMIT 1'
     ).bind(m.member_no).first<{ status: string; role: string }>()
-    return c.json({ ok: true, member_no: m.member_no, name_zh: m.name_zh, existing })
+    return c.json({ ok: true, member_no: m.member_no, name_zh: m.name_zh, name_en: m.name_en || '', phone: m.phone, existing })
   })
 
   // 提交申請
