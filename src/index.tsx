@@ -11819,7 +11819,7 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
     <!-- 電郵 -->
     <div class="field-group">
       <label>電郵地址 <span class="req">*</span></label>
-      <input type="email" id="kycEmail" placeholder="your@email.com" inputmode="email" autocomplete="email">
+      <input type="text" id="kycEmail" placeholder="your@email.com" inputmode="email" autocomplete="email" autocorrect="off" autocapitalize="none">
       <div class="hint">用於接收申請通知及分成結算通知</div>
     </div>
     <!-- 推薦人 -->
@@ -12789,7 +12789,7 @@ body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC
       <!-- 電郵 -->
       <div class="field-group">
         <label>電郵地址 <span style="color:#C62828;">*</span></label>
-        <input type="email" id="tcKycEmail" placeholder="your@email.com" inputmode="email">
+        <input type="text" id="tcKycEmail" placeholder="your@email.com" inputmode="email" autocorrect="off" autocapitalize="none">
         <div class="hint">用於接收分成結算通知</div>
       </div>
       <!-- 推薦人 -->
