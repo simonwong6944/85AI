@@ -10943,6 +10943,12 @@ function showCard(memberNo, waClicked) {
     '</div>';
   // partner entry section — 用全域函數 goPartnerApply / goWallet 避免 onclick 引號衝突
   window._partnerMember = memberNo;
+  // 同時存 phone 到 window._partnerPhone，供 goPartnerApply/goWallet 使用
+  var _phoneInputEl = document.getElementById('phoneInput');
+  if (_phoneInputEl && _phoneInputEl.value.trim()) {
+    window._partnerPhone = _phoneInputEl.value.trim();
+    localStorage.setItem('ce85_phone', window._partnerPhone);
+  }
   var partnerEntryHtml =
     '<div id="partnerEntrySection" style="margin:20px 0 0;padding:0 2px;">' +
       '<div style="font-size:16px;font-weight:900;color:#8B0000;letter-spacing:1px;margin-bottom:10px;padding-left:2px;">\uD83C\uDF1F CoEldery 85 \u9818\u822a\u8005\u8a08\u5283</div>' +
@@ -10968,12 +10974,12 @@ function showCard(memberNo, waClicked) {
 // ── Partner apply / Wallet 導航（全域函數，供 showCard() 動態生成的按鈕呼叫）──
 function goPartnerApply() {
   var m = window._partnerMember || localStorage.getItem('ce85_member_no') || '';
-  var p = localStorage.getItem('ce85_phone') || '';
+  var p = window._partnerPhone || localStorage.getItem('ce85_phone') || (document.getElementById('phoneInput') ? document.getElementById('phoneInput').value.trim() : '') || '';
   window.location.href = '/app/partner-apply?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
 }
 function goWallet() {
   var m = window._partnerMember || localStorage.getItem('ce85_member_no') || '';
-  var p = localStorage.getItem('ce85_phone') || '';
+  var p = window._partnerPhone || localStorage.getItem('ce85_phone') || (document.getElementById('phoneInput') ? document.getElementById('phoneInput').value.trim() : '') || '';
   window.location.href = '/app/wallet?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
 }
 
@@ -11967,7 +11973,7 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
       5. \u9805\u76ee\u5206\u6210\u70ba\u975e\u4fdd\u8b49\u6536\u76ca\uff0c\u5b9e\u969b\u4ee5\u6b63\u5f0f\u7d50\u7b97\u70ba\u6e96\u3002
     </div>
     <label class="check-row" id="declarationCheck">
-      <input type="checkbox" id="agreeCheck" onchange="updateDeclareBtn()">
+      <input type="checkbox" id="agreeCheck" onchange="updateDeclareBtn()" checked>
       <span style="font-size:16px;line-height:1.5;">\u672c\u4eba\u5df2\u9285\u8b80\u4e26\u540c\u610f\u4e0a\u8ff0\u8072\u660e\u6307\u5f15</span>
     </label>
     <div class="err-box" id="s6Err"></div>
@@ -12051,7 +12057,7 @@ function showStep(n) {
   btnBack.style.display = n === 1 ? 'none' : '';
   btnNext.textContent = n === TOTAL_STEPS ? '\u63d0\u4ea4\u7533\u8acb' : '\u4e0b\u4e00\u6b65';
   if (n === TOTAL_STEPS) {
-    btnNext.disabled = !document.getElementById('agreeCheck').checked;
+    btnNext.disabled = false;
   } else {
     btnNext.disabled = false;
   }
@@ -12084,10 +12090,6 @@ function nextStep() {
     showStep(6); return;
   }
   if (currentStep === 6) {
-    if (!document.getElementById('agreeCheck').checked) {
-      showErr('s6Err', '\u8acb\u5148\u52fe\u9078\u8072\u660e');
-      return;
-    }
     submitApplication();
     return;
   }
@@ -12321,7 +12323,8 @@ function handleFileSelect(input) {
 }
 
 function updateDeclareBtn() {
-  document.getElementById('btnNext').disabled = !document.getElementById('agreeCheck').checked;
+  // checkbox is informational only — never block submit
+  document.getElementById('btnNext').disabled = false;
 }
 
 function getVal(id) {
