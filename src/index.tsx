@@ -12310,10 +12310,10 @@ function selectType(t) {
 // ── Step 2: KYC 提交 ──────────────────────────────────────────────────────────
 function submitKyc(cb) {
   var idPrefix = document.getElementById('kycIdPrefix').value.trim().toUpperCase();
-  // 清除所有不可見字符（包括 zero-width space、non-breaking space 等）
+  // 清除不可見字符（zero-width space、non-breaking space）
   var emailRaw = document.getElementById('kycEmail').value;
-  var email = emailRaw.replace(/[\u0000-\u001F\u007F-\u009F\u00A0\u200B-\u200D\uFEFF\u2028\u2029]/g, '').trim();
-  console.log('[KYC debug] emailRaw repr:', JSON.stringify(emailRaw), 'cleaned:', JSON.stringify(email));
+  var email = emailRaw.replace(/\u00A0/g,'').replace(/\u200B/g,'').replace(/\uFEFF/g,'').trim();
+  console.log('[KYC debug] email:', JSON.stringify(email));
   var refPhone = document.getElementById('kycRefPhone').value.replace(/\D/g,'');
   var refName = document.getElementById('kycRefNameInput') ? document.getElementById('kycRefNameInput').value.trim() : '';
   var bankName = document.getElementById('kycBankName').value;
@@ -13028,10 +13028,10 @@ function doVerify() {
 function doKycNext() {
   clearErr('kycErr');
   var idPrefix = document.getElementById('tcKycId').value.trim().toUpperCase();
-  // 清除所有不可見字符
+  // 清除不可見字符
   var emailRaw2 = document.getElementById('tcKycEmail').value;
-  var email = emailRaw2.replace(/[\u0000-\u001F\u007F-\u009F\u00A0\u200B-\u200D\uFEFF\u2028\u2029]/g, '').trim();
-  console.log('[KYC-TC debug] emailRaw repr:', JSON.stringify(emailRaw2), 'cleaned:', JSON.stringify(email));
+  var email = emailRaw2.replace(/\u00A0/g,'').replace(/\u200B/g,'').replace(/\uFEFF/g,'').trim();
+  console.log('[KYC-TC debug] email:', JSON.stringify(email));
   var refPhone = document.getElementById('tcRefPhone').value.replace(/\D/g,'');
   var bank = document.getElementById('tcKycBank').value;
   var acc = document.getElementById('tcKycAcc').value.trim();
