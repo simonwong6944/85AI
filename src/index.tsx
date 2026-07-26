@@ -13308,8 +13308,8 @@ function renderWallet(d) {
     projList.innerHTML = projects.map(function(proj) {
       var stLabel = projStatusLabels[proj.project_status] || proj.project_status;
       var stKey = proj.project_status || 'DRAFT';
-      var mySharePct = Math.round((proj.team_share_bps || 0) / 100);
-      var roleOfPool = proj.holder_no && myHolderNos.indexOf(proj.holder_no) >= 0 ? proj.role : '';
+      // 此人在本項目的所有角色（可能多個）
+      var myRoles = proj.myRoles || [];
       // Build team chips（含 GROUP 成員展開）
       var team = proj.team || [];
       var teamHtml = '';
@@ -13336,10 +13336,15 @@ function renderWallet(d) {
         });
         teamHtml = '<div class="team-row">' + chips.join('') + '</div>';
       }
-      // Share pcts for this role pool
-      var poolPct = proj.role === 'COLEADERY' ? Math.round((proj.pct_coleadery || 0) / 100) :
-                    proj.role === 'COLINKERY'  ? Math.round((proj.pct_colinkery || 0) / 100) : 0;
-      var myActualPct = Math.round(poolPct * mySharePct / 100 * 10) / 10;
+      // 我的角色明細：每個角色一行，顯示角色名稱 + 團隊分帳% + 占項目收益%
+      var myRoleLines = myRoles.map(function(mr) {
+        var rLabel = roleLabelsShort[mr.role] || mr.role;
+        var rSharePct = Math.round((mr.team_share_bps || 0) / 100);
+        var poolPct = mr.role === 'COLEADERY' ? Math.round((proj.pct_coleadery || 0) / 100) :
+                      mr.role === 'COLINKERY'  ? Math.round((proj.pct_colinkery || 0) / 100) : 0;
+        var actualPct = Math.round(poolPct * rSharePct / 100 * 10) / 10;
+        return rLabel + ' ' + rSharePct + '%' + (poolPct > 0 ? '（占項目收益 ' + actualPct + '%）' : '');
+      }).join(' ／ ');
       return '<div class="proj-card-w ' + stKey.toLowerCase() + '">' +
         '<div class="proj-title-row">' +
           '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
@@ -13349,12 +13354,8 @@ function renderWallet(d) {
           '<span class="proj-status-w ps-' + stKey + '">' + stLabel + '</span>' +
         '</div>' +
         teamHtml +
-        '<div class="my-share-row">' +
-          '\u6211\u7684\u89d2\u8272\uff1a' + (roleLabelsShort[proj.role] || proj.role) +
-          '\uff0c\u5718\u968a\u5206\u5e33\uff1a<strong>' + mySharePct + '%</strong>' +
-          (poolPct > 0 ? '\uff08\u5360\u9805\u76ee\u6536\u76ca ' + myActualPct + '%\uff09' : '') +
-        '</div>' +
-        (proj.confirm_status === 'PENDING' ? '<div style="font-size:12px;color:#D97706;margin-top:4px;">\u26a0\ufe0f \u5c1a\u5f85\u78ba\u8a8d\u53c3\u8207</div>' : '') +
+        '<div class="my-share-row">我的角色：<strong>' + myRoleLines + '</strong></div>' +
+        (proj.confirm_status === 'PENDING' ? '<div style="font-size:12px;color:#D97706;margin-top:4px;">⚠️ 尚待確認參與</div>' : '') +
       '</div>';
     }).join('');
   } else {
@@ -13848,21 +13849,42 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
        ORDER BY w.created_at DESC`
     ).bind(...holderNos).all()
     // 拉此人參與的所有項目（含團隊成員資料）
-    // 用 MIN(pp.holder_no) GROUP BY project_id 去重：同一人以多個 holder_no 參與同一項目，只顯示一次
-    const participantProjects = await db.prepare(
-      `SELECT pp.project_id, pp.role, pp.team_share_bps, pp.confirm_status,
-              MIN(pp.holder_no) as holder_no,
+    // 取此人所有 holder_no 參與的每個項目每個角色（不 GROUP BY，逐行取）
+    const participantRows = await db.prepare(
+      `SELECT pp.project_id, pp.role, pp.holder_no, pp.team_share_bps, pp.confirm_status,
               p.project_code, p.name as project_name, p.status as project_status, p.scenario,
               ps.pct_coleadery, ps.pct_colinkery
        FROM project_participants pp
        JOIN projects p ON p.id = pp.project_id
        LEFT JOIN project_shares ps ON ps.project_id = pp.project_id
        WHERE pp.holder_no IN (${placeholders})
-       GROUP BY pp.project_id
-       ORDER BY p.created_at DESC`
+       ORDER BY p.created_at DESC, pp.role`
     ).bind(...holderNos).all<any>()
+    // 按 project_id 合併：同一項目的所有「我的角色」聚合成一個 myRoles 陣列
+    const projectMap: Record<number, any> = {}
+    for (const row of participantRows.results as any[]) {
+      if (!projectMap[row.project_id]) {
+        projectMap[row.project_id] = {
+          project_id: row.project_id,
+          project_code: row.project_code,
+          project_name: row.project_name,
+          project_status: row.project_status,
+          scenario: row.scenario,
+          pct_coleadery: row.pct_coleadery,
+          pct_colinkery: row.pct_colinkery,
+          confirm_status: row.confirm_status,
+          myRoles: []
+        }
+      }
+      projectMap[row.project_id].myRoles.push({
+        role: row.role,
+        holder_no: row.holder_no,
+        team_share_bps: row.team_share_bps
+      })
+    }
+    const participantProjects = { results: Object.values(projectMap) }
     // 每個項目：取同項目所有其他成員
-    const projectIds = [...new Set((participantProjects.results as any[]).map((r: any) => r.project_id))]
+    const projectIds = Object.keys(projectMap).map(Number)
     let projectTeams: Record<number, any[]> = {}
     if (projectIds.length > 0) {
       const pidPlaceholders = projectIds.map(() => '?').join(',')
@@ -13914,7 +13936,7 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
         }
       }
     }
-    // 彙整項目資料
+    // 彙整項目資料（附上 team）
     const projects = (participantProjects.results as any[]).map((pp: any) => ({
       ...pp,
       team: projectTeams[pp.project_id] || []
