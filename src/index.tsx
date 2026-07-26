@@ -13336,14 +13336,15 @@ function renderWallet(d) {
         });
         teamHtml = '<div class="team-row">' + chips.join('') + '</div>';
       }
-      // 我的角色明細：每個角色一行，顯示角色名稱 + 團隊分帳% + 占項目收益%
+      // 我的角色明細：每個角色一行，顯示角色名稱 + 分帳% + 占項目收益%
       var myRoleLines = myRoles.map(function(mr) {
         var rLabel = roleLabelsShort[mr.role] || mr.role;
         var rSharePct = Math.round((mr.team_share_bps || 0) / 100);
         var poolPct = mr.role === 'COLEADERY' ? Math.round((proj.pct_coleadery || 0) / 100) :
                       mr.role === 'COLINKERY'  ? Math.round((proj.pct_colinkery || 0) / 100) : 0;
         var actualPct = Math.round(poolPct * rSharePct / 100 * 10) / 10;
-        return rLabel + ' ' + rSharePct + '%' + (poolPct > 0 ? '（占項目收益 ' + actualPct + '%）' : '');
+        var groupNote = mr.as_group_member ? '（小組成員 ' + mr.group_share_pct + '%）' : '';
+        return rLabel + groupNote + ' · 分帳 ' + rSharePct + '%' + (poolPct > 0 ? '（占項目收益 ' + actualPct + '%）' : '');
       }).join(' ／ ');
       return '<div class="proj-card-w ' + stKey.toLowerCase() + '">' +
         '<div class="proj-title-row">' +
@@ -13882,6 +13883,59 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
         team_share_bps: row.team_share_bps
       })
     }
+    // ── 額外查：此人作為小組成員（team_invites.member_no）參與的項目 ──────────
+    // 小組申請批准後，小組成員不在 project_participants，但在 team_invites 裡有 member_no
+    // 需透過：team_invites → role_applications → role_holders → project_participants 找到項目
+    const teamInviteRows = await db.prepare(`
+      SELECT ti.share_pct, ti.confirmed,
+             ra.role as app_role,
+             pp.project_id, pp.holder_no, pp.team_share_bps, pp.confirm_status,
+             p.project_code, p.name as project_name, p.status as project_status, p.scenario,
+             ps.pct_coleadery, ps.pct_colinkery
+      FROM team_invites ti
+      JOIN role_applications ra ON ra.id = ti.app_id
+      JOIN role_holders rh ON rh.member_no = ra.member_no AND rh.role = ra.role AND rh.applicant_type = 'GROUP'
+      JOIN project_participants pp ON pp.holder_no = rh.holder_no
+      JOIN projects p ON p.id = pp.project_id
+      LEFT JOIN project_shares ps ON ps.project_id = pp.project_id
+      WHERE ti.member_no = ?
+        AND ra.status = 'APPROVED'
+        AND ra.applicant_type = 'GROUP'
+      ORDER BY p.created_at DESC
+    `).bind(m.member_no).all<any>()
+
+    for (const row of teamInviteRows.results as any[]) {
+      if (!projectMap[row.project_id]) {
+        // 新項目：此人只以小組成員身份參與
+        projectMap[row.project_id] = {
+          project_id: row.project_id,
+          project_code: row.project_code,
+          project_name: row.project_name,
+          project_status: row.project_status,
+          scenario: row.scenario,
+          pct_coleadery: row.pct_coleadery,
+          pct_colinkery: row.pct_colinkery,
+          confirm_status: row.confirm_status,
+          myRoles: []
+        }
+      }
+      // 以小組成員身份的分成：team_share_bps（小組整體）× share_pct（本人在小組中的比例）
+      const myEffectiveBps = Math.round((row.team_share_bps || 0) * (row.share_pct || 0) / 100)
+      // 避免重複加入同一角色
+      const alreadyHas = projectMap[row.project_id].myRoles.some((r: any) =>
+        r.role === row.app_role && r.as_group_member === true
+      )
+      if (!alreadyHas) {
+        projectMap[row.project_id].myRoles.push({
+          role: row.app_role,
+          holder_no: row.holder_no,
+          team_share_bps: myEffectiveBps,
+          as_group_member: true,   // 標記：以小組成員身份
+          group_share_pct: row.share_pct
+        })
+      }
+    }
+
     const participantProjects = { results: Object.values(projectMap) }
     // 每個項目：取同項目所有其他成員
     const projectIds = Object.keys(projectMap).map(Number)
