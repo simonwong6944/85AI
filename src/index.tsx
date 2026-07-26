@@ -12179,31 +12179,50 @@ function renderTeamInvites(invites, role) {
   var html = '<div style="margin-top:20px;">' +
     '<div style="font-size:17px;font-weight:900;color:#8B0000;margin-bottom:12px;">\ud83d\udce8 \u9080\u8acb\u5718\u968a\u6210\u54e1\u78ba\u8a8d\u52a0\u5165</div>' +
     '<div style="font-size:14px;color:#555;margin-bottom:14px;">\u8acb\u5411\u4ee5\u4e0b\u5718\u968a\u6210\u54e1\u767c\u9001 WhatsApp \u9080\u8acb\uff0c\u8b93\u5c0d\u65b9\u78ba\u8a8d\u52a0\u5165\u5718\u968a\u53ca\u5206\u6210\u6bd4\u4f8b\u3002</div>';
-  invites.forEach(function(inv) {
+  invites.forEach(function(inv, i) {
     var confirmUrl = 'https://coeldery85.com/app/team-confirm?token=' + inv.token;
     var msg = '\u4f60\u597d\uff01\u6211\u6b63\u7533\u8acb\u52a0\u5165 CoEldery 85 \u7684 ' + roleLabel + ' \u5718\u968a\uff0c\u9084\u8acb\u4f60\u4e00\u8d77\u53c3\u8207\uff01\n\n' +
       '\ud83d\udc64 \u6210\u54e1\uff1a' + inv.name_zh + '\n' +
       '\ud83d\udcb0 \u4f60\u7684\u5206\u6210\uff1a' + inv.share_pct + '%\n\n' +
       '\u8acb\u9ede\u64ca\u9023\u7d50\u78ba\u8a8d\u6216\u62d2\u7d55\uff1a\n' + confirmUrl;
-    var waLink = 'https://api.whatsapp.com/send?phone=852' + inv.phone + '&text=' + encodeURIComponent(msg);
+    var waPhone = '852' + inv.phone;
+    var msgId = 'inviteMsg_' + i;
+    // WA link: 用 data-phone + data-msg，透過 JS 組合，避免雙引號破壞 HTML 屬性
     html += '<div style="background:#fff;border:1.5px solid #E5E7EB;border-radius:10px;padding:14px;margin-bottom:12px;">' +
-      '<div style="font-weight:700;font-size:15px;color:#1B4332;margin-bottom:6px;">' + inv.name_zh + '（' + inv.member_no + '）</div>' +
+      '<div style="font-weight:700;font-size:15px;color:#1B4332;margin-bottom:6px;">' + inv.name_zh + '\uff08' + inv.member_no + '\uff09</div>' +
       '<div style="font-size:13px;color:#666;margin-bottom:10px;">\u5206\u6210\uff1a<strong style="color:#8B0000;">' + inv.share_pct + '%</strong></div>' +
-      '<a href="' + waLink + '" target="_blank" rel="noopener" ' +
-        'style="display:inline-block;padding:10px 18px;background:#25D366;color:#fff;border-radius:8px;font-size:15px;font-weight:700;text-decoration:none;margin-bottom:10px;" ' +
-        'onclick="showWaCopyFallback(this)">' +
-        '\ud83d\udcf2 WhatsApp \u767c\u9001\u9080\u8acb</a>' +
+      '<button class="wa-invite-btn" data-phone="' + waPhone + '" data-msg-id="' + msgId + '"' +
+        ' style="display:inline-block;width:100%;padding:10px 18px;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">' +
+        '\ud83d\udcf2 WhatsApp \u767c\u9001\u9080\u8acb</button>' +
       '<div style="margin-top:6px;">' +
         '<div style="font-size:12px;color:#9CA3AF;margin-bottom:4px;">WhatsApp Business \u7528\u6236\u53ef\u8907\u88fd\u4ee5\u4e0b\u6587\u5b57\uff0c\u624b\u52d5\u767c\u9001\uff1a</div>' +
-        '<div style="background:#F3F4F6;border-radius:6px;padding:10px;font-size:12px;color:#374151;word-break:break-all;white-space:pre-wrap;font-family:monospace;">' + escHtml(msg) + '</div>' +
-        '<button onclick="copyText(this, ' + JSON.stringify(msg) + ')" ' +
-          'style="margin-top:6px;padding:6px 12px;background:#6B7280;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">' +
+        '<textarea id="' + msgId + '" readonly rows="6"' +
+          ' style="width:100%;background:#F3F4F6;border:none;border-radius:6px;padding:10px;font-size:12px;color:#374151;word-break:break-all;resize:none;font-family:monospace;">' +
+          escHtml(msg) + '</textarea>' +
+        '<button class="copy-msg-btn" data-msg-id="' + msgId + '"' +
+          ' style="margin-top:6px;padding:6px 12px;background:#6B7280;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">' +
           '\ud83d\udccb \u8907\u88fd\u6587\u5b57</button>' +
       '</div>' +
     '</div>';
   });
   html += '</div>';
   container.innerHTML = html;
+  // 綁定按鈕事件（避免 inline onclick 引號問題）
+  container.querySelectorAll('.wa-invite-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var phone = btn.getAttribute('data-phone');
+      var msgEl = document.getElementById(btn.getAttribute('data-msg-id'));
+      var text = msgEl ? msgEl.value : '';
+      window.open('https://api.whatsapp.com/send?phone=' + phone + '&text=' + encodeURIComponent(text), '_blank');
+    });
+  });
+  container.querySelectorAll('.copy-msg-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var msgEl = document.getElementById(btn.getAttribute('data-msg-id'));
+      var text = msgEl ? msgEl.value : '';
+      copyText(btn, text);
+    });
+  });
 }
 
 function escHtml(str) {
@@ -12211,16 +12230,17 @@ function escHtml(str) {
 }
 
 function copyText(btn, text) {
+  var origText = btn.textContent;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(function() {
       btn.textContent = '\u2705 \u5df2\u8907\u88fd\uff01';
-      setTimeout(function() { btn.textContent = '\ud83d\udccb \u8907\u88fd\u6587\u5b57'; }, 2000);
+      setTimeout(function() { btn.textContent = origText; }, 2000);
     });
   } else {
     var ta = document.createElement('textarea');
     ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); btn.textContent = '\u2705 \u5df2\u8907\u88fd\uff01'; setTimeout(function() { btn.textContent = '\ud83d\udccb \u8907\u88fd\u6587\u5b57'; }, 2000); } catch(e) {}
+    try { document.execCommand('copy'); btn.textContent = '\u2705 \u5df2\u8907\u88fd\uff01'; setTimeout(function() { btn.textContent = origText; }, 2000); } catch(e) {}
     document.body.removeChild(ta);
   }
 }
