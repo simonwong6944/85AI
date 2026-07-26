@@ -3515,7 +3515,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 
       <div class="footer-links">
         <a href="/membership/join-family">家庭同行卡申請 →</a><br>
-        如有疑問 WhatsApp：<a href="https://wa.me/85254429749?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%88%91%E6%83%B3%E6%9F%A5%E8%A9%A2%E6%9C%89%E9%97%9C%E8%80%81%E6%9C%89%E5%8D%A1%E7%9A%84%E8%B3%87%E8%A8%8A%E3%80%82" target="_blank" style="color:#25D366;font-weight:700;">📱 WhatsApp 5442-9749</a>
+        如有疑問 WhatsApp：<button onclick="window.open('https://wa.me/85254429749?text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:#25D366;font-weight:700;font-size:inherit;font-family:inherit;padding:0;text-decoration:underline;">📱 WhatsApp 5442-9749</button>
       </div>
     </form>
   </div>
@@ -6526,7 +6526,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       medStatus === 'ISSUED'   ? '✅ 已發出 ISSUED'    :
       medStatus === 'DECLINED' ? '❌ 未批准 DECLINED'  : medStatus
     }</span>
-    <div style="font-size:18px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<a href="https://wa.me/85254429749?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%88%91%E6%83%B3%E6%9F%A5%E8%A9%A2%E6%9C%89%E9%97%9C%E8%80%81%E6%9C%89%E5%8D%A1%E7%9A%84%E8%B3%87%E8%A8%8A%E3%80%82" target="_blank" style="color:#1565C0;font-weight:700;">📱 5442-9749</a></div>
+    <div style="font-size:18px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<button onclick="window.open('https://wa.me/85254429749?text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:#1565C0;font-weight:700;font-size:18px;font-family:inherit;padding:0;text-decoration:underline;">📱 5442-9749</button></div>
     ` : `
     <div style="font-size:18px;color:#546E7A;margin-bottom:14px;line-height:1.6;">
       由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>
@@ -6564,7 +6564,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       </button>
     </div>
     <div style="color:#aaa;font-size:16px;">
-      如有疑問 WhatsApp：<a href="https://wa.me/85254429749?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%88%91%E6%83%B3%E6%9F%A5%E8%A9%A2%E6%9C%89%E9%97%9C%E8%80%81%E6%9C%89%E5%8D%A1%E7%9A%84%E8%B3%87%E8%A8%8A%E3%80%82" target="_blank" style="color:${accentMid};font-weight:700;">📱 5442-9749</a>
+      如有疑問 WhatsApp：<button onclick="window.open('https://wa.me/85254429749?text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:${accentMid};font-weight:700;font-size:16px;font-family:inherit;padding:0;text-decoration:underline;">📱 5442-9749</button>
     </div>
   </div>
 </div>
@@ -10949,15 +10949,16 @@ function showCard(memberNo, waClicked) {
       '</div>' +
       '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>' +
     '</div>';
-  // partner entry section — 用 data-member attribute 避免 onclick 引號衝突
+  // partner entry section — 用全域函數 goPartnerApply / goWallet 避免 onclick 引號衝突
+  window._partnerMember = memberNo;
   var partnerEntryHtml =
     '<div id="partnerEntrySection" style="margin:20px 0 0;padding:0 2px;">' +
       '<div style="font-size:16px;font-weight:900;color:#8B0000;letter-spacing:1px;margin-bottom:10px;padding-left:2px;">\uD83C\uDF1F CoEldery 85 \u9818\u822a\u8005\u8a08\u5283</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-        '<button id="btnPartnerApply" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
+        '<button onclick="goPartnerApply()" style="background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
           '\uD83C\uDF1F \u6210\u70ba\u9818\u822a\u8005<br><span style="font-size:12px;font-weight:400;opacity:0.9;">\u5206\u4eab\u9805\u76ee\u6de8\u5229\u6f64</span>' +
         '</button>' +
-        '<button id="btnWallet" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
+        '<button onclick="goWallet()" style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
           '\uD83D\uDCB0 \u6211\u7684\u9322\u5305<br><span style="font-size:12px;font-weight:400;opacity:0.9;">\u67e5\u770b\u5206\u6210\u8a18\u9304</span>' +
         '</button>' +
       '</div>' +
@@ -10966,23 +10967,22 @@ function showCard(memberNo, waClicked) {
       '</div>' +
     '</div>';
   wrap.innerHTML = iframeHtml + installHtml + partnerEntryHtml;
-  // 綁定 partner 按鈕事件（避免 onclick 內嵌字串引號問題）
-  var bpa = document.getElementById('btnPartnerApply');
-  if (bpa) bpa.addEventListener('click', function() {
-    var m = this.getAttribute('data-member') || '';
-    var p = localStorage.getItem('ce85_phone') || '';
-    window.location.href = '/app/partner-apply?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
-  });
-  var bw = document.getElementById('btnWallet');
-  if (bw) bw.addEventListener('click', function() {
-    var m = this.getAttribute('data-member') || '';
-    var p = localStorage.getItem('ce85_phone') || '';
-    window.location.href = '/app/wallet?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
-  });
   // 用戶已點過 WA 按鈕 → 立即展開安裝提示
   if (waClicked) {
     showInstallBanner();
   }
+}
+
+// ── Partner apply / Wallet 導航（全域函數，供 showCard() 動態生成的按鈕呼叫）──
+function goPartnerApply() {
+  var m = window._partnerMember || localStorage.getItem('ce85_member_no') || '';
+  var p = localStorage.getItem('ce85_phone') || '';
+  window.location.href = '/app/partner-apply?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
+}
+function goWallet() {
+  var m = window._partnerMember || localStorage.getItem('ce85_member_no') || '';
+  var p = localStorage.getItem('ce85_phone') || '';
+  window.location.href = '/app/wallet?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
 }
 
 // ── 換人（清除 localStorage + CoWorkery session）──
