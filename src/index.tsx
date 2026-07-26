@@ -10440,15 +10440,15 @@ function showCard(memberNo, waClicked) {
       '</div>' +
       '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>' +
     '</div>';
-  // partner entry section（顯示「成為領航者/連結者」及「我的錢包」入口）
+  // partner entry section — 用 data-member attribute 避免 onclick 引號衝突
   var partnerEntryHtml =
     '<div id="partnerEntrySection" style="margin:20px 0 0;padding:0 2px;">' +
-      '<div style="font-size:16px;font-weight:900;color:#8B0000;letter-spacing:1px;margin-bottom:10px;padding-left:2px;">🌟 CoEldery 85 領航者計劃</div>' +
+      '<div style="font-size:16px;font-weight:900;color:#8B0000;letter-spacing:1px;margin-bottom:10px;padding-left:2px;">\uD83C\uDF1F CoEldery 85 \u9818\u822a\u8005\u8a08\u5283</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-        '<button onclick="goPartnerApply(\'' + memberNo + '\')" style="background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
-          '\uD83C\uDF1F \u6210\u70BA\u9818\u822A\u8005<br><span style="font-size:12px;font-weight:400;opacity:0.9;">\u5206\u4eab\u9805\u76ee\u6de8\u5229\u6f64</span>' +
+        '<button id="btnPartnerApply" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
+          '\uD83C\uDF1F \u6210\u70ba\u9818\u822a\u8005<br><span style="font-size:12px;font-weight:400;opacity:0.9;">\u5206\u4eab\u9805\u76ee\u6de8\u5229\u6f64</span>' +
         '</button>' +
-        '<button onclick="goWallet(\'' + memberNo + '\')" style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
+        '<button id="btnWallet" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
           '\uD83D\uDCB0 \u6211\u7684\u9322\u5305<br><span style="font-size:12px;font-weight:400;opacity:0.9;">\u67e5\u770b\u5206\u6210\u8a18\u9304</span>' +
         '</button>' +
       '</div>' +
@@ -10457,17 +10457,19 @@ function showCard(memberNo, waClicked) {
       '</div>' +
     '</div>';
   wrap.innerHTML = iframeHtml + installHtml + partnerEntryHtml;
-  // 用戶已點過 WA 按鈕 → 立即展開 accordion + 顯示安裝提示
+  // 綁定 partner 按鈕事件（避免 onclick 內嵌字串引號問題）
+  var bpa = document.getElementById('btnPartnerApply');
+  if (bpa) bpa.addEventListener('click', function() {
+    window.location.href = '/app/partner-apply?member=' + encodeURIComponent(this.getAttribute('data-member') || '');
+  });
+  var bw = document.getElementById('btnWallet');
+  if (bw) bw.addEventListener('click', function() {
+    window.location.href = '/app/wallet?member=' + encodeURIComponent(this.getAttribute('data-member') || '');
+  });
+  // 用戶已點過 WA 按鈕 → 立即展開安裝提示
   if (waClicked) {
     showInstallBanner();
   }
-}
-
-function goPartnerApply(memberNo) {
-  window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo);
-}
-function goWallet(memberNo) {
-  window.location.href = '/app/wallet?member=' + encodeURIComponent(memberNo);
 }
 
 // ── 換人（清除 localStorage + CoWorkery session）──
@@ -11814,6 +11816,18 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
       'SELECT member_no, name_zh, tier FROM members WHERE phone = ? AND status = ? LIMIT 1'
     ).bind(digits, 'ACTIVE').first<{ member_no: string; name_zh: string; tier: string }>()
     if (!m) return c.json({ ok: false, error: '找不到此電話號碼對應的老有卡會員，請確認電話號碼或先登記老有卡。' })
+    // ── 55 歲資格限制（創始人 Simon Wong 91477341 豁免）──
+    const FOUNDER_PHONE = '91477341'
+    const isFounder = digits === FOUNDER_PHONE
+    if (!isFounder) {
+      const mAge = await db.prepare(
+        'SELECT birth_year FROM members WHERE member_no = ? LIMIT 1'
+      ).bind(m.member_no).first<{ birth_year: number | null }>()
+      const currentYear = new Date().getFullYear()
+      if (!mAge?.birth_year || (currentYear - mAge.birth_year) < 55) {
+        return c.json({ ok: false, error: '申請資格限 55 歲或以上人士。如有疑問請聯絡 CoEldery 85。' })
+      }
+    }
     // 檢查是否已有申請
     const existing = await db.prepare(
       'SELECT status, role FROM role_applications WHERE member_no = ? ORDER BY created_at DESC LIMIT 1'
