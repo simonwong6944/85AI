@@ -12181,10 +12181,10 @@ function renderTeamInvites(invites, role) {
     '<div style="font-size:14px;color:#555;margin-bottom:14px;">\u8acb\u5411\u4ee5\u4e0b\u5718\u968a\u6210\u54e1\u767c\u9001 WhatsApp \u9080\u8acb\uff0c\u8b93\u5c0d\u65b9\u78ba\u8a8d\u52a0\u5165\u5718\u968a\u53ca\u5206\u6210\u6bd4\u4f8b\u3002</div>';
   invites.forEach(function(inv, i) {
     var confirmUrl = 'https://coeldery85.com/app/team-confirm?token=' + inv.token;
-    var msg = '\u4f60\u597d\uff01\u6211\u6b63\u7533\u8acb\u52a0\u5165 CoEldery 85 \u7684 ' + roleLabel + ' \u5718\u968a\uff0c\u9084\u8acb\u4f60\u4e00\u8d77\u53c3\u8207\uff01\n\n' +
-      '\ud83d\udc64 \u6210\u54e1\uff1a' + inv.name_zh + '\n' +
-      '\ud83d\udcb0 \u4f60\u7684\u5206\u6210\uff1a' + inv.share_pct + '%\n\n' +
-      '\u8acb\u9ede\u64ca\u9023\u7d50\u78ba\u8a8d\u6216\u62d2\u7d55\uff1a\n' + confirmUrl;
+    var msg = '\u4f60\u597d\uff01\u6211\u6b63\u7533\u8acb\u52a0\u5165 CoEldery 85 \u7684 ' + roleLabel + ' \u5718\u968a\uff0c\u9084\u8acb\u4f60\u4e00\u8d77\u53c3\u8207\uff01\\n\\n' +
+      '\ud83d\udc64 \u6210\u54e1\uff1a' + inv.name_zh + '\\n' +
+      '\ud83d\udcb0 \u4f60\u7684\u5206\u6210\uff1a' + inv.share_pct + '%\\n\\n' +
+      '\u8acb\u9ede\u64ca\u9023\u7d50\u78ba\u8a8d\u6216\u62d2\u7d55\uff1a\\n' + confirmUrl;
     var waPhone = '852' + inv.phone;
     var msgId = 'inviteMsg_' + i;
     // WA link: 用 data-phone + data-msg，透過 JS 組合，避免雙引號破壞 HTML 屬性
