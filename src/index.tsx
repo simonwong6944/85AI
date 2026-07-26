@@ -3863,14 +3863,9 @@ function showSuccess(data, appliedMedical) {
     var waNum = (s.settings && s.settings.admin_whatsapp) ? s.settings.admin_whatsapp : '85254429749';
     var msgText = '你好，我剛登記了老有卡，會員編號：' + data.memberNo + '，請幫我確認。';
     var msgEnc = encodeURIComponent(msgText);
-    // Build deep link URLs for direct WA app launch (bypass wa.me interstitial page)
+    // Always use https://wa.me/ — avoids WA Business intercept on Android
     var phoneDigits = waNum.replace(/[^0-9]/g,'');
-    // Use whatsapp:// on all mobile (works on both iOS and Android)
-    // Desktop fallback: wa.me link
-    var isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
-    var waUrl = isMobile
-      ? 'whatsapp://send?phone=' + phoneDigits + '&text=' + msgEnc
-      : 'https://wa.me/' + phoneDigits + '?text=' + msgEnc;
+    var waUrl = 'https://wa.me/' + phoneDigits + '?text=' + msgEnc;
     window._waUrl = waUrl;
     var block = document.getElementById('waVerifyBlock');
     var preview = document.getElementById('waVerifyMsgPreview');
@@ -6599,10 +6594,7 @@ window.addEventListener('load', function(){
       var msgText='你好，我的老有卡會員編號：'+MEMBER_NO+'，請幫我確認。';
       var msgEnc=encodeURIComponent(msgText);
       var phoneDigits=waNum.replace(/[^0-9]/g,'');
-      var isMobile=/iphone|ipad|ipod|android/i.test(navigator.userAgent);
-      window._waUrl=isMobile
-        ?'whatsapp://send?phone='+phoneDigits+'&text='+msgEnc
-        :'https://wa.me/'+phoneDigits+'?text='+msgEnc;
+      window._waUrl='https://wa.me/'+phoneDigits+'?text='+msgEnc;
       var preview=document.getElementById('waVerifyMsgPreview');
       if(preview) preview.textContent=msgText;
     }).catch(function(){});
@@ -7297,7 +7289,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
   </div>
 
   <div class="footer-note">
-    如有疑問 WhatsApp：<a href="https://wa.me/85254429749">5442-9749</a> ·
+    如有疑問 WhatsApp：<button onclick="window.open('https://wa.me/85254429749?text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:#25D366;font-weight:700;font-size:inherit;font-family:inherit;padding:0;text-decoration:underline;">5442-9749</button> ·
     <a href="/membership/admin">後台</a>
   </div>
 </div>
@@ -12036,13 +12028,9 @@ initDots();
 })();
 
 function goBack() {
-  // 優先使用 history.back() 返回上一頁（保留會員卡狀態）
-  // 如果沒有歷史記錄才跳 /app
-  if (window.history.length > 1) {
-    window.history.back();
-  } else {
-    window.location.href = '/app';
-  }
+  // 直接跳回會員卡頁面，保留 member 參數
+  var m = memberNo || '';
+  window.location.href = '/app' + (m ? '?member=' + encodeURIComponent(m) : '');
 }
 
 function updateDots() {
@@ -12200,7 +12188,8 @@ function validateStep4() {
     rows.forEach(function(row) {
       var mn = row.getAttribute('data-member-no');
       if (!mn) unverified++;
-      total += parseFloat(row.querySelector('.gm-pct').value) || 0;
+      var pctEl = row.querySelector('.gm-pct');
+      total += pctEl ? (parseFloat(pctEl.value) || 0) : 0;
     });
     if (unverified > 0) { showErr('s4Err', '\u6709 ' + unverified + ' \u4f4d\u6210\u54e1\u672a\u9a57\u8b49\uff0c\u8acb\u6aa2\u67e5\u96fb\u8a71\u865f\u78bc'); return false; }
     if (Math.abs(total - 100) > 0.01) { showErr('s4Err', '\u5206\u6210\u767e\u5206\u6bd4\u5408\u8a08\u5fc5\u9808\u7b49\u65bc 100%\uff0c\u73fe\u70ba ' + total.toFixed(1) + '%'); return false; }
