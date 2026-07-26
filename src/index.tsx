@@ -9676,6 +9676,7 @@ function doRevAction(id, action) {
     closeRevModal();
     loadRevApps(_revCurrentStatus);
     loadRevStats();
+    loadRevHolders(); // 批准後同步刷新「已認證持有人」列表
     alert(action==='APPROVED' ? '✅ 已批准！角色持有人記錄已建立。' : '申請已拒絕。');
   }).catch(function(){
     errEl.textContent='網絡錯誤，請重試';
@@ -14695,16 +14696,32 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
       WHERE pp.holder_no = ?
       ORDER BY p.created_at DESC
     `).bind(holderNo).all()
-    // Also get GROUP team members from team_invites
-    const teamMembers = await db.prepare(`
-      SELECT ti.*, ra.id as app_id
-      FROM team_invites ti
-      JOIN role_applications ra ON ra.id = ti.app_id
-      JOIN role_holders rh ON rh.member_no = ra.member_no AND rh.role = ra.role
-      WHERE rh.holder_no = ?
-      ORDER BY ti.created_at DESC
-    `).bind(holderNo).all()
-    return c.json({ ok: true, projects: projects.results, team_members: teamMembers.results })
+    // Also get GROUP team members — only from the latest APPROVED GROUP application for this holder
+    // Must join via role_holders to find member_no/role, then pick ONLY the latest APPROVED GROUP app
+    const holderRow = await db.prepare(
+      'SELECT member_no, role FROM role_holders WHERE holder_no = ? LIMIT 1'
+    ).bind(holderNo).first<{ member_no: string; role: string }>()
+
+    let teamMembers: any[] = []
+    if (holderRow) {
+      // Find the latest APPROVED GROUP application for this holder
+      const latestGroupApp = await db.prepare(`
+        SELECT id FROM role_applications
+        WHERE member_no = ? AND role = ? AND status = 'APPROVED' AND applicant_type = 'GROUP'
+        ORDER BY id DESC LIMIT 1
+      `).bind(holderRow.member_no, holderRow.role).first<{ id: number }>()
+
+      if (latestGroupApp) {
+        const rows = await db.prepare(`
+          SELECT ti.name_zh, ti.phone, ti.share_pct, ti.confirmed, ti.confirmed_at
+          FROM team_invites ti
+          WHERE ti.app_id = ?
+          ORDER BY ti.id ASC
+        `).bind(latestGroupApp.id).all()
+        teamMembers = rows.results
+      }
+    }
+    return c.json({ ok: true, projects: projects.results, team_members: teamMembers })
   })
 
   // ── 項目分成比例更新（互助基金15%+平台費15%鎖定）────────────────
