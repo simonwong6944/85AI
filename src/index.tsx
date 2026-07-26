@@ -11856,11 +11856,11 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
         </optgroup>
       </select>
     </div>
-    <!-- 個人：HKID -->
+    <!-- 申請人 HKID（所有類型均需，GROUP/COMPANY 為申請人個人 KYC） -->
     <div id="fieldIdPrefix" class="field-group" style="display:none;">
       <label>身份證號碼（前 7 位）<span class="req">*</span></label>
       <input type="text" id="applyIdPrefix" placeholder="例: A123456" maxlength="8" autocapitalize="characters">
-      <div class="hint">填身份證號碼前 7 位，不包括括號內數字。例：A123456（即 A123456(7)）</div>
+      <div class="hint" id="idPrefixHint">填身份證號碼前 7 位，不包括括號內數字。例：A123456（即 A123456(7)）</div>
     </div>
     <!-- 公司：公司名 + BR -->
     <div id="fieldCompany" class="field-group" style="display:none;">
@@ -11924,6 +11924,9 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
   <!-- Step 5: 上傳文件 -->
   <div id="step5" class="section" style="display:none;">
     <div class="section-title">&#x1F4CE; \u7b2c\u4e94\u6b65\uff1a\u4e0a\u50b3\u8eab\u4efd\u6587\u4ef6</div>
+    <div id="step5ExistingNote" style="display:none;background:#DCFCE7;border:1.5px solid #4CAF50;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:14px;color:#1B4332;">
+      &#x2705; \u60a8\u4e4b\u524d\u5df2\u4e0a\u50b3\u904e\u8eab\u4efd\u6587\u4ef6\uff0c\u7cfb\u7d71\u5df2\u81ea\u52d5\u5f15\u7528\u3002\u5982\u6587\u4ef6\u6709\u66f4\u65b0\u5247\u53ef\u91cd\u65b0\u4e0a\u50b3\uff1b\u5426\u5247\u53ef\u76f4\u63a5\u9ede\u300c\u4e0b\u4e00\u6b65\u300d\u3002
+    </div>
     <p style="font-size:16px;color:#555;margin-bottom:14px;line-height:1.6;">\u8acb\u4e0a\u50b3\u8eab\u4efd\u8b49\u6b63\u9762\u7167\u7247\uff08\u6216\u516c\u53f8 BR \u767b\u8a18\u8b49\u660e\uff09\u4f9b\u5be9\u6838\u4e4b\u7528\u3002\u5c0f\u65bc 5MB\uff0cJPG / PNG / PDF\u3002</p>
     <div class="upload-area" onclick="document.getElementById('idDocInput').click()">
       <div style="font-size:40px;margin-bottom:8px;">&#x1F4F7;</div>
@@ -11981,6 +11984,8 @@ var selectedType = '';
 var memberNo = '${prefillMember}';
 var prefillPhone = '${prefillPhone}';
 var uploadedKey = '';
+var selfName = '';   // 申請人姓名（Step 1 驗證後填入）
+var selfPhone = '';  // 申請人電話（Step 1 驗證後填入）
 
 // Init step dots
 function initDots() {
@@ -12088,14 +12093,49 @@ function verifyPhone(cb) {
     btn.textContent = '\u4e0b\u4e00\u6b65';
     if (!d.ok) { showErr('s1Err', d.error || '\u6838\u5bfb\u5931\u6557'); return; }
     memberNo = d.member_no;
+    selfName = d.name_zh || '';
+    selfPhone = d.phone || phone;
     sessionStorage.setItem('ce85_phone', phone); // 存起來下次預填用
     var found = document.getElementById('s1Found');
     found.style.display = '';
     found.textContent = '\u627e\u5230\u6703\u54e1\uff1a' + d.name_zh + '\uff08' + d.member_no + '\uff09';
-    // \u9810\u586b Step 4 \u8cc7\u6599
+    // 預填 Step 4 資料
     if (d.name_zh) document.getElementById('applyNameZh').value = d.name_zh;
     if (d.name_en) document.getElementById('applyNameEn').value = d.name_en;
     if (d.phone) document.getElementById('applyContactPhone').value = d.phone;
+    // 預填 HKID（若已有核准記錄，只填不鎖，顯示提示）
+    var idPrefixEl = document.getElementById('applyIdPrefix');
+    var idHint = document.getElementById('idPrefixHint');
+    if (d.id_prefix) {
+      idPrefixEl.value = d.id_prefix;
+      idPrefixEl.readOnly = true;
+      idPrefixEl.style.background = '#F3F4F6';
+      if (idHint) idHint.textContent = '✅ 已從舊有申請預填，如需更改請聯絡管理員';
+    } else {
+      idPrefixEl.value = '';
+      idPrefixEl.readOnly = false;
+      idPrefixEl.style.background = '';
+      if (idHint) idHint.textContent = '填身份證號碼前 7 位，不包括括號內數字。例：A123456（即 A123456(7)）';
+    }
+    // 預填銀行資料（可編輯，用戶可改用新帳戶）
+    if (d.bank_name) {
+      var bankSel = document.getElementById('applyBankName');
+      // 嘗試設定 select 值，找不到匹配就保持預設
+      for (var oi = 0; oi < bankSel.options.length; oi++) {
+        if (bankSel.options[oi].text === d.bank_name || bankSel.options[oi].value === d.bank_name) {
+          bankSel.selectedIndex = oi; break;
+        }
+      }
+    }
+    if (d.bank_acc_no) document.getElementById('applyBankAcc').value = d.bank_acc_no;
+    // Step 5 文件：若已有上傳記錄，預設 uploadedKey，讓上傳變為可選
+    if (d.id_doc_r2_key) {
+      uploadedKey = d.id_doc_r2_key;
+      var stEl = document.getElementById('uploadStatus');
+      if (stEl) { stEl.textContent = '✅ 已有上傳記錄（可重新上傳替換）'; stEl.className = 'upload-status ok'; }
+      var step5Note = document.getElementById('step5ExistingNote');
+      if (step5Note) step5Note.style.display = '';
+    }
     // 允許多次申請，不再封鎖已有 PENDING/APPROVED 申請的用戶
     if (cb) cb(true);
     else showStep(2);
@@ -12133,7 +12173,8 @@ function updateStep4Fields() {
   var isCo = selectedType === 'COMPANY';
   var isGrp = selectedType === 'GROUP';
   var isCK = selectedRole === 'COLINKERY';
-  document.getElementById('fieldIdPrefix').style.display = isInd ? '' : 'none';
+  // HKID 對所有類型都需要（申請人個人 KYC），不再限 INDIVIDUAL
+  document.getElementById('fieldIdPrefix').style.display = '';
   document.getElementById('fieldCompany').style.display = isCo ? '' : 'none';
   document.getElementById('fieldBR').style.display = isCo ? '' : 'none';
   document.getElementById('fieldTeam').style.display = isGrp ? '' : 'none';
@@ -12147,7 +12188,7 @@ function validateStep4() {
   var phone = document.getElementById('applyContactPhone').value.trim();
   if (!name) { showErr('s4Err', '\u8acb\u586b\u5beb\u4e2d\u6587\u59d3\u540d'); return false; }
   if (!phone) { showErr('s4Err', '\u8acb\u586b\u5beb\u9023\u7d61\u96fb\u8a71'); return false; }
-  if (selectedType === 'INDIVIDUAL' && !document.getElementById('applyIdPrefix').value.trim()) {
+  if (!document.getElementById('applyIdPrefix').value.trim()) {
     showErr('s4Err', '\u8acb\u586b\u5beb\u8eab\u4efd\u8b49\u524d\u7f00'); return false;
   }
   if (selectedType === 'COMPANY' && !document.getElementById('applyCompanyName').value.trim()) {
@@ -12160,7 +12201,9 @@ function validateStep4() {
     var total = 0; var unverified = 0;
     rows.forEach(function(row) {
       var mn = row.getAttribute('data-member-no');
-      if (!mn) unverified++;
+      var isSelf = row.getAttribute('data-is-self') === 'true';
+      // 自己（row 1）已預填，不算未驗證；其他成員才需驗證
+      if (!mn && !isSelf) unverified++;
       total += parseFloat(row.querySelector('.gm-pct').value) || 0;
     });
     if (unverified > 0) { showErr('s4Err', '\u6709 ' + unverified + ' \u4f4d\u6210\u54e1\u672a\u9a57\u8b49\uff0c\u8acb\u6aa2\u67e5\u96fb\u8a71\u865f\u78bc'); return false; }
@@ -12176,34 +12219,51 @@ function buildGroupMemberRows() {
   var rowsDiv = document.getElementById('groupMemberRows');
   if (n < 2) { container.style.display = 'none'; rowsDiv.innerHTML = ''; return; }
   container.style.display = '';
-  // Keep existing rows, add/remove as needed
-  var existing = rowsDiv.querySelectorAll('.gm-row');
-  // Add rows
-  for (var i = existing.length; i < n; i++) {
+  // 清空重建（確保 row 1 為自己）
+  rowsDiv.innerHTML = '';
+  for (var i = 0; i < n; i++) {
     var idx = i + 1;
     var div = document.createElement('div');
     div.className = 'gm-row';
-    div.setAttribute('data-member-no', '');
-    div.setAttribute('data-name', '');
-    div.style.cssText = 'background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:8px;padding:12px;margin-bottom:8px;';
-    div.innerHTML = '<div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#374151;">成員 ' + idx + '</div>' +
-      '<div style="display:flex;gap:8px;align-items:flex-start;">' +
-        '<div style="flex:1;">' +
-          '<input type="tel" class="gm-phone" placeholder="香港電話號碼" style="width:100%;padding:9px 11px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;" oninput="debounceVerifyMember(this, ' + i + ')">' +
-          '<div class="gm-status" style="font-size:12px;margin-top:4px;min-height:18px;"></div>' +
-          '<div class="gm-name" style="font-size:13px;font-weight:600;color:#1B4332;margin-top:2px;"></div>' +
-        '</div>' +
-        '<div style="width:90px;">' +
-          '<input type="number" class="gm-pct" placeholder="分成%" min="1" max="99" step="0.5" style="width:100%;padding:9px 11px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;" oninput="updatePercentSum()">' +
-          '<div style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:2px;">分成%</div>' +
-        '</div>' +
-      '</div>';
+    if (i === 0) {
+      // 第一行 = 申請人自己，pre-filled 並鎖定
+      div.setAttribute('data-member-no', memberNo);
+      div.setAttribute('data-name', selfName);
+      div.setAttribute('data-phone', selfPhone);
+      div.setAttribute('data-is-self', 'true');
+      div.style.cssText = 'background:#ECFDF5;border:1.5px solid #4CAF50;border-radius:8px;padding:12px;margin-bottom:8px;';
+      div.innerHTML = '<div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#1B4332;">成員 1（申請人本人）</div>' +
+        '<div style="display:flex;gap:8px;align-items:flex-start;">' +
+          '<div style="flex:1;">' +
+            '<input type="tel" class="gm-phone" value="' + selfPhone + '" readonly' +
+              ' style="width:100%;padding:9px 11px;border:1.5px solid #4CAF50;border-radius:6px;font-size:14px;background:#F0FDF4;color:#1B4332;">' +
+            '<div class="gm-status" style="font-size:12px;margin-top:4px;color:#1B4332;">✅ 申請人本人（自動確認，毋須邀請）</div>' +
+            '<div class="gm-name" style="font-size:13px;font-weight:600;color:#1B4332;margin-top:2px;">' + selfName + '（' + memberNo + '）</div>' +
+          '</div>' +
+          '<div style="width:90px;">' +
+            '<input type="number" class="gm-pct" placeholder="分成%" min="1" max="99" step="0.5" style="width:100%;padding:9px 11px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;" oninput="updatePercentSum()">' +
+            '<div style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:2px;">分成%</div>' +
+          '</div>' +
+        '</div>';
+    } else {
+      // 其他成員行
+      div.setAttribute('data-member-no', '');
+      div.setAttribute('data-name', '');
+      div.style.cssText = 'background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:8px;padding:12px;margin-bottom:8px;';
+      div.innerHTML = '<div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#374151;">成員 ' + idx + '</div>' +
+        '<div style="display:flex;gap:8px;align-items:flex-start;">' +
+          '<div style="flex:1;">' +
+            '<input type="tel" class="gm-phone" placeholder="香港電話號碼" style="width:100%;padding:9px 11px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;" oninput="debounceVerifyMember(this, ' + i + ')">' +
+            '<div class="gm-status" style="font-size:12px;margin-top:4px;min-height:18px;"></div>' +
+            '<div class="gm-name" style="font-size:13px;font-weight:600;color:#1B4332;margin-top:2px;"></div>' +
+          '</div>' +
+          '<div style="width:90px;">' +
+            '<input type="number" class="gm-pct" placeholder="分成%" min="1" max="99" step="0.5" style="width:100%;padding:9px 11px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;" oninput="updatePercentSum()">' +
+            '<div style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:2px;">分成%</div>' +
+          '</div>' +
+        '</div>';
+    }
     rowsDiv.appendChild(div);
-  }
-  // Remove extra rows
-  var allRows = rowsDiv.querySelectorAll('.gm-row');
-  for (var j = n; j < allRows.length; j++) {
-    rowsDiv.removeChild(allRows[j]);
   }
   updatePercentSum();
 }
@@ -12366,10 +12426,13 @@ function renderTeamInvites(invites, role) {
   var roleLabel = role === 'COLEADERY' ? 'CoLeadery \u9818\u822a\u8005' : 'CoLinkery \u9023\u7d50\u8005';
   var container = document.getElementById('teamInviteSection');
   if (!container) return;
+  // 過濾掉申請人自己（後端已不傳，前端再做一層保險）
+  var otherInvites = invites.filter(function(inv) { return inv.member_no !== memberNo; });
+  if (otherInvites.length === 0) { container.innerHTML = ''; return; }
   var html = '<div style="margin-top:20px;">' +
     '<div style="font-size:17px;font-weight:900;color:#8B0000;margin-bottom:12px;">\ud83d\udce8 \u9080\u8acb\u5718\u968a\u6210\u54e1\u78ba\u8a8d\u52a0\u5165</div>' +
     '<div style="font-size:14px;color:#555;margin-bottom:14px;">\u8acb\u5411\u4ee5\u4e0b\u5718\u968a\u6210\u54e1\u767c\u9001 WhatsApp \u9080\u8acb\uff0c\u8b93\u5c0d\u65b9\u78ba\u8a8d\u52a0\u5165\u5718\u968a\u53ca\u5206\u6210\u6bd4\u4f8b\u3002</div>';
-  invites.forEach(function(inv, i) {
+  otherInvites.forEach(function(inv, i) {
     var confirmUrl = 'https://coeldery85.com/app/team-confirm?token=' + inv.token;
     var msg = '\u4f60\u597d\uff01\u6211\u6b63\u7533\u8acb\u52a0\u5165 CoEldery 85 \u7684 ' + roleLabel + ' \u5718\u968a\uff0c\u9084\u8acb\u4f60\u4e00\u8d77\u53c3\u8207\uff01\\n\\n' +
       '\ud83d\udc64 \u6210\u54e1\uff1a' + inv.name_zh + '\\n' +
@@ -13026,7 +13089,25 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     const existing = await db.prepare(
       'SELECT status, role FROM role_applications WHERE member_no = ? ORDER BY created_at DESC LIMIT 1'
     ).bind(m.member_no).first<{ status: string; role: string }>()
-    return c.json({ ok: true, member_no: m.member_no, name_zh: m.name_zh, name_en: m.name_en || '', phone: m.phone, existing })
+    // 取最近一筆已核准申請的 HKID / 文件 / 銀行資料（用於預填，避免重複上傳）
+    const approvedApp = await db.prepare(
+      `SELECT id_prefix, id_doc_r2_key, bank_name, bank_acc_no
+       FROM role_applications
+       WHERE member_no = ? AND status = 'APPROVED'
+       ORDER BY created_at DESC LIMIT 1`
+    ).bind(m.member_no).first<{ id_prefix: string; id_doc_r2_key: string; bank_name: string; bank_acc_no: string }>()
+    // members 表也可能存有 id_prefix（登記時填寫）
+    const memberRow = await db.prepare(
+      'SELECT id_prefix FROM members WHERE member_no = ? LIMIT 1'
+    ).bind(m.member_no).first<{ id_prefix: string | null }>()
+    const idPrefix = approvedApp?.id_prefix || memberRow?.id_prefix || ''
+    const idDocKey = approvedApp?.id_doc_r2_key || ''
+    const bankName = approvedApp?.bank_name || ''
+    const bankAccNo = approvedApp?.bank_acc_no || ''
+    return c.json({
+      ok: true, member_no: m.member_no, name_zh: m.name_zh, name_en: m.name_en || '', phone: m.phone, existing,
+      id_prefix: idPrefix, id_doc_r2_key: idDocKey, bank_name: bankName, bank_acc_no: bankAccNo
+    })
   })
 
   // 提交申請
@@ -13060,18 +13141,30 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     ).run()
     const appId = insertResult.meta.last_row_id as number
 
-    // GROUP 申請：為每位團隊成員生成邀請 token
+    // GROUP 申請：為每位團隊成員生成邀請 token（申請人自己自動確認，不需邀請）
     const invites: { member_no: string; name_zh: string; phone: string; share_pct: number; token: string }[] = []
     if (applicant_type === 'GROUP' && Array.isArray(group_members) && group_members.length > 0) {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      const now = new Date().toISOString()
       for (const gm of group_members) {
         if (!gm.member_no) continue
-        const token = genToken()
-        await db.prepare(`
-          INSERT INTO team_invites (token, app_id, member_no, name_zh, phone, share_pct, expires_at)
-          VALUES (?,?,?,?,?,?,?)
-        `).bind(token, appId, gm.member_no, gm.name_zh || '', gm.phone || '', gm.share_pct || 0, expiresAt).run()
-        invites.push({ member_no: gm.member_no, name_zh: gm.name_zh || '', phone: gm.phone || '', share_pct: gm.share_pct || 0, token })
+        const isSelf = gm.member_no === member_no
+        if (isSelf) {
+          // 申請人自己：直接插入已確認記錄（confirmed = 1），無需邀請
+          const selfToken = genToken()
+          await db.prepare(`
+            INSERT INTO team_invites (token, app_id, member_no, name_zh, phone, share_pct, confirmed, confirmed_at, expires_at)
+            VALUES (?,?,?,?,?,?,1,?,?)
+          `).bind(selfToken, appId, gm.member_no, gm.name_zh || '', gm.phone || '', gm.share_pct || 0, now, expiresAt).run()
+          // 不加入 invites（不需 WA 邀請）
+        } else {
+          const token = genToken()
+          await db.prepare(`
+            INSERT INTO team_invites (token, app_id, member_no, name_zh, phone, share_pct, expires_at)
+            VALUES (?,?,?,?,?,?,?)
+          `).bind(token, appId, gm.member_no, gm.name_zh || '', gm.phone || '', gm.share_pct || 0, expiresAt).run()
+          invites.push({ member_no: gm.member_no, name_zh: gm.name_zh || '', phone: gm.phone || '', share_pct: gm.share_pct || 0, token })
+        }
       }
     }
 
