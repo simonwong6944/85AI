@@ -14215,12 +14215,13 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
       ).bind(app_.member_no, app_.role).first<{ holder_no: string }>()
 
       if (existingHolder) {
-        // 複用：更新 name/applicant_type（資料可能有變），保持 holder_no 不變
+        // 複用：只更新 name_zh/name_en 和 status，不覆寫 applicant_type
+        // （applicant_type 以首次建立時的申請類型為準，後續申請不應覆蓋）
         holder_no = existingHolder.holder_no
         await db.prepare(`
-          UPDATE role_holders SET applicant_type=?, name_zh=?, name_en=?, status='ACTIVE'
+          UPDATE role_holders SET name_zh=?, name_en=?, status='ACTIVE'
           WHERE holder_no=?
-        `).bind(app_.applicant_type, app_.name_zh, app_.name_en || '', holder_no).run()
+        `).bind(app_.name_zh, app_.name_en || '', holder_no).run()
       } else {
         // 新建 role_holder 記錄（首次申請）
         holder_no = await nextHolderNo(db, app_.role as 'COLEADERY' | 'COLINKERY')
