@@ -3515,7 +3515,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 
       <div class="footer-links">
         <a href="/membership/join-family">家庭同行卡申請 →</a><br>
-        如有疑問 WhatsApp：<a href="https://wa.me/85254429749" target="_blank">5442-9749</a>
+        如有疑問 WhatsApp：<a href="https://api.whatsapp.com/send?phone=85254429749&text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%88%91%E6%83%B3%E6%9F%A5%E8%A9%A2%E6%9C%89%E9%97%9C%E8%80%81%E6%9C%89%E5%8D%A1%E7%9A%84%E8%B3%87%E8%A8%8A%E3%80%82" target="_blank" style="color:#25D366;font-weight:700;">📱 WhatsApp 5442-9749</a>
       </div>
     </form>
   </div>
@@ -7791,7 +7791,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <label>管理員密碼</label>
       <input type="password" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password">
     </div>
-    <button class="login-btn" id="login-btn" onclick="doAdminLogin()">
+    <button class="login-btn" id="login-btn">
       <i class="fas fa-sign-in-alt" style="margin-right:8px"></i>登入
     </button>
   </div>
@@ -8409,6 +8409,7 @@ function showAppShell(){
 document.getElementById('login-pw').addEventListener('keydown',function(e){
   if(e.key==='Enter') doAdminLogin();
 });
+document.getElementById('login-btn').addEventListener('click', doAdminLogin);
 
 function doAdminLogin(){
   var pw = document.getElementById('login-pw').value;
@@ -11376,8 +11377,16 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
     </div>
     <!-- 小組：人數 + 說明 -->
     <div id="fieldTeam" class="field-group" style="display:none;">
-      <label>小組人數</label>
-      <input type="number" id="applyTeamSize" min="2" max="50" placeholder="預期參與人數">
+      <label>小組人數 <span class="req">*</span></label>
+      <input type="number" id="applyTeamSize" min="2" max="20" placeholder="預期參與人數（2-20）" oninput="buildGroupMemberRows()">
+    </div>
+    <!-- 小組成員動態列表 -->
+    <div id="fieldGroupMembers" style="display:none;">
+      <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#795548;">
+        💡 請填寫每位成員電話號碼，系統會自動驗證是否為會員及符合55歲資格。分成百分比合計必須等於100%。
+      </div>
+      <div id="groupMemberRows"></div>
+      <div id="groupPercentSum" style="text-align:right;font-size:14px;font-weight:700;margin-top:6px;color:#555;"></div>
     </div>
     <div id="fieldTeamNotes" class="field-group" style="display:none;">
       <label>小組簡介</label>
@@ -11634,6 +11643,7 @@ function updateStep4Fields() {
   document.getElementById('fieldCompany').style.display = isCo ? '' : 'none';
   document.getElementById('fieldBR').style.display = isCo ? '' : 'none';
   document.getElementById('fieldTeam').style.display = isGrp ? '' : 'none';
+  document.getElementById('fieldGroupMembers').style.display = isGrp ? '' : 'none';
   document.getElementById('fieldTeamNotes').style.display = isGrp ? '' : 'none';
   document.getElementById('fieldIndustry').style.display = isCK ? '' : 'none';
 }
@@ -11649,8 +11659,114 @@ function validateStep4() {
   if (selectedType === 'COMPANY' && !document.getElementById('applyCompanyName').value.trim()) {
     showErr('s4Err', '\u8acb\u586b\u5beb\u516c\u53f8\u540d\u7a31'); return false;
   }
+  if (selectedType === 'GROUP') {
+    var n = parseInt(document.getElementById('applyTeamSize').value) || 0;
+    if (n < 2) { showErr('s4Err', '\u5c0f\u7d44\u81f3\u5c11\u9700\u8981 2 \u4eba'); return false; }
+    var rows = document.querySelectorAll('.gm-row');
+    var total = 0; var unverified = 0;
+    rows.forEach(function(row) {
+      var mn = row.getAttribute('data-member-no');
+      if (!mn) unverified++;
+      total += parseFloat(row.querySelector('.gm-pct').value) || 0;
+    });
+    if (unverified > 0) { showErr('s4Err', '\u6709 ' + unverified + ' \u4f4d\u6210\u54e1\u672a\u9a57\u8b49\uff0c\u8acb\u6aa2\u67e5\u96fb\u8a71\u865f\u78bc'); return false; }
+    if (Math.abs(total - 100) > 0.01) { showErr('s4Err', '\u5206\u6210\u767e\u5206\u6bd4\u5408\u8a08\u5fc5\u9808\u7b49\u65bc 100%\uff0c\u73fe\u70ba ' + total.toFixed(1) + '%'); return false; }
+  }
   return true;
 }
+
+// ── Group member rows ──────────────────────────────────────────────────────
+function buildGroupMemberRows() {
+  var n = parseInt(document.getElementById('applyTeamSize').value) || 0;
+  var container = document.getElementById('fieldGroupMembers');
+  var rowsDiv = document.getElementById('groupMemberRows');
+  if (n < 2) { container.style.display = 'none'; rowsDiv.innerHTML = ''; return; }
+  container.style.display = '';
+  // Keep existing rows, add/remove as needed
+  var existing = rowsDiv.querySelectorAll('.gm-row');
+  // Add rows
+  for (var i = existing.length; i < n; i++) {
+    var idx = i + 1;
+    var div = document.createElement('div');
+    div.className = 'gm-row';
+    div.setAttribute('data-member-no', '');
+    div.setAttribute('data-name', '');
+    div.style.cssText = 'background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:8px;padding:12px;margin-bottom:8px;';
+    div.innerHTML = '<div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#374151;">成員 ' + idx + '</div>' +
+      '<div style="display:flex;gap:8px;align-items:flex-start;">' +
+        '<div style="flex:1;">' +
+          '<input type="tel" class="gm-phone" placeholder="香港電話號碼" style="width:100%;padding:9px 11px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;" oninput="debounceVerifyMember(this, ' + i + ')">' +
+          '<div class="gm-status" style="font-size:12px;margin-top:4px;min-height:18px;"></div>' +
+          '<div class="gm-name" style="font-size:13px;font-weight:600;color:#1B4332;margin-top:2px;"></div>' +
+        '</div>' +
+        '<div style="width:90px;">' +
+          '<input type="number" class="gm-pct" placeholder="分成%" min="1" max="99" step="0.5" style="width:100%;padding:9px 11px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;" oninput="updatePercentSum()">' +
+          '<div style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:2px;">分成%</div>' +
+        '</div>' +
+      '</div>';
+    rowsDiv.appendChild(div);
+  }
+  // Remove extra rows
+  var allRows = rowsDiv.querySelectorAll('.gm-row');
+  for (var j = n; j < allRows.length; j++) {
+    rowsDiv.removeChild(allRows[j]);
+  }
+  updatePercentSum();
+}
+
+var _gmTimers = {};
+function debounceVerifyMember(input, idx) {
+  clearTimeout(_gmTimers[idx]);
+  _gmTimers[idx] = setTimeout(function() { verifyGroupMember(input, idx); }, 600);
+}
+
+function verifyGroupMember(input, idx) {
+  var row = input.closest('.gm-row');
+  var statusEl = row.querySelector('.gm-status');
+  var nameEl = row.querySelector('.gm-name');
+  var phone = input.value.replace(/\D/g, '');
+  row.setAttribute('data-member-no', '');
+  row.setAttribute('data-name', '');
+  nameEl.textContent = '';
+  if (phone.length < 8) { statusEl.textContent = ''; statusEl.style.color = '#9CA3AF'; return; }
+  statusEl.textContent = '驗證中…'; statusEl.style.color = '#9CA3AF';
+  input.style.borderColor = '#D1D5DB';
+  fetch('/api/partner/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: phone })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      row.setAttribute('data-member-no', d.member_no);
+      row.setAttribute('data-name', d.name_zh || '');
+      nameEl.textContent = d.name_zh ? ('✓ ' + d.name_zh + '（' + d.member_no + '）') : '';
+      statusEl.textContent = '✅ 會員驗證通過';
+      statusEl.style.color = '#1B4332';
+      input.style.borderColor = '#4CAF50';
+    } else {
+      statusEl.textContent = '❌ ' + (d.error || '未找到符合資格會員');
+      statusEl.style.color = '#DC2626';
+      input.style.borderColor = '#F87171';
+    }
+  }).catch(function() {
+    statusEl.textContent = '網絡錯誤，請重試'; statusEl.style.color = '#DC2626';
+  });
+}
+
+function updatePercentSum() {
+  var rows = document.querySelectorAll('.gm-row');
+  var total = 0;
+  rows.forEach(function(row) { total += parseFloat(row.querySelector('.gm-pct').value) || 0; });
+  var sumEl = document.getElementById('groupPercentSum');
+  if (total === 0) { sumEl.textContent = ''; return; }
+  var diff = Math.abs(total - 100);
+  if (diff < 0.01) {
+    sumEl.innerHTML = '<span style="color:#1B4332;">✅ 分成合計：100%</span>';
+  } else {
+    sumEl.innerHTML = '<span style="color:#DC2626;">⚠️ 分成合計：' + total.toFixed(1) + '%（需為100%）</span>';
+  }
+}
+// ── End Group member rows ───────────────────────────────────────────────────
 
 function handleFileSelect(input) {
   var file = input.files[0];
@@ -11705,6 +11821,17 @@ function submitApplication() {
     industry_background: document.getElementById('applyIndustry') ? document.getElementById('applyIndustry').value.trim() : '',
     team_size: parseInt(document.getElementById('applyTeamSize').value) || null,
     team_notes: document.getElementById('applyTeamNotes') ? document.getElementById('applyTeamNotes').value.trim() : '',
+    group_members: (function() {
+      var rows = document.querySelectorAll('.gm-row');
+      var arr = [];
+      rows.forEach(function(row) {
+        var mn = row.getAttribute('data-member-no') || '';
+        var name = row.getAttribute('data-name') || '';
+        var pct = parseFloat(row.querySelector('.gm-pct').value) || 0;
+        if (mn) arr.push({ member_no: mn, name_zh: name, share_pct: pct });
+      });
+      return arr;
+    })(),
     bank_name: document.getElementById('applyBankName').value,
     bank_acc_no: document.getElementById('applyBankAcc').value.trim()
   };
@@ -12431,6 +12558,9 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
     ⚠️ 以上數據為根據項目當前記錄之匯總，成果分享屬非保證收益，不顯示任何個人金額。實際以正式結算為準。
   </div>
   <div class="footer">coeldery85.com · ${new Date().toLocaleDateString('zh-HK')}</div>
+  <div style="text-align:center;margin-top:20px;padding-bottom:20px;">
+    <a href="javascript:history.back()" style="display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:#8B0000;color:#fff;border-radius:10px;font-size:16px;font-weight:700;text-decoration:none;box-shadow:0 4px 12px rgba(139,0,0,0.3);">← 返回</a>
+  </div>
 </div>
 </body>
 </html>`)
