@@ -3887,7 +3887,7 @@ function openWA() {
   // Save pending state so restore works if page fully reloads
   sessionStorage.setItem('waVerifyPending', '1');
   // Open WA deep link — user leaves page here
-  window.location.href = window._waUrl;
+  window.open(window._waUrl, '_blank');
   // visibilitychange: fires when user switches back (Android / desktop)
   document.addEventListener('visibilitychange', function onVis() {
     if(document.visibilityState === 'visible') {
@@ -4633,7 +4633,7 @@ function openWA(){
   if(btn){btn.disabled=true;btn.textContent='📤 正在開啟 WhatsApp...';btn.style.background='#a5d6a7';}
   if(bizBtn){bizBtn.disabled=true;bizBtn.style.opacity='0.4';}
   sessionStorage.setItem('waVerifyPending','1');
-  window.location.href=window._waUrl;
+  window.open(window._waUrl,'_blank');
   document.addEventListener('visibilitychange',function onVis(){
     if(document.visibilityState==='visible'){
       document.removeEventListener('visibilitychange',onVis);
@@ -7007,7 +7007,7 @@ function openWA() {
   var bizBtn = document.getElementById('waBizBtn');
   if(btn){ btn.disabled=true; btn.textContent='📤 正在開啟 WhatsApp...'; btn.style.background='#a5d6a7'; }
   if(bizBtn){ bizBtn.disabled=true; bizBtn.style.opacity='0.4'; }
-  window.location.href = window._waUrl;
+  window.open(window._waUrl, '_blank');
   document.addEventListener('visibilitychange', function onVis() {
     if(document.visibilityState==='visible'){ document.removeEventListener('visibilitychange',onVis); markWASent(); }
   });
@@ -11058,12 +11058,12 @@ function openUsefulLinksPanel(){
           '</a>';
         } else if(l.link_type==='whatsapp'){
           var waNum=l.content.replace(/[^0-9]/g,'');
-          inner='<a href="https://wa.me/'+waNum+'" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%">'+
+          inner='<button onclick="window.open(\'https://wa.me/'+waNum+'\',\'_blank\')" style="display:flex;align-items:center;gap:10px;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;text-align:left;width:100%;">'+
             '<span style="font-size:26px">💬</span>'+
             '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
             '<div style="font-size:17px;color:#059669;margin-top:2px">WhatsApp: '+escHtml(l.content)+'</div></span>'+
             '<span style="font-size:22px;color:#059669">›</span>'+
-          '</a>';
+          '</button>';
         } else if(l.link_type==='url'){
           inner='<a href="'+escHtml(l.content)+'" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%">'+
             '<span style="font-size:26px">🔗</span>'+
