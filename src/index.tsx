@@ -6526,7 +6526,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       medStatus === 'ISSUED'   ? '✅ 已發出 ISSUED'    :
       medStatus === 'DECLINED' ? '❌ 未批准 DECLINED'  : medStatus
     }</span>
-    <div style="font-size:18px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<a href="https://wa.me/85254429749" style="color:#1565C0;">5442-9749</a></div>
+    <div style="font-size:18px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<a href="https://wa.me/85254429749?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%88%91%E6%83%B3%E6%9F%A5%E8%A9%A2%E6%9C%89%E9%97%9C%E8%80%81%E6%9C%89%E5%8D%A1%E7%9A%84%E8%B3%87%E8%A8%8A%E3%80%82" target="_blank" style="color:#1565C0;font-weight:700;">📱 5442-9749</a></div>
     ` : `
     <div style="font-size:18px;color:#546E7A;margin-bottom:14px;line-height:1.6;">
       由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>
@@ -6564,7 +6564,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       </button>
     </div>
     <div style="color:#aaa;font-size:16px;">
-      如有疑問 WhatsApp：<a href="https://wa.me/85254429749" style="color:${accentMid};">5442-9749</a>
+      如有疑問 WhatsApp：<a href="https://wa.me/85254429749?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%88%91%E6%83%B3%E6%9F%A5%E8%A9%A2%E6%9C%89%E9%97%9C%E8%80%81%E6%9C%89%E5%8D%A1%E7%9A%84%E8%B3%87%E8%A8%8A%E3%80%82" target="_blank" style="color:${accentMid};font-weight:700;">📱 5442-9749</a>
     </div>
   </div>
 </div>
@@ -7727,13 +7727,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* ── Module Pages ── */
 .mod-page{display:none;}
 .mod-page.active{display:block;}
-/* Modules rendered outside .page-area still need sidebar offset + padding */
+/* Modules rendered outside .page-area: position fixed to overlay the whole screen */
 #app-shell ~ .mod-page.active {
-  margin-left:220px;
-  padding:24px;
-  min-height:100vh;
+  display:block !important;
+  position:fixed !important;
+  top:0 !important;
+  left:220px !important;
+  right:0 !important;
+  bottom:0 !important;
+  overflow-y:auto;
+  padding:24px !important;
   box-sizing:border-box;
   background:#F3F4F6;
+  z-index:50;
 }
 
 /* ── Roadshow Module ── */
