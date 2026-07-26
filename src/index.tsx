@@ -11905,10 +11905,7 @@ function verifyPhone(cb) {
     if (d.name_zh) document.getElementById('applyNameZh').value = d.name_zh;
     if (d.name_en) document.getElementById('applyNameEn').value = d.name_en;
     if (d.phone) document.getElementById('applyContactPhone').value = d.phone;
-    if (d.existing && (d.existing.status === 'PENDING' || d.existing.status === 'APPROVED')) {
-      showErr('s1Err', '\u4f60\u5df2\u6709 ' + d.existing.status + ' \u72c0\u614b\u7684\u7533\u8acb\uff08\u89d2\u8272\uff1a' + d.existing.role + '\uff09\uff0c\u8acb\u8010\u5fc3\u7b49\u5019\u5be9\u6838\u3002');
-      return;
-    }
+    // 允許多次申請，不再封鎖已有 PENDING/APPROVED 申請的用戶
     if (cb) cb(true);
     else showStep(2);
   }).catch(function() {
