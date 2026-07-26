@@ -3515,7 +3515,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 
       <div class="footer-links">
         <a href="/membership/join-family">家庭同行卡申請 →</a><br>
-        如有疑問 WhatsApp：<a href="https://api.whatsapp.com/send?phone=85254429749&text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%88%91%E6%83%B3%E6%9F%A5%E8%A9%A2%E6%9C%89%E9%97%9C%E8%80%81%E6%9C%89%E5%8D%A1%E7%9A%84%E8%B3%87%E8%A8%8A%E3%80%82" target="_blank" style="color:#25D366;font-weight:700;">📱 WhatsApp 5442-9749</a>
+        如有疑問 WhatsApp：<a href="https://wa.me/85254429749?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%88%91%E6%83%B3%E6%9F%A5%E8%A9%A2%E6%9C%89%E9%97%9C%E8%80%81%E6%9C%89%E5%8D%A1%E7%9A%84%E8%B3%87%E8%A8%8A%E3%80%82" target="_blank" style="color:#25D366;font-weight:700;">📱 WhatsApp 5442-9749</a>
       </div>
     </form>
   </div>
@@ -9527,8 +9527,8 @@ function openRevModal(id) {
         '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:6px;">審核備注（可選）</div>' +
         '<textarea id="revNotes" class="review-notes" placeholder="審核備注（批准/拒絕原因，選填）" rows="2"></textarea>' +
         '<div class="review-actions">' +
-          '<button class="btn-approve" onclick="doRevAction('+id+','APPROVED')">✅ 批准</button>' +
-          '<button class="btn-reject" onclick="doRevAction('+id+','REJECTED')">❌ 拒絕</button>' +
+          '<button class="btn-approve" data-rev-id="'+id+'" data-rev-action="APPROVED">✅ 批准</button>' +
+          '<button class="btn-reject" data-rev-id="'+id+'" data-rev-action="REJECTED">❌ 拒絕</button>' +
         '</div>' +
         '<div id="revActionErr" style="color:#DC2626;font-size:13px;margin-top:8px;display:none;"></div>' +
       '</div>';
@@ -9542,6 +9542,15 @@ function openRevModal(id) {
 function closeRevModal() {
   document.getElementById('revModal').style.display = 'none';
 }
+
+// Event delegation for approve/reject buttons (avoids inline onclick quote issues)
+document.getElementById('revModal').addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-rev-action]');
+  if (!btn) return;
+  var id = parseInt(btn.getAttribute('data-rev-id'));
+  var action = btn.getAttribute('data-rev-action');
+  if (id && action) doRevAction(id, action);
+});
 
 function doRevAction(id, action) {
   var notes = (document.getElementById('revNotes')||{}).value||'';
