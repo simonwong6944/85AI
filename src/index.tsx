@@ -11534,18 +11534,23 @@ input,select,textarea{width:100%;padding:12px 14px;font-size:17px;border:2px sol
 input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3px rgba(198,40,40,.12);}
 .hint{font-size:14px;color:#888;margin-top:5px;line-height:1.4;}
 .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;}
-.role-card{border:2.5px solid #ddd;border-radius:12px;padding:14px 12px;cursor:pointer;text-align:center;transition:all 0.15s;background:#fff;}
+.role-card{border:2.5px solid #ddd;border-radius:12px;padding:14px 12px;cursor:pointer;text-align:center;transition:all 0.15s;background:#fff;position:relative;}
 .role-card.selected{border-color:#8B0000;background:#FFF5F5;}
+.role-card.selected::after{content:'\u2714';position:absolute;top:6px;right:8px;font-size:14px;color:#8B0000;font-weight:900;}
 .role-card .role-icon{font-size:28px;margin-bottom:6px;}
 .role-card .role-name{font-size:16px;font-weight:900;color:#8B0000;}
 .role-card .role-desc{font-size:13px;color:#666;margin-top:4px;line-height:1.4;}
 .type-group{display:flex;flex-direction:column;gap:8px;}
-.type-radio{display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid #ddd;border-radius:8px;cursor:pointer;}
+.type-radio{display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid #ddd;border-radius:8px;cursor:pointer;position:relative;}
 .type-radio.selected{border-color:#8B0000;background:#FFF5F5;}
-.type-radio input[type=radio]{width:20px;height:20px;accent-color:#8B0000;flex-shrink:0;}
+.type-radio.selected::after{content:'\u2714';position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:16px;color:#8B0000;font-weight:900;}
+/* Custom radio button (cross-browser, iOS safe) */
+.type-radio input[type=radio]{-webkit-appearance:none;appearance:none;width:20px;height:20px;border:2px solid #9CA3AF;border-radius:50%;flex-shrink:0;background:#fff;position:relative;cursor:pointer;transition:all 0.15s;}
+.type-radio input[type=radio]:checked{border-color:#8B0000;background:#8B0000;}
+.type-radio input[type=radio]:checked::after{content:'';position:absolute;width:8px;height:8px;background:#fff;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);}
 .upload-area{border:2px dashed #C62828;border-radius:10px;padding:18px;text-align:center;cursor:pointer;background:#FFF9F9;}
 .upload-area:hover{background:#FFF0F0;}
-.upload-status{font-size:15px;color:#666;margin-top:8px;}
+.upload-status{font-size:15px;color:#666;margin-top:8px;min-height:22px;}
 .upload-status.ok{color:#2E7D32;font-weight:700;}
 .step-indicator{display:flex;gap:6px;justify-content:center;margin-bottom:20px;}
 .step-dot{width:10px;height:10px;border-radius:50%;background:#ddd;transition:background 0.15s;}
@@ -11562,8 +11567,11 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
 .success-box .s-title{font-size:24px;font-weight:900;color:#2E7D32;margin-bottom:10px;}
 .success-box .s-text{font-size:17px;color:#555;line-height:1.7;}
 .declaration-box{background:#FFF9E6;border:1.5px solid #FF8F00;border-radius:10px;padding:14px;font-size:15px;color:#5D4037;line-height:1.7;}
+/* Custom checkbox (cross-browser, iOS safe) */
 .check-row{display:flex;align-items:flex-start;gap:10px;margin-top:12px;cursor:pointer;}
-.check-row input[type=checkbox]{width:20px;height:20px;accent-color:#8B0000;flex-shrink:0;margin-top:3px;}
+.check-row input[type=checkbox]{-webkit-appearance:none;appearance:none;width:22px;height:22px;min-width:22px;border:2.5px solid #9CA3AF;border-radius:5px;background:#fff;cursor:pointer;position:relative;flex-shrink:0;margin-top:2px;transition:all 0.15s;}
+.check-row input[type=checkbox]:checked{border-color:#8B0000;background:#8B0000;}
+.check-row input[type=checkbox]:checked::after{content:'';position:absolute;left:5px;top:1px;width:7px;height:12px;border:2.5px solid #fff;border-top:none;border-left:none;transform:rotate(45deg);}
 </style>
 </head>
 <body>
@@ -12150,7 +12158,12 @@ function submitApplication() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
-  }).then(function(r) { return r.json(); }).then(function(d) {
+  }).then(function(r) {
+    if (!r.ok) {
+      return r.json().then(function(d) { throw new Error(d.error || 'HTTP ' + r.status); }).catch(function() { throw new Error('HTTP ' + r.status); });
+    }
+    return r.json();
+  }).then(function(d) {
     if (d.ok) {
       document.getElementById('step6').style.display = 'none';
       document.getElementById('navBtns').style.display = 'none';
@@ -12165,10 +12178,10 @@ function submitApplication() {
       btn.textContent = '\u63d0\u4ea4\u7533\u8acb';
       showErr('s6Err', d.error || '\u63d0\u4ea4\u5931\u6557\uff0c\u8acb\u518d\u8a66');
     }
-  }).catch(function() {
+  }).catch(function(err) {
     btn.disabled = false;
     btn.textContent = '\u63d0\u4ea4\u7533\u8acb';
-    showErr('s6Err', '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66');
+    showErr('s6Err', '\u63d0\u4ea4\u5931\u6557\uff1a' + (err && err.message ? err.message : '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66'));
   });
 }
 
