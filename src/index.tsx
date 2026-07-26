@@ -13343,8 +13343,7 @@ function renderWallet(d) {
         var poolPct = mr.role === 'COLEADERY' ? Math.round((proj.pct_coleadery || 0) / 100) :
                       mr.role === 'COLINKERY'  ? Math.round((proj.pct_colinkery || 0) / 100) : 0;
         var actualPct = Math.round(poolPct * rSharePct / 100 * 10) / 10;
-        var groupNote = mr.as_group_member ? '（小組成員 ' + mr.group_share_pct + '%）' : '';
-        return rLabel + groupNote + ' · 分帳 ' + rSharePct + '%' + (poolPct > 0 ? '（占項目收益 ' + actualPct + '%）' : '');
+        return rLabel + ' ' + rSharePct + '%' + (poolPct > 0 ? '（占項目收益 ' + actualPct + '%）' : '');
       }).join(' ／ ');
       return '<div class="proj-card-w ' + stKey.toLowerCase() + '">' +
         '<div class="proj-title-row">' +
