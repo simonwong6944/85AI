@@ -14195,11 +14195,12 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
     if (!['APPROVED', 'REJECTED'].includes(action))
       return c.json({ ok: false, error: 'action 必須為 APPROVED 或 REJECTED' }, 400)
     const db = c.env.DB
+    try {
     const app_ = await db.prepare(
       'SELECT * FROM role_applications WHERE id = ?'
     ).bind(id).first<any>()
     if (!app_) return c.json({ ok: false, error: '申請不存在' }, 404)
-    if (app_.status !== 'PENDING') return c.json({ ok: false, error: '此申請已處理' }, 409)
+    if (app_.status !== 'PENDING') return c.json({ ok: false, error: '此申請已處理，狀態：' + app_.status }, 409)
 
     await db.prepare(
       "UPDATE role_applications SET status = ?, review_notes = ?, reviewed_at = datetime('now') WHERE id = ?"
@@ -14242,6 +14243,10 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
       }
     }
     return c.json({ ok: true, holder_no })
+    } catch (err: any) {
+      console.error('[review] DB error:', err)
+      return c.json({ ok: false, error: '審核失敗：' + (err?.message || '資料庫錯誤') }, 500)
+    }
   })
 
   // ── CoPartnery：建立 ──────────────────────────────────────────
@@ -14651,32 +14656,24 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
   app.get('/api/admin/rev/holders', async (c) => {
     const role = c.req.query('role')
     const db = c.env.DB
-    // JOIN role_applications to get HKID, bank info, team_invites for group members
+    // 用 subquery 取最新 APPROVED application，避免多筆 APPROVED 導致重複行
+    const baseQuery = `
+          SELECT rh.*,
+                 ra.id_prefix, ra.bank_name, ra.bank_acc_no, ra.phone as app_phone,
+                 ra.applicant_type as app_type, ra.name_en as app_name_en,
+                 ra.address, ra.company_name, ra.team_size, ra.team_notes,
+                 m.phone as member_phone, m.name_zh as member_name_zh,
+                 (SELECT COUNT(*) FROM project_participants pp WHERE pp.holder_no = rh.holder_no) as project_count
+          FROM role_holders rh
+          LEFT JOIN role_applications ra ON ra.id = (
+            SELECT id FROM role_applications
+            WHERE member_no = rh.member_no AND role = rh.role AND status = 'APPROVED'
+            ORDER BY id DESC LIMIT 1
+          )
+          LEFT JOIN members m ON m.member_no = rh.member_no`
     const rows = role
-      ? await db.prepare(`
-          SELECT rh.*,
-                 ra.id_prefix, ra.bank_name, ra.bank_acc_no, ra.phone as app_phone,
-                 ra.applicant_type as app_type, ra.name_en as app_name_en,
-                 ra.address, ra.company_name, ra.team_size, ra.team_notes,
-                 m.phone as member_phone, m.name_zh as member_name_zh,
-                 (SELECT COUNT(*) FROM project_participants pp WHERE pp.holder_no = rh.holder_no) as project_count
-          FROM role_holders rh
-          LEFT JOIN role_applications ra ON ra.member_no = rh.member_no AND ra.role = rh.role AND ra.status = 'APPROVED'
-          LEFT JOIN members m ON m.member_no = rh.member_no
-          WHERE rh.role = ? ORDER BY rh.created_at DESC
-        `).bind(role).all()
-      : await db.prepare(`
-          SELECT rh.*,
-                 ra.id_prefix, ra.bank_name, ra.bank_acc_no, ra.phone as app_phone,
-                 ra.applicant_type as app_type, ra.name_en as app_name_en,
-                 ra.address, ra.company_name, ra.team_size, ra.team_notes,
-                 m.phone as member_phone, m.name_zh as member_name_zh,
-                 (SELECT COUNT(*) FROM project_participants pp WHERE pp.holder_no = rh.holder_no) as project_count
-          FROM role_holders rh
-          LEFT JOIN role_applications ra ON ra.member_no = rh.member_no AND ra.role = rh.role AND ra.status = 'APPROVED'
-          LEFT JOIN members m ON m.member_no = rh.member_no
-          ORDER BY rh.created_at DESC
-        `).all()
+      ? await db.prepare(baseQuery + ` WHERE rh.role = ? ORDER BY rh.created_at DESC`).bind(role).all()
+      : await db.prepare(baseQuery + ` ORDER BY rh.created_at DESC`).all()
     return c.json({ ok: true, holders: rows.results })
   })
 
