@@ -10948,6 +10948,11 @@ function showCard(memberNo, waClicked) {
   if (_phoneInputEl && _phoneInputEl.value.trim()) {
     window._partnerPhone = _phoneInputEl.value.trim();
     localStorage.setItem('ce85_phone', window._partnerPhone);
+    localStorage.setItem('ce85_phone_' + memberNo, window._partnerPhone);
+  } else {
+    // 從 localStorage 恢復（init() 自動登入時 phoneInput 係空的）
+    var _savedPhone = localStorage.getItem('ce85_phone_' + memberNo) || localStorage.getItem('ce85_phone') || '';
+    if (_savedPhone) window._partnerPhone = _savedPhone;
   }
   var partnerEntryHtml =
     '<div id="partnerEntrySection" style="margin:20px 0 0;padding:0 2px;">' +
@@ -10974,12 +10979,16 @@ function showCard(memberNo, waClicked) {
 // ── Partner apply / Wallet 導航（全域函數，供 showCard() 動態生成的按鈕呼叫）──
 function goPartnerApply() {
   var m = window._partnerMember || localStorage.getItem('ce85_member_no') || '';
-  var p = window._partnerPhone || localStorage.getItem('ce85_phone') || (document.getElementById('phoneInput') ? document.getElementById('phoneInput').value.trim() : '') || '';
+  // phone: try window._partnerPhone first, then localStorage, then phoneInput field
+  var p = (window._partnerPhone && window._partnerPhone.trim()) || localStorage.getItem('ce85_phone') || (document.getElementById('phoneInput') ? document.getElementById('phoneInput').value.trim() : '') || '';
+  // if still no phone and we have memberNo stored, check localStorage for phone keyed by memberNo
+  if (!p && m) p = localStorage.getItem('ce85_phone_' + m) || '';
   window.location.href = '/app/partner-apply?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
 }
 function goWallet() {
   var m = window._partnerMember || localStorage.getItem('ce85_member_no') || '';
-  var p = window._partnerPhone || localStorage.getItem('ce85_phone') || (document.getElementById('phoneInput') ? document.getElementById('phoneInput').value.trim() : '') || '';
+  var p = (window._partnerPhone && window._partnerPhone.trim()) || localStorage.getItem('ce85_phone') || (document.getElementById('phoneInput') ? document.getElementById('phoneInput').value.trim() : '') || '';
+  if (!p && m) p = localStorage.getItem('ce85_phone_' + m) || '';
   window.location.href = '/app/wallet?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
 }
 
@@ -11058,7 +11067,7 @@ function openUsefulLinksPanel(){
           '</a>';
         } else if(l.link_type==='whatsapp'){
           var waNum=l.content.replace(/[^0-9]/g,'');
-          inner='<a href="https://wa.me/'+waNum+'" target="_blank" rel="noreferrer noopener" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%;">'+
+          inner='<a href="https://api.whatsapp.com/send?phone='+waNum+'" target="_blank" rel="noreferrer noopener" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%;">'+'
             '<span style="font-size:26px">💬</span>'+
             '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
             '<div style="font-size:17px;color:#059669;margin-top:2px">WhatsApp: '+escHtml(l.content)+'</div></span>'+
