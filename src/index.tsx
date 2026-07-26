@@ -8363,22 +8363,62 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     .btn-reject{padding:9px 20px;background:#991B1B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
     .review-notes{width:100%;padding:8px 10px;font-size:14px;border:1.5px solid #D1D5DB;border-radius:6px;resize:vertical;font-family:inherit;margin-top:8px;}
     .doc-link{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#F3F4F6;border-radius:6px;font-size:13px;font-weight:600;color:#1B4332;text-decoration:none;margin-top:6px;}
+    /* Rev Tabs */
+    .rev-tabs{display:flex;gap:0;border-bottom:2px solid #E5E7EB;margin-bottom:20px;}
+    .rev-tab{padding:10px 20px;border:none;background:none;font-size:14px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;}
+    .rev-tab.active{color:var(--brand);border-bottom-color:var(--brand);}
+    /* Project cards */
+    .proj-card{background:#fff;border-radius:10px;border:1.5px solid #E5E7EB;padding:14px 16px;margin-bottom:10px;}
+    .proj-card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+    .proj-code{font-size:12px;font-family:monospace;background:#F3F4F6;padding:2px 8px;border-radius:4px;color:#6B7280;}
+    .proj-name{font-size:16px;font-weight:700;color:#111;}
+    .proj-status-DRAFT{background:#F3F4F6;color:#374151;}
+    .proj-status-ACTIVE{background:#D1FAE5;color:#065F46;}
+    .proj-status-SETTLING{background:#FEF3C7;color:#92400e;}
+    .proj-status-SETTLED{background:#DBEAFE;color:#1D4ED8;}
+    .proj-status-CLOSED{background:#F3F4F6;color:#9CA3AF;}
+    .ledger-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:13px;}
+    .ledger-INCOME{color:#065F46;font-weight:700;}
+    .ledger-cost{color:#991B1B;}
+    .share-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0;}
+    .share-row{display:flex;justify-content:space-between;background:#F9FAFB;padding:5px 10px;border-radius:6px;font-size:13px;}
+    .holder-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:20px;font-size:12px;font-weight:600;color:#065F46;margin:2px;}
   </style>
 
-  <div style="max-width:700px;">
-    <h2 style="font-size:22px;font-weight:900;color:#1B4332;margin-bottom:16px;">🌟 領航者 / 連結者申請審核</h2>
+  <!-- Rev Module Tabs -->
+  <div class="rev-tabs">
+    <button class="rev-tab active" onclick="revTabSwitch('tab-apps',this)">📋 申請審核</button>
+    <button class="rev-tab" onclick="revTabSwitch('tab-holders',this)">🏅 已認證持有人</button>
+    <button class="rev-tab" onclick="revTabSwitch('tab-projects',this)">📊 項目管理</button>
+  </div>
 
-    <!-- 統計列 -->
+  <!-- Tab 1: 申請審核 -->
+  <div id="tab-apps" class="rev-tab-panel" style="max-width:700px;">
     <div id="revStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;"></div>
-
-    <!-- 篩選按鈕 -->
     <div class="rev-filter-bar">
       <button class="rev-filter-btn active" onclick="loadRevApps('PENDING',this)">⏳ 待審批</button>
       <button class="rev-filter-btn" onclick="loadRevApps('APPROVED',this)">✅ 已批准</button>
       <button class="rev-filter-btn" onclick="loadRevApps('REJECTED',this)">❌ 已拒絕</button>
     </div>
-
     <div id="revAppList">載入中…</div>
+  </div>
+
+  <!-- Tab 2: 已認證持有人 -->
+  <div id="tab-holders" class="rev-tab-panel" style="display:none;max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 style="font-size:16px;font-weight:700;color:#374151;">🏅 已認證 CoLeadery / CoLinkery</h3>
+      <button class="btn btn-secondary btn-sm" onclick="loadRevHolders()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="revHolderList">載入中…</div>
+  </div>
+
+  <!-- Tab 3: 項目管理 -->
+  <div id="tab-projects" class="rev-tab-panel" style="display:none;max-width:900px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <h3 style="font-size:16px;font-weight:700;color:#374151;">📊 項目列表</h3>
+      <button class="btn btn-primary btn-sm" onclick="openCreateProject()"><i class="fas fa-plus"></i> 新增項目</button>
+    </div>
+    <div id="projList">載入中…</div>
   </div>
 
   <!-- 審核 Detail Modal -->
@@ -8387,6 +8427,47 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button onclick="closeRevModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#6B7280;">✕</button>
       <h3 style="font-size:20px;font-weight:900;margin-bottom:16px;color:#1B4332;">📋 申請詳情</h3>
       <div id="revModalBody"></div>
+    </div>
+  </div>
+
+  <!-- 項目詳情 Modal -->
+  <div id="projModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;overflow-y:auto;padding:20px;">
+    <div style="background:#fff;border-radius:12px;max-width:680px;margin:0 auto;padding:24px;position:relative;">
+      <button onclick="closeProjModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#6B7280;">✕</button>
+      <h3 id="projModalTitle" style="font-size:18px;font-weight:900;margin-bottom:16px;color:#1B4332;">項目詳情</h3>
+      <div id="projModalBody"></div>
+    </div>
+  </div>
+
+  <!-- 新增/編輯項目 Modal -->
+  <div id="createProjModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;overflow-y:auto;padding:20px;">
+    <div style="background:#fff;border-radius:12px;max-width:520px;margin:0 auto;padding:24px;position:relative;">
+      <button onclick="closeCreateProjModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#6B7280;">✕</button>
+      <h3 style="font-size:18px;font-weight:900;margin-bottom:16px;color:#1B4332;">➕ 新增項目</h3>
+      <div class="search-bar" style="flex-direction:column;gap:10px;">
+        <div style="width:100%;">
+          <label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;display:block;">項目名稱 <span style="color:#DC2626">*</span></label>
+          <input id="cpName" type="text" placeholder="例：葵青社區日用品項目" style="width:100%;padding:9px 12px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:14px;">
+        </div>
+        <div style="width:100%;">
+          <label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;display:block;">業務場景 <span style="color:#DC2626">*</span></label>
+          <select id="cpScenario" style="width:100%;padding:9px 12px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:14px;">
+            <option value="PURE_B2C">PURE_B2C — 純消費者銷售</option>
+            <option value="B2C_TO_B2B">B2C_TO_B2B — 消費者轉商業</option>
+            <option value="PURE_B2B">PURE_B2B — 純商業合作</option>
+          </select>
+        </div>
+        <div style="width:100%;">
+          <label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;display:block;">業務類型</label>
+          <input id="cpBizType" type="text" placeholder="例：日用品、餐飲、服務" style="width:100%;padding:9px 12px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:14px;">
+        </div>
+        <div style="width:100%;">
+          <label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;display:block;">備注</label>
+          <textarea id="cpNotes" rows="2" placeholder="項目說明" style="width:100%;padding:9px 12px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:14px;resize:vertical;font-family:inherit;"></textarea>
+        </div>
+        <div id="cpErr" style="color:#DC2626;font-size:13px;display:none;"></div>
+        <button class="btn btn-primary" onclick="submitCreateProject()" style="width:100%;">建立項目</button>
+      </div>
     </div>
   </div>
 </div>
@@ -8453,7 +8534,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'領航者申請審核'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'CoLeadery / CoLinkery 申請審核'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -9592,6 +9673,208 @@ function doRevAction(id, action) {
     errEl.style.display='';
     if(btn){ btn.disabled=false; btn.textContent=action==='APPROVED'?'✅ 批准':'❌ 拒絕'; }
   });
+}
+// ── Rev Tab Switch ────────────────────────────────────────────────────────────
+function revTabSwitch(tabId, btn) {
+  document.querySelectorAll('.rev-tab-panel').forEach(function(p){ p.style.display='none'; });
+  document.querySelectorAll('.rev-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById(tabId).style.display='';
+  btn.classList.add('active');
+  if(tabId==='tab-holders') loadRevHolders();
+  if(tabId==='tab-projects') loadProjects();
+}
+
+// ── Holders Tab ───────────────────────────────────────────────────────────────
+function loadRevHolders() {
+  fetch('/api/admin/rev/holders').then(function(r){return r.json();}).then(function(d){
+    var el = document.getElementById('revHolderList');
+    if(!d.ok || !d.holders.length){ el.innerHTML='<div style="color:#9CA3AF;text-align:center;padding:30px;">尚無已認證持有人</div>'; return; }
+    el.innerHTML = d.holders.map(function(h){
+      var roleLabel = h.role==='COLEADERY' ? '🌟 CoLeadery' : '🤝 CoLinkery';
+      var roleColor = h.role==='COLEADERY' ? '#92400e' : '#0369a1';
+      var roleBg = h.role==='COLEADERY' ? '#FFF3CD' : '#E0F2FE';
+      return '<div class="proj-card">'+
+        '<div class="proj-card-top">'+
+          '<div>'+
+            '<span style="font-size:16px;font-weight:700;color:#111;">'+h.name_zh+'</span>'+
+            '<span style="font-size:12px;font-family:monospace;background:#F3F4F6;padding:2px 8px;border-radius:4px;color:#6B7280;margin-left:8px;">'+h.holder_no+'</span>'+
+          '</div>'+
+          '<span style="padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:'+roleBg+';color:'+roleColor+';">'+roleLabel+'</span>'+
+        '</div>'+
+        '<div style="font-size:13px;color:#6B7280;">會員編號：'+h.member_no+' · '+h.applicant_type+' · 申請時間：'+h.created_at.slice(0,10)+
+          ' · 狀態：<span style="font-weight:700;color:'+(h.status==='ACTIVE'?'#065F46':'#991B1B')+';">'+h.status+'</span></div>'+
+      '</div>';
+    }).join('');
+  }).catch(function(){ document.getElementById('revHolderList').innerHTML='<div style="color:#DC2626;padding:20px;">載入失敗</div>'; });
+}
+
+// ── Projects Tab ──────────────────────────────────────────────────────────────
+function loadProjects() {
+  fetch('/api/admin/rev/projects').then(function(r){return r.json();}).then(function(d){
+    var el = document.getElementById('projList');
+    if(!d.ok || !d.projects.length){ el.innerHTML='<div style="color:#9CA3AF;text-align:center;padding:30px;">尚無項目，點擊「新增項目」開始</div>'; return; }
+    el.innerHTML = d.projects.map(function(p){
+      var stCls = 'proj-status-'+p.status;
+      var stLabel = {DRAFT:'草稿',ACTIVE:'進行中',SETTLING:'結算中',SETTLED:'已結算',CLOSED:'已關閉'}[p.status]||p.status;
+      return '<div class="proj-card" onclick="openProjModal('+p.id+')" style="cursor:pointer;">'+
+        '<div class="proj-card-top">'+
+          '<div>'+
+            '<span class="proj-code">'+p.project_code+'</span>'+
+            '<span class="proj-name" style="margin-left:8px;">'+p.name+'</span>'+
+          '</div>'+
+          '<span class="status-badge '+stCls+'" style="font-size:12px;padding:3px 10px;border-radius:12px;">'+stLabel+'</span>'+
+        '</div>'+
+        '<div style="font-size:13px;color:#6B7280;margin-top:4px;">'+p.scenario+' · '+(p.business_type||'—')+' · 建立：'+p.created_at.slice(0,10)+'</div>'+
+      '</div>';
+    }).join('');
+  }).catch(function(){ document.getElementById('projList').innerHTML='<div style="color:#DC2626;padding:20px;">載入失敗</div>'; });
+}
+
+function openCreateProject() { document.getElementById('createProjModal').style.display=''; }
+function closeCreateProjModal() { document.getElementById('createProjModal').style.display='none'; }
+
+function submitCreateProject() {
+  var name = document.getElementById('cpName').value.trim();
+  var scenario = document.getElementById('cpScenario').value;
+  var bizType = document.getElementById('cpBizType').value.trim();
+  var notes = document.getElementById('cpNotes').value.trim();
+  var errEl = document.getElementById('cpErr');
+  if(!name){ errEl.textContent='請填寫項目名稱'; errEl.style.display=''; return; }
+  errEl.style.display='none';
+  fetch('/api/admin/rev/project', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name:name, scenario:scenario, business_type:bizType, notes:notes})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ errEl.textContent=d.error||'建立失敗'; errEl.style.display=''; return; }
+    closeCreateProjModal();
+    loadProjects();
+    alert('✅ 項目 '+d.project_code+' 已建立！');
+  }).catch(function(){ errEl.textContent='網絡錯誤'; errEl.style.display=''; });
+}
+
+function closeProjModal() { document.getElementById('projModal').style.display='none'; }
+
+function openProjModal(projId) {
+  document.getElementById('projModal').style.display='';
+  document.getElementById('projModalTitle').textContent='載入中…';
+  document.getElementById('projModalBody').innerHTML='<div style="text-align:center;padding:30px;color:#9CA3AF;">載入中…</div>';
+  fetch('/api/admin/rev/project/'+projId+'/statement').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ document.getElementById('projModalBody').innerHTML='<div style="color:#DC2626;">'+d.error+'</div>'; return; }
+    var p = d.project, s = d.shares||{}, sum = d.summary||{};
+    document.getElementById('projModalTitle').textContent='📊 '+p.name;
+    var stLabel = {DRAFT:'草稿',ACTIVE:'進行中',SETTLING:'結算中',SETTLED:'已結算',CLOSED:'已關閉'}[p.status]||p.status;
+    var html = '';
+    // 基本資料 + 狀態控制
+    html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">'+
+      '<span class="proj-code">'+p.project_code+'</span>'+
+      '<span class="status-badge proj-status-'+p.status+'">'+stLabel+'</span>'+
+      '<span style="font-size:12px;color:#6B7280;">'+p.scenario+'</span>'+
+    '</div>';
+    // 分成比例
+    if(s && s.pct_coleadery!=null){
+      html += '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:6px;">分成比例</div>'+
+        '<div class="share-grid">'+
+          shareRow('🌟 CoLeadery',s.pct_coleadery)+shareRow('🤝 CoLinkery',s.pct_colinkery)+
+          shareRow('🏠 CoOwnery池',s.pct_coownery)+shareRow('🛠 CoSupportery池',s.pct_cosupportery)+
+          shareRow('❤️ 互助基金',s.pct_mutual_fund)+shareRow('💼 平台費',s.pct_platform_fee)+
+          shareRow('🏦 特別帳戶',s.pct_special_account)+
+        '</div>';
+    }
+    // 參與者
+    if(d.participants && d.participants.length){
+      html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:12px 0 6px;">參與者</div>'+
+        '<div>'+d.participants.map(function(pp){
+          var role = pp.holder_role==='COLEADERY'?'🌟 CoLeadery':'🤝 CoLinkery';
+          return '<span class="holder-chip">'+role+' '+pp.name_zh+' ('+pp.holder_no+') '+Math.round(pp.team_share_bps/100)+'%</span>';
+        }).join('')+'</div>';
+    }
+    // 損益彙總
+    html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:14px 0 8px;">💰 損益彙總</div>'+
+      '<div style="background:#F9FAFB;border-radius:8px;padding:12px;">'+
+      '<div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;"><span>收入合計</span><span class="ledger-INCOME">HK$'+Math.round((sum.income||0)/100).toLocaleString()+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;"><span>支出合計</span><span class="ledger-cost">HK$'+Math.round((sum.costs||0)/100).toLocaleString()+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;border-top:1px solid #E5E7EB;padding-top:8px;margin-top:4px;"><span>淨利潤</span><span style="color:'+(sum.net_profit>=0?'#065F46':'#991B1B')+';">HK$'+Math.round((sum.net_profit||0)/100).toLocaleString()+'</span></div>'+
+      '</div>';
+    // 錄入賬目
+    html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:14px 0 8px;">📝 錄入賬目</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'+
+        '<select id="ledType" style="padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+          '<option value="INCOME">收入 INCOME</option>'+
+          '<option value="DIRECT_COST">支出 DIRECT_COST</option>'+
+          '<option value="FIXED_DEDUCTION">固定扣除 FIXED_DEDUCTION</option>'+
+        '</select>'+
+        '<input id="ledAmt" type="number" placeholder="金額（港元）" style="padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+      '</div>'+
+      '<input id="ledDesc" type="text" placeholder="描述（如：葵青場銷售收入 7月）" style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;margin-bottom:8px;">'+
+      '<button class="btn btn-primary btn-sm" onclick="submitLedger('+projId+')">➕ 錄入賬目</button>';
+    // 賬目明細
+    if(d.ledger && d.ledger.length){
+      html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:14px 0 6px;">📄 賬目明細</div>'+
+        d.ledger.map(function(l){
+          var isIncome = l.entry_type==='INCOME';
+          var amtStr = (isIncome?'+':'-')+'HK$'+Math.round(l.amount_cents/100).toLocaleString();
+          return '<div class="ledger-row"><span>'+l.entry_type+'<br><span style="color:#9CA3AF;font-size:11px;">'+l.description+'</span></span>'+
+            '<span class="'+(isIncome?'ledger-INCOME':'ledger-cost')+'">'+amtStr+'</span></div>';
+        }).join('');
+    }
+    // 添加參與者
+    html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:14px 0 8px;">👤 綁定參與者</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;">'+
+        '<input id="ppHolderNo" type="text" placeholder="持有人編號 CL000001" style="padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+        '<select id="ppRole" style="padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+          '<option value="COLEADERY">CoLeadery</option><option value="COLINKERY">CoLinkery</option>'+
+        '</select>'+
+        '<button class="btn btn-secondary btn-sm" onclick="submitParticipant('+projId+')">綁定</button>'+
+      '</div>'+
+      '<div id="ppMsg" style="font-size:12px;margin-top:4px;"></div>';
+    // 結算按鈕
+    if(p.status==='ACTIVE'){
+      html += '<div style="margin-top:16px;border-top:1.5px solid #E5E7EB;padding-top:14px;">'+
+        '<button class="btn btn-primary" onclick="triggerSettle('+projId+')" style="background:#065F46;">💰 觸發結算</button>'+
+        '<div style="font-size:12px;color:#6B7280;margin-top:6px;">結算後將按比例計算各方分潤並記入錢包</div>'+
+      '</div>';
+    }
+    document.getElementById('projModalBody').innerHTML = html;
+  }).catch(function(e){ document.getElementById('projModalBody').innerHTML='<div style="color:#DC2626;">載入失敗：'+e.message+'</div>'; });
+}
+
+function shareRow(label, bps){ return '<div class="share-row"><span>'+label+'</span><span style="font-weight:700;">'+Math.round((bps||0)/100)+'%</span></div>'; }
+
+function submitLedger(projId) {
+  var type = document.getElementById('ledType').value;
+  var amt = parseFloat(document.getElementById('ledAmt').value)||0;
+  var desc = document.getElementById('ledDesc').value.trim();
+  if(!amt){ alert('請填寫金額'); return; }
+  fetch('/api/admin/rev/ledger',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({project_id:projId,entry_type:type,description:desc,amount_cents:Math.round(amt*100)})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ alert(d.error||'錄入失敗'); return; }
+    openProjModal(projId); // 重新載入
+  }).catch(function(){ alert('網絡錯誤'); });
+}
+
+function submitParticipant(projId) {
+  var holderNo = document.getElementById('ppHolderNo').value.trim();
+  var role = document.getElementById('ppRole').value;
+  var msgEl = document.getElementById('ppMsg');
+  if(!holderNo){ msgEl.style.color='#DC2626'; msgEl.textContent='請填寫持有人編號'; return; }
+  fetch('/api/admin/rev/project/'+projId+'/participants',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({holder_no:holderNo,role:role,team_share_bps:10000})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ msgEl.style.color='#DC2626'; msgEl.textContent=d.error||'綁定失敗'; return; }
+    msgEl.style.color='#065F46'; msgEl.textContent='✅ 已綁定'+(d.warning?' · '+d.warning:'');
+    openProjModal(projId);
+  }).catch(function(){ msgEl.style.color='#DC2626'; msgEl.textContent='網絡錯誤'; });
+}
+
+function triggerSettle(projId) {
+  if(!confirm('確認觸發結算？此操作將計算各方分潤並記入錢包，且會將項目狀態改為「結算中」。')) return;
+  fetch('/api/admin/rev/project/'+projId+'/settle',{method:'POST'})
+    .then(function(r){return r.json();}).then(function(d){
+      if(!d.ok){ alert(d.error||'結算失敗'); return; }
+      alert('✅ 結算完成！淨利潤：HK$'+Math.round(d.net_profit/100)+' · 共 '+d.entries_created+' 筆分潤記錄已建立');
+      openProjModal(projId);
+    }).catch(function(){ alert('網絡錯誤'); });
 }
 // ── End Revenue ──────────────────────────────────────────────────────────────
 </script>
@@ -11228,7 +11511,7 @@ function partnerApplyHtml(prefillMember: string, prefillPhone = ''): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>申請成為 CoEldery 領航者</title>
+<title>申請成為 CoLeadery 領航者 / CoLinkery 連結者</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:18px;line-height:1.6;color:#111;}
@@ -11281,7 +11564,7 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
 <body>
 <div class="topbar">
   <button class="back" onclick="goBack()">&#8592;</button>
-  <span class="title">&#x1F31F; \u7533\u8acb\u6210\u70ba CoEldery \u9818\u822a\u8005</span>
+  <span class="title">&#x1F31F; \u7533\u8acb CoLeadery \u9818\u822a\u8005 / CoLinkery \u9023\u7d50\u8005</span>
 </div>
 <div class="wrap">
 
@@ -12245,11 +12528,8 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     if (!['INDIVIDUAL', 'GROUP', 'COMPANY'].includes(applicant_type))
       return c.json({ ok: false, error: '申請人類型無效' }, 400)
     const db = c.env.DB
-    // 防重複提交（同一會員同一角色只能有一個 PENDING）
-    const dup = await db.prepare(
-      "SELECT id FROM role_applications WHERE member_no = ? AND role = ? AND status = 'PENDING'"
-    ).bind(member_no, role).first()
-    if (dup) return c.json({ ok: false, error: '你已有待審批的申請，請耐心等候。' }, 409)
+    // 允許同一會員同一角色多次申請（不同團隊），但限制同一個 PENDING 的 GROUP 申請不能完全重複
+    // 不再強制每人只能有一個 PENDING（因為可以與不同夥伴組成不同團隊）
     await db.prepare(`
       INSERT INTO role_applications
         (member_no, role, applicant_type, name_zh, name_en, id_prefix, id_doc_r2_key,
@@ -12300,6 +12580,42 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
   })
 
   // 我的錢包（role holder 專用，用電話驗證身份）
+  // ── 查看上傳文件（R2）────────────────────────────────────────
+  app.get('/api/partner/doc/:key', async (c) => {
+    const rawKey = c.req.param('key')
+    const key = decodeURIComponent(rawKey)
+    if (!key || !key.startsWith('partner-id/')) return c.json({ error: '無效的文件路徑' }, 400)
+    if (!c.env.FILES) return c.json({ error: 'R2 未設定' }, 503)
+    const obj = await c.env.FILES.get(key)
+    if (!obj) return c.json({ error: '文件不存在' }, 404)
+    const contentType = obj.httpMetadata?.contentType || 'application/octet-stream'
+    return new Response(obj.body, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': 'inline',
+        'Cache-Control': 'private, max-age=3600'
+      }
+    })
+  })
+
+  // ── Admin：查看文件（帶管理員身份驗證）───────────────────────
+  app.get('/api/admin/doc/:key', async (c) => {
+    const rawKey = c.req.param('key')
+    const key = decodeURIComponent(rawKey)
+    if (!key) return c.json({ error: '無效的文件路徑' }, 400)
+    if (!c.env.FILES) return c.json({ error: 'R2 未設定' }, 503)
+    const obj = await c.env.FILES.get(key)
+    if (!obj) return c.json({ error: '文件不存在 (key: ' + key + ')' }, 404)
+    const contentType = obj.httpMetadata?.contentType || 'application/octet-stream'
+    return new Response(obj.body, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': 'inline',
+        'Cache-Control': 'private, max-age=300'
+      }
+    })
+  })
+
   app.get('/api/partner/wallet', async (c) => {
     const phone = c.req.query('phone')?.replace(/\D/g, '')
     if (!phone) return c.json({ ok: false, error: '請提供電話' }, 400)
