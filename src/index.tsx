@@ -6806,22 +6806,13 @@ async function shareCardToWA(){
   showToast('圖片已下載，請貼入 WhatsApp 傳送', 3000);
 }
 
-// ── 開普通 WhatsApp（whatsapp:// deep link，兩平台通用）──
+// ── 開 WhatsApp 傳送訊息（使用 wa.me 標準連結）──
+// 使用 https://wa.me/ 讓系統或用戶自行選擇 WhatsApp / WhatsApp Business
+// 避免 whatsapp:// deep link 只打開其中一個 app 的問題
 function openNormalWA(msg) {
-  // whatsapp:// 係 WhatsApp 官方 URI scheme，直接喚起 WhatsApp app
-  // 唔會開 WA Biz，唔會跳 Google Play，iOS/Android 都 work
   var encoded = encodeURIComponent(msg);
-  var deepLink = 'whatsapp://send?text=' + encoded;
-  var webFallback = 'https://wa.me/?text=' + encoded;
-  // 嘗試 deep link，500ms 後如果 app 冇打開就用 web fallback
-  var fallbackTimer = setTimeout(function() {
-    window.open(webFallback, '_blank');
-  }, 500);
-  window.addEventListener('blur', function onBlur() {
-    clearTimeout(fallbackTimer);
-    window.removeEventListener('blur', onBlur);
-  }, { once: true });
-  window.location.href = deepLink;
+  // wa.me 標準連結：iOS/Android 都能讓用戶選擇用哪個 WA app
+  window.open('https://wa.me/?text=' + encoded, '_blank');
 }
 
 // ── 分享我張卡 ──
@@ -11489,8 +11480,234 @@ function applyJob() {
 // ════════════════════════════════════════════════════════════════════════════
 // 分錢系統 前端頁面
 // /app/partner-apply  — 角色申請頁（領航者/連結者）
+// /app/team-confirm   — 團隊邀請確認頁
 // /app/wallet         — 錢包頁（分成記錄）
+
+// ── 團隊邀請確認頁 HTML ─────────────────────────────────────────────────────
+function teamConfirmHtml(token: string): string {
+  const roleLabel: Record<string, string> = {
+    COLEADERY: 'CoLeadery 領航者',
+    COLINKERY: 'CoLinkery 連結者',
+  }
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>確認加入申請團隊 · CoEldery 85</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:18px;line-height:1.6;color:#111;}
+.topbar{background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;}
+.topbar .logo{font-size:22px;font-weight:900;letter-spacing:1px;}
+.wrap{max-width:480px;margin:0 auto;padding:20px 16px 48px;}
+.card{background:#fff;border-radius:16px;padding:24px 20px;box-shadow:0 2px 12px rgba(0,0,0,.09);margin-bottom:16px;}
+.invite-icon{font-size:52px;text-align:center;margin-bottom:12px;}
+.invite-title{font-size:22px;font-weight:900;color:#1B5E20;text-align:center;margin-bottom:8px;}
+.invite-sub{font-size:16px;color:#555;text-align:center;margin-bottom:20px;line-height:1.6;}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0f0;}
+.info-row:last-child{border-bottom:none;}
+.info-label{font-size:15px;color:#888;}
+.info-val{font-size:17px;font-weight:700;color:#222;}
+.share-big{font-size:32px;font-weight:900;color:#1B5E20;text-align:center;margin:16px 0 4px;}
+.share-note{font-size:14px;color:#888;text-align:center;margin-bottom:20px;}
+.section-title{font-size:17px;font-weight:900;color:#1B5E20;margin:20px 0 10px;border-left:4px solid #2E7D32;padding-left:10px;}
+input.big-in{width:100%;padding:13px 14px;font-size:18px;border:2px solid #a5d6a7;border-radius:8px;font-family:inherit;outline:none;margin-bottom:4px;}
+input.big-in:focus{border-color:#1B5E20;}
+.hint{font-size:14px;color:#888;margin-bottom:14px;padding:0 2px;}
+.btn-confirm{display:block;width:100%;padding:16px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:19px;font-weight:900;cursor:pointer;font-family:inherit;margin-bottom:12px;}
+.btn-confirm:disabled{background:#a5d6a7;cursor:not-allowed;}
+.btn-reject{display:block;width:100%;padding:14px;background:#fff;color:#c62828;border:2px solid #c62828;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn-reject:disabled{opacity:.4;cursor:not-allowed;}
+.err{margin-top:10px;padding:10px 14px;background:#ffebee;border:2px solid #c62828;border-radius:8px;color:#c62828;font-size:16px;font-weight:700;display:none;}
+.err.show{display:block;}
+.success-box{text-align:center;padding:30px 16px;}
+.success-icon{font-size:64px;margin-bottom:16px;}
+.success-title{font-size:24px;font-weight:900;color:#1B5E20;margin-bottom:10px;}
+.success-msg{font-size:17px;color:#444;line-height:1.7;}
+.rejected-box{text-align:center;padding:30px 16px;}
+.rejected-icon{font-size:64px;margin-bottom:16px;}
+.rejected-title{font-size:24px;font-weight:900;color:#c62828;margin-bottom:10px;}
+.rejected-msg{font-size:17px;color:#444;line-height:1.7;}
+.loading-box{text-align:center;padding:60px 20px;font-size:18px;color:#888;}
+.expired-box{text-align:center;padding:40px 20px;}
+.expired-icon{font-size:56px;margin-bottom:14px;}
+.expired-title{font-size:22px;font-weight:900;color:#E65100;margin-bottom:10px;}
+.expired-msg{font-size:16px;color:#666;line-height:1.7;}
+.already-done{text-align:center;padding:40px 20px;}
+.already-icon{font-size:56px;margin-bottom:14px;}
+.already-title{font-size:20px;font-weight:900;color:#555;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="logo">CoEldery 85 老有聯盟</span>
+</div>
+<div class="wrap">
+  <div id="mainContent" class="card">
+    <div class="loading-box">⏳ 載入邀請資料中…</div>
+  </div>
+</div>
+
+<script>
+var TOKEN = ${JSON.stringify(token)};
+
+function renderInvite(inv) {
+  var roleMap = { COLEADERY: 'CoLeadery 領航者', COLINKERY: 'CoLinkery 連結者' };
+  var roleName = roleMap[inv.role] || inv.role;
+  // Already handled
+  if (inv.confirmed === 1) {
+    document.getElementById('mainContent').innerHTML = '<div class="already-done"><div class="already-icon">✅</div><div class="already-title">你已確認加入此申請團隊</div><p style="color:#666;font-size:16px;margin-top:8px;">如有查詢，請聯絡申請人</p></div>';
+    return;
+  }
+  if (inv.confirmed === 2) {
+    document.getElementById('mainContent').innerHTML = '<div class="already-done"><div class="already-icon">❌</div><div class="already-title">你已拒絕此邀請</div><p style="color:#666;font-size:16px;margin-top:8px;">如需更改，請聯絡申請人重新邀請</p></div>';
+    return;
+  }
+  var html = '';
+  html += '<div class="invite-icon">🤝</div>';
+  html += '<div class="invite-title">你被邀請加入申請團隊</div>';
+  html += '<div class="invite-sub"><strong>' + (inv.leader_name || '申請人') + '</strong> 邀請你以團隊成員身份，一同申請成為 <strong>' + roleName + '</strong></div>';
+  html += '<div class="info-row"><span class="info-label">申請角色</span><span class="info-val">' + roleName + '</span></div>';
+  html += '<div class="info-row"><span class="info-label">你的姓名</span><span class="info-val">' + (inv.name_zh || '（未填寫）') + '</span></div>';
+  html += '<div class="share-big">' + (inv.share_pct || 0) + '%</div>';
+  html += '<div class="share-note">你的建議分成比例</div>';
+  html += '<div class="section-title">驗證你的身份</div>';
+  html += '<p style="font-size:15px;color:#555;margin-bottom:14px;line-height:1.6;">請輸入你在老有卡登記的手機號碼，以確認你的身份：</p>';
+  html += '<input class="big-in" type="tel" id="confirmPhone" placeholder="例如：91234567" maxlength="12">';
+  html += '<p class="hint">只需輸入本地號碼（不需 +852）</p>';
+  html += '<div class="err" id="confirmErr"></div>';
+  html += '<button class="btn-confirm" id="btnConfirm" onclick="doConfirm(\'confirm\')">✅ 確認加入此申請</button>';
+  html += '<button class="btn-reject" id="btnReject" onclick="doConfirm(\'reject\')">❌ 拒絕此邀請</button>';
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+function showErr(msg) {
+  var el = document.getElementById('confirmErr');
+  if (el) { el.textContent = msg; el.className = 'err show'; }
+}
+
+function doConfirm(action) {
+  var phone = document.getElementById('confirmPhone') ? document.getElementById('confirmPhone').value.trim() : '';
+  if (action === 'confirm' && !phone) { showErr('請輸入你的手機號碼以驗證身份'); return; }
+  var btnC = document.getElementById('btnConfirm');
+  var btnR = document.getElementById('btnReject');
+  if (btnC) { btnC.disabled = true; btnC.textContent = '處理中…'; }
+  if (btnR) btnR.disabled = true;
+  fetch('/api/team-invite/' + encodeURIComponent(TOKEN) + '/confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: phone, action: action })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      if (action === 'confirm') {
+        document.getElementById('mainContent').innerHTML =
+          '<div class="success-box"><div class="success-icon">🎉</div>' +
+          '<div class="success-title">確認成功！</div>' +
+          '<div class="success-msg">你已成功確認加入申請團隊。<br>申請人將收到通知，等候管理員審批。<br><br>如有查詢，請聯絡老有聯盟85 ☎ 5442-9749</div></div>';
+      } else {
+        document.getElementById('mainContent').innerHTML =
+          '<div class="rejected-box"><div class="rejected-icon">👋</div>' +
+          '<div class="rejected-title">已拒絕邀請</div>' +
+          '<div class="rejected-msg">你已拒絕加入此申請團隊。<br>如有疑問，請聯絡邀請你的申請人。</div></div>';
+      }
+    } else {
+      if (btnC) { btnC.disabled = false; btnC.textContent = '✅ 確認加入此申請'; }
+      if (btnR) btnR.disabled = false;
+      showErr(d.error || '操作失敗，請重試');
+    }
+  }).catch(function() {
+    if (btnC) { btnC.disabled = false; btnC.textContent = '✅ 確認加入此申請'; }
+    if (btnR) btnR.disabled = false;
+    showErr('網絡錯誤，請重試');
+  });
+}
+
+// Load invite data on page load
+if (!TOKEN) {
+  document.getElementById('mainContent').innerHTML =
+    '<div class="expired-box"><div class="expired-icon">🔗</div>' +
+    '<div class="expired-title">無效連結</div>' +
+    '<div class="expired-msg">此邀請連結無效，請確認你收到的 WhatsApp 訊息連結是否完整。</div></div>';
+} else {
+  fetch('/api/team-invite/' + encodeURIComponent(TOKEN))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) {
+        var isExpired = (d.error || '').indexOf('過期') >= 0;
+        document.getElementById('mainContent').innerHTML =
+          '<div class="expired-box"><div class="expired-icon">' + (isExpired ? '⏰' : '❌') + '</div>' +
+          '<div class="expired-title">' + (isExpired ? '邀請已過期' : '連結無效') + '</div>' +
+          '<div class="expired-msg">' + (d.error || '邀請連結無效或已失效') + '<br><br>如需重新邀請，請聯絡申請人。</div></div>';
+      } else {
+        renderInvite(d.invite);
+      }
+    })
+    .catch(function() {
+      document.getElementById('mainContent').innerHTML =
+        '<div class="expired-box"><div class="expired-icon">⚠️</div>' +
+        '<div class="expired-title">載入失敗</div>' +
+        '<div class="expired-msg">無法載入邀請資料，請檢查網絡後重試。</div></div>';
+    });
+}
+</script>
+</body>
+</html>`
+}
 // ════════════════════════════════════════════════════════════════════════════
+
+// ── 團隊邀請確認 API ─────────────────────────────────────────────────────────
+app.get('/api/team-invite/:token', async (c) => {
+  const token = c.req.param('token')
+  const db = c.env.DB
+  const invite = await db.prepare(`
+    SELECT ti.*, ra.name_zh as leader_name, ra.role, ra.applicant_type,
+           m.name_zh as member_name
+    FROM team_invites ti
+    JOIN role_applications ra ON ra.id = ti.app_id
+    LEFT JOIN members m ON m.member_no = ti.member_no
+    WHERE ti.token = ?
+  `).bind(token).first<any>()
+  if (!invite) return c.json({ ok: false, error: '邀請連結無效或已失效' }, 404)
+  if (invite.expires_at < new Date().toISOString().slice(0, 19).replace('T', ' '))
+    return c.json({ ok: false, error: '邀請連結已過期（7天有效）' }, 410)
+  return c.json({ ok: true, invite: {
+    token, app_id: invite.app_id, member_no: invite.member_no,
+    name_zh: invite.name_zh, phone: invite.phone, share_pct: invite.share_pct,
+    confirmed: invite.confirmed, leader_name: invite.leader_name,
+    role: invite.role, expires_at: invite.expires_at
+  }})
+})
+
+app.post('/api/team-invite/:token/confirm', async (c) => {
+  const token = c.req.param('token')
+  const { phone, action } = await c.req.json() // action: 'confirm' | 'reject'
+  if (!['confirm', 'reject'].includes(action))
+    return c.json({ ok: false, error: 'action 無效' }, 400)
+  const db = c.env.DB
+  const invite = await db.prepare('SELECT * FROM team_invites WHERE token = ?').bind(token).first<any>()
+  if (!invite) return c.json({ ok: false, error: '邀請連結無效' }, 404)
+  if (invite.confirmed !== 0) return c.json({ ok: false, error: '此邀請已處理過' }, 409)
+  if (invite.expires_at < new Date().toISOString().slice(0, 19).replace('T', ' '))
+    return c.json({ ok: false, error: '邀請連結已過期' }, 410)
+  // 驗證電話號碼
+  if (phone) {
+    const m = await db.prepare('SELECT member_no FROM members WHERE phone = ?')
+      .bind(phone.replace(/\D/g, '')).first<{ member_no: string }>()
+    if (!m || m.member_no !== invite.member_no)
+      return c.json({ ok: false, error: '電話號碼與邀請不符，請確認你的老有卡電話' }, 403)
+  }
+  const confirmedVal = action === 'confirm' ? 1 : 2
+  await db.prepare(
+    "UPDATE team_invites SET confirmed = ?, confirmed_at = DATETIME('now') WHERE token = ?"
+  ).bind(confirmedVal, token).run()
+  return c.json({ ok: true, action })
+})
+
+app.get('/app/team-confirm', async (c) => {
+  const token = c.req.query('token') || ''
+  return c.html(teamConfirmHtml(token))
+})
 
 app.get('/app/partner-apply', (c) => {
   const memberNo = c.req.query('member') || ''
@@ -11768,9 +11985,10 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
   <div id="stepSuccess" class="section" style="display:none;">
     <div class="success-box">
       <div class="s-icon">&#x2705;</div>
-      <div class="s-title">\u7533\u8acb\u5df2\u63d0\u4ea4\uff01</div>
-      <div class="s-text">\u6211\u5011\u6703\u5c55\u958b\u5be9\u6838\uff0c\u9810\u8a08 3-5 \u5de5\u4f5c\u65e5\u5167\u56de\u8986\u3002\u5be9\u6838\u901a\u904e\u5f8c\u6703\u767c\u51fa\u96fb\u5b50\u6388\u6b0a\u5361\u3002</div>
-      <button onclick="goBack()" style="margin-top:24px;padding:14px 32px;background:#8B0000;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;">\u8fd4\u56de\u6211\u7684\u5361</button>
+      <div class="s-title">申請已提交！</div>
+      <div class="s-text">我們會展開審核，預計 3-5 工作日內回覆。審核通過後會發出電子授權卡。</div>
+      <div id="inviteLinksBlock" style="display:none;margin-top:20px;"></div>
+      <button onclick="goBack()" style="margin-top:24px;padding:14px 32px;background:#8B0000;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;">返回我的卡</button>
     </div>
   </div>
 
@@ -12151,15 +12369,40 @@ function submitApplication() {
       document.getElementById('stepSuccess').style.display = '';
       document.getElementById('navBtns').style.display = 'none';
       document.getElementById('stepDots').style.display = 'none';
+      // If GROUP application with invite tokens, show WA links for each member
+      if (d.invites && d.invites.length > 0) {
+        var invBlock = document.getElementById('inviteLinksBlock');
+        if (invBlock) {
+          var html = '<div style="background:#E8F5E9;border-radius:12px;padding:16px;text-align:left;">';
+          html += '<div style="font-size:16px;font-weight:900;color:#1B5E20;margin-bottom:10px;">📲 請以 WhatsApp 通知團隊成員確認</div>';
+          html += '<p style="font-size:14px;color:#555;margin-bottom:14px;line-height:1.6;">請點擊下方連結，以 WhatsApp 傳送邀請給每位團隊成員。<br>他們需點擊連結並確認身份，才算正式加入申請。</p>';
+          for (var i = 0; i < d.invites.length; i++) {
+            var inv = d.invites[i];
+            var confirmUrl = 'https://coeldery85.com/app/team-confirm?token=' + encodeURIComponent(inv.token);
+            var waMsg = '你好 ' + (inv.name_zh || '朋友') + '，\n我邀請你加入我的 CoLeadery / CoLinkery 申請團隊。\n你的建議分成：' + (inv.share_pct || 0) + '%\n\n請點擊以下連結確認加入：\n' + confirmUrl + '\n\n連結有效期 7 日。';
+            var phone = (inv.phone || '').replace(/\D/g, '');
+            var waHref = phone
+              ? 'https://wa.me/852' + phone + '?text=' + encodeURIComponent(waMsg)
+              : 'https://wa.me/?text=' + encodeURIComponent(waMsg);
+            html += '<div style="border:1px solid #a5d6a7;border-radius:8px;padding:12px;margin-bottom:10px;">';
+            html += '<div style="font-size:15px;font-weight:700;color:#222;margin-bottom:6px;">' + (inv.name_zh || '成員 ' + (i+1)) + ' — ' + (inv.share_pct || 0) + '%</div>';
+            html += '<a href="' + waHref + '" target="_blank" style="display:block;text-align:center;padding:10px;background:#25D366;color:#fff;border-radius:8px;font-size:15px;font-weight:700;text-decoration:none;">📱 WhatsApp 傳送邀請給 ' + (inv.name_zh || '成員') + '</a>';
+            html += '</div>';
+          }
+          html += '</div>';
+          invBlock.innerHTML = html;
+          invBlock.style.display = 'block';
+        }
+      }
     } else {
       btn.disabled = false;
-      btn.textContent = '\u63d0\u4ea4\u7533\u8acb';
-      showErr('s6Err', d.error || '\u63d0\u4ea4\u5931\u6557\uff0c\u8acb\u518d\u8a66');
+      btn.textContent = '提交申請';
+      showErr('s6Err', d.error || '提交失敗，請再試');
     }
   }).catch(function() {
     btn.disabled = false;
-    btn.textContent = '\u63d0\u4ea4\u7533\u8acb';
-    showErr('s6Err', '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66');
+    btn.textContent = '提交申請';
+    showErr('s6Err', '網絡錯誤，請重試');
   });
 }
 
@@ -12528,22 +12771,39 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     if (!['INDIVIDUAL', 'GROUP', 'COMPANY'].includes(applicant_type))
       return c.json({ ok: false, error: '申請人類型無效' }, 400)
     const db = c.env.DB
-    // 允許同一會員同一角色多次申請（不同團隊），但限制同一個 PENDING 的 GROUP 申請不能完全重複
-    // 不再強制每人只能有一個 PENDING（因為可以與不同夥伴組成不同團隊）
-    await db.prepare(`
+    // 允許同一會員同一角色多次申請（不同團隊）
+    const inserted = await db.prepare(`
       INSERT INTO role_applications
         (member_no, role, applicant_type, name_zh, name_en, id_prefix, id_doc_r2_key,
          address, phone, bank_name, bank_acc_no, company_name, company_br,
          industry_background, team_size, team_notes)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      RETURNING id
     `).bind(
       member_no, role, applicant_type,
       name_zh, name_en || '', id_prefix || '', id_doc_r2_key || '',
       address || '', phone || '', bank_name || '', bank_acc_no || '',
       company_name || '', company_br || '', industry_background || '',
       team_size || null, team_notes || ''
-    ).run()
-    return c.json({ ok: true })
+    ).first<{ id: number }>()
+    if (!inserted) return c.json({ ok: false, error: '申請建立失敗' }, 500)
+    const app_id = inserted.id
+
+    // 若為 GROUP 申請，為每位隊員建立邀請 token
+    let invites: any[] = []
+    if (applicant_type === 'GROUP' && Array.isArray(body.group_members) && body.group_members.length > 0) {
+      const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+      for (const gm of body.group_members as any[]) {
+        if (!gm.member_no) continue
+        const token = genToken() + genToken().slice(0, 8) // 48 char token
+        await db.prepare(`
+          INSERT INTO team_invites (token, app_id, member_no, name_zh, phone, share_pct, expires_at)
+          VALUES (?,?,?,?,?,?,?)
+        `).bind(token, app_id, gm.member_no, gm.name_zh || '', gm.phone || '', gm.share_pct || 0, expires).run()
+        invites.push({ token, member_no: gm.member_no, name_zh: gm.name_zh || '', phone: gm.phone || '', share_pct: gm.share_pct || 0 })
+      }
+    }
+    return c.json({ ok: true, app_id, invites })
   })
 
   // 上傳身份證至 R2
