@@ -10390,6 +10390,9 @@ function doLookup() {
         // 換新帳號登入時，清除舊的 CoWorkery 打卡 session
         sessionStorage.removeItem('cw_session');
         localStorage.setItem('ce85_member_no', memberNo);
+        // 同時存 phone（電話號碼），方便跳轉申請頁/錢包頁時預填
+        var inputVal = document.getElementById('phoneInput').value.trim();
+        if (inputVal) localStorage.setItem('ce85_phone', inputVal);
         var waClickedAt = data.wa_clicked_at || (data.member && data.member.wa_clicked_at) || null;
         if (waClickedAt) {
           localStorage.setItem('ce85_wa_clicked', '1');
@@ -10460,11 +10463,15 @@ function showCard(memberNo, waClicked) {
   // 綁定 partner 按鈕事件（避免 onclick 內嵌字串引號問題）
   var bpa = document.getElementById('btnPartnerApply');
   if (bpa) bpa.addEventListener('click', function() {
-    window.location.href = '/app/partner-apply?member=' + encodeURIComponent(this.getAttribute('data-member') || '');
+    var m = this.getAttribute('data-member') || '';
+    var p = localStorage.getItem('ce85_phone') || '';
+    window.location.href = '/app/partner-apply?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
   });
   var bw = document.getElementById('btnWallet');
   if (bw) bw.addEventListener('click', function() {
-    window.location.href = '/app/wallet?member=' + encodeURIComponent(this.getAttribute('data-member') || '');
+    var m = this.getAttribute('data-member') || '';
+    var p = localStorage.getItem('ce85_phone') || '';
+    window.location.href = '/app/wallet?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
   });
   // 用戶已點過 WA 按鈕 → 立即展開安裝提示
   if (waClicked) {
@@ -10972,16 +10979,18 @@ function applyJob() {
 
 app.get('/app/partner-apply', (c) => {
   const memberNo = c.req.query('member') || ''
-  return c.html(partnerApplyHtml(memberNo))
+  const phone = c.req.query('phone') || ''
+  return c.html(partnerApplyHtml(memberNo, phone))
 })
 
 app.get('/app/wallet', async (c) => {
   const memberNo = c.req.query('member') || ''
-  return c.html(walletHtml(memberNo))
+  const phone = c.req.query('phone') || ''
+  return c.html(walletHtml(memberNo, phone))
 })
 
 // ── 申請頁 HTML ────────────────────────────────────────────────────────────
-function partnerApplyHtml(prefillMember: string): string {
+function partnerApplyHtml(prefillMember: string, prefillPhone = ''): string {
   return `<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
@@ -11237,6 +11246,7 @@ var currentStep = 1;
 var selectedRole = '';
 var selectedType = '';
 var memberNo = '${prefillMember}';
+var prefillPhone = '${prefillPhone}';
 var uploadedKey = '';
 
 // Init step dots
@@ -11252,11 +11262,15 @@ function initDots() {
 }
 initDots();
 
-// Pre-fill phone if member_no provided
-if (memberNo) {
-  document.getElementById('applyPhone').value = memberNo;
-  verifyPhone();
-}
+// 預填電話並自動驗證（優先用 phone 參數，否則嘗試 sessionStorage）
+(function() {
+  var p = prefillPhone || sessionStorage.getItem('ce85_phone') || '';
+  if (p) {
+    document.getElementById('applyPhone').value = p;
+    // 畫面 render 後才呼叫，確保 DOM 就緒
+    setTimeout(function() { verifyPhone(); }, 100);
+  }
+})();
 
 function goBack() {
   window.location.href = '/app' + (memberNo ? '?member=' + encodeURIComponent(memberNo) : '');
@@ -11341,6 +11355,7 @@ function verifyPhone(cb) {
     btn.textContent = '\u4e0b\u4e00\u6b65';
     if (!d.ok) { showErr('s1Err', d.error || '\u6838\u5bfb\u5931\u6557'); return; }
     memberNo = d.member_no;
+    sessionStorage.setItem('ce85_phone', phone); // 存起來下次預填用
     var found = document.getElementById('s1Found');
     found.style.display = '';
     found.textContent = '\u627e\u5230\u6703\u54e1\uff1a' + d.name_zh + '\uff08' + d.member_no + '\uff09';
@@ -11497,7 +11512,7 @@ function clearErrors() {
 }
 
 // ── 錢包頁 HTML ────────────────────────────────────────────────────────────
-function walletHtml(prefillMember: string): string {
+function walletHtml(prefillMember: string, prefillPhone = ''): string {
   return `<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
@@ -11588,13 +11603,13 @@ function goBack() {
   window.location.href = '/app' + (memberNo ? '?member=' + encodeURIComponent(memberNo) : '');
 }
 
-// If memberNo provided, pre-fill phone field and try to load
-// (we don't have phone from memberNo directly, so just show the input)
+// 預填電話：優先用 server 傳入的 prefillPhone，其次 sessionStorage
 (function init() {
-  // Try to pre-fill phone from sessionStorage if available
-  var savedPhone = sessionStorage.getItem('ce85_phone');
-  if (savedPhone) {
-    document.getElementById('walletPhone').value = savedPhone;
+  var p = '${prefillPhone}' || sessionStorage.getItem('ce85_phone') || '';
+  if (p) {
+    document.getElementById('walletPhone').value = p;
+    // 自動觸發載入
+    setTimeout(function() { loadWallet(); }, 100);
   }
 })();
 
