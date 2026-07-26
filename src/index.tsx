@@ -14217,7 +14217,7 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
         // 複用：更新 name/applicant_type（資料可能有變），保持 holder_no 不變
         holder_no = existingHolder.holder_no
         await db.prepare(`
-          UPDATE role_holders SET applicant_type=?, name_zh=?, name_en=?, status='ACTIVE', updated_at=datetime('now')
+          UPDATE role_holders SET applicant_type=?, name_zh=?, name_en=?, status='ACTIVE'
           WHERE holder_no=?
         `).bind(app_.applicant_type, app_.name_zh, app_.name_en || '', holder_no).run()
       } else {
