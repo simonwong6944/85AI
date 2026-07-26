@@ -3515,7 +3515,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
 
       <div class="footer-links">
         <a href="/membership/join-family">家庭同行卡申請 →</a><br>
-        如有疑問 WhatsApp：<button onclick="window.open('https://wa.me/85254429749?text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:#25D366;font-weight:700;font-size:inherit;font-family:inherit;padding:0;text-decoration:underline;">📱 WhatsApp 5442-9749</button>
+        如有疑問 WhatsApp：<button onclick="window.open('https://api.whatsapp.com/send?phone=85254429749&text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:#25D366;font-weight:700;font-size:inherit;font-family:inherit;padding:0;text-decoration:underline;">📱 WhatsApp 5442-9749</button>
       </div>
     </form>
   </div>
@@ -3865,7 +3865,7 @@ function showSuccess(data, appliedMedical) {
     var msgEnc = encodeURIComponent(msgText);
     // Always use https://wa.me/ — avoids WA Business intercept on Android
     var phoneDigits = waNum.replace(/[^0-9]/g,'');
-    var waUrl = 'https://wa.me/' + phoneDigits + '?text=' + msgEnc;
+    var waUrl = 'https://api.whatsapp.com/send?phone=' + phoneDigits + '&text=' + msgEnc;
     window._waUrl = waUrl;
     var block = document.getElementById('waVerifyBlock');
     var preview = document.getElementById('waVerifyMsgPreview');
@@ -6521,7 +6521,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       medStatus === 'ISSUED'   ? '✅ 已發出 ISSUED'    :
       medStatus === 'DECLINED' ? '❌ 未批准 DECLINED'  : medStatus
     }</span>
-    <div style="font-size:18px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<button onclick="window.open('https://wa.me/85254429749?text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:#1565C0;font-weight:700;font-size:18px;font-family:inherit;padding:0;text-decoration:underline;">📱 5442-9749</button></div>
+    <div style="font-size:18px;color:#78909C;margin-top:10px;line-height:1.6;">如有查詢請 WhatsApp：<button onclick="window.open('https://api.whatsapp.com/send?phone=85254429749&text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:#1565C0;font-weight:700;font-size:18px;font-family:inherit;padding:0;text-decoration:underline;">📱 5442-9749</button></div>
     ` : `
     <div style="font-size:18px;color:#546E7A;margin-bottom:14px;line-height:1.6;">
       由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>
@@ -6559,7 +6559,7 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       </button>
     </div>
     <div style="color:#aaa;font-size:16px;">
-      如有疑問 WhatsApp：<button onclick="window.open('https://wa.me/85254429749?text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:${accentMid};font-weight:700;font-size:16px;font-family:inherit;padding:0;text-decoration:underline;">📱 5442-9749</button>
+      如有疑問 WhatsApp：<button onclick="window.open('https://api.whatsapp.com/send?phone=85254429749&text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:${accentMid};font-weight:700;font-size:16px;font-family:inherit;padding:0;text-decoration:underline;">📱 5442-9749</button>
     </div>
   </div>
 </div>
@@ -6594,7 +6594,7 @@ window.addEventListener('load', function(){
       var msgText='你好，我的老有卡會員編號：'+MEMBER_NO+'，請幫我確認。';
       var msgEnc=encodeURIComponent(msgText);
       var phoneDigits=waNum.replace(/[^0-9]/g,'');
-      window._waUrl='https://wa.me/'+phoneDigits+'?text='+msgEnc;
+      window._waUrl='https://api.whatsapp.com/send?phone='+phoneDigits+'&text='+msgEnc;
       var preview=document.getElementById('waVerifyMsgPreview');
       if(preview) preview.textContent=msgText;
     }).catch(function(){});
@@ -6804,7 +6804,7 @@ async function shareCardToWA(){
 function openNormalWA(msg) {
   var encoded = encodeURIComponent(msg);
   // wa.me 標準連結：iOS/Android 都能讓用戶選擇用哪個 WA app
-  window.open('https://wa.me/?text=' + encoded, '_blank');
+  window.open('https://api.whatsapp.com/send?text=' + encoded, '_blank');
 }
 
 // ── 分享我張卡 ──
@@ -7289,7 +7289,7 @@ body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-h
   </div>
 
   <div class="footer-note">
-    如有疑問 WhatsApp：<button onclick="window.open('https://wa.me/85254429749?text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:#25D366;font-weight:700;font-size:inherit;font-family:inherit;padding:0;text-decoration:underline;">5442-9749</button> ·
+    如有疑問 WhatsApp：<button onclick="window.open('https://api.whatsapp.com/send?phone=85254429749&text='+encodeURIComponent('你好，我想查詢有關老有卡的資訊。'),'_blank')" style="background:none;border:none;cursor:pointer;color:#25D366;font-weight:700;font-size:inherit;font-family:inherit;padding:0;text-decoration:underline;">5442-9749</button> ·
     <a href="/membership/admin">後台</a>
   </div>
 </div>
@@ -11058,12 +11058,12 @@ function openUsefulLinksPanel(){
           '</a>';
         } else if(l.link_type==='whatsapp'){
           var waNum=l.content.replace(/[^0-9]/g,'');
-          inner='<button onclick="window.open(\'https://wa.me/'+waNum+'\',\'_blank\')" style="display:flex;align-items:center;gap:10px;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;text-align:left;width:100%;">'+
+          inner='<a href="https://wa.me/'+waNum+'" target="_blank" rel="noreferrer noopener" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%;">'+
             '<span style="font-size:26px">💬</span>'+
             '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
             '<div style="font-size:17px;color:#059669;margin-top:2px">WhatsApp: '+escHtml(l.content)+'</div></span>'+
             '<span style="font-size:22px;color:#059669">›</span>'+
-          '</button>';
+          '</a>';
         } else if(l.link_type==='url'){
           inner='<a href="'+escHtml(l.content)+'" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%">'+
             '<span style="font-size:26px">🔗</span>'+
@@ -11707,9 +11707,16 @@ app.get('/app/team-confirm', async (c) => {
   return c.html(teamConfirmHtml(token))
 })
 
-app.get('/app/partner-apply', (c) => {
+app.get('/app/partner-apply', async (c) => {
   const memberNo = c.req.query('member') || ''
-  const phone = c.req.query('phone') || ''
+  let phone = c.req.query('phone') || ''
+  // 如果 URL 無帶 phone，用 memberNo 去 DB 查
+  if (!phone && memberNo) {
+    try {
+      const row = await c.env.DB.prepare('SELECT phone FROM members WHERE member_no=? LIMIT 1').bind(memberNo).first() as any
+      if (row?.phone) phone = row.phone
+    } catch {}
+  }
   return c.html(partnerApplyHtml(memberNo, phone))
 })
 
@@ -12393,8 +12400,8 @@ function submitApplication() {
             var waMsg = '你好 ' + (inv.name_zh || '朋友') + '，\n我邀請你加入我的 CoLeadery / CoLinkery 申請團隊。\n你的建議分成：' + (inv.share_pct || 0) + '%\n\n請點擊以下連結確認加入：\n' + confirmUrl + '\n\n連結有效期 7 日。';
             var phone = (inv.phone || '').replace(/\D/g, '');
             var waHref = phone
-              ? 'https://wa.me/852' + phone + '?text=' + encodeURIComponent(waMsg)
-              : 'https://wa.me/?text=' + encodeURIComponent(waMsg);
+              ? 'https://api.whatsapp.com/send?phone=852' + phone + '&text=' + encodeURIComponent(waMsg)
+              : 'https://api.whatsapp.com/send?text=' + encodeURIComponent(waMsg);
             html += '<div style="border:1px solid #a5d6a7;border-radius:8px;padding:12px;margin-bottom:10px;">';
             html += '<div style="font-size:15px;font-weight:700;color:#222;margin-bottom:6px;">' + (inv.name_zh || '成員 ' + (i+1)) + ' — ' + (inv.share_pct || 0) + '%</div>';
             html += '<a href="' + waHref + '" target="_blank" style="display:block;text-align:center;padding:10px;background:#25D366;color:#fff;border-radius:8px;font-size:15px;font-weight:700;text-decoration:none;">📱 WhatsApp 傳送邀請給 ' + (inv.name_zh || '成員') + '</a>';
