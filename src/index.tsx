@@ -10939,4 +10939,917 @@ function applyJob() {
 </html>`
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 分錢系統 Revenue Sharing Routes (registerRevenueRoutes)
+// 所有後台 route 走 /api/admin/rev/* → 自動受 /api/admin/* middleware 保護
+// 前台 role-holder route 走 /api/partner/*
+// 公開查核 /verify/:token
+// 公開影響力 /impact
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── 工具：生成隨機 token（32位 hex）────────────────────────────────────────
+function genToken(): string {
+  const arr = new Uint8Array(16)
+  crypto.getRandomValues(arr)
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// ── 工具：SHA-256 哈希（Web Crypto API）────────────────────────────────────
+async function sha256hex(data: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// ── 工具：下一個 holder_no（CL000001 / CK000001）────────────────────────────
+async function nextHolderNo(db: D1Database, role: 'COLEADERY' | 'COLINKERY'): Promise<string> {
+  const row = await db.prepare(
+    'UPDATE role_holder_counters SET next_val = next_val + 1 WHERE role = ? RETURNING next_val'
+  ).bind(role).first<{ next_val: number }>()
+  const n = row?.next_val ?? 1
+  const prefix = role === 'COLEADERY' ? 'CL' : 'CK'
+  return prefix + String(n).padStart(6, '0')
+}
+
+// ── 工具：下一個 partner_no（CP000001）──────────────────────────────────────
+async function nextPartnerNo(db: D1Database): Promise<string> {
+  const row = await db.prepare(
+    'UPDATE co_partner_counter SET next_val = next_val + 1 WHERE id = 1 RETURNING next_val'
+  ).bind().first<{ next_val: number }>()
+  return 'CP' + String(row?.next_val ?? 1).padStart(6, '0')
+}
+
+// ── 工具：下一個 project_code（PRJ0001）─────────────────────────────────────
+async function nextProjectCode(db: D1Database): Promise<string> {
+  const row = await db.prepare(
+    'UPDATE project_counter SET next_val = next_val + 1 WHERE id = 1 RETURNING next_val'
+  ).bind().first<{ next_val: number }>()
+  return 'PRJ' + String(row?.next_val ?? 1).padStart(4, '0')
+}
+
+// ── 工具：追加哈希鏈記錄 ────────────────────────────────────────────────────
+async function appendHashChain(
+  db: D1Database,
+  record_type: string,
+  record_id: number,
+  payload: string
+): Promise<string> {
+  const last = await db.prepare(
+    'SELECT sha256 FROM hash_chain ORDER BY id DESC LIMIT 1'
+  ).first<{ sha256: string }>()
+  const prev = last?.sha256 ?? ''
+  const hash = await sha256hex(prev + record_type + record_id + payload)
+  await db.prepare(
+    'INSERT INTO hash_chain (record_type, record_id, sha256, prev_hash) VALUES (?,?,?,?)'
+  ).bind(record_type, record_id, hash, prev).run()
+  return hash
+}
+
+// ── 工具：驗證 project_shares 七方加總 = 10000 bps ──────────────────────────
+function validateShares(s: Record<string, number>): boolean {
+  const total = (s.pct_coleadery ?? 0) + (s.pct_colinkery ?? 0) +
+    (s.pct_coownery ?? 0) + (s.pct_cosupportery ?? 0) +
+    (s.pct_mutual_fund ?? 0) + (s.pct_platform_fee ?? 0) +
+    (s.pct_special_account ?? 0)
+  return total === 10000
+}
+
+// ── 章程標準範本預設比例（bps）──────────────────────────────────────────────
+const SHARE_TEMPLATES: Record<string, Record<string, number>> = {
+  PURE_B2C: {
+    pct_coleadery: 1000, pct_colinkery: 2000, pct_coownery: 4000,
+    pct_cosupportery: 1500, pct_mutual_fund: 1000, pct_platform_fee: 500, pct_special_account: 0
+  },
+  B2C_TO_B2B: {
+    pct_coleadery: 1000, pct_colinkery: 1000, pct_coownery: 1500,
+    pct_cosupportery: 3500, pct_mutual_fund: 1500, pct_platform_fee: 500, pct_special_account: 1000
+  },
+  PURE_B2B: {
+    pct_coleadery: 1000, pct_colinkery: 1000, pct_coownery: 0,
+    pct_cosupportery: 0, pct_mutual_fund: 1500, pct_platform_fee: 500, pct_special_account: 5000
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
+
+  // ════════════════════════════════════════════════════════════
+  // 角色申請（前台，無需 admin auth）
+  // ════════════════════════════════════════════════════════════
+
+  // 驗證是否為老有卡會員
+  app.post('/api/partner/check', async (c) => {
+    const { phone } = await c.req.json()
+    if (!phone) return c.json({ ok: false, error: '請提供電話號碼' })
+    const db = c.env.DB
+    const digits = String(phone).replace(/\D/g, '')
+    const m = await db.prepare(
+      'SELECT member_no, name_zh, tier FROM members WHERE phone = ? AND status = ? LIMIT 1'
+    ).bind(digits, 'ACTIVE').first<{ member_no: string; name_zh: string; tier: string }>()
+    if (!m) return c.json({ ok: false, error: '找不到此電話號碼對應的老有卡會員，請確認電話號碼或先登記老有卡。' })
+    // 檢查是否已有申請
+    const existing = await db.prepare(
+      'SELECT status, role FROM role_applications WHERE member_no = ? ORDER BY created_at DESC LIMIT 1'
+    ).bind(m.member_no).first<{ status: string; role: string }>()
+    return c.json({ ok: true, member_no: m.member_no, name_zh: m.name_zh, existing })
+  })
+
+  // 提交申請
+  app.post('/api/partner/apply', async (c) => {
+    const body = await c.req.json()
+    const { member_no, role, applicant_type, name_zh, name_en, id_prefix,
+            id_doc_r2_key, address, phone, bank_name, bank_acc_no,
+            company_name, company_br, industry_background,
+            team_size, team_notes } = body
+    if (!member_no || !role || !applicant_type || !name_zh)
+      return c.json({ ok: false, error: '缺少必填欄位' }, 400)
+    if (!['COLEADERY', 'COLINKERY'].includes(role))
+      return c.json({ ok: false, error: '角色無效' }, 400)
+    if (!['INDIVIDUAL', 'GROUP', 'COMPANY'].includes(applicant_type))
+      return c.json({ ok: false, error: '申請人類型無效' }, 400)
+    const db = c.env.DB
+    // 防重複提交（同一會員同一角色只能有一個 PENDING）
+    const dup = await db.prepare(
+      "SELECT id FROM role_applications WHERE member_no = ? AND role = ? AND status = 'PENDING'"
+    ).bind(member_no, role).first()
+    if (dup) return c.json({ ok: false, error: '你已有待審批的申請，請耐心等候。' }, 409)
+    await db.prepare(`
+      INSERT INTO role_applications
+        (member_no, role, applicant_type, name_zh, name_en, id_prefix, id_doc_r2_key,
+         address, phone, bank_name, bank_acc_no, company_name, company_br,
+         industry_background, team_size, team_notes)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).bind(
+      member_no, role, applicant_type,
+      name_zh, name_en || '', id_prefix || '', id_doc_r2_key || '',
+      address || '', phone || '', bank_name || '', bank_acc_no || '',
+      company_name || '', company_br || '', industry_background || '',
+      team_size || null, team_notes || ''
+    ).run()
+    return c.json({ ok: true })
+  })
+
+  // 上傳身份證至 R2
+  app.post('/api/partner/upload', async (c) => {
+    if (!c.env.FILES) return c.json({ ok: false, error: '文件上傳服務未設定' }, 503)
+    const form = await c.req.formData()
+    const file = form.get('file') as File | null
+    if (!file || !(file instanceof File)) return c.json({ ok: false, error: '請選擇文件' }, 400)
+    if (file.size > 5 * 1024 * 1024) return c.json({ ok: false, error: '文件不可超過 5MB' }, 400)
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const key = `partner-id/${genToken()}.${ext}`
+    await c.env.FILES.put(key, await file.arrayBuffer(), {
+      httpMetadata: { contentType: file.type || 'image/jpeg' }
+    })
+    return c.json({ ok: true, key })
+  })
+
+  // 查詢申請狀態
+  app.get('/api/partner/my-status', async (c) => {
+    const phone = c.req.query('phone')?.replace(/\D/g, '')
+    if (!phone) return c.json({ ok: false, error: '請提供電話' }, 400)
+    const db = c.env.DB
+    const m = await db.prepare(
+      'SELECT member_no FROM members WHERE phone = ? LIMIT 1'
+    ).bind(phone).first<{ member_no: string }>()
+    if (!m) return c.json({ ok: false, error: '找不到會員' }, 404)
+    const apps = await db.prepare(
+      'SELECT role, status, created_at, reviewed_at FROM role_applications WHERE member_no = ? ORDER BY created_at DESC'
+    ).bind(m.member_no).all()
+    const holder = await db.prepare(
+      'SELECT holder_no, role, status FROM role_holders WHERE member_no = ? ORDER BY created_at DESC'
+    ).bind(m.member_no).all()
+    return c.json({ ok: true, applications: apps.results, holders: holder.results })
+  })
+
+  // 我的錢包（role holder 專用，用電話驗證身份）
+  app.get('/api/partner/wallet', async (c) => {
+    const phone = c.req.query('phone')?.replace(/\D/g, '')
+    if (!phone) return c.json({ ok: false, error: '請提供電話' }, 400)
+    const db = c.env.DB
+    const m = await db.prepare(
+      'SELECT member_no FROM members WHERE phone = ? LIMIT 1'
+    ).bind(phone).first<{ member_no: string }>()
+    if (!m) return c.json({ ok: false, error: '找不到會員' }, 404)
+    const holders = await db.prepare(
+      'SELECT holder_no, role FROM role_holders WHERE member_no = ? AND status = ?'
+    ).bind(m.member_no, 'ACTIVE').all<{ holder_no: string; role: string }>()
+    if (!holders.results.length) return c.json({ ok: false, error: '你尚未持有任何認證角色' }, 403)
+    const holderNos = holders.results.map(h => h.holder_no)
+    // 拉所有 wallet_entries 屬於此人
+    const placeholders = holderNos.map(() => '?').join(',')
+    const entries = await db.prepare(
+      `SELECT w.*, p.project_code, p.name as project_name
+       FROM wallet_entries w
+       JOIN projects p ON p.id = w.project_id
+       WHERE w.holder_no IN (${placeholders})
+       ORDER BY w.created_at DESC`
+    ).bind(...holderNos).all()
+    // 彙總
+    const summary = { total_posted: 0, total_pending_payout: 0, total_paid: 0 }
+    for (const e of entries.results as any[]) {
+      if (e.status === 'POSTED') summary.total_posted += e.amount_cents
+      if (e.status === 'PENDING_PAYOUT') summary.total_pending_payout += e.amount_cents
+      if (e.status === 'PAID') summary.total_paid += e.amount_cents
+    }
+    return c.json({ ok: true, holders: holders.results, entries: entries.results, summary })
+  })
+
+  // 我的錢包：單項目損益明細（可見版）
+  app.get('/api/partner/project/:id/statement', async (c) => {
+    const phone = c.req.query('phone')?.replace(/\D/g, '')
+    const projectId = parseInt(c.req.param('id'))
+    if (!phone || isNaN(projectId)) return c.json({ ok: false, error: '參數錯誤' }, 400)
+    const db = c.env.DB
+    const m = await db.prepare('SELECT member_no FROM members WHERE phone = ? LIMIT 1').bind(phone).first<{ member_no: string }>()
+    if (!m) return c.json({ ok: false, error: '找不到會員' }, 404)
+    // 確認此人係此項目參與者
+    const isParticipant = await db.prepare(
+      `SELECT pp.id FROM project_participants pp
+       JOIN role_holders rh ON rh.holder_no = pp.holder_no
+       WHERE pp.project_id = ? AND rh.member_no = ? LIMIT 1`
+    ).bind(projectId, m.member_no).first()
+    if (!isParticipant) return c.json({ ok: false, error: '你不是此項目參與者' }, 403)
+    const project = await db.prepare('SELECT * FROM projects WHERE id = ?').bind(projectId).first()
+    const shares = await db.prepare('SELECT * FROM project_shares WHERE project_id = ?').bind(projectId).first()
+    // 損益帳（CoPartnery 依 disclosure_level 遮蔽名稱）
+    const ledger = await db.prepare(`
+      SELECT l.entry_type, l.description, l.amount_cents, l.created_at,
+             CASE WHEN cp.disclosure_level = 'PUBLIC' THEN cp.name
+                  WHEN cp.disclosure_level = 'GENERIC' THEN '合作夥伴'
+                  ELSE NULL END as partner_display
+      FROM project_ledger l
+      LEFT JOIN co_partners cp ON cp.id = l.co_partner_id
+      WHERE l.project_id = ?
+      ORDER BY l.created_at
+    `).bind(projectId).all()
+    const walletEntries = await db.prepare(`
+      SELECT w.role_or_pool, w.amount_cents, w.status, w.paid_at, w.hash, w.created_at
+      FROM wallet_entries w
+      JOIN role_holders rh ON rh.holder_no = w.holder_no
+      WHERE w.project_id = ? AND rh.member_no = ?
+      ORDER BY w.created_at DESC
+    `).bind(projectId, m.member_no).all()
+    return c.json({ ok: true, project, shares, ledger: ledger.results, wallet: walletEntries.results })
+  })
+
+  // ════════════════════════════════════════════════════════════
+  // 公開查核頁（授權卡 QR）
+  // ════════════════════════════════════════════════════════════
+
+  app.get('/verify/:token', async (c) => {
+    const token = c.req.param('token')
+    const db = c.env.DB
+    const card = await db.prepare(`
+      SELECT ac.*, rh.name_zh, rh.role, rh.status as holder_status
+      FROM authorization_cards ac
+      JOIN role_holders rh ON rh.holder_no = ac.holder_no
+      WHERE ac.token = ?
+    `).bind(token).first<any>()
+
+    const now = new Date().toISOString()
+    // 自動過期
+    if (card && card.status === 'VALID' && card.expires_at && card.expires_at < now) {
+      await db.prepare("UPDATE authorization_cards SET status = 'EXPIRED' WHERE token = ?").bind(token).run()
+      if (card) card.status = 'EXPIRED'
+    }
+
+    const roleLabel = (r: string) => r === 'COLEADERY' ? '已認證領航者 CoLeadery' : '已認證連結者 CoLinkery'
+    const cardTypeLabel = (t: string) => t === 'NEGOTIATION' ? '洽商授權卡' : '項目授權卡'
+    const statusColor = (s: string) => s === 'VALID' ? '#2E7D32' : '#C62828'
+    const statusLabel = (s: string) => s === 'VALID' ? '✅ 有效' : s === 'EXPIRED' ? '⏰ 已過期' : '❌ 已撤銷'
+
+    // 姓氏遮蔽（只顯示姓氏）
+    const surname = card ? (card.name_zh?.charAt(0) || '') + '先生/女士' : ''
+
+    return c.html(`<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CoEldery 85 授權卡查核</title>
+<style>
+body{background:#F5F5F5;font-family:"Noto Serif TC",serif;margin:0;padding:20px 16px;color:#111;}
+.wrap{max-width:420px;margin:0 auto;}
+.header{background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;padding:20px;border-radius:10px 10px 0 0;text-align:center;}
+.header h1{margin:0;font-size:22px;letter-spacing:2px;}
+.header p{margin:4px 0 0;font-size:14px;opacity:0.85;}
+.card{background:#fff;border-radius:0 0 10px 10px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.12);}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0F0F0;}
+.row:last-child{border-bottom:none;}
+.label{font-size:14px;color:#777;}
+.value{font-size:16px;font-weight:700;text-align:right;}
+.status-badge{font-size:18px;font-weight:900;padding:4px 12px;border-radius:6px;}
+.disclaimer{margin-top:16px;background:#FFF3E0;border:1.5px solid #FF8F00;border-radius:8px;padding:12px 14px;font-size:14px;color:#E65100;line-height:1.6;}
+.invalid-box{background:#fff;border-radius:10px;padding:40px 20px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.12);}
+.footer{text-align:center;margin-top:16px;font-size:13px;color:#999;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>CoEldery 85</h1>
+    <p>電子授權卡查核系統</p>
+  </div>
+  ${!card ? `
+  <div class="invalid-box">
+    <div style="font-size:48px;margin-bottom:12px;">❌</div>
+    <div style="font-size:20px;font-weight:900;color:#C62828;">此卡不存在或連結無效</div>
+    <div style="font-size:15px;color:#666;margin-top:8px;">如有疑問請聯絡 CoEldery 85</div>
+  </div>` : card.status !== 'VALID' ? `
+  <div class="invalid-box">
+    <div style="font-size:48px;margin-bottom:12px;">${card.status === 'EXPIRED' ? '⏰' : '❌'}</div>
+    <div style="font-size:20px;font-weight:900;color:#C62828;">此卡已${card.status === 'EXPIRED' ? '過期' : '撤銷'}</div>
+    <div style="font-size:15px;color:#666;margin-top:8px;">此授權卡已失效，請向持卡人索取最新授權卡。</div>
+  </div>` : `
+  <div class="card">
+    <div class="row">
+      <span class="label">持卡人</span>
+      <span class="value">${surname}（${card.holder_no}）</span>
+    </div>
+    <div class="row">
+      <span class="label">認證角色</span>
+      <span class="value" style="color:#8B0000;">${roleLabel(card.role)}</span>
+    </div>
+    <div class="row">
+      <span class="label">卡類型</span>
+      <span class="value">${cardTypeLabel(card.card_type)}</span>
+    </div>
+    <div class="row">
+      <span class="label">卡狀態</span>
+      <span class="status-badge" style="color:${statusColor(card.status)}">${statusLabel(card.status)}</span>
+    </div>
+    ${card.expires_at ? `
+    <div class="row">
+      <span class="label">有效期至</span>
+      <span class="value">${card.expires_at.slice(0, 10)}</span>
+    </div>` : ''}
+    <div class="disclaimer">
+      ⚠️ <strong>重要聲明</strong>：此人僅獲授權進行洽商，<strong>無權代表公司簽約、作出財務承諾或代收款項</strong>。如有疑問請聯絡 CoEldery 85 核實。
+    </div>
+  </div>`}
+  <div class="footer">coeldery85.com · ${new Date().toLocaleDateString('zh-HK')}</div>
+</div>
+</body>
+</html>`)
+  })
+
+  // ════════════════════════════════════════════════════════════
+  // 公開影響力頁 /impact
+  // ════════════════════════════════════════════════════════════
+
+  app.get('/impact', async (c) => {
+    const db = c.env.DB
+    // 匿名匯總數據
+    const totalPosted = await db.prepare(
+      "SELECT COALESCE(SUM(amount_cents),0) as total FROM wallet_entries WHERE status IN ('POSTED','PENDING_PAYOUT','PAID')"
+    ).first<{ total: number }>()
+    const totalPaid = await db.prepare(
+      "SELECT COALESCE(SUM(amount_cents),0) as total FROM wallet_entries WHERE status = 'PAID'"
+    ).first<{ total: number }>()
+    const activeProjects = await db.prepare(
+      "SELECT COUNT(*) as cnt FROM projects WHERE status IN ('ACTIVE','SETTLING','SETTLED')"
+    ).first<{ cnt: number }>()
+    const holderCount = await db.prepare(
+      "SELECT COUNT(*) as cnt FROM role_holders WHERE status = 'ACTIVE'"
+    ).first<{ cnt: number }>()
+    const partnerCount = await db.prepare(
+      "SELECT COUNT(*) as cnt FROM co_partners"
+    ).first<{ cnt: number }>()
+    // 項目列表（匿名版）
+    const projects = await db.prepare(`
+      SELECT p.project_code, p.name, p.scenario, p.business_type, p.status,
+             COUNT(DISTINCT pp.holder_no) as participant_count,
+             COALESCE(SUM(CASE WHEN w.status IN ('POSTED','PENDING_PAYOUT','PAID') THEN w.amount_cents ELSE 0 END),0) as total_returned
+      FROM projects p
+      LEFT JOIN project_participants pp ON pp.project_id = p.id
+      LEFT JOIN wallet_entries w ON w.project_id = p.id
+      WHERE p.status != 'DRAFT'
+      GROUP BY p.id
+      ORDER BY total_returned DESC
+    `).all<any>()
+
+    const fmt = (cents: number) => 'HK$' + (cents / 100).toLocaleString('zh-HK', { minimumFractionDigits: 0 })
+    const scenarioLabel = (s: string) => ({ PURE_B2C: '純零售', B2C_TO_B2B: '零售延伸B2B', PURE_B2B: '純B2B' }[s] || s)
+
+    return c.html(`<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CoEldery 85 · 影響力</title>
+<style>
+body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 16px;color:#111;}
+.wrap{max-width:480px;margin:0 auto;}
+.hero{background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;padding:28px 20px;border-radius:12px;text-align:center;margin-bottom:20px;}
+.hero h1{margin:0 0 6px;font-size:26px;letter-spacing:3px;}
+.hero p{margin:0;font-size:15px;opacity:0.85;}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+.stat{background:#fff;border-radius:10px;padding:16px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+.stat-num{font-size:26px;font-weight:900;color:#8B0000;}
+.stat-label{font-size:13px;color:#777;margin-top:4px;}
+.section-title{font-size:18px;font-weight:900;color:#8B0000;margin:0 0 12px;border-left:4px solid #C62828;padding-left:10px;}
+.project-card{background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+.project-name{font-size:17px;font-weight:700;margin-bottom:6px;}
+.project-meta{font-size:13px;color:#666;display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+.project-stats{display:flex;justify-content:space-between;font-size:14px;}
+.badge{background:#FFEBEE;color:#C62828;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700;}
+.disclaimer{background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:12px 14px;font-size:13px;color:#795548;margin-top:16px;line-height:1.6;}
+.footer{text-align:center;margin-top:20px;font-size:13px;color:#999;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>老有卡 CoEldery 85</h1>
+    <p>項目淨利潤 85% 回流長者社群</p>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-num">${fmt(totalPosted?.total ?? 0)}</div>
+      <div class="stat-label">已計算回流長者社群</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">${fmt(totalPaid?.total ?? 0)}</div>
+      <div class="stat-label">已實際出款</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">${activeProjects?.cnt ?? 0}</div>
+      <div class="stat-label">進行中項目</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">${holderCount?.cnt ?? 0}</div>
+      <div class="stat-label">正享受分成人士</div>
+    </div>
+  </div>
+  ${partnerCount?.cnt ? `<p style="text-align:center;font-size:15px;color:#555;margin-bottom:16px;">合作夥伴：<strong style="color:#8B0000;">${partnerCount.cnt}</strong> 間</p>` : ''}
+
+  ${projects.results.length ? `
+  <div class="section-title">項目一覽</div>
+  ${(projects.results as any[]).map(p => `
+  <div class="project-card">
+    <div class="project-name">${p.name}</div>
+    <div class="project-meta">
+      <span class="badge">${scenarioLabel(p.scenario)}</span>
+      ${p.business_type ? `<span>${p.business_type}</span>` : ''}
+    </div>
+    <div class="project-stats">
+      <span>👥 參與 ${p.participant_count} 人</span>
+      <span>💰 已回流 ${fmt(p.total_returned)}</span>
+    </div>
+  </div>`).join('')}` : `
+  <div style="text-align:center;color:#999;padding:30px 0;font-size:16px;">項目即將上線，敬請期待</div>`}
+
+  <div class="disclaimer">
+    ⚠️ 以上數據為根據項目當前記錄之匯總，成果分享屬非保證收益，不顯示任何個人金額。實際以正式結算為準。
+  </div>
+  <div class="footer">coeldery85.com · ${new Date().toLocaleDateString('zh-HK')}</div>
+</div>
+</body>
+</html>`)
+  })
+
+  // ════════════════════════════════════════════════════════════
+  // Admin 後台 API（/api/admin/rev/* — 自動受 middleware 保護）
+  // ════════════════════════════════════════════════════════════
+
+  // ── 角色申請：列表 ────────────────────────────────────────────
+  app.get('/api/admin/rev/applications', async (c) => {
+    const db = c.env.DB
+    const status = c.req.query('status') || 'PENDING'
+    const rows = await db.prepare(`
+      SELECT ra.*, m.name_zh as member_name_zh
+      FROM role_applications ra
+      JOIN members m ON m.member_no = ra.member_no
+      WHERE ra.status = ?
+      ORDER BY ra.created_at DESC
+    `).bind(status).all()
+    return c.json({ ok: true, applications: rows.results })
+  })
+
+  // ── 角色申請：審批 ────────────────────────────────────────────
+  app.post('/api/admin/rev/applications/:id/review', async (c) => {
+    const id = parseInt(c.req.param('id'))
+    const { action, review_notes } = await c.req.json()
+    if (!['APPROVED', 'REJECTED'].includes(action))
+      return c.json({ ok: false, error: 'action 必須為 APPROVED 或 REJECTED' }, 400)
+    const db = c.env.DB
+    const app_ = await db.prepare(
+      'SELECT * FROM role_applications WHERE id = ?'
+    ).bind(id).first<any>()
+    if (!app_) return c.json({ ok: false, error: '申請不存在' }, 404)
+    if (app_.status !== 'PENDING') return c.json({ ok: false, error: '此申請已處理' }, 409)
+
+    await db.prepare(
+      "UPDATE role_applications SET status = ?, review_notes = ?, reviewed_at = datetime('now') WHERE id = ?"
+    ).bind(action, review_notes || '', id).run()
+
+    let holder_no = null
+    if (action === 'APPROVED') {
+      // 建立 role_holder 記錄
+      holder_no = await nextHolderNo(db, app_.role as 'COLEADERY' | 'COLINKERY')
+      await db.prepare(`
+        INSERT INTO role_holders (holder_no, member_no, role, applicant_type, name_zh, name_en)
+        VALUES (?,?,?,?,?,?)
+      `).bind(holder_no, app_.member_no, app_.role, app_.applicant_type, app_.name_zh, app_.name_en || '').run()
+
+      // 自動發洽商授權卡（90日有效）
+      const token = genToken()
+      const expires = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      await db.prepare(`
+        INSERT INTO authorization_cards (token, holder_no, card_type, expires_at)
+        VALUES (?, ?, 'NEGOTIATION', ?)
+      `).bind(token, holder_no, expires).run()
+
+      // 取剛建立的卡 id 寫哈希鏈
+      const cardRow = await db.prepare('SELECT id FROM authorization_cards WHERE token = ?').bind(token).first<{ id: number }>()
+      if (cardRow) {
+        await appendHashChain(db, 'CARD_ISSUED', cardRow.id, `${holder_no}|${token}|${expires}`)
+      }
+    }
+    return c.json({ ok: true, holder_no })
+  })
+
+  // ── CoPartnery：建立 ──────────────────────────────────────────
+  app.post('/api/admin/rev/partner', async (c) => {
+    const body = await c.req.json()
+    const { name, partner_type, contact, terms_notes, disclosure_level } = body
+    if (!name || !partner_type) return c.json({ ok: false, error: '缺少必填欄位' }, 400)
+    if (!['SUPPLIER', 'BRAND', 'RETAIL'].includes(partner_type))
+      return c.json({ ok: false, error: 'partner_type 無效' }, 400)
+    const db = c.env.DB
+    const partner_no = await nextPartnerNo(db)
+    await db.prepare(`
+      INSERT INTO co_partners (partner_no, name, partner_type, contact, terms_notes, disclosure_level)
+      VALUES (?,?,?,?,?,?)
+    `).bind(partner_no, name, partner_type, contact || '', terms_notes || '', disclosure_level || 'GENERIC').run()
+    return c.json({ ok: true, partner_no })
+  })
+
+  // ── CoPartnery：列表 ─────────────────────────────────────────
+  app.get('/api/admin/rev/partners', async (c) => {
+    const rows = await c.env.DB.prepare('SELECT * FROM co_partners ORDER BY created_at DESC').all()
+    return c.json({ ok: true, partners: rows.results })
+  })
+
+  // ── 項目：建立 ────────────────────────────────────────────────
+  app.post('/api/admin/rev/project', async (c) => {
+    const body = await c.req.json()
+    const { name, scenario, stage, business_type, notes,
+            pct_coleadery, pct_colinkery, pct_coownery, pct_cosupportery,
+            pct_mutual_fund, pct_platform_fee, pct_special_account } = body
+    if (!name || !scenario) return c.json({ ok: false, error: '缺少必填欄位' }, 400)
+    if (!['PURE_B2C', 'B2C_TO_B2B', 'PURE_B2B'].includes(scenario))
+      return c.json({ ok: false, error: 'scenario 無效' }, 400)
+    const db = c.env.DB
+    // 決定分成比例（用傳入值或章程範本預設）
+    const template = SHARE_TEMPLATES[scenario]
+    const shares = {
+      pct_coleadery:    pct_coleadery    ?? template.pct_coleadery,
+      pct_colinkery:    pct_colinkery    ?? template.pct_colinkery,
+      pct_coownery:     pct_coownery     ?? template.pct_coownery,
+      pct_cosupportery: pct_cosupportery ?? template.pct_cosupportery,
+      pct_mutual_fund:  pct_mutual_fund  ?? template.pct_mutual_fund,
+      pct_platform_fee: pct_platform_fee ?? template.pct_platform_fee,
+      pct_special_account: pct_special_account ?? template.pct_special_account,
+    }
+    // 強制驗證加總 = 10000 bps
+    if (!validateShares(shares))
+      return c.json({ ok: false, error: `七方比例加總必須等於 100%（目前：${Object.values(shares).reduce((a,b)=>a+b,0)/100}%）` }, 400)
+    // 特殊結構標記
+    const special_flag = (shares.pct_coleadery > 1000 || shares.pct_cosupportery > 4000) ? 1 : 0
+
+    const project_code = await nextProjectCode(db)
+    const proj = await db.prepare(`
+      INSERT INTO projects (project_code, name, scenario, stage, business_type, notes)
+      VALUES (?,?,?,?,?,?) RETURNING id
+    `).bind(project_code, name, scenario, stage || 'STARTUP', business_type || '', notes || '').first<{ id: number }>()
+    if (!proj) return c.json({ ok: false, error: '建立項目失敗' }, 500)
+
+    await db.prepare(`
+      INSERT INTO project_shares
+        (project_id, pct_coleadery, pct_colinkery, pct_coownery, pct_cosupportery,
+         pct_mutual_fund, pct_platform_fee, pct_special_account, special_flag)
+      VALUES (?,?,?,?,?,?,?,?,?)
+    `).bind(
+      proj.id, shares.pct_coleadery, shares.pct_colinkery, shares.pct_coownery,
+      shares.pct_cosupportery, shares.pct_mutual_fund, shares.pct_platform_fee,
+      shares.pct_special_account, special_flag
+    ).run()
+
+    return c.json({ ok: true, project_id: proj.id, project_code, special_flag })
+  })
+
+  // ── 項目：更新基本資料 ────────────────────────────────────────
+  app.put('/api/admin/rev/project/:id', async (c) => {
+    const id = parseInt(c.req.param('id'))
+    const body = await c.req.json()
+    const { name, stage, business_type, notes, status } = body
+    const db = c.env.DB
+    await db.prepare(`
+      UPDATE projects SET name = COALESCE(?, name), stage = COALESCE(?, stage),
+        business_type = COALESCE(?, business_type), notes = COALESCE(?, notes),
+        status = COALESCE(?, status)
+      WHERE id = ?
+    `).bind(name || null, stage || null, business_type || null, notes || null, status || null, id).run()
+    return c.json({ ok: true })
+  })
+
+  // ── 項目：更新分成比例 ────────────────────────────────────────
+  app.post('/api/admin/rev/project/:id/shares', async (c) => {
+    const id = parseInt(c.req.param('id'))
+    const shares = await c.req.json()
+    if (!validateShares(shares))
+      return c.json({ ok: false, error: `七方比例加總必須等於 100%（目前：${Object.values(shares as Record<string,number>).reduce((a,b)=>a+b,0)/100}%）` }, 400)
+    const special_flag = ((shares.pct_coleadery ?? 0) > 1000 || (shares.pct_cosupportery ?? 0) > 4000) ? 1 : 0
+    const db = c.env.DB
+    await db.prepare(`
+      UPDATE project_shares SET
+        pct_coleadery=?, pct_colinkery=?, pct_coownery=?, pct_cosupportery=?,
+        pct_mutual_fund=?, pct_platform_fee=?, pct_special_account=?,
+        special_flag=?, updated_at=datetime('now')
+      WHERE project_id=?
+    `).bind(
+      shares.pct_coleadery, shares.pct_colinkery, shares.pct_coownery, shares.pct_cosupportery,
+      shares.pct_mutual_fund, shares.pct_platform_fee, shares.pct_special_account,
+      special_flag, id
+    ).run()
+    return c.json({ ok: true, special_flag })
+  })
+
+  // ── 項目：綁定參與者 ─────────────────────────────────────────
+  app.post('/api/admin/rev/project/:id/participants', async (c) => {
+    const project_id = parseInt(c.req.param('id'))
+    const { holder_no, role, team_share_bps } = await c.req.json()
+    if (!holder_no || !role) return c.json({ ok: false, error: '缺少必填欄位' }, 400)
+    const db = c.env.DB
+    // 驗證 holder 存在且角色匹配
+    const holder = await db.prepare('SELECT role FROM role_holders WHERE holder_no = ? AND status = ?').bind(holder_no, 'ACTIVE').first<{ role: string }>()
+    if (!holder) return c.json({ ok: false, error: '找不到此角色持有人' }, 404)
+    if (holder.role !== role) return c.json({ ok: false, error: `此持有人角色為 ${holder.role}，不符合 ${role}` }, 400)
+    // 加入（或更新）
+    await db.prepare(`
+      INSERT INTO project_participants (project_id, holder_no, role, team_share_bps)
+      VALUES (?,?,?,?)
+      ON CONFLICT(project_id, holder_no, role) DO UPDATE SET team_share_bps = excluded.team_share_bps
+    `).bind(project_id, holder_no, role, team_share_bps ?? 10000).run()
+    // 驗證同角色加總 = 10000
+    const sum = await db.prepare(
+      'SELECT COALESCE(SUM(team_share_bps),0) as total FROM project_participants WHERE project_id = ? AND role = ?'
+    ).bind(project_id, role).first<{ total: number }>()
+    if (sum && sum.total !== 10000)
+      return c.json({ ok: true, warning: `⚠️ ${role} 團隊分帳比例加總目前為 ${sum.total / 100}%，需調整至 100%` })
+    return c.json({ ok: true })
+  })
+
+  // ── 項目：綁定 CoPartnery ─────────────────────────────────────
+  app.post('/api/admin/rev/project/:id/bind-partner', async (c) => {
+    // CoPartnery 綁定記錄於 project_ledger（PARTNER_SETTLEMENT 類型），
+    // 此 endpoint 只是驗證 partner 存在並返回資料，實際交易透過 /ledger 錄入
+    const project_id = parseInt(c.req.param('id'))
+    const { co_partner_id } = await c.req.json()
+    const db = c.env.DB
+    const partner = await db.prepare('SELECT * FROM co_partners WHERE id = ?').bind(co_partner_id).first()
+    if (!partner) return c.json({ ok: false, error: '找不到此合作夥伴' }, 404)
+    return c.json({ ok: true, partner })
+  })
+
+  // ── 損益：錄入單筆 ────────────────────────────────────────────
+  app.post('/api/admin/rev/ledger', async (c) => {
+    const body = await c.req.json()
+    const { project_id, entry_type, description, amount_cents, co_partner_id } = body
+    if (!project_id || !entry_type || amount_cents == null)
+      return c.json({ ok: false, error: '缺少必填欄位' }, 400)
+    if (!['INCOME', 'DIRECT_COST', 'PARTNER_SETTLEMENT', 'FIXED_DEDUCTION'].includes(entry_type))
+      return c.json({ ok: false, error: 'entry_type 無效' }, 400)
+    const db = c.env.DB
+    await db.prepare(`
+      INSERT INTO project_ledger (project_id, entry_type, description, amount_cents, co_partner_id)
+      VALUES (?,?,?,?,?)
+    `).bind(project_id, entry_type, description || '', parseInt(amount_cents), co_partner_id || null).run()
+    return c.json({ ok: true })
+  })
+
+  // ── 損益：項目損益表 ─────────────────────────────────────────
+  app.get('/api/admin/rev/project/:id/statement', async (c) => {
+    const id = parseInt(c.req.param('id'))
+    const db = c.env.DB
+    const project = await db.prepare('SELECT * FROM projects WHERE id = ?').bind(id).first()
+    if (!project) return c.json({ ok: false, error: '項目不存在' }, 404)
+    const shares = await db.prepare('SELECT * FROM project_shares WHERE project_id = ?').bind(id).first()
+    const ledger = await db.prepare(`
+      SELECT l.*, cp.name as partner_name, cp.partner_type, cp.disclosure_level
+      FROM project_ledger l
+      LEFT JOIN co_partners cp ON cp.id = l.co_partner_id
+      WHERE l.project_id = ?
+      ORDER BY l.created_at
+    `).bind(id).all()
+    const participants = await db.prepare(`
+      SELECT pp.*, rh.name_zh, rh.role as holder_role
+      FROM project_participants pp
+      JOIN role_holders rh ON rh.holder_no = pp.holder_no
+      WHERE pp.project_id = ?
+    `).bind(id).all()
+    const walletEntries = await db.prepare(`
+      SELECT w.*, rh.name_zh as holder_name
+      FROM wallet_entries w
+      LEFT JOIN role_holders rh ON rh.holder_no = w.holder_no
+      WHERE w.project_id = ?
+      ORDER BY w.created_at DESC
+    `).bind(id).all()
+    // 計算淨利潤
+    let income = 0, costs = 0
+    for (const e of ledger.results as any[]) {
+      if (e.entry_type === 'INCOME') income += e.amount_cents
+      else costs += e.amount_cents
+    }
+    const net_profit = income - costs
+    return c.json({
+      ok: true, project, shares, ledger: ledger.results,
+      participants: participants.results, wallet: walletEntries.results,
+      summary: { income, costs, net_profit }
+    })
+  })
+
+  // ── 觸發結算 ──────────────────────────────────────────────────
+  app.post('/api/admin/rev/project/:id/settle', async (c) => {
+    const id = parseInt(c.req.param('id'))
+    const db = c.env.DB
+    const project = await db.prepare("SELECT * FROM projects WHERE id = ? AND status = 'ACTIVE'").bind(id).first<any>()
+    if (!project) return c.json({ ok: false, error: '項目不存在或狀態非 ACTIVE' }, 404)
+    const shares = await db.prepare('SELECT * FROM project_shares WHERE project_id = ?').bind(id).first<any>()
+    if (!shares) return c.json({ ok: false, error: '此項目尚未設定分成比例' }, 400)
+    // 計算淨利潤
+    const ledger = await db.prepare('SELECT entry_type, amount_cents FROM project_ledger WHERE project_id = ?').bind(id).all<{ entry_type: string; amount_cents: number }>()
+    let income = 0, costs = 0
+    for (const e of ledger.results) {
+      if (e.entry_type === 'INCOME') income += e.amount_cents
+      else costs += e.amount_cents
+    }
+    const net_profit = income - costs
+    if (net_profit <= 0) return c.json({ ok: false, error: `淨利潤為 ${net_profit / 100} HKD，無法結算` }, 400)
+
+    // 取各角色參與者
+    const participants = await db.prepare(
+      "SELECT * FROM project_participants WHERE project_id = ? AND confirm_status = 'CONFIRMED'"
+    ).bind(id).all<any>()
+
+    const entries: any[] = []
+
+    // CoLeadery 份額 → 按 team_share_bps 拆分
+    const leaderAmount = Math.floor(net_profit * shares.pct_coleadery / 10000)
+    const leaders = participants.results.filter((p: any) => p.role === 'COLEADERY')
+    for (const p of leaders) {
+      const amt = Math.floor(leaderAmount * p.team_share_bps / 10000)
+      if (amt > 0) entries.push({ holder_no: p.holder_no, role_or_pool: 'COLEADERY', amount_cents: amt, status: 'POSTED' })
+    }
+
+    // CoLinkery 份額 → 按 team_share_bps 拆分
+    const linkerAmount = Math.floor(net_profit * shares.pct_colinkery / 10000)
+    const linkers = participants.results.filter((p: any) => p.role === 'COLINKERY')
+    for (const p of linkers) {
+      const amt = Math.floor(linkerAmount * p.team_share_bps / 10000)
+      if (amt > 0) entries.push({ holder_no: p.holder_no, role_or_pool: 'COLINKERY', amount_cents: amt, status: 'POSTED' })
+    }
+
+    // 各池（已預留未分配）
+    const pools: Array<{ key: keyof typeof shares; pool: string }> = [
+      { key: 'pct_coownery',      pool: 'COOWNERY_POOL' },
+      { key: 'pct_cosupportery',  pool: 'COSUPPORTERY_POOL' },
+      { key: 'pct_mutual_fund',   pool: 'MUTUAL_FUND' },
+      { key: 'pct_platform_fee',  pool: 'PLATFORM_FEE' },
+      { key: 'pct_special_account', pool: 'SPECIAL_ACCOUNT' },
+    ]
+    for (const { key, pool } of pools) {
+      const amt = Math.floor(net_profit * (shares[key] as number) / 10000)
+      if (amt > 0) entries.push({ holder_no: null, role_or_pool: pool, amount_cents: amt, status: 'RESERVED' })
+    }
+
+    // 批次寫入 wallet_entries + 哈希鏈
+    for (const e of entries) {
+      const row = await db.prepare(`
+        INSERT INTO wallet_entries (project_id, holder_no, role_or_pool, amount_cents, status)
+        VALUES (?,?,?,?,?) RETURNING id
+      `).bind(id, e.holder_no, e.role_or_pool, e.amount_cents, e.status).first<{ id: number }>()
+      if (row) {
+        const hash = await appendHashChain(db, 'SETTLEMENT', row.id,
+          `${id}|${e.holder_no ?? 'pool'}|${e.role_or_pool}|${e.amount_cents}`)
+        await db.prepare('UPDATE wallet_entries SET hash = ? WHERE id = ?').bind(hash, row.id).run()
+      }
+    }
+
+    // 更新項目狀態
+    await db.prepare("UPDATE projects SET status = 'SETTLING' WHERE id = ?").bind(id).run()
+
+    return c.json({ ok: true, net_profit, entries_created: entries.length, entries })
+  })
+
+  // ── 出款狀態推進（批次支援）────────────────────────────────────
+  app.post('/api/admin/rev/wallet/status', async (c) => {
+    const { ids, new_status, paid_at } = await c.req.json()
+    if (!Array.isArray(ids) || !ids.length || !new_status)
+      return c.json({ ok: false, error: '缺少必填欄位' }, 400)
+    const validStatuses = ['POSTED', 'PENDING_PAYOUT', 'PAID']
+    if (!validStatuses.includes(new_status)) return c.json({ ok: false, error: 'new_status 無效' }, 400)
+    const db = c.env.DB
+    const paidAtVal = new_status === 'PAID' ? (paid_at || new Date().toISOString()) : null
+    for (const wid of ids) {
+      await db.prepare(
+        'UPDATE wallet_entries SET status = ?, paid_at = COALESCE(?, paid_at) WHERE id = ?'
+      ).bind(new_status, paidAtVal, wid).run()
+      const rec_type = new_status === 'POSTED' ? 'WALLET_POSTED' : new_status === 'PENDING_PAYOUT' ? 'WALLET_PAYOUT' : 'WALLET_PAID'
+      await appendHashChain(db, rec_type, wid, `${wid}|${new_status}|${paidAtVal ?? ''}`)
+    }
+    return c.json({ ok: true, updated: ids.length })
+  })
+
+  // ── 授權卡：撤銷 ─────────────────────────────────────────────
+  app.post('/api/admin/rev/card/:id/revoke', async (c) => {
+    const id = parseInt(c.req.param('id'))
+    const db = c.env.DB
+    await db.prepare("UPDATE authorization_cards SET status = 'REVOKED' WHERE id = ?").bind(id).run()
+    await appendHashChain(db, 'CARD_REVOKED', id, `${id}|REVOKED`)
+    return c.json({ ok: true })
+  })
+
+  // ── 授權卡：列表（按 holder）────────────────────────────────────
+  app.get('/api/admin/rev/cards', async (c) => {
+    const holder_no = c.req.query('holder_no')
+    const db = c.env.DB
+    const rows = holder_no
+      ? await db.prepare('SELECT * FROM authorization_cards WHERE holder_no = ? ORDER BY created_at DESC').bind(holder_no).all()
+      : await db.prepare('SELECT ac.*, rh.name_zh FROM authorization_cards ac JOIN role_holders rh ON rh.holder_no = ac.holder_no ORDER BY ac.created_at DESC LIMIT 100').all()
+    return c.json({ ok: true, cards: rows.results })
+  })
+
+  // ── Admin 儀表板 ──────────────────────────────────────────────
+  app.get('/api/admin/rev/dashboard', async (c) => {
+    const db = c.env.DB
+    const [totalPosted, totalPaid, activeProjects, holderCount, partnerCount,
+           pendingApplications, byRole, topProjects] = await Promise.all([
+      db.prepare("SELECT COALESCE(SUM(amount_cents),0) as v FROM wallet_entries WHERE status IN ('POSTED','PENDING_PAYOUT','PAID')").first<{v:number}>(),
+      db.prepare("SELECT COALESCE(SUM(amount_cents),0) as v FROM wallet_entries WHERE status='PAID'").first<{v:number}>(),
+      db.prepare("SELECT COUNT(*) as v FROM projects WHERE status IN ('ACTIVE','SETTLING','SETTLED')").first<{v:number}>(),
+      db.prepare("SELECT COUNT(*) as v FROM role_holders WHERE status='ACTIVE'").first<{v:number}>(),
+      db.prepare('SELECT COUNT(*) as v FROM co_partners').first<{v:number}>(),
+      db.prepare("SELECT COUNT(*) as v FROM role_applications WHERE status='PENDING'").first<{v:number}>(),
+      db.prepare(`
+        SELECT rh.role, COUNT(DISTINCT rh.id) as holders,
+               COALESCE(SUM(CASE WHEN we.status IN ('POSTED','PENDING_PAYOUT','PAID') THEN we.amount_cents ELSE 0 END),0) as total_cents
+        FROM role_holders rh
+        LEFT JOIN wallet_entries we ON we.holder_no = rh.holder_no
+        WHERE rh.status='ACTIVE'
+        GROUP BY rh.role
+      `).all(),
+      db.prepare(`
+        SELECT p.project_code, p.name, p.status,
+               COUNT(DISTINCT pp.holder_no) as participants,
+               COALESCE(SUM(CASE WHEN we.status IN ('POSTED','PENDING_PAYOUT','PAID') THEN we.amount_cents ELSE 0 END),0) as returned_cents
+        FROM projects p
+        LEFT JOIN project_participants pp ON pp.project_id = p.id
+        LEFT JOIN wallet_entries we ON we.project_id = p.id
+        GROUP BY p.id
+        ORDER BY returned_cents DESC
+        LIMIT 10
+      `).all(),
+    ])
+    return c.json({
+      ok: true,
+      overview: {
+        total_returned_cents: totalPosted?.v ?? 0,
+        total_paid_cents: totalPaid?.v ?? 0,
+        active_projects: activeProjects?.v ?? 0,
+        holder_count: holderCount?.v ?? 0,
+        partner_count: partnerCount?.v ?? 0,
+        pending_applications: pendingApplications?.v ?? 0,
+      },
+      by_role: byRole.results,
+      top_projects: topProjects.results,
+    })
+  })
+
+  // ── 項目列表 ─────────────────────────────────────────────────
+  app.get('/api/admin/rev/projects', async (c) => {
+    const db = c.env.DB
+    const status = c.req.query('status')
+    const rows = status
+      ? await db.prepare('SELECT p.*, ps.pct_coleadery, ps.pct_colinkery, ps.special_flag FROM projects p LEFT JOIN project_shares ps ON ps.project_id = p.id WHERE p.status = ? ORDER BY p.created_at DESC').bind(status).all()
+      : await db.prepare('SELECT p.*, ps.pct_coleadery, ps.pct_colinkery, ps.special_flag FROM projects p LEFT JOIN project_shares ps ON ps.project_id = p.id ORDER BY p.created_at DESC').all()
+    return c.json({ ok: true, projects: rows.results })
+  })
+
+  // ── role_holders 列表 ─────────────────────────────────────────
+  app.get('/api/admin/rev/holders', async (c) => {
+    const role = c.req.query('role')
+    const db = c.env.DB
+    const rows = role
+      ? await db.prepare('SELECT * FROM role_holders WHERE role = ? ORDER BY created_at DESC').bind(role).all()
+      : await db.prepare('SELECT * FROM role_holders ORDER BY created_at DESC').all()
+    return c.json({ ok: true, holders: rows.results })
+  })
+
+}
+
+// ── 呼叫 registerRevenueRoutes ──────────────────────────────────
+registerRevenueRoutes(app)
+
 export default app
