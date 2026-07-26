@@ -11797,57 +11797,76 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
 
   <!-- Step 2: 個人正式資料（KYC） -->
   <div id="step2" class="section" style="display:none;">
-    <div class="section-title">&#x1F4CB; \u7b2c\u4e8c\u6b65\uff1a\u500b\u4eba\u6b63\u5f0f\u8cc7\u6599</div>
+    <div class="section-title">&#x1F4CB; 第二步：個人正式資料</div>
     <div id="s2KycDone" style="display:none;background:#DCFCE7;border:1.5px solid #4CAF50;border-radius:8px;padding:14px;margin-bottom:14px;">
-      <div style="font-size:15px;font-weight:700;color:#1B4332;margin-bottom:6px;">&#x2705; \u5df2\u767b\u9304\u500b\u4eba\u6b63\u5f0f\u8cc7\u6599</div>
+      <div style="font-size:15px;font-weight:700;color:#1B4332;margin-bottom:6px;">✅ 已登記個人正式資料</div>
       <div style="font-size:14px;color:#1B4332;" id="s2KycSummary"></div>
-      <div style="font-size:13px;color:#555;margin-top:6px;">\u9280\u884c\u8cc7\u6599\u53ef\u5728\u4e0b\u65b9\u66f4\u65b0\uff08\u5982\u9700\u66f4\u6539\u9280\u884c\u6236\u53e3\uff09</div>
+      <div style="font-size:13px;color:#555;margin-top:6px;">資料可在下方更新（如需更改銀行戶口）</div>
     </div>
     <div id="s2KycNew" style="display:none;background:#FFF9E6;border:1.5px solid #FFB300;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:14px;color:#795548;">
-      &#x26A0;&#xFE0F; \u9996\u6b21\u7533\u8acb\u9700\u8981\u63d0\u4ea4\u500b\u4eba\u6b63\u5f0f\u8cc7\u6599\uff0c\u5305\u62ec\u8eab\u4efd\u8b49\u53ca\u9280\u884c\u8cc7\u6599\u3002
+      ⚠️ 首次申請需要填寫個人正式資料，資料將用於身份核實及分成結算。
     </div>
-    <!-- HKID -->
-    <div class="field-group">
-      <label>\u8eab\u4efd\u8b49\u865f\u78bc\uff08\u524d 7 \u4f4d\uff09 <span class="req">*</span></label>
-      <input type="text" id="kycIdPrefix" placeholder="\u4f8b: A123456" maxlength="8" autocapitalize="characters">
-      <div class="hint" id="kycIdHint">\u586b\u8eab\u4efd\u8b49\u865f\u78bc\u524d 7 \u4f4d\uff0c\u4e0d\u5305\u62ec\u62ec\u865f\u5167\u6578\u5b57\u3002\u4f8b\uff1aA123456\uff08\u5373 A123456(7)\uff09</div>
+    <!-- 身份核實提示 -->
+    <div style="background:#FFF3E0;border:1.5px solid #FF9800;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:14px;color:#E65100;">
+      🪪 <strong>身份核實說明：</strong>申請人須親身出示香港身份證（HKID）予系統管理員核實年齡及身份。分成款項將在核實後方可發放。
     </div>
-    <!-- \u9280\u884c\u8cc7\u6599 -->
+    <!-- HKID（1 個英文字母 + 3 位數字） -->
     <div class="field-group">
-      <label>\u9280\u884c\u540d\u7a31 <span class="req">*</span></label>
-      <select id="kycBankName">
-        <option value="">\u8acb\u63c7\u9078\u9280\u884c</option>
-        <option>\u532f\u8c50\u9280\u884c (HSBC)</option>
-        <option>\u6046\u751f\u9280\u884c (Hang Seng)</option>
-        <option>\u4e2d\u570b\u9280\u884c (Bank of China)</option>
-        <option>\u6e23\u6253\u9280\u884c (Standard Chartered)</option>
-        <option>\u4e2d\u4fe1\u9280\u884c\uff08\u4e2d\u4fe1\u9280\u884c\u570b\u969b\uff09</option>
-        <option>\u6771\u4e9e\u9280\u884c (Bank of East Asia)</option>
-        <option>\u661f\u5c55\u9280\u884c (DBS)</option>
-        <option>\u82b1\u65d7\u9280\u884c (Citibank)</option>
-        <option>ZA Bank\uff08\u8846\u5b89\u9280\u884c\uff09</option>
+      <label>身份證號碼首 4 位 <span class="req">*</span></label>
+      <input type="text" id="kycIdPrefix" placeholder="例: A123" maxlength="4" autocapitalize="characters" oninput="this.value=this.value.toUpperCase()">
+      <div class="hint" id="kycIdHint">填寫 HKID 首 1 個英文字母及後 3 位數字，例：A123（即 A123456(7) 的首4位）</div>
+    </div>
+    <!-- 電郵 -->
+    <div class="field-group">
+      <label>電郵地址 <span class="req">*</span></label>
+      <input type="email" id="kycEmail" placeholder="your@email.com" inputmode="email" autocomplete="email">
+      <div class="hint">用於接收申請通知及分成結算通知</div>
+    </div>
+    <!-- 推薦人 -->
+    <div class="field-group">
+      <label>推薦人電話號碼 <span class="req">*</span></label>
+      <div style="display:flex;gap:8px;align-items:flex-start;">
+        <input type="tel" id="kycRefPhone" placeholder="推薦人電話" maxlength="8" inputmode="numeric" style="flex:1;" oninput="lookupReferral()">
+        <div id="kycRefStatus" style="min-width:28px;padding-top:11px;font-size:18px;"></div>
+      </div>
+      <div class="hint">推薦人必須已是 CoEldery 85 會員</div>
+      <div id="kycRefFound" style="display:none;background:#DCFCE7;border-radius:6px;padding:8px 12px;font-size:14px;color:#1B4332;margin-top:6px;"></div>
+      <div id="kycRefName" style="display:none;">
+        <input type="text" id="kycRefNameInput" placeholder="推薦人姓名（自動填入）" readonly style="background:#F3F4F6;margin-top:6px;">
+      </div>
+    </div>
+    <!-- 銀行資料 -->
+    <div class="field-group">
+      <label>銀行名稱 <span class="req">*</span></label>
+      <select id="kycBankName" onchange="autoFillSwift()">
+        <option value="">請揀選銀行</option>
+        <option>匯豐銀行 (HSBC)</option>
+        <option>恒生銀行 (Hang Seng)</option>
+        <option>中國銀行 (Bank of China)</option>
+        <option>渣打銀行 (Standard Chartered)</option>
+        <option>中信銀行（中信銀行國際）</option>
+        <option>東亞銀行 (Bank of East Asia)</option>
+        <option>星展銀行 (DBS)</option>
+        <option>花旗銀行 (Citibank)</option>
+        <option>ZA Bank（衆安銀行）</option>
         <option>Mox Bank</option>
-        <option>WeLab Bank\uff08\u532f\u7acb\u9280\u884c\uff09</option>
+        <option>WeLab Bank（匯立銀行）</option>
         <option>Livi Bank</option>
-        <option>\u5176\u4ed6</option>
+        <option>其他</option>
       </select>
     </div>
     <div class="field-group">
-      <label>\u9280\u884c\u6236\u53e3\u865f\u78bc <span class="req">*</span></label>
-      <input type="text" id="kycBankAcc" placeholder="\u9280\u884c\u6236\u53e3\u865f\u78bc" inputmode="numeric">
-      <div class="hint">\u5206\u6210\u6b3e\u9805\u5c07\u5b58\u5165\u6b64\u6236\u53e3</div>
+      <label>銀行戶口號碼 <span class="req">*</span></label>
+      <input type="text" id="kycBankAcc" placeholder="銀行戶口號碼" inputmode="numeric">
+      <div class="hint">分成款項將存入此戶口</div>
     </div>
-    <!-- \u4e0a\u50b3\u8eab\u4efd\u8b49\u6587\u4ef6 -->
     <div class="field-group">
-      <label>\u8eab\u4efd\u8b49\u6b63\u9762\u7167\u7247 / \u516c\u53f8 BR <span class="req">*</span></label>
-      <div id="kycUploadDone" style="display:none;background:#DCFCE7;border-radius:6px;padding:10px 12px;font-size:14px;color:#1B4332;margin-bottom:8px;"></div>
-      <div class="upload-area" onclick="document.getElementById('kycDocInput').click()" id="kycUploadArea">
-        <div style="font-size:32px;margin-bottom:6px;">&#x1F4F7;</div>
-        <div style="font-size:15px;font-weight:700;color:#8B0000;">\u9ede\u64ca\u9078\u64c7\u6a94\u6848</div>
-        <div style="font-size:13px;color:#888;margin-top:3px;">JPG / PNG / PDF &middot; \u4e0d\u8d85\u904e 5MB</div>
+      <label>SWIFT / BIC 代碼</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="kycSwift" placeholder="例: HSBCHKHH" maxlength="11" autocapitalize="characters" style="flex:1;" oninput="this.value=this.value.toUpperCase()">
+        <div id="kycSwiftNote" style="font-size:13px;color:#1B5E20;min-width:60px;"></div>
       </div>
-      <input type="file" id="kycDocInput" accept="image/*,.pdf" style="display:none" onchange="handleKycFileSelect(this)">
-      <div class="upload-status" id="kycUploadStatus">\u5c1a\u672a\u9078\u64c7\u6a94\u6848</div>
+      <div class="hint">選擇銀行後自動填入；如銀行不在列表可手動輸入。用於跨境匯款驗證。</div>
     </div>
     <div class="err-box" id="s2Err"></div>
   </div>
@@ -12019,10 +12038,79 @@ var selectedType = '';
 var memberNo = '${prefillMember}';
 var prefillPhone = '${prefillPhone}';
 var uploadedKey = '';
-var kycUploadedKey = '';  // Step 2 KYC 文件 R2 key
 var selfName = '';   // 申請人姓名（Step 1 驗證後填入）
 var selfPhone = '';  // 申請人電話（Step 1 驗證後填入）
 var kycDone = false; // 是否已有 KYC 記錄
+var kycRefMemberNo = ''; // 推薦人 member_no（驗證後填入）
+
+// SWIFT code 自動對照表（香港主要銀行）
+var SWIFT_MAP = {
+  '匯豐銀行 (HSBC)': 'HSBCHKHH',
+  '恒生銀行 (Hang Seng)': 'HASEHKHH',
+  '中國銀行 (Bank of China)': 'BKCHHKHHXXX',
+  '渣打銀行 (Standard Chartered)': 'SCBLHKHHXXX',
+  '中信銀行（中信銀行國際）': 'KWHKHKHH',
+  '東亞銀行 (Bank of East Asia)': 'BEASHKHH',
+  '星展銀行 (DBS)': 'DHBKHKHH',
+  '花旗銀行 (Citibank)': 'CITIHKHX',
+  'ZA Bank（衆安銀行）': 'ICBKHKHH',
+  'Mox Bank': 'MOXBHKHH',
+  'WeLab Bank（匯立銀行）': 'WLABHKHH',
+  'Livi Bank': 'LIVIHKHH'
+};
+
+function autoFillSwift() {
+  var bank = document.getElementById('kycBankName').value;
+  var swiftEl = document.getElementById('kycSwift');
+  var noteEl = document.getElementById('kycSwiftNote');
+  if (!swiftEl) return;
+  if (SWIFT_MAP[bank]) {
+    swiftEl.value = SWIFT_MAP[bank];
+    swiftEl.readOnly = true;
+    swiftEl.style.background = '#F3F4F6';
+    if (noteEl) { noteEl.textContent = '✅ 自動填入'; noteEl.style.color = '#1B5E20'; }
+  } else {
+    swiftEl.value = '';
+    swiftEl.readOnly = false;
+    swiftEl.style.background = '';
+    if (noteEl) { noteEl.textContent = bank ? '請手動輸入' : ''; noteEl.style.color = '#888'; }
+  }
+}
+
+var _refLookupTimer = null;
+function lookupReferral() {
+  var phone = document.getElementById('kycRefPhone').value.replace(/\D/g,'');
+  var statusEl = document.getElementById('kycRefStatus');
+  var foundEl = document.getElementById('kycRefFound');
+  var nameDiv = document.getElementById('kycRefName');
+  var nameInput = document.getElementById('kycRefNameInput');
+  foundEl.style.display = 'none'; nameDiv.style.display = 'none';
+  kycRefMemberNo = '';
+  if (phone.length < 8) { statusEl.textContent = ''; return; }
+  statusEl.textContent = '🔍';
+  clearTimeout(_refLookupTimer);
+  _refLookupTimer = setTimeout(function() {
+    fetch('/api/member/lookup?phone=' + encodeURIComponent(phone))
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.ok && d.member_no) {
+          kycRefMemberNo = d.member_no;
+          statusEl.textContent = '✅';
+          foundEl.style.display = '';
+          foundEl.textContent = '✅ ' + (d.name_zh || d.name_en || d.member_no) + '（' + d.member_no + '）';
+          nameDiv.style.display = '';
+          if (nameInput) nameInput.value = d.name_zh || d.name_en || '';
+        } else {
+          kycRefMemberNo = '';
+          statusEl.textContent = '❌';
+          foundEl.style.display = '';
+          foundEl.style.background = '#FFEBEE'; foundEl.style.color = '#C62828'; foundEl.style.borderColor = '#C62828';
+          foundEl.textContent = '找不到此電話的會員，請確認推薦人已登記為 CoEldery 85 會員';
+          nameDiv.style.display = 'none';
+        }
+      }).catch(function() { statusEl.textContent = '❌'; });
+  }, 600);
+}
 
 // Init step dots
 function initDots() {
@@ -12149,33 +12237,41 @@ function verifyPhone(cb) {
       document.getElementById('s2KycDone').style.display = '';
       document.getElementById('s2KycNew').style.display = 'none';
       var summary = document.getElementById('s2KycSummary');
-      if (summary) summary.textContent = '\u8eab\u4efd\u8b49\uff1a' + (kyc.id_prefix || '\u5df2\u767b\u9304') + '\u3000\u9280\u884c\uff1a' + (kyc.bank_name || '\u5df2\u767b\u9304') + '\u3000\u6236\u53e3\uff1a' + (kyc.bank_acc_no || '\u5df2\u767b\u9304');
-      // \u9810\u586b KYC \u6b04\u4f4d\uff08\u53ef\u6539\u9280\u884c\u8cc7\u6599\uff09
+      if (summary) summary.textContent = '身份證：' + (kyc.id_prefix || '已登錄') + '　銀行：' + (kyc.bank_name || '已登錄') + '　戶口：' + (kyc.bank_acc_no || '已登錄');
+      // 預填 KYC 欄位（可改銀行資料）
       var kycIdEl = document.getElementById('kycIdPrefix');
       if (kycIdEl) {
         kycIdEl.value = kyc.id_prefix || '';
         kycIdEl.readOnly = true;
         kycIdEl.style.background = '#F3F4F6';
         var kycIdHint = document.getElementById('kycIdHint');
-        if (kycIdHint) kycIdHint.textContent = '\u2705 \u5df2\u767b\u9304\u8eab\u4efd\u8b49\uff0c\u5982\u9700\u66f4\u6539\u8acb\u806f\u7d61\u7ba1\u7406\u54e1';
+        if (kycIdHint) kycIdHint.textContent = '✅ 已登錄身份證，如需更改請聯絡管理員';
+      }
+      if (kyc.email) { var emailEl = document.getElementById('kycEmail'); if (emailEl) emailEl.value = kyc.email; }
+      if (kyc.referral_phone) {
+        var refPhEl = document.getElementById('kycRefPhone');
+        if (refPhEl) { refPhEl.value = kyc.referral_phone; refPhEl.readOnly = true; refPhEl.style.background = '#F3F4F6'; }
+        var refNameEl = document.getElementById('kycRefNameInput');
+        if (refNameEl && kyc.referral_name) { refNameEl.value = kyc.referral_name; document.getElementById('kycRefName').style.display = ''; }
+        document.getElementById('kycRefFound').style.display = '';
+        document.getElementById('kycRefFound').textContent = '✅ 推薦人：' + (kyc.referral_name || kyc.referral_phone);
+        document.getElementById('kycRefStatus').textContent = '✅';
+        kycRefMemberNo = kyc.referral_phone; // phone used for lookup
       }
       if (kyc.bank_name) {
         var kycBankSel = document.getElementById('kycBankName');
         for (var oi = 0; oi < kycBankSel.options.length; oi++) {
           if (kycBankSel.options[oi].text === kyc.bank_name) { kycBankSel.selectedIndex = oi; break; }
         }
+        autoFillSwift();
       }
       if (kyc.bank_acc_no) document.getElementById('kycBankAcc').value = kyc.bank_acc_no;
-      // \u6587\u4ef6\u5df2\u4e0a\u50b3
-      if (kyc.id_doc_r2_key) {
-        kycUploadedKey = kyc.id_doc_r2_key;
-        var kycDoneEl = document.getElementById('kycUploadDone');
-        if (kycDoneEl) { kycDoneEl.style.display = ''; kycDoneEl.textContent = '\u2705 \u5df2\u4e0a\u50b3\u8eab\u4efd\u6587\u4ef6\uff0c\u5982\u9700\u66f4\u65b0\u53ef\u91cd\u65b0\u9078\u64c7'; }
-        var kycStatus = document.getElementById('kycUploadStatus');
-        if (kycStatus) { kycStatus.textContent = '\u2705 \u5df2\u6709\u4e0a\u50b3\u8a18\u9304'; kycStatus.className = 'upload-status ok'; }
+      if (kyc.swift_code) {
+        var swiftEl = document.getElementById('kycSwift');
+        if (swiftEl) { swiftEl.value = kyc.swift_code; }
       }
     } else {
-      // \u9996\u6b21\uff1a\u63d0\u793a\u9700\u8981\u586b\u5beb
+      // 首次：提示需要填寫
       document.getElementById('s2KycDone').style.display = 'none';
       document.getElementById('s2KycNew').style.display = '';
     }
@@ -12211,70 +12307,56 @@ function selectType(t) {
   });
 }
 
-// ── Step 2: KYC \u63d0\u4ea4 ──────────────────────────────────────────────────────────
-function handleKycFileSelect(input) {
-  var file = input.files[0];
-  if (!file) return;
-  if (file.size > 5 * 1024 * 1024) {
-    document.getElementById('kycUploadStatus').textContent = '\u6a94\u6848\u4e0d\u80fd\u8d85\u904e 5MB';
-    return;
-  }
-  var statusEl = document.getElementById('kycUploadStatus');
-  statusEl.textContent = '\u4e0a\u50b3\u4e2d\u2026'; statusEl.className = 'upload-status';
-  var form = new FormData();
-  form.append('file', file);
-  fetch('/api/partner/upload', { method: 'POST', body: form })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.ok) {
-        kycUploadedKey = d.key;
-        statusEl.textContent = '\u2705 ' + file.name + ' \u4e0a\u50b3\u6210\u529f';
-        statusEl.className = 'upload-status ok';
-        var doneEl = document.getElementById('kycUploadDone');
-        if (doneEl) { doneEl.style.display = ''; doneEl.textContent = '\u2705 ' + file.name; }
-      } else {
-        statusEl.textContent = '\u4e0a\u50b3\u5931\u6557\uff1a' + (d.error || '\u8acb\u91cd\u8a66');
-      }
-    }).catch(function() { statusEl.textContent = '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66'; });
-}
-
+// ── Step 2: KYC 提交 ──────────────────────────────────────────────────────────
 function submitKyc(cb) {
-  var idPrefix = document.getElementById('kycIdPrefix').value.trim();
+  var idPrefix = document.getElementById('kycIdPrefix').value.trim().toUpperCase();
+  var email = document.getElementById('kycEmail').value.trim();
+  var refPhone = document.getElementById('kycRefPhone').value.replace(/\D/g,'');
+  var refName = document.getElementById('kycRefNameInput') ? document.getElementById('kycRefNameInput').value.trim() : '';
   var bankName = document.getElementById('kycBankName').value;
   var bankAcc = document.getElementById('kycBankAcc').value.trim();
-  // \u82e5\u5df2\u6709 KYC \u8a18\u9304\uff1a\u9280\u884c\u8cc7\u6599\u5fc5\u586b\uff0cHKID \u53ef\u4e0d\u6539
-  if (kycDone) {
-    if (!bankName) { showErr('s2Err', '\u8acb\u9078\u64c7\u9280\u884c'); return; }
-    if (!bankAcc) { showErr('s2Err', '\u8acb\u586b\u5beb\u9280\u884c\u6236\u53e3\u865f\u78bc'); return; }
-    // \u66f4\u65b0\u9280\u884c\u8cc7\u6599\uff08HKID \u4e0d\u8b8a\uff09
-    fetch('/api/partner/kyc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_no: memberNo, bank_name: bankName, bank_acc_no: bankAcc, update_only: true })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      if (d.ok) { if (cb) cb(true); }
-      else { showErr('s2Err', d.error || '\u66f4\u65b0\u5931\u6557'); }
-    }).catch(function() { showErr('s2Err', '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66'); });
-    return;
+  var swiftCode = document.getElementById('kycSwift').value.trim().toUpperCase();
+
+  // 驗證 HKID 格式：1 letter + 3 digits
+  if (!idPrefix || !/^[A-Z][0-9]{3}$/.test(idPrefix)) {
+    showErr('s2Err', '請填寫正確的身份證號碼首4位（1個英文字母 + 3位數字，例：A123）'); return;
   }
-  // \u9996\u6b21\u63d0\u4ea4\uff1a\u5168\u90e8\u5fc5\u586b
-  if (!idPrefix) { showErr('s2Err', '\u8acb\u586b\u5beb\u8eab\u4efd\u8b49\u524d\u7f00'); return; }
-  if (!bankName) { showErr('s2Err', '\u8acb\u9078\u64c7\u9280\u884c'); return; }
-  if (!bankAcc) { showErr('s2Err', '\u8acb\u586b\u5beb\u9280\u884c\u6236\u53e3\u865f\u78bc'); return; }
-  if (!kycUploadedKey) { showErr('s2Err', '\u8acb\u4e0a\u50b3\u8eab\u4efd\u8b49\u6216 BR \u6587\u4ef6'); return; }
+  // 電郵格式
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showErr('s2Err', '請填寫有效的電郵地址'); return;
+  }
+  // 推薦人
+  if (!kycDone) {
+    if (!refPhone || refPhone.length < 8) { showErr('s2Err', '請填寫推薦人電話號碼'); return; }
+    if (!kycRefMemberNo) { showErr('s2Err', '推薦人未能驗證，請確認其電話號碼已登記為 CoEldery 85 會員'); return; }
+  }
+  if (!bankName) { showErr('s2Err', '請選擇銀行'); return; }
+  if (!bankAcc) { showErr('s2Err', '請填寫銀行戶口號碼'); return; }
+
   var btn = document.getElementById('btnNext');
-  btn.disabled = true; btn.textContent = '\u63d0\u4ea4\u4e2d\u2026';
+  btn.disabled = true; btn.textContent = '提交中…';
+  var payload = {
+    member_no: memberNo,
+    id_prefix: idPrefix,
+    email: email,
+    referral_phone: refPhone,
+    referral_name: refName,
+    bank_name: bankName,
+    bank_acc_no: bankAcc,
+    swift_code: swiftCode,
+    update_only: kycDone
+  };
   fetch('/api/partner/kyc', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ member_no: memberNo, id_prefix: idPrefix, id_doc_r2_key: kycUploadedKey, bank_name: bankName, bank_acc_no: bankAcc })
+    body: JSON.stringify(payload)
   }).then(function(r) { return r.json(); }).then(function(d) {
-    btn.disabled = false; btn.textContent = '\u4e0b\u4e00\u6b65';
+    btn.disabled = false; btn.textContent = '下一步';
     if (d.ok) { kycDone = true; if (cb) cb(true); }
-    else { showErr('s2Err', d.error || '\u63d0\u4ea4\u5931\u6557'); }
+    else { showErr('s2Err', d.error || '提交失敗'); }
   }).catch(function() {
-    btn.disabled = false; btn.textContent = '\u4e0b\u4e00\u6b65';
-    showErr('s2Err', '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66');
+    btn.disabled = false; btn.textContent = '下一步';
+    showErr('s2Err', '網絡錯誤，請重試');
   });
 }
 
@@ -12475,9 +12557,8 @@ function submitApplication() {
     name_en: document.getElementById('applyNameEn').value.trim(),
     phone: document.getElementById('applyContactPhone').value.trim(),
     address: (document.getElementById('applyDistrict') ? document.getElementById('applyDistrict').value.trim() : ''),
-    // HKID + \u9280\u884c\u8cc7\u6599\u5f9e KYC \u8b80\u53d6\uff08\u5df2\u5728 Step 2 \u63d0\u4ea4\uff09
+    // HKID + 銀行資料從 KYC 讀取（已在 Step 2 提交）
     id_prefix: document.getElementById('kycIdPrefix').value.trim(),
-    id_doc_r2_key: kycUploadedKey,
     company_name: document.getElementById('applyCompanyName').value.trim(),
     company_br: document.getElementById('applyCompanyBR').value.trim(),
     industry_background: document.getElementById('applyIndustry') ? document.getElementById('applyIndustry').value.trim() : '',
@@ -12693,18 +12774,38 @@ body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC
       <h2>📋 第二步：個人正式資料</h2>
       <div id="kycStatusNote" style="display:none;background:#DCFCE7;border:1.5px solid #4CAF50;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:14px;color:#1B4332;"></div>
       <div id="kycNewNote" style="display:none;background:#FFF9E6;border:1.5px solid #FFB300;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:14px;color:#795548;">
-        ⚠️ 加入團隊前需先登記個人正式資料（身份證及銀行資料），以便日後分成結算。
+        ⚠️ 加入團隊前需先登記個人正式資料，資料將用於身份核實及分成結算。
       </div>
-      <!-- HKID -->
+      <!-- 身份核實提示 -->
+      <div style="background:#FFF3E0;border:1.5px solid #FF9800;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:#E65100;">
+        🪪 <strong>身份核實說明：</strong>請親身出示 HKID 予管理員核實，分成款項於核實後方可發放。
+      </div>
+      <!-- HKID（1 letter + 3 digits） -->
       <div class="field-group" id="kycIdGroup">
-        <label>身份證號碼（前 7 位）<span style="color:#C62828;">*</span></label>
-        <input type="text" id="tcKycId" placeholder="例: A123456" maxlength="8" autocapitalize="characters">
-        <div class="hint" id="tcKycIdHint">填身份證號碼前 7 位，不包括括號內數字</div>
+        <label>身份證號碼首 4 位 <span style="color:#C62828;">*</span></label>
+        <input type="text" id="tcKycId" placeholder="例: A123" maxlength="4" autocapitalize="characters" oninput="this.value=this.value.toUpperCase()">
+        <div class="hint" id="tcKycIdHint">填寫 HKID 首 1 個英文字母及後 3 位數字，例：A123</div>
+      </div>
+      <!-- 電郵 -->
+      <div class="field-group">
+        <label>電郵地址 <span style="color:#C62828;">*</span></label>
+        <input type="email" id="tcKycEmail" placeholder="your@email.com" inputmode="email">
+        <div class="hint">用於接收分成結算通知</div>
+      </div>
+      <!-- 推薦人 -->
+      <div class="field-group">
+        <label>推薦人電話號碼 <span style="color:#C62828;" id="tcRefReq">*</span></label>
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <input type="tel" id="tcRefPhone" placeholder="推薦人電話" maxlength="8" inputmode="numeric" style="flex:1;" oninput="lookupTcReferral()">
+          <div id="tcRefStatus" style="min-width:28px;padding-top:11px;font-size:18px;"></div>
+        </div>
+        <div class="hint">推薦人必須已是 CoEldery 85 會員</div>
+        <div id="tcRefFound" style="display:none;background:#DCFCE7;border-radius:6px;padding:8px 12px;font-size:14px;color:#1B4332;margin-top:6px;"></div>
       </div>
       <!-- 銀行 -->
       <div class="field-group">
         <label>銀行名稱 <span style="color:#C62828;">*</span></label>
-        <select id="tcKycBank">
+        <select id="tcKycBank" onchange="autoFillTcSwift()">
           <option value="">請揀選銀行</option>
           <option>匯豐銀行 (HSBC)</option>
           <option>恒生銀行 (Hang Seng)</option>
@@ -12726,17 +12827,13 @@ body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC
         <input type="text" id="tcKycAcc" placeholder="銀行戶口號碼" inputmode="numeric">
         <div class="hint">分成款項將存入此戶口</div>
       </div>
-      <!-- 文件上傳（首次必須） -->
-      <div class="field-group" id="tcDocGroup">
-        <label>身份證正面照片 / 公司BR <span style="color:#C62828;" id="tcDocReq">*</span></label>
-        <div id="tcDocDone" style="display:none;background:#DCFCE7;border-radius:6px;padding:8px 12px;font-size:14px;color:#1B4332;margin-bottom:6px;"></div>
-        <div class="upload-area" onclick="document.getElementById('tcDocInput').click()">
-          <div style="font-size:28px;margin-bottom:4px;">📷</div>
-          <div style="font-size:14px;font-weight:700;color:#8B0000;">點擊選擇檔案</div>
-          <div style="font-size:12px;color:#888;margin-top:2px;">JPG / PNG / PDF · 不超過 5MB</div>
+      <div class="field-group">
+        <label>SWIFT / BIC 代碼</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="tcKycSwift" placeholder="例: HSBCHKHH" maxlength="11" autocapitalize="characters" style="flex:1;" oninput="this.value=this.value.toUpperCase()">
+          <div id="tcSwiftNote" style="font-size:13px;color:#1B5E20;min-width:60px;"></div>
         </div>
-        <input type="file" id="tcDocInput" accept="image/*,.pdf" style="display:none" onchange="handleTcDocUpload(this)">
-        <div class="upload-status" id="tcDocStatus">尚未選擇檔案</div>
+        <div class="hint">選擇銀行後自動填入</div>
       </div>
       <div class="err" id="kycErr"></div>
       <button class="big-btn btn-confirm" id="btnKycNext" style="margin-top:12px;" onclick="doKycNext()">下一步 →</button>
@@ -12762,7 +12859,65 @@ var TOKEN = '${token}';
 var inviteData = null;
 var tcMemberNo = '';
 var tcKycDone = false;
-var tcKycDocKey = '';
+var tcKycDocKey = ''; // kept for legacy compat
+var tcRefMemberNo = '';
+
+var TC_SWIFT_MAP = {
+  '匯豐銀行 (HSBC)': 'HSBCHKHH',
+  '恒生銀行 (Hang Seng)': 'HASEHKHH',
+  '中國銀行 (Bank of China)': 'BKCHHKHHXXX',
+  '渣打銀行 (Standard Chartered)': 'SCBLHKHHXXX',
+  '中信銀行（中信銀行國際）': 'KWHKHKHH',
+  '東亞銀行 (Bank of East Asia)': 'BEASHKHH',
+  '星展銀行 (DBS)': 'DHBKHKHH',
+  '花旗銀行 (Citibank)': 'CITIHKHX',
+  'ZA Bank（衆安銀行）': 'ICBKHKHH',
+  'Mox Bank': 'MOXBHKHH',
+  'WeLab Bank（匯立銀行）': 'WLABHKHH',
+  'Livi Bank': 'LIVIHKHH'
+};
+function autoFillTcSwift() {
+  var bank = document.getElementById('tcKycBank').value;
+  var el = document.getElementById('tcKycSwift');
+  var noteEl = document.getElementById('tcSwiftNote');
+  if (!el) return;
+  if (TC_SWIFT_MAP[bank]) {
+    el.value = TC_SWIFT_MAP[bank]; el.readOnly = true; el.style.background = '#F3F4F6';
+    if (noteEl) { noteEl.textContent = '✅ 自動填入'; noteEl.style.color = '#1B5E20'; }
+  } else {
+    el.value = ''; el.readOnly = false; el.style.background = '';
+    if (noteEl) { noteEl.textContent = bank ? '請手動輸入' : ''; }
+  }
+}
+var _tcRefTimer = null;
+function lookupTcReferral() {
+  var phone = document.getElementById('tcRefPhone').value.replace(/\D/g,'');
+  var statusEl = document.getElementById('tcRefStatus');
+  var foundEl = document.getElementById('tcRefFound');
+  foundEl.style.display = 'none'; tcRefMemberNo = '';
+  if (phone.length < 8) { statusEl.textContent = ''; return; }
+  statusEl.textContent = '🔍';
+  clearTimeout(_tcRefTimer);
+  _tcRefTimer = setTimeout(function() {
+    fetch('/api/member/lookup?phone=' + encodeURIComponent(phone))
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.ok && d.member_no) {
+          tcRefMemberNo = d.member_no;
+          statusEl.textContent = '✅';
+          foundEl.style.display = '';
+          foundEl.style.background = '#DCFCE7'; foundEl.style.color = '#1B4332';
+          foundEl.textContent = '✅ ' + (d.name_zh || d.member_no);
+        } else {
+          tcRefMemberNo = '';
+          statusEl.textContent = '❌';
+          foundEl.style.display = '';
+          foundEl.style.background = '#FFEBEE'; foundEl.style.color = '#C62828';
+          foundEl.textContent = '找不到此電話的會員';
+        }
+      }).catch(function() { statusEl.textContent = '❌'; });
+  }, 600);
+}
 
 function showErr(id, msg) {
   var el = document.getElementById(id);
@@ -12811,7 +12966,7 @@ fetch('/api/team-invite?token=' + encodeURIComponent(TOKEN))
 // 步驟1：驗證身份
 function doVerify() {
   clearErr('verifyErr');
-  var phone = document.getElementById('confirmPhone').value.replace(/\\D/g,'');
+  var phone = document.getElementById('confirmPhone').value.replace(/\D/g,'');
   if (phone.length < 8) { showErr('verifyErr', '請輸入有效的香港電話號碼'); return; }
   var btn = document.getElementById('btnVerify');
   btn.disabled = true; btn.textContent = '驗證中…';
@@ -12821,7 +12976,6 @@ function doVerify() {
   }).then(function(r){return r.json();}).then(function(d){
     btn.disabled = false; btn.textContent = '🔍 驗證身份';
     if (!d.ok) { showErr('verifyErr', d.error || '驗證失敗'); return; }
-    // 驗證邀請的 member_no 是否一致
     if (inviteData && d.member_no !== inviteData.member_no) {
       showErr('verifyErr', '電話號碼與邀請成員不符，請確認你的登記電話'); return;
     }
@@ -12840,21 +12994,26 @@ function doVerify() {
       idEl.value = kyc.id_prefix || '';
       idEl.readOnly = true; idEl.style.background = '#F3F4F6';
       document.getElementById('tcKycIdHint').textContent = '✅ 已登記身份證';
+      // 預填 email
+      if (kyc.email) { var em = document.getElementById('tcKycEmail'); if(em) em.value = kyc.email; }
+      // 預填推薦人（已有則鎖定）
+      if (kyc.referral_phone) {
+        var rp = document.getElementById('tcRefPhone');
+        if (rp) { rp.value = kyc.referral_phone; rp.readOnly = true; rp.style.background = '#F3F4F6'; }
+        var rf = document.getElementById('tcRefFound');
+        if (rf) { rf.style.display=''; rf.style.background='#DCFCE7'; rf.style.color='#1B4332'; rf.textContent='✅ 推薦人：' + (kyc.referral_name||kyc.referral_phone); }
+        var rs = document.getElementById('tcRefStatus'); if(rs) rs.textContent='✅';
+        var rreq = document.getElementById('tcRefReq'); if(rreq) rreq.style.display='none';
+        tcRefMemberNo = kyc.referral_phone;
+      }
       // 預填銀行
       var bkSel = document.getElementById('tcKycBank');
       for (var i=0;i<bkSel.options.length;i++) {
         if (bkSel.options[i].text===kyc.bank_name){bkSel.selectedIndex=i;break;}
       }
+      autoFillTcSwift();
       document.getElementById('tcKycAcc').value = kyc.bank_acc_no || '';
-      // 文件
-      if (kyc.id_doc_r2_key) {
-        tcKycDocKey = kyc.id_doc_r2_key;
-        document.getElementById('tcDocDone').style.display='';
-        document.getElementById('tcDocDone').textContent='✅ 已有上傳記錄';
-        document.getElementById('tcDocStatus').textContent='✅ 已有上傳記錄';
-        document.getElementById('tcDocStatus').className='upload-status ok';
-        document.getElementById('tcDocReq').style.display='none';
-      }
+      if (kyc.swift_code) { var sw = document.getElementById('tcKycSwift'); if(sw) sw.value=kyc.swift_code; }
     } else {
       document.getElementById('kycStatusNote').style.display = 'none';
       document.getElementById('kycNewNote').style.display = '';
@@ -12862,55 +13021,42 @@ function doVerify() {
   }).catch(function(){ btn.disabled=false; btn.textContent='🔍 驗證身份'; showErr('verifyErr','網絡錯誤，請重試'); });
 }
 
-// 上傳文件
-function handleTcDocUpload(input) {
-  var file = input.files[0];
-  if (!file) return;
-  if (file.size > 5*1024*1024) { document.getElementById('tcDocStatus').textContent='檔案不能超過 5MB'; return; }
-  var st = document.getElementById('tcDocStatus');
-  st.textContent = '上傳中…'; st.className = 'upload-status';
-  var form = new FormData(); form.append('file', file);
-  fetch('/api/partner/upload', {method:'POST',body:form})
-    .then(function(r){return r.json();}).then(function(d){
-      if (d.ok) {
-        tcKycDocKey = d.key;
-        st.textContent = '✅ ' + file.name; st.className = 'upload-status ok';
-        document.getElementById('tcDocDone').style.display='';
-        document.getElementById('tcDocDone').textContent='✅ ' + file.name;
-      } else { st.textContent = '上傳失敗：' + (d.error||'請重試'); }
-    }).catch(function(){ st.textContent='網絡錯誤，請重試'; });
-}
-
 // 步驟2：KYC 提交
 function doKycNext() {
   clearErr('kycErr');
-  var idPrefix = document.getElementById('tcKycId').value.trim();
+  var idPrefix = document.getElementById('tcKycId').value.trim().toUpperCase();
+  var email = document.getElementById('tcKycEmail').value.trim();
+  var refPhone = document.getElementById('tcRefPhone').value.replace(/\D/g,'');
   var bank = document.getElementById('tcKycBank').value;
   var acc = document.getElementById('tcKycAcc').value.trim();
+  var swift = document.getElementById('tcKycSwift').value.trim().toUpperCase();
+
+  // 驗證 HKID 格式
+  if (!idPrefix || !/^[A-Z][0-9]{3}$/.test(idPrefix)) {
+    showErr('kycErr','請填寫正確的身份證號碼首4位（1個英文字母 + 3位數字，例：A123）'); return;
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showErr('kycErr','請填寫有效的電郵地址'); return;
+  }
+  if (!tcKycDone && (!refPhone || refPhone.length < 8)) {
+    showErr('kycErr','請填寫推薦人電話號碼'); return;
+  }
+  if (!tcKycDone && !tcRefMemberNo) {
+    showErr('kycErr','推薦人未能驗證，請確認電話號碼'); return;
+  }
   if (!bank) { showErr('kycErr','請選擇銀行'); return; }
   if (!acc) { showErr('kycErr','請填寫銀行戶口號碼'); return; }
-  if (tcKycDone) {
-    // 已有 KYC：只更新銀行
-    var btn = document.getElementById('btnKycNext');
-    btn.disabled = true; btn.textContent = '儲存中…';
-    fetch('/api/partner/kyc', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({member_no: tcMemberNo, bank_name: bank, bank_acc_no: acc, update_only: true})
-    }).then(function(r){return r.json();}).then(function(d){
-      btn.disabled=false; btn.textContent='下一步 →';
-      if (d.ok) { document.getElementById('stepKyc').style.display='none'; document.getElementById('stepAction').style.display=''; }
-      else { showErr('kycErr', d.error||'儲存失敗'); }
-    }).catch(function(){ btn.disabled=false; btn.textContent='下一步 →'; showErr('kycErr','網絡錯誤'); });
-    return;
-  }
-  // 首次：全部必填
-  if (!idPrefix) { showErr('kycErr','請填寫身份證前綴'); return; }
-  if (!tcKycDocKey) { showErr('kycErr','請上傳身份證文件'); return; }
+
   var btn = document.getElementById('btnKycNext');
   btn.disabled = true; btn.textContent = '提交中…';
   fetch('/api/partner/kyc', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({member_no: tcMemberNo, id_prefix: idPrefix, id_doc_r2_key: tcKycDocKey, bank_name: bank, bank_acc_no: acc})
+    body: JSON.stringify({
+      member_no: tcMemberNo, id_prefix: idPrefix,
+      email: email, referral_phone: refPhone,
+      bank_name: bank, bank_acc_no: acc, swift_code: swift,
+      update_only: tcKycDone
+    })
   }).then(function(r){return r.json();}).then(function(d){
     btn.disabled=false; btn.textContent='下一步 →';
     if (d.ok) { tcKycDone=true; document.getElementById('stepKyc').style.display='none'; document.getElementById('stepAction').style.display=''; }
@@ -13368,6 +13514,18 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
   // 角色申請（前台，無需 admin auth）
   // ════════════════════════════════════════════════════════════
 
+  // 會員電話號碼查詢（用於推薦人驗證）
+  app.get('/api/member/lookup', async (c) => {
+    const phone = c.req.query('phone')
+    if (!phone) return c.json({ ok: false, error: '缺少 phone' }, 400)
+    const db = c.env.DB
+    const m = await db.prepare(
+      'SELECT member_no, name_zh, name_en FROM members WHERE phone = ? LIMIT 1'
+    ).bind(phone).first<{ member_no: string; name_zh: string; name_en: string }>()
+    if (!m) return c.json({ ok: false, error: '找不到會員' })
+    return c.json({ ok: true, member_no: m.member_no, name_zh: m.name_zh || '', name_en: m.name_en || '' })
+  })
+
   // 驗證是否為老有卡會員
   app.post('/api/partner/check', async (c) => {
     const { phone } = await c.req.json()
@@ -13396,47 +13554,63 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     ).bind(m.member_no).first<{ status: string; role: string }>()
     // 取 member_kyc 個人正式資料（若存在）
     const kyc = await db.prepare(
-      'SELECT id, id_prefix, id_doc_r2_key, bank_name, bank_acc_no, status FROM member_kyc WHERE member_no = ? LIMIT 1'
-    ).bind(m.member_no).first<{ id: number; id_prefix: string; id_doc_r2_key: string; bank_name: string; bank_acc_no: string; status: string }>()
+      'SELECT id, id_prefix, bank_name, bank_acc_no, swift_code, email, referral_phone, referral_name, status FROM member_kyc WHERE member_no = ? LIMIT 1'
+    ).bind(m.member_no).first<{ id: number; id_prefix: string; bank_name: string; bank_acc_no: string; swift_code: string; email: string; referral_phone: string; referral_name: string; status: string }>()
     return c.json({
       ok: true, member_no: m.member_no, name_zh: m.name_zh, name_en: m.name_en || '', phone: m.phone, existing,
       kyc_id: kyc?.id || null,
-      kyc: kyc ? { id_prefix: kyc.id_prefix, id_doc_r2_key: kyc.id_doc_r2_key, bank_name: kyc.bank_name, bank_acc_no: kyc.bank_acc_no, status: kyc.status } : null
+      kyc: kyc ? {
+        id_prefix: kyc.id_prefix,
+        bank_name: kyc.bank_name,
+        bank_acc_no: kyc.bank_acc_no,
+        swift_code: kyc.swift_code || '',
+        email: kyc.email || '',
+        referral_phone: kyc.referral_phone || '',
+        referral_name: kyc.referral_name || '',
+        status: kyc.status
+      } : null
     })
   })
 
   // ── 提交 / 更新個人正式資料（KYC）────────────────────────────────────────────
   app.post('/api/partner/kyc', async (c) => {
     const body = await c.req.json()
-    const { member_no, id_prefix, id_doc_r2_key, bank_name, bank_acc_no, update_only } = body
+    const { member_no, id_prefix, email, referral_phone, referral_name,
+            bank_name, bank_acc_no, swift_code, update_only } = body
     if (!member_no) return c.json({ ok: false, error: '缺少 member_no' }, 400)
     const db = c.env.DB
     // 驗證會員存在
     const m = await db.prepare('SELECT member_no FROM members WHERE member_no = ? LIMIT 1').bind(member_no).first<{ member_no: string }>()
     if (!m) return c.json({ ok: false, error: '找不到會員' }, 404)
-    // 查現有 KYC
+    // 驗證 HKID 格式（1 letter + 3 digits）
+    if (id_prefix && !/^[A-Z][0-9]{3}$/.test(id_prefix))
+      return c.json({ ok: false, error: '身份證號碼格式錯誤（需為1個英文字母+3位數字）' }, 400)
+    // 驗證電郵
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return c.json({ ok: false, error: '電郵地址格式錯誤' }, 400)
+    // 驗證推薦人（首次必填）
     const existing = await db.prepare('SELECT id FROM member_kyc WHERE member_no = ? LIMIT 1').bind(member_no).first<{ id: number }>()
+    if (!existing && referral_phone) {
+      const refMember = await db.prepare('SELECT member_no, name_zh FROM members WHERE phone = ? LIMIT 1').bind(referral_phone).first<{ member_no: string; name_zh: string }>()
+      if (!refMember) return c.json({ ok: false, error: '找不到推薦人（電話未登記為會員）' }, 400)
+    }
     if (existing) {
-      // 更新：只更新銀行（HKID 鎖定，除非 update_only=false 且提供新值）
-      if (update_only) {
-        if (!bank_name) return c.json({ ok: false, error: '請選擇銀行' }, 400)
-        if (!bank_acc_no) return c.json({ ok: false, error: '請填寫銀行戶口號碼' }, 400)
-        await db.prepare('UPDATE member_kyc SET bank_name=?, bank_acc_no=? WHERE member_no=?').bind(bank_name, bank_acc_no, member_no).run()
-      } else {
-        // 完整更新（前端一般不觸發，保留後門）
-        await db.prepare(
-          'UPDATE member_kyc SET id_prefix=COALESCE(NULLIF(?,\'\'),id_prefix), id_doc_r2_key=COALESCE(NULLIF(?,\'\'),id_doc_r2_key), bank_name=?, bank_acc_no=? WHERE member_no=?'
-        ).bind(id_prefix||'', id_doc_r2_key||'', bank_name||'', bank_acc_no||'', member_no).run()
-      }
-    } else {
-      // 首次提交：全部必填
-      if (!id_prefix) return c.json({ ok: false, error: '請填寫身份證前綴' }, 400)
-      if (!id_doc_r2_key) return c.json({ ok: false, error: '請上傳身份證文件' }, 400)
+      // 更新：可更新銀行、email、swift（HKID 鎖定）
       if (!bank_name) return c.json({ ok: false, error: '請選擇銀行' }, 400)
       if (!bank_acc_no) return c.json({ ok: false, error: '請填寫銀行戶口號碼' }, 400)
       await db.prepare(
-        'INSERT INTO member_kyc (member_no, id_prefix, id_doc_r2_key, bank_name, bank_acc_no) VALUES (?,?,?,?,?)'
-      ).bind(member_no, id_prefix, id_doc_r2_key, bank_name, bank_acc_no).run()
+        'UPDATE member_kyc SET bank_name=?, bank_acc_no=?, swift_code=?, email=COALESCE(NULLIF(?,\'\'),email) WHERE member_no=?'
+      ).bind(bank_name, bank_acc_no, swift_code||'', email||'', member_no).run()
+    } else {
+      // 首次提交：全部必填
+      if (!id_prefix) return c.json({ ok: false, error: '請填寫身份證號碼首4位' }, 400)
+      if (!email) return c.json({ ok: false, error: '請填寫電郵地址' }, 400)
+      if (!referral_phone) return c.json({ ok: false, error: '請填寫推薦人電話' }, 400)
+      if (!bank_name) return c.json({ ok: false, error: '請選擇銀行' }, 400)
+      if (!bank_acc_no) return c.json({ ok: false, error: '請填寫銀行戶口號碼' }, 400)
+      await db.prepare(
+        'INSERT INTO member_kyc (member_no, id_prefix, email, referral_phone, referral_name, bank_name, bank_acc_no, swift_code) VALUES (?,?,?,?,?,?,?,?)'
+      ).bind(member_no, id_prefix, email, referral_phone, referral_name||'', bank_name, bank_acc_no, swift_code||'').run()
     }
     return c.json({ ok: true })
   })
