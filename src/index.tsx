@@ -13322,15 +13322,14 @@ function renderWallet(d) {
           if (tm.applicant_type === 'GROUP' && tm.group_members && tm.group_members.length > 0) {
             // GROUP holder：展開為每個成員的 chip
             tm.group_members.forEach(function(gm) {
-              var isGmMe = isMe; // 若持有人是我，則成員都算「我方」
-              chips.push('<span class="team-chip' + (isGmMe ? ' me' : '') + '" title="' + escHtml(tm.holder_no) + ' 小組成員">' +
-                tmRole + ' ' + escHtml(gm.name_zh) + (isGmMe ? '（你方）' : '') +
+              chips.push('<span class="team-chip' + (isMe ? ' me' : '') + '" title="' + escHtml(tm.holder_no) + ' 小組成員">' +
+                tmRole + ' ' + escHtml(gm.name_zh) +
                 ' · ' + gm.share_pct + '% <span style="font-size:10px;color:rgba(255,255,255,0.7);">(小組)</span>' +
               '</span>');
             });
           } else {
             chips.push('<span class="team-chip' + (isMe ? ' me' : '') + '">' +
-              tmRole + ' ' + escHtml(tm.name_zh) + (isMe ? '（你）' : '') +
+              tmRole + ' ' + escHtml(tm.name_zh) +
               ' · ' + tmShare + '%' +
             '</span>');
           }
@@ -13849,14 +13848,17 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
        ORDER BY w.created_at DESC`
     ).bind(...holderNos).all()
     // 拉此人參與的所有項目（含團隊成員資料）
+    // 用 MIN(pp.holder_no) GROUP BY project_id 去重：同一人以多個 holder_no 參與同一項目，只顯示一次
     const participantProjects = await db.prepare(
-      `SELECT pp.holder_no, pp.team_share_bps, pp.confirm_status,
-              p.id as project_id, p.project_code, p.name as project_name, p.status as project_status, p.scenario,
+      `SELECT pp.project_id, pp.role, pp.team_share_bps, pp.confirm_status,
+              MIN(pp.holder_no) as holder_no,
+              p.project_code, p.name as project_name, p.status as project_status, p.scenario,
               ps.pct_coleadery, ps.pct_colinkery
        FROM project_participants pp
        JOIN projects p ON p.id = pp.project_id
        LEFT JOIN project_shares ps ON ps.project_id = pp.project_id
        WHERE pp.holder_no IN (${placeholders})
+       GROUP BY pp.project_id
        ORDER BY p.created_at DESC`
     ).bind(...holderNos).all<any>()
     // 每個項目：取同項目所有其他成員
@@ -13882,15 +13884,28 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
       const uniqueGroupHolders = [...new Set(groupHolderNos)]
       const groupMembersMap: Record<string, any[]> = {}
       for (const hn of uniqueGroupHolders) {
-        const gm = await db.prepare(`
-          SELECT ti.name_zh, ti.phone, ti.share_pct, ti.confirmed, ti.member_no
-          FROM team_invites ti
-          JOIN role_applications ra ON ra.id = ti.app_id
-          JOIN role_holders rh ON rh.member_no = ra.member_no AND rh.role = ra.role
-          WHERE rh.holder_no = ?
-          ORDER BY ti.share_pct DESC
-        `).bind(hn).all<any>()
-        groupMembersMap[hn] = gm.results
+        // 只取該 holder 對應的最新 APPROVED GROUP application 的 team_invites
+        const holderInfo = await db.prepare(
+          'SELECT member_no, role FROM role_holders WHERE holder_no = ? LIMIT 1'
+        ).bind(hn).first<{ member_no: string; role: string }>()
+        if (holderInfo) {
+          const latestApp = await db.prepare(`
+            SELECT id FROM role_applications
+            WHERE member_no = ? AND role = ? AND status = 'APPROVED' AND applicant_type = 'GROUP'
+            ORDER BY id DESC LIMIT 1
+          `).bind(holderInfo.member_no, holderInfo.role).first<{ id: number }>()
+          if (latestApp) {
+            const gm = await db.prepare(`
+              SELECT ti.name_zh, ti.phone, ti.share_pct, ti.confirmed
+              FROM team_invites ti
+              WHERE ti.app_id = ?
+              ORDER BY ti.id ASC
+            `).bind(latestApp.id).all<any>()
+            groupMembersMap[hn] = gm.results
+          } else {
+            groupMembersMap[hn] = []
+          }
+        }
       }
       // 把 group_members 附到 team 裡每個 GROUP 行
       for (const row of projectTeams[Object.keys(projectTeams)[0]] ? Object.values(projectTeams).flat() : []) {
