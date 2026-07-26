@@ -12022,18 +12022,27 @@ function initDots() {
 }
 initDots();
 
-// 預填電話並自動驗證（優先用 phone 參數，否則嘗試 sessionStorage）
+// 預填電話並自動驗證（優先用 URL phone 參數，否則嘗試 localStorage / sessionStorage）
 (function() {
-  var p = prefillPhone || sessionStorage.getItem('ce85_phone') || '';
+  var p = prefillPhone
+    || localStorage.getItem('ce85_phone')
+    || sessionStorage.getItem('ce85_phone')
+    || '';
   if (p) {
     document.getElementById('applyPhone').value = p;
     // 畫面 render 後才呼叫，確保 DOM 就緒
-    setTimeout(function() { verifyPhone(); }, 100);
+    setTimeout(function() { verifyPhone(); }, 200);
   }
 })();
 
 function goBack() {
-  window.location.href = '/app' + (memberNo ? '?member=' + encodeURIComponent(memberNo) : '');
+  // 優先使用 history.back() 返回上一頁（保留會員卡狀態）
+  // 如果沒有歷史記錄才跳 /app
+  if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    window.location.href = '/app';
+  }
 }
 
 function updateDots() {
@@ -12326,44 +12335,54 @@ function updateDeclareBtn() {
   document.getElementById('btnNext').disabled = !document.getElementById('agreeCheck').checked;
 }
 
+function getVal(id) {
+  var el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
 function submitApplication() {
   var btn = document.getElementById('btnNext');
+  if (!btn) return;
   btn.disabled = true;
-  btn.textContent = '\u63d0\u4ea4\u4e2d\u2026';
+  btn.textContent = '提交中…';
   var body = {
     member_no: memberNo,
     role: selectedRole,
     applicant_type: selectedType,
-    name_zh: document.getElementById('applyNameZh').value.trim(),
-    name_en: document.getElementById('applyNameEn').value.trim(),
-    phone: document.getElementById('applyContactPhone').value.trim(),
-    address: (document.getElementById('applyDistrict') ? document.getElementById('applyDistrict').value.trim() : ''),
-    id_prefix: document.getElementById('applyIdPrefix').value.trim(),
+    name_zh: getVal('applyNameZh'),
+    name_en: getVal('applyNameEn'),
+    phone: getVal('applyContactPhone'),
+    address: getVal('applyDistrict'),
+    id_prefix: getVal('applyIdPrefix'),
     id_doc_r2_key: uploadedKey,
-    company_name: document.getElementById('applyCompanyName').value.trim(),
-    company_br: document.getElementById('applyCompanyBR').value.trim(),
-    industry_background: document.getElementById('applyIndustry') ? document.getElementById('applyIndustry').value.trim() : '',
-    team_size: parseInt(document.getElementById('applyTeamSize').value) || null,
-    team_notes: document.getElementById('applyTeamNotes') ? document.getElementById('applyTeamNotes').value.trim() : '',
+    company_name: getVal('applyCompanyName'),
+    company_br: getVal('applyCompanyBR'),
+    industry_background: getVal('applyIndustry'),
+    team_size: (function() { var el = document.getElementById('applyTeamSize'); return el ? (parseInt(el.value) || null) : null; })(),
+    team_notes: getVal('applyTeamNotes'),
     group_members: (function() {
       var rows = document.querySelectorAll('.gm-row');
       var arr = [];
       rows.forEach(function(row) {
         var mn = row.getAttribute('data-member-no') || '';
         var name = row.getAttribute('data-name') || '';
-        var pct = parseFloat(row.querySelector('.gm-pct').value) || 0;
+        var pctEl = row.querySelector('.gm-pct');
+        var pct = pctEl ? (parseFloat(pctEl.value) || 0) : 0;
         if (mn) arr.push({ member_no: mn, name_zh: name, share_pct: pct });
       });
       return arr;
     })(),
-    bank_name: document.getElementById('applyBankName').value,
-    bank_acc_no: document.getElementById('applyBankAcc').value.trim()
+    bank_name: (function() { var el = document.getElementById('applyBankName'); return el ? el.value : ''; })(),
+    bank_acc_no: getVal('applyBankAcc')
   };
   fetch('/api/partner/apply', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
-  }).then(function(r) { return r.json(); }).then(function(d) {
+  }).then(function(r) {
+    if (!r.ok && r.status !== 400) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(d) {
     if (d.ok) {
       document.getElementById('step6').style.display = 'none';
       document.getElementById('stepSuccess').style.display = '';
