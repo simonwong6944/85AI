@@ -8439,6 +8439,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
   </div>
 
+  <!-- 持有人詳情 Modal -->
+  <div id="holderDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;overflow-y:auto;padding:20px;">
+    <div style="background:#fff;border-radius:12px;max-width:620px;margin:0 auto;padding:24px;position:relative;">
+      <button onclick="document.getElementById('holderDetailModal').style.display='none'" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#6B7280;">✕</button>
+      <h3 id="holderDetailTitle" style="font-size:18px;font-weight:900;margin-bottom:16px;color:#1B4332;">持有人詳情</h3>
+      <div id="holderDetailBody"></div>
+    </div>
+  </div>
+
   <!-- 新增/編輯項目 Modal -->
   <div id="createProjModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;overflow-y:auto;padding:20px;">
     <div style="background:#fff;border-radius:12px;max-width:520px;margin:0 auto;padding:24px;position:relative;">
@@ -9693,19 +9702,120 @@ function loadRevHolders() {
       var roleLabel = h.role==='COLEADERY' ? '🌟 CoLeadery' : '🤝 CoLinkery';
       var roleColor = h.role==='COLEADERY' ? '#92400e' : '#0369a1';
       var roleBg = h.role==='COLEADERY' ? '#FFF3CD' : '#E0F2FE';
-      return '<div class="proj-card">'+
+      var typeLabel = {INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司'}[h.applicant_type] || h.applicant_type;
+      var hasHkid  = h.id_prefix && h.id_prefix.length >= 3;
+      var hasBank  = h.bank_name && h.bank_acc_no;
+      var hasPhone = h.member_phone || h.app_phone;
+      var kycOk    = hasHkid && hasBank;
+      var kycStatus = kycOk
+        ? '<span style="color:#065F46;font-weight:700;font-size:12px;">✅ KYC完成</span>'
+        : '<span style="color:#DC2626;font-weight:700;font-size:12px;">⚠️ KYC不完整</span>';
+      var missing = [];
+      if(!hasHkid)  missing.push('HKID前7位');
+      if(!hasBank)  missing.push('銀行資料');
+      if(!hasPhone) missing.push('電話');
+      var missingHtml = missing.length ? '<div style="font-size:12px;color:#DC2626;margin-top:3px;">缺：'+missing.join('、')+'</div>' : '';
+      var infoHtml =
+        '<span style="font-size:12px;background:#F3F4F6;padding:2px 7px;border-radius:5px;color:#374151;margin-right:4px;">'+typeLabel+'</span>'+
+        (hasPhone ? '<span style="font-size:12px;background:#F3F4F6;padding:2px 7px;border-radius:5px;color:#374151;margin-right:4px;">📞 '+esc(hasPhone)+'</span>' : '')+
+        (hasHkid  ? '<span style="font-size:12px;background:#F3F4F6;padding:2px 7px;border-radius:5px;color:#374151;margin-right:4px;">ID: '+esc(h.id_prefix)+'</span>' : '')+
+        (hasBank  ? '<span style="font-size:12px;background:#F3F4F6;padding:2px 7px;border-radius:5px;color:#374151;margin-right:4px;">🏦 '+esc(h.bank_name)+' '+esc(h.bank_acc_no)+'</span>' : '')+
+        (h.project_count > 0 ? '<span style="font-size:12px;background:#DBEAFE;padding:2px 7px;border-radius:5px;color:#1e40af;margin-right:4px;">📂 '+h.project_count+' 項目</span>' : '');
+      return '<div class="proj-card holder-detail-card" data-holder-no="'+esc(h.holder_no)+'" style="cursor:pointer;">'+
         '<div class="proj-card-top">'+
           '<div>'+
-            '<span style="font-size:16px;font-weight:700;color:#111;">'+h.name_zh+'</span>'+
+            '<span style="font-size:16px;font-weight:700;color:#111;">'+esc(h.name_zh)+'</span>'+
             '<span style="font-size:12px;font-family:monospace;background:#F3F4F6;padding:2px 8px;border-radius:4px;color:#6B7280;margin-left:8px;">'+h.holder_no+'</span>'+
           '</div>'+
-          '<span style="padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:'+roleBg+';color:'+roleColor+';">'+roleLabel+'</span>'+
+          '<div style="display:flex;gap:8px;align-items:center;">'+
+            kycStatus+
+            '<span style="padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:'+roleBg+';color:'+roleColor+';">'+roleLabel+'</span>'+
+          '</div>'+
         '</div>'+
-        '<div style="font-size:13px;color:#6B7280;">會員編號：'+h.member_no+' · '+h.applicant_type+' · 申請時間：'+h.created_at.slice(0,10)+
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px;">'+infoHtml+'</div>'+
+        missingHtml+
+        '<div style="font-size:12px;color:#9CA3AF;margin-top:4px;">會員：'+h.member_no+' · 申請：'+h.created_at.slice(0,10)+
           ' · 狀態：<span style="font-weight:700;color:'+(h.status==='ACTIVE'?'#065F46':'#991B1B')+';">'+h.status+'</span></div>'+
       '</div>';
     }).join('');
   }).catch(function(){ document.getElementById('revHolderList').innerHTML='<div style="color:#DC2626;padding:20px;">載入失敗</div>'; });
+}
+
+// Event delegation for holder detail cards (avoids onclick with string params)
+document.getElementById('revHolderList').addEventListener('click', function(e) {
+  var card = e.target.closest('.holder-detail-card');
+  if (!card) return;
+  var holderNo = card.getAttribute('data-holder-no');
+  if (holderNo) openHolderDetail(holderNo);
+});
+
+// 持有人詳情（項目參與）
+function openHolderDetail(holderNo) {
+  var modal = document.getElementById('holderDetailModal');
+  var body  = document.getElementById('holderDetailBody');
+  var titleEl = document.getElementById('holderDetailTitle');
+  if(!modal) return;
+  modal.style.display='';
+  titleEl.textContent='載入中…';
+  body.innerHTML='<div style="text-align:center;padding:30px;color:#9CA3AF;">載入中…</div>';
+  fetch('/api/admin/rev/holder/'+encodeURIComponent(holderNo)+'/projects')
+    .then(function(r){return r.json();}).then(function(d){
+      titleEl.textContent='📂 '+holderNo+' 項目參與';
+      if(!d.ok){ body.innerHTML='<div style="color:#DC2626;">'+esc(d.error||'載入失敗')+'</div>'; return; }
+      var projects = d.projects||[];
+      var teamMembers = d.team_members||[];
+      var html = '';
+      // GROUP team members
+      if(teamMembers.length){
+        html += '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px;">👥 團隊成員（GROUP申請）</div>'+
+          '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">'+
+          '<thead><tr style="background:#F9FAFB;">'+
+            '<th style="padding:7px 8px;text-align:left;font-weight:700;">姓名</th>'+
+            '<th style="padding:7px 8px;text-align:left;font-weight:700;">電話</th>'+
+            '<th style="padding:7px 8px;text-align:center;font-weight:700;">分成%</th>'+
+            '<th style="padding:7px 8px;text-align:center;font-weight:700;">確認狀態</th>'+
+          '</tr></thead><tbody>'+
+          teamMembers.map(function(tm){
+            var confirmed = tm.confirmed
+              ? '<span style="color:#065F46;font-weight:700;">✅ 已確認</span>'
+              : '<span style="color:#D97706;">⏳ 待確認</span>';
+            return '<tr style="border-bottom:1px solid #F3F4F6;">'+
+              '<td style="padding:7px 8px;">'+esc(tm.name_zh)+'</td>'+
+              '<td style="padding:7px 8px;font-family:monospace;">'+esc(tm.phone||'—')+'</td>'+
+              '<td style="padding:7px 8px;text-align:center;font-weight:700;color:#8B0000;">'+tm.share_pct+'%</td>'+
+              '<td style="padding:7px 8px;text-align:center;">'+confirmed+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table>';
+      }
+      // Projects
+      if(!projects.length){
+        html += '<div style="color:#9CA3AF;text-align:center;padding:20px;">尚未參與任何項目</div>';
+      } else {
+        var stLbl = {DRAFT:'草稿',ACTIVE:'進行中',SETTLING:'結算中',SETTLED:'已結算',CLOSED:'已關閉'};
+        var stColor = {DRAFT:'#9CA3AF',ACTIVE:'#065F46',SETTLING:'#D97706',SETTLED:'#1565C0',CLOSED:'#6B7280'};
+        var stBg    = {DRAFT:'#F3F4F6',ACTIVE:'#D1FAE5',SETTLING:'#FEF3C7',SETTLED:'#DBEAFE',CLOSED:'#F3F4F6'};
+        html += '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px;">📊 項目參與記錄</div>'+
+          projects.map(function(proj){
+            var share = Math.round((proj.team_share_bps||0)/100);
+            var earned = 'HK$'+Math.round((proj.earned_cents||0)/100).toLocaleString();
+            var st = proj.project_status||'DRAFT';
+            return '<div style="background:#F9FAFB;border-radius:8px;padding:10px 12px;margin-bottom:8px;border-left:3px solid '+(stColor[st]||'#9CA3AF')+';">'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'+
+                '<span style="font-weight:700;color:#1B5E20;">'+esc(proj.project_name)+'</span>'+
+                '<span style="font-size:12px;background:'+(stBg[st]||'#F3F4F6')+';color:'+(stColor[st]||'#6B7280')+';padding:2px 8px;border-radius:6px;">'+(stLbl[st]||st)+'</span>'+
+              '</div>'+
+              '<div style="font-size:12px;color:#6B7280;">'+
+                esc(proj.project_code)+' · '+esc(proj.scenario)+
+                ' · 角色：<b>'+proj.role+'</b>'+
+                ' · 團隊分帳：<b style="color:#8B0000;">'+share+'%</b>'+
+                ' · 已結算：<b style="color:#065F46;">'+earned+'</b>'+
+              '</div>'+
+            '</div>';
+          }).join('');
+      }
+      body.innerHTML = html;
+    }).catch(function(e){ body.innerHTML='<div style="color:#DC2626;">載入失敗：'+(e.message||'')+'</div>'; });
 }
 
 // ── Projects Tab ──────────────────────────────────────────────────────────────
@@ -9770,23 +9880,57 @@ function openProjModal(projId) {
       '<span class="status-badge proj-status-'+p.status+'">'+stLabel+'</span>'+
       '<span style="font-size:12px;color:#6B7280;">'+p.scenario+'</span>'+
     '</div>';
-    // 分成比例
+    // 分成比例（互助基金15%和平台費5%為固定，其他可調整）
     if(s && s.pct_coleadery!=null){
+      var canEdit = (p.status === 'DRAFT' || p.status === 'ACTIVE');
+      var shareEditHtml = canEdit
+        ? '<div style="margin-top:10px;background:#FFFBEB;border:1.5px solid #FEF08A;border-radius:8px;padding:12px;">'+
+            '<div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:10px;">✏️ 調整分成比例（互助基金15%、平台費5%固定不可改）</div>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
+              shareInputRow('🌟 CoLeadery %', 'adjCL', Math.round(s.pct_coleadery/100))+
+              shareInputRow('🤝 CoLinkery %', 'adjCK', Math.round(s.pct_colinkery/100))+
+              shareInputRow('🏠 CoOwnery池 %', 'adjCO', Math.round(s.pct_coownery/100))+
+              shareInputRow('🛠 CoSupportery池 %', 'adjCS', Math.round(s.pct_cosupportery/100))+
+              shareInputRow('🏦 特別帳戶 %', 'adjSA', Math.round(s.pct_special_account/100))+
+            '</div>'+
+            '<div style="font-size:12px;color:#6B7280;margin:6px 0;">互助基金：<b>15%</b>（固定）&nbsp;·&nbsp; 平台費：<b>5%</b>（固定）&nbsp;·&nbsp; 七方合計必須 = 100%</div>'+
+            '<div id="adjShareMsg" style="font-size:13px;margin:4px 0;display:none;"></div>'+
+            '<button class="btn btn-secondary btn-sm" onclick="submitShareAdj('+projId+')">💾 更新比例</button>'+
+          '</div>'
+        : '';
       html += '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:6px;">分成比例</div>'+
         '<div class="share-grid">'+
           shareRow('🌟 CoLeadery',s.pct_coleadery)+shareRow('🤝 CoLinkery',s.pct_colinkery)+
           shareRow('🏠 CoOwnery池',s.pct_coownery)+shareRow('🛠 CoSupportery池',s.pct_cosupportery)+
           shareRow('❤️ 互助基金',s.pct_mutual_fund)+shareRow('💼 平台費',s.pct_platform_fee)+
           shareRow('🏦 特別帳戶',s.pct_special_account)+
-        '</div>';
+        '</div>'+
+        shareEditHtml;
     }
-    // 參與者
+    // 參與者（含團隊成員分成詳情）
     if(d.participants && d.participants.length){
       html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:12px 0 6px;">參與者</div>'+
-        '<div>'+d.participants.map(function(pp){
+        '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">'+
+        '<thead><tr style="background:#F9FAFB;">'+
+          '<th style="padding:6px 8px;text-align:left;">角色</th>'+
+          '<th style="padding:6px 8px;text-align:left;">姓名</th>'+
+          '<th style="padding:6px 8px;text-align:left;">持有人編號</th>'+
+          '<th style="padding:6px 8px;text-align:center;">團隊分帳</th>'+
+          '<th style="padding:6px 8px;text-align:center;">狀態</th>'+
+        '</tr></thead><tbody>'+
+        d.participants.map(function(pp){
           var role = pp.holder_role==='COLEADERY'?'🌟 CoLeadery':'🤝 CoLinkery';
-          return '<span class="holder-chip">'+role+' '+pp.name_zh+' ('+pp.holder_no+') '+Math.round(pp.team_share_bps/100)+'%</span>';
-        }).join('')+'</div>';
+          var share = Math.round((pp.team_share_bps||0)/100);
+          var cs = pp.confirm_status==='CONFIRMED'?'<span style="color:#065F46;font-weight:700;">✅</span>':'<span style="color:#D97706;">⏳</span>';
+          return '<tr style="border-bottom:1px solid #F3F4F6;">'+
+            '<td style="padding:6px 8px;">'+role+'</td>'+
+            '<td style="padding:6px 8px;font-weight:600;">'+esc(pp.name_zh)+'</td>'+
+            '<td style="padding:6px 8px;font-family:monospace;font-size:12px;">'+pp.holder_no+'</td>'+
+            '<td style="padding:6px 8px;text-align:center;font-weight:700;color:#8B0000;">'+share+'%</td>'+
+            '<td style="padding:6px 8px;text-align:center;">'+cs+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>';
     }
     // 損益彙總
     html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:14px 0 8px;">💰 損益彙總</div>'+
@@ -9839,6 +9983,39 @@ function openProjModal(projId) {
 }
 
 function shareRow(label, bps){ return '<div class="share-row"><span>'+label+'</span><span style="font-weight:700;">'+Math.round((bps||0)/100)+'%</span></div>'; }
+
+function shareInputRow(label, id, val) {
+  return '<div>'+
+    '<label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px;">'+label+'</label>'+
+    '<input id="'+id+'" type="number" min="0" max="100" step="1" value="'+val+'" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+  '</div>';
+}
+
+function submitShareAdj(projId) {
+  var cl = parseFloat(document.getElementById('adjCL').value)||0;
+  var ck = parseFloat(document.getElementById('adjCK').value)||0;
+  var co = parseFloat(document.getElementById('adjCO').value)||0;
+  var cs = parseFloat(document.getElementById('adjCS').value)||0;
+  var sa = parseFloat(document.getElementById('adjSA').value)||0;
+  var total = cl+ck+co+cs+sa+15+5;  // +互助基金15% +平台費5%
+  var msgEl = document.getElementById('adjShareMsg');
+  msgEl.style.display='';
+  if(Math.abs(total-100)>0.01){
+    msgEl.style.color='#DC2626';
+    msgEl.textContent='合計目前：'+total+'%，必須剛好等於 100%（已含互助基金15%+平台費5%）';
+    return;
+  }
+  msgEl.style.color='#888';
+  msgEl.textContent='更新中…';
+  fetch('/api/admin/rev/project/'+projId+'/shares',{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pct_coleadery:cl,pct_colinkery:ck,pct_coownery:co,pct_cosupportery:cs,pct_special_account:sa})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ msgEl.style.color='#DC2626'; msgEl.textContent=d.error||'更新失敗'; return; }
+    msgEl.style.color='#065F46'; msgEl.textContent='✅ 分成比例已更新！';
+    setTimeout(function(){ openProjModal(projId); }, 800);
+  }).catch(function(){ msgEl.style.color='#DC2626'; msgEl.textContent='網絡錯誤'; });
+}
 
 function submitLedger(projId) {
   var type = document.getElementById('ledType').value;
@@ -12479,6 +12656,26 @@ input.big-in:focus{border-color:#1B5E20;}
 .empty-box{text-align:center;padding:50px 20px;color:#999;}
 .empty-box .icon{font-size:52px;margin-bottom:14px;}
 .loading-box{text-align:center;padding:50px 20px;font-size:18px;color:#888;}
+/* Project cards */
+.proj-card-w{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-left:4px solid #2E7D32;}
+.proj-card-w.draft{border-left-color:#9CA3AF;}
+.proj-card-w.settling{border-left-color:#D97706;}
+.proj-card-w.settled{border-left-color:#1565C0;}
+.proj-card-w.closed{border-left-color:#6B7280;}
+.proj-title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;}
+.proj-name-w{font-size:16px;font-weight:800;color:#1B5E20;}
+.proj-code-w{font-size:12px;font-family:monospace;background:#F3F4F6;padding:2px 7px;border-radius:4px;color:#6B7280;}
+.proj-status-w{font-size:12px;font-weight:700;padding:3px 9px;border-radius:10px;}
+.ps-DRAFT{background:#F3F4F6;color:#6B7280;}
+.ps-ACTIVE{background:#D1FAE5;color:#065F46;}
+.ps-SETTLING{background:#FEF3C7;color:#D97706;}
+.ps-SETTLED{background:#DBEAFE;color:#1565C0;}
+.ps-CLOSED{background:#F3F4F6;color:#6B7280;}
+.team-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 6px;}
+.team-chip{font-size:12px;background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;padding:3px 9px;border-radius:8px;font-weight:600;}
+.team-chip.me{background:#ECFDF5;border-color:#6EE7B7;color:#065F46;}
+.my-share-row{font-size:13px;color:#374151;margin-top:4px;}
+.my-share-row strong{color:#8B0000;}
 </style>
 </head>
 <body>
@@ -12503,8 +12700,11 @@ input.big-in:focus{border-color:#1B5E20;}
     <div id="holdersRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"></div>
     <!-- 彙總 -->
     <div class="summary-grid" id="summaryGrid"></div>
+    <!-- 關聯項目 -->
+    <div class="section-title" id="projSectionTitle" style="display:none;">\uD83D\uDCC2 \u95dc\u806f\u9805\u76ee</div>
+    <div id="projList"></div>
     <!-- 分成記錄 -->
-    <div class="section-title">\u5206\u6210\u8a18\u9304</div>
+    <div class="section-title">\uD83D\uDCB0 \u5206\u6210\u8a18\u9304</div>
     <div id="entriesList"></div>
   </div>
 
@@ -12590,6 +12790,60 @@ function renderWallet(d) {
     '<div class="sum-card"><div class="sum-num">' + fmt(s.total_paid) + '</div><div class="sum-label">\u5df2\u5be6\u969b\u51fa\u6b3e</div></div>' +
     '<div class="sum-card"><div class="sum-num">' + fmt((s.total_posted||0) + (s.total_pending_payout||0) + (s.total_paid||0)) + '</div><div class="sum-label">\u7d2f\u8a08\u5206\u6210</div></div>';
 
+  // Projects
+  var projList = document.getElementById('projList');
+  var projects = d.projects || [];
+  var projTitleEl = document.getElementById('projSectionTitle');
+  if (projects.length) {
+    projTitleEl.style.display = '';
+    var myHolderNos = (d.holders || []).map(function(h) { return h.holder_no; });
+    var projStatusLabels = {DRAFT:'\u8349\u7a3f',ACTIVE:'\u9032\u884c\u4e2d',SETTLING:'\u7d50\u7b97\u4e2d',SETTLED:'\u5df2\u7d50\u7b97',CLOSED:'\u5df2\u95dc\u9589'};
+    var roleLabelsShort = {COLEADERY:'\uD83C\uDF1F CoLeadery',COLINKERY:'\uD83E\uDD1D CoLinkery'};
+    projList.innerHTML = projects.map(function(proj) {
+      var stLabel = projStatusLabels[proj.project_status] || proj.project_status;
+      var stKey = proj.project_status || 'DRAFT';
+      var mySharePct = Math.round((proj.team_share_bps || 0) / 100);
+      var roleOfPool = proj.holder_no && myHolderNos.indexOf(proj.holder_no) >= 0 ? proj.role : '';
+      // Build team chips
+      var team = proj.team || [];
+      var teamHtml = '';
+      if (team.length > 0) {
+        teamHtml = '<div class="team-row">' + team.map(function(tm) {
+          var isMe = myHolderNos.indexOf(tm.holder_no) >= 0;
+          var tmRole = roleLabelsShort[tm.role] || tm.role;
+          var tmShare = Math.round((tm.team_share_bps || 0) / 100);
+          return '<span class="team-chip' + (isMe ? ' me' : '') + '">' +
+            tmRole + ' ' + escHtml(tm.name_zh) + (isMe ? '\uff08\u4f60\uff09' : '') +
+            ' \u00b7 ' + tmShare + '%' +
+          '</span>';
+        }).join('') + '</div>';
+      }
+      // Share pcts for this role pool
+      var poolPct = proj.role === 'COLEADERY' ? Math.round((proj.pct_coleadery || 0) / 100) :
+                    proj.role === 'COLINKERY'  ? Math.round((proj.pct_colinkery || 0) / 100) : 0;
+      var myActualPct = Math.round(poolPct * mySharePct / 100 * 10) / 10;
+      return '<div class="proj-card-w ' + stKey.toLowerCase() + '">' +
+        '<div class="proj-title-row">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+            '<span class="proj-name-w">' + escHtml(proj.project_name) + '</span>' +
+            '<span class="proj-code-w">' + escHtml(proj.project_code) + '</span>' +
+          '</div>' +
+          '<span class="proj-status-w ps-' + stKey + '">' + stLabel + '</span>' +
+        '</div>' +
+        teamHtml +
+        '<div class="my-share-row">' +
+          '\u6211\u7684\u89d2\u8272\uff1a' + (roleLabelsShort[proj.role] || proj.role) +
+          '\uff0c\u5718\u968a\u5206\u5e33\uff1a<strong>' + mySharePct + '%</strong>' +
+          (poolPct > 0 ? '\uff08\u5360\u9805\u76ee\u6536\u76ca ' + myActualPct + '%\uff09' : '') +
+        '</div>' +
+        (proj.confirm_status === 'PENDING' ? '<div style="font-size:12px;color:#D97706;margin-top:4px;">\u26a0\ufe0f \u5c1a\u5f85\u78ba\u8a8d\u53c3\u8207</div>' : '') +
+      '</div>';
+    }).join('');
+  } else {
+    projTitleEl.style.display = 'none';
+    projList.innerHTML = '';
+  }
+
   // Entries
   var list = document.getElementById('entriesList');
   var entries = d.entries || [];
@@ -12640,6 +12894,11 @@ function showErr(msg) {
   var el = document.getElementById('walletErr');
   el.textContent = msg;
   el.classList.add('show');
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
 </body>
@@ -12958,12 +13217,12 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     ).bind(phone).first<{ member_no: string }>()
     if (!m) return c.json({ ok: false, error: '找不到會員' }, 404)
     const holders = await db.prepare(
-      'SELECT holder_no, role FROM role_holders WHERE member_no = ? AND status = ?'
-    ).bind(m.member_no, 'ACTIVE').all<{ holder_no: string; role: string }>()
+      'SELECT holder_no, role, applicant_type, name_zh FROM role_holders WHERE member_no = ? AND status = ?'
+    ).bind(m.member_no, 'ACTIVE').all<{ holder_no: string; role: string; applicant_type: string; name_zh: string }>()
     if (!holders.results.length) return c.json({ ok: false, error: '你尚未持有任何認證角色' }, 403)
     const holderNos = holders.results.map(h => h.holder_no)
-    // 拉所有 wallet_entries 屬於此人
     const placeholders = holderNos.map(() => '?').join(',')
+    // 拉所有 wallet_entries 屬於此人
     const entries = await db.prepare(
       `SELECT w.*, p.project_code, p.name as project_name
        FROM wallet_entries w
@@ -12971,6 +13230,39 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
        WHERE w.holder_no IN (${placeholders})
        ORDER BY w.created_at DESC`
     ).bind(...holderNos).all()
+    // 拉此人參與的所有項目（含團隊成員資料）
+    const participantProjects = await db.prepare(
+      `SELECT pp.holder_no, pp.team_share_bps, pp.confirm_status,
+              p.id as project_id, p.project_code, p.name as project_name, p.status as project_status, p.scenario,
+              ps.pct_coleadery, ps.pct_colinkery
+       FROM project_participants pp
+       JOIN projects p ON p.id = pp.project_id
+       LEFT JOIN project_shares ps ON ps.project_id = pp.project_id
+       WHERE pp.holder_no IN (${placeholders})
+       ORDER BY p.created_at DESC`
+    ).bind(...holderNos).all<any>()
+    // 每個項目：取同項目所有其他成員
+    const projectIds = [...new Set((participantProjects.results as any[]).map((r: any) => r.project_id))]
+    let projectTeams: Record<number, any[]> = {}
+    if (projectIds.length > 0) {
+      const pidPlaceholders = projectIds.map(() => '?').join(',')
+      const allTeamRows = await db.prepare(
+        `SELECT pp.project_id, pp.holder_no, pp.role, pp.team_share_bps, rh.name_zh, rh.applicant_type
+         FROM project_participants pp
+         JOIN role_holders rh ON rh.holder_no = pp.holder_no
+         WHERE pp.project_id IN (${pidPlaceholders})
+         ORDER BY pp.project_id, pp.role`
+      ).bind(...projectIds).all<any>()
+      for (const row of allTeamRows.results as any[]) {
+        if (!projectTeams[row.project_id]) projectTeams[row.project_id] = []
+        projectTeams[row.project_id].push(row)
+      }
+    }
+    // 彙整項目資料
+    const projects = (participantProjects.results as any[]).map((pp: any) => ({
+      ...pp,
+      team: projectTeams[pp.project_id] || []
+    }))
     // 彙總
     const summary = { total_posted: 0, total_pending_payout: 0, total_paid: 0 }
     for (const e of entries.results as any[]) {
@@ -12978,7 +13270,7 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
       if (e.status === 'PENDING_PAYOUT') summary.total_pending_payout += e.amount_cents
       if (e.status === 'PAID') summary.total_paid += e.amount_cents
     }
-    return c.json({ ok: true, holders: holders.results, entries: entries.results, summary })
+    return c.json({ ok: true, holders: holders.results, entries: entries.results, summary, projects })
   })
 
   // 我的錢包：單項目損益明細（可見版）
@@ -13667,14 +13959,96 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
     return c.json({ ok: true, projects: rows.results })
   })
 
-  // ── role_holders 列表 ─────────────────────────────────────────
+  // ── role_holders 列表（含申請資料 + 項目參與）─────────────────
   app.get('/api/admin/rev/holders', async (c) => {
     const role = c.req.query('role')
     const db = c.env.DB
+    // JOIN role_applications to get HKID, bank info, team_invites for group members
     const rows = role
-      ? await db.prepare('SELECT * FROM role_holders WHERE role = ? ORDER BY created_at DESC').bind(role).all()
-      : await db.prepare('SELECT * FROM role_holders ORDER BY created_at DESC').all()
+      ? await db.prepare(`
+          SELECT rh.*,
+                 ra.id_prefix, ra.bank_name, ra.bank_acc_no, ra.phone as app_phone,
+                 ra.applicant_type as app_type, ra.name_en as app_name_en,
+                 ra.address, ra.company_name, ra.team_size, ra.team_notes,
+                 m.phone as member_phone, m.name_zh as member_name_zh,
+                 (SELECT COUNT(*) FROM project_participants pp WHERE pp.holder_no = rh.holder_no) as project_count
+          FROM role_holders rh
+          LEFT JOIN role_applications ra ON ra.member_no = rh.member_no AND ra.role = rh.role AND ra.status = 'APPROVED'
+          LEFT JOIN members m ON m.member_no = rh.member_no
+          WHERE rh.role = ? ORDER BY rh.created_at DESC
+        `).bind(role).all()
+      : await db.prepare(`
+          SELECT rh.*,
+                 ra.id_prefix, ra.bank_name, ra.bank_acc_no, ra.phone as app_phone,
+                 ra.applicant_type as app_type, ra.name_en as app_name_en,
+                 ra.address, ra.company_name, ra.team_size, ra.team_notes,
+                 m.phone as member_phone, m.name_zh as member_name_zh,
+                 (SELECT COUNT(*) FROM project_participants pp WHERE pp.holder_no = rh.holder_no) as project_count
+          FROM role_holders rh
+          LEFT JOIN role_applications ra ON ra.member_no = rh.member_no AND ra.role = rh.role AND ra.status = 'APPROVED'
+          LEFT JOIN members m ON m.member_no = rh.member_no
+          ORDER BY rh.created_at DESC
+        `).all()
     return c.json({ ok: true, holders: rows.results })
+  })
+
+  // ── role_holders：取單一 holder 的項目參與詳情 ────────────────
+  app.get('/api/admin/rev/holder/:holderNo/projects', async (c) => {
+    const holderNo = c.req.param('holderNo')
+    const db = c.env.DB
+    const projects = await db.prepare(`
+      SELECT pp.*, p.project_code, p.name as project_name, p.status as project_status,
+             p.scenario, ps.pct_coleadery, ps.pct_colinkery,
+             COALESCE((
+               SELECT SUM(w.amount_cents) FROM wallet_entries w
+               WHERE w.holder_no = pp.holder_no AND w.project_id = pp.project_id
+               AND w.status IN ('POSTED','PENDING_PAYOUT','PAID')
+             ), 0) as earned_cents
+      FROM project_participants pp
+      JOIN projects p ON p.id = pp.project_id
+      LEFT JOIN project_shares ps ON ps.project_id = pp.project_id
+      WHERE pp.holder_no = ?
+      ORDER BY p.created_at DESC
+    `).bind(holderNo).all()
+    // Also get GROUP team members from team_invites
+    const teamMembers = await db.prepare(`
+      SELECT ti.*, ra.id as app_id
+      FROM team_invites ti
+      JOIN role_applications ra ON ra.id = ti.app_id
+      JOIN role_holders rh ON rh.member_no = ra.member_no AND rh.role = ra.role
+      WHERE rh.holder_no = ?
+      ORDER BY ti.created_at DESC
+    `).bind(holderNo).all()
+    return c.json({ ok: true, projects: projects.results, team_members: teamMembers.results })
+  })
+
+  // ── 項目分成比例更新（互助基金15%+平台費5%鎖定）────────────────
+  app.patch('/api/admin/rev/project/:id/shares', async (c) => {
+    const id = parseInt(c.req.param('id'))
+    const body = await c.req.json()
+    const db = c.env.DB
+    const existing = await db.prepare('SELECT * FROM project_shares WHERE project_id = ?').bind(id).first<any>()
+    if (!existing) return c.json({ ok: false, error: '此項目尚未設定分成比例' }, 404)
+    // 互助基金 1500bps (15%) 和平台費 500bps (5%) 為固定值，不得修改
+    const pct_coleadery    = typeof body.pct_coleadery    === 'number' ? Math.round(body.pct_coleadery * 100)    : existing.pct_coleadery
+    const pct_colinkery    = typeof body.pct_colinkery    === 'number' ? Math.round(body.pct_colinkery * 100)    : existing.pct_colinkery
+    const pct_coownery     = typeof body.pct_coownery     === 'number' ? Math.round(body.pct_coownery * 100)     : existing.pct_coownery
+    const pct_cosupportery = typeof body.pct_cosupportery === 'number' ? Math.round(body.pct_cosupportery * 100) : existing.pct_cosupportery
+    const pct_special_account = typeof body.pct_special_account === 'number' ? Math.round(body.pct_special_account * 100) : existing.pct_special_account
+    const pct_mutual_fund  = 1500  // 固定 15%
+    const pct_platform_fee = 500   // 固定 5%
+    const shares = { pct_coleadery, pct_colinkery, pct_coownery, pct_cosupportery,
+                     pct_mutual_fund, pct_platform_fee, pct_special_account }
+    if (!validateShares(shares))
+      return c.json({ ok: false, error: `七方比例加總必須等於 100%（目前：${Object.values(shares).reduce((a,b)=>a+b,0)/100}%）` }, 400)
+    await db.prepare(`
+      UPDATE project_shares SET
+        pct_coleadery=?, pct_colinkery=?, pct_coownery=?, pct_cosupportery=?,
+        pct_mutual_fund=1500, pct_platform_fee=500, pct_special_account=?,
+        updated_at=DATETIME('now')
+      WHERE project_id=?
+    `).bind(pct_coleadery, pct_colinkery, pct_coownery, pct_cosupportery, pct_special_account, id).run()
+    return c.json({ ok: true })
   })
 
 }
