@@ -11067,7 +11067,7 @@ function openUsefulLinksPanel(){
           '</a>';
         } else if(l.link_type==='whatsapp'){
           var waNum=l.content.replace(/[^0-9]/g,'');
-          inner='<a href="https://api.whatsapp.com/send?phone='+waNum+'" target="_blank" rel="noreferrer noopener" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%;">'+'
+          inner='<a href="https://api.whatsapp.com/send?phone='+waNum+'" target="_blank" rel="noreferrer noopener" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%;">'+
             '<span style="font-size:26px">💬</span>'+
             '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
             '<div style="font-size:17px;color:#059669;margin-top:2px">WhatsApp: '+escHtml(l.content)+'</div></span>'+
