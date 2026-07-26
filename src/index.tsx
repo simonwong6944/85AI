@@ -14209,28 +14209,35 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
 
     let holder_no = null
     if (action === 'APPROVED') {
-      // 每位成員每個角色只有一個 holder_no — 若已有，複用舊號碼
-      const existingHolder = await db.prepare(
-        'SELECT holder_no FROM role_holders WHERE member_no = ? AND role = ? LIMIT 1'
-      ).bind(app_.member_no, app_.role).first<{ holder_no: string }>()
+      // ── holder_no 分配邏輯 ──────────────────────────────────────
+      // INDIVIDUAL / COMPANY：同一人同角色同類型只能有一個 holder，重複批准時複用
+      // GROUP：每次批准都是全新小組，永遠新建新 holder_no（一人可有無限個小組）
+      // ────────────────────────────────────────────────────────────
+      let existingHolder: { holder_no: string } | null = null
+      if (app_.applicant_type !== 'GROUP') {
+        // INDIVIDUAL / COMPANY：查有無同類型的既有 holder
+        existingHolder = await db.prepare(
+          'SELECT holder_no FROM role_holders WHERE member_no = ? AND role = ? AND applicant_type = ? LIMIT 1'
+        ).bind(app_.member_no, app_.role, app_.applicant_type).first<{ holder_no: string }>()
+      }
+      // GROUP 的 existingHolder 永遠是 null → 強制新建
 
       if (existingHolder) {
-        // 複用：只更新 name_zh/name_en 和 status，不覆寫 applicant_type
-        // （applicant_type 以首次建立時的申請類型為準，後續申請不應覆蓋）
+        // 複用既有 INDIVIDUAL/COMPANY holder：只更新 name（不改 applicant_type）
         holder_no = existingHolder.holder_no
         await db.prepare(`
           UPDATE role_holders SET name_zh=?, name_en=?, status='ACTIVE'
           WHERE holder_no=?
         `).bind(app_.name_zh, app_.name_en || '', holder_no).run()
       } else {
-        // 新建 role_holder 記錄（首次申請）
+        // 新建 holder（首次 INDIVIDUAL/COMPANY，或任何 GROUP 申請）
         holder_no = await nextHolderNo(db, app_.role as 'COLEADERY' | 'COLINKERY')
         await db.prepare(`
           INSERT INTO role_holders (holder_no, member_no, role, applicant_type, name_zh, name_en)
           VALUES (?,?,?,?,?,?)
         `).bind(holder_no, app_.member_no, app_.role, app_.applicant_type, app_.name_zh, app_.name_en || '').run()
 
-        // 首次建立才發授權卡（避免重複）
+        // 每個新 holder 都發一張授權卡
         const token = genToken()
         const expires = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
         await db.prepare(`
