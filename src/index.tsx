@@ -12310,7 +12310,10 @@ function selectType(t) {
 // ── Step 2: KYC 提交 ──────────────────────────────────────────────────────────
 function submitKyc(cb) {
   var idPrefix = document.getElementById('kycIdPrefix').value.trim().toUpperCase();
-  var email = document.getElementById('kycEmail').value.trim();
+  // 清除所有不可見字符（包括 zero-width space、non-breaking space 等）
+  var emailRaw = document.getElementById('kycEmail').value;
+  var email = emailRaw.replace(/[\u0000-\u001F\u007F-\u009F\u00A0\u200B-\u200D\uFEFF\u2028\u2029]/g, '').trim();
+  console.log('[KYC debug] emailRaw repr:', JSON.stringify(emailRaw), 'cleaned:', JSON.stringify(email));
   var refPhone = document.getElementById('kycRefPhone').value.replace(/\D/g,'');
   var refName = document.getElementById('kycRefNameInput') ? document.getElementById('kycRefNameInput').value.trim() : '';
   var bankName = document.getElementById('kycBankName').value;
@@ -12321,9 +12324,9 @@ function submitKyc(cb) {
   if (!idPrefix || !/^[A-Z][0-9]{3}$/.test(idPrefix)) {
     showErr('s2Err', '請填寫正確的身份證號碼首4位（1個英文字母 + 3位數字，例：A123）'); return;
   }
-  // 電郵格式
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    showErr('s2Err', '請填寫有效的電郵地址'); return;
+  // 電郵格式：只檢查是否含有 @ 及 . (更寬鬆)
+  if (!email || email.indexOf('@') < 1 || email.lastIndexOf('.') < email.indexOf('@') + 2) {
+    showErr('s2Err', '請填寫有效的電郵地址（例：name@domain.com）'); return;
   }
   // 推薦人
   if (!kycDone) {
@@ -13025,7 +13028,10 @@ function doVerify() {
 function doKycNext() {
   clearErr('kycErr');
   var idPrefix = document.getElementById('tcKycId').value.trim().toUpperCase();
-  var email = document.getElementById('tcKycEmail').value.trim();
+  // 清除所有不可見字符
+  var emailRaw2 = document.getElementById('tcKycEmail').value;
+  var email = emailRaw2.replace(/[\u0000-\u001F\u007F-\u009F\u00A0\u200B-\u200D\uFEFF\u2028\u2029]/g, '').trim();
+  console.log('[KYC-TC debug] emailRaw repr:', JSON.stringify(emailRaw2), 'cleaned:', JSON.stringify(email));
   var refPhone = document.getElementById('tcRefPhone').value.replace(/\D/g,'');
   var bank = document.getElementById('tcKycBank').value;
   var acc = document.getElementById('tcKycAcc').value.trim();
@@ -13035,8 +13041,8 @@ function doKycNext() {
   if (!idPrefix || !/^[A-Z][0-9]{3}$/.test(idPrefix)) {
     showErr('kycErr','請填寫正確的身份證號碼首4位（1個英文字母 + 3位數字，例：A123）'); return;
   }
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    showErr('kycErr','請填寫有效的電郵地址'); return;
+  if (!email || email.indexOf('@') < 1 || email.lastIndexOf('.') < email.indexOf('@') + 2) {
+    showErr('kycErr','請填寫有效的電郵地址（例：name@domain.com）'); return;
   }
   if (!tcKycDone && (!refPhone || refPhone.length < 8)) {
     showErr('kycErr','請填寫推薦人電話號碼'); return;
