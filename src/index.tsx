@@ -10440,11 +10440,34 @@ function showCard(memberNo, waClicked) {
       '</div>' +
       '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>' +
     '</div>';
-  wrap.innerHTML = iframeHtml + installHtml;
+  // partner entry section（顯示「成為領航者/連結者」及「我的錢包」入口）
+  var partnerEntryHtml =
+    '<div id="partnerEntrySection" style="margin:20px 0 0;padding:0 2px;">' +
+      '<div style="font-size:16px;font-weight:900;color:#8B0000;letter-spacing:1px;margin-bottom:10px;padding-left:2px;">🌟 CoEldery 85 領航者計劃</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '<button onclick="goPartnerApply(\'' + memberNo + '\')" style="background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
+          '\uD83C\uDF1F \u6210\u70BA\u9818\u822A\u8005<br><span style="font-size:12px;font-weight:400;opacity:0.9;">\u5206\u4eab\u9805\u76ee\u6de8\u5229\u6f64</span>' +
+        '</button>' +
+        '<button onclick="goWallet(\'' + memberNo + '\')" style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
+          '\uD83D\uDCB0 \u6211\u7684\u9322\u5305<br><span style="font-size:12px;font-weight:400;opacity:0.9;">\u67e5\u770b\u5206\u6210\u8a18\u9304</span>' +
+        '</button>' +
+      '</div>' +
+      '<div style="text-align:center;margin-top:10px;">' +
+        '<a href="/impact" target="_blank" style="font-size:14px;color:#8B0000;text-decoration:none;font-weight:600;">\uD83D\uDCCA \u516c\u958b\u5f71\u97ff\u529b\u5831\u544a \u2192</a>' +
+      '</div>' +
+    '</div>';
+  wrap.innerHTML = iframeHtml + installHtml + partnerEntryHtml;
   // 用戶已點過 WA 按鈕 → 立即展開 accordion + 顯示安裝提示
   if (waClicked) {
     showInstallBanner();
   }
+}
+
+function goPartnerApply(memberNo) {
+  window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo);
+}
+function goWallet(memberNo) {
+  window.location.href = '/app/wallet?member=' + encodeURIComponent(memberNo);
 }
 
 // ── 換人（清除 localStorage + CoWorkery session）──
@@ -10940,8 +10963,753 @@ function applyJob() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 分錢系統 Revenue Sharing Routes (registerRevenueRoutes)
-// 所有後台 route 走 /api/admin/rev/* → 自動受 /api/admin/* middleware 保護
+// 分錢系統 前端頁面
+// /app/partner-apply  — 角色申請頁（領航者/連結者）
+// /app/wallet         — 錢包頁（分成記錄）
+// ════════════════════════════════════════════════════════════════════════════
+
+app.get('/app/partner-apply', (c) => {
+  const memberNo = c.req.query('member') || ''
+  return c.html(partnerApplyHtml(memberNo))
+})
+
+app.get('/app/wallet', async (c) => {
+  const memberNo = c.req.query('member') || ''
+  return c.html(walletHtml(memberNo))
+})
+
+// ── 申請頁 HTML ────────────────────────────────────────────────────────────
+function partnerApplyHtml(prefillMember: string): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>申請成為 CoEldery 領航者</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:18px;line-height:1.6;color:#111;}
+.topbar{background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;}
+.topbar .back{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;border-radius:6px;}
+.topbar .title{font-size:20px;font-weight:900;letter-spacing:1px;}
+.wrap{max-width:480px;margin:0 auto;padding:20px 16px 80px;}
+.section{background:#fff;border-radius:14px;padding:22px 18px;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,0,0,.07);}
+.section-title{font-size:18px;font-weight:900;color:#8B0000;margin-bottom:16px;border-left:4px solid #C62828;padding-left:10px;}
+.field-group{margin-bottom:16px;}
+label{display:block;font-size:16px;font-weight:700;color:#333;margin-bottom:6px;}
+.req{color:#C62828;margin-left:3px;}
+input,select,textarea{width:100%;padding:12px 14px;font-size:17px;border:2px solid #ddd;border-radius:8px;
+  font-family:inherit;color:#111;background:#fff;outline:none;-webkit-appearance:none;}
+input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3px rgba(198,40,40,.12);}
+.hint{font-size:14px;color:#888;margin-top:5px;line-height:1.4;}
+.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;}
+.role-card{border:2.5px solid #ddd;border-radius:12px;padding:14px 12px;cursor:pointer;text-align:center;transition:all 0.15s;background:#fff;}
+.role-card.selected{border-color:#8B0000;background:#FFF5F5;}
+.role-card .role-icon{font-size:28px;margin-bottom:6px;}
+.role-card .role-name{font-size:16px;font-weight:900;color:#8B0000;}
+.role-card .role-desc{font-size:13px;color:#666;margin-top:4px;line-height:1.4;}
+.type-group{display:flex;flex-direction:column;gap:8px;}
+.type-radio{display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid #ddd;border-radius:8px;cursor:pointer;}
+.type-radio.selected{border-color:#8B0000;background:#FFF5F5;}
+.type-radio input[type=radio]{width:20px;height:20px;accent-color:#8B0000;flex-shrink:0;}
+.upload-area{border:2px dashed #C62828;border-radius:10px;padding:18px;text-align:center;cursor:pointer;background:#FFF9F9;}
+.upload-area:hover{background:#FFF0F0;}
+.upload-status{font-size:15px;color:#666;margin-top:8px;}
+.upload-status.ok{color:#2E7D32;font-weight:700;}
+.step-indicator{display:flex;gap:6px;justify-content:center;margin-bottom:20px;}
+.step-dot{width:10px;height:10px;border-radius:50%;background:#ddd;transition:background 0.15s;}
+.step-dot.active{background:#8B0000;}
+.step-dot.done{background:#C62828;}
+.nav-btns{display:flex;gap:10px;position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:#fff;border-top:1.5px solid #eee;z-index:99;max-width:480px;margin:0 auto;}
+.btn-back{flex:1;padding:14px;background:#f5f5f5;color:#555;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn-next{flex:2;padding:14px;background:#8B0000;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:900;cursor:pointer;font-family:inherit;letter-spacing:1px;}
+.btn-next:disabled{background:#ccc;cursor:not-allowed;}
+.err-box{background:#FFEBEE;border:2px solid #C62828;border-radius:8px;padding:12px 14px;font-size:16px;color:#C62828;font-weight:700;display:none;margin-bottom:12px;}
+.err-box.show{display:block;}
+.success-box{text-align:center;padding:40px 20px;}
+.success-box .s-icon{font-size:64px;margin-bottom:16px;}
+.success-box .s-title{font-size:24px;font-weight:900;color:#2E7D32;margin-bottom:10px;}
+.success-box .s-text{font-size:17px;color:#555;line-height:1.7;}
+.declaration-box{background:#FFF9E6;border:1.5px solid #FF8F00;border-radius:10px;padding:14px;font-size:15px;color:#5D4037;line-height:1.7;}
+.check-row{display:flex;align-items:flex-start;gap:10px;margin-top:12px;cursor:pointer;}
+.check-row input[type=checkbox]{width:20px;height:20px;accent-color:#8B0000;flex-shrink:0;margin-top:3px;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="back" onclick="goBack()">&#8592;</button>
+  <span class="title">&#x1F31F; \u7533\u8acb\u6210\u70ba CoEldery \u9818\u822a\u8005</span>
+</div>
+<div class="wrap">
+
+  <!-- Step indicator -->
+  <div class="step-indicator" id="stepDots"></div>
+
+  <!-- Step 1: 驗證身份 -->
+  <div id="step1" class="section">
+    <div class="section-title">&#x1F50D; \u7b2c\u4e00\u6b65\uff1a\u9a57\u8b49\u8001\u6709\u5361\u6703\u54e1\u8eab\u4efd</div>
+    <div class="field-group">
+      <label>\u6703\u54e1\u96fb\u8a71\u865f\u78bc <span class="req">*</span></label>
+      <input type="tel" id="applyPhone" inputmode="numeric" placeholder="\u8f38\u5165\u5df2\u767b\u8a18\u7684\u96fb\u8a71\u865f\u78bc" maxlength="20">
+      <div class="hint">\u7cfb\u7d71\u6703\u6838\u5bfb\u4f60\u7684\u8001\u6709\u5361\u6703\u54e1\u8cc7\u6599</div>
+    </div>
+    <div class="err-box" id="s1Err"></div>
+    <div id="s1Found" style="display:none;background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:8px;padding:12px 14px;font-size:16px;color:#1B5E20;font-weight:700;"></div>
+  </div>
+
+  <!-- Step 2: 選擇角色 -->
+  <div id="step2" class="section" style="display:none;">
+    <div class="section-title">&#x1F3AF; \u7b2c\u4e8c\u6b65\uff1a\u64c7\u9078\u7533\u8acb\u89d2\u8272</div>
+    <div class="role-grid">
+      <div class="role-card" id="roleCardCL" onclick="selectRole('COLEADERY')">
+        <div class="role-icon">&#x1F31F;</div>
+        <div class="role-name">CoLeadery</div>
+        <div class="role-desc">\u9818\u822a\u8005<br>\u5c0e\u5165\u9879\u76ee\u3001\u5f15\u5c0e\u9577\u8005\u53c3\u8207</div>
+      </div>
+      <div class="role-card" id="roleCardCK" onclick="selectRole('COLINKERY')">
+        <div class="role-icon">&#x1F91D;</div>
+        <div class="role-name">CoLinkery</div>
+        <div class="role-desc">\u9023\u7d50\u8005<br>\u9023\u63a5\u5546\u696d\u5ba2\u6236\u3001\u6cfd\u5c55\u5408\u4f5c</div>
+      </div>
+    </div>
+    <div id="roleDesc" style="margin-top:12px;padding:12px;background:#FFF5F5;border-radius:8px;font-size:15px;color:#555;display:none;line-height:1.6;"></div>
+    <div class="err-box" id="s2Err"></div>
+  </div>
+
+  <!-- Step 3: 申請人類型 -->
+  <div id="step3" class="section" style="display:none;">
+    <div class="section-title">&#x1F4CB; \u7b2c\u4e09\u6b65\uff1a\u7533\u8acb\u4eba\u985e\u578b</div>
+    <div class="type-group">
+      <label class="type-radio" id="typeInd" onclick="selectType('INDIVIDUAL')">
+        <input type="radio" name="applyType" value="INDIVIDUAL">
+        <div>
+          <div style="font-size:17px;font-weight:700;">\uD83D\uDC64 \u500b\u4eba</div>
+          <div style="font-size:14px;color:#666;margin-top:3px;">\u4e2a\u4eba\u540d\u7fa9\u7533\u8acb\uff0c\u63d0\u4f9b\u8eab\u4efd\u8b49\u6587\u4ef6</div>
+        </div>
+      </label>
+      <label class="type-radio" id="typeGrp" onclick="selectType('GROUP')">
+        <input type="radio" name="applyType" value="GROUP">
+        <div>
+          <div style="font-size:17px;font-weight:700;">\uD83D\uDC65 \u5c0f\u7d44</div>
+          <div style="font-size:14px;color:#666;margin-top:3px;">\u5c0e\u9818\u5c0f\u7d44\u9818\u822a\uff0c\u586b\u5beb\u5c0f\u7d44\u8cc7\u6599</div>
+        </div>
+      </label>
+      <label class="type-radio" id="typeCo" onclick="selectType('COMPANY')">
+        <input type="radio" name="applyType" value="COMPANY">
+        <div>
+          <div style="font-size:17px;font-weight:700;">\uD83C\uDFE2 \u516c\u53f8</div>
+          <div style="font-size:14px;color:#666;margin-top:3px;">\u4ee5\u516c\u53f8\u540d\u7fa9\u7533\u8acb\uff0c\u63d0\u4f9b BR \u767b\u8a18\u8b49\u660e</div>
+        </div>
+      </label>
+    </div>
+    <div class="err-box" id="s3Err"></div>
+  </div>
+
+  <!-- Step 4: 填寫資料 -->
+  <div id="step4" class="section" style="display:none;">
+    <div class="section-title">&#x270D;&#xFE0F; \u7b2c\u56db\u6b65\uff1a\u586b\u5beb\u8cc7\u6599</div>
+    <div class="field-group">
+      <label>\u4e2d\u6587\u59d3\u540d <span class="req">*</span></label>
+      <input type="text" id="applyNameZh" placeholder="\u4e2d\u6587\u59d3\u540d">
+    </div>
+    <div class="field-group">
+      <label>\u82f1\u6587\u59d3\u540d</label>
+      <input type="text" id="applyNameEn" placeholder="English Name (optional)">
+    </div>
+    <div class="field-group">
+      <label>\u8a1c\u8981\u96fb\u8a71 <span class="req">*</span></label>
+      <input type="tel" id="applyContactPhone" inputmode="numeric" placeholder="\u8a81\u8981\u96fb\u8a71\u865f\u78bc">
+    </div>
+    <div class="field-group">
+      <label>\u5730\u5740</label>
+      <input type="text" id="applyAddress" placeholder="\u9999\u6e2f\u5730\u5740 (\u5931\u696d)">
+    </div>
+    <!-- 個人：HKID prefix -->
+    <div id="fieldIdPrefix" class="field-group" style="display:none;">
+      <label>\u8eab\u4efd\u8b49\u524d\u7f00 <span class="req">*</span></label>
+      <input type="text" id="applyIdPrefix" placeholder="\u4f8b: A123456" maxlength="8">
+      <div class="hint">\u8eab\u4efd\u8b49\u865f\u78bc\u524d 7 \u4f4d\uff08\u4e0d\u5305\u62ec\u62ec\u865f\u5167\u6578\u5b57\uff09</div>
+    </div>
+    <!-- 公司：公司名 + BR -->
+    <div id="fieldCompany" class="field-group" style="display:none;">
+      <label>\u516c\u53f8\u540d\u7a31 <span class="req">*</span></label>
+      <input type="text" id="applyCompanyName" placeholder="\u6ce8\u518c\u516c\u53f8\u540d\u7a31">
+    </div>
+    <div id="fieldBR" class="field-group" style="display:none;">
+      <label>BR \u865f\u78bc</label>
+      <input type="text" id="applyCompanyBR" placeholder="BR\u767b\u8a18\u865f\u78bc">
+    </div>
+    <!-- 小組：人數 + 說明 -->
+    <div id="fieldTeam" class="field-group" style="display:none;">
+      <label>\u5c0f\u7d44\u4eba\u6578</label>
+      <input type="number" id="applyTeamSize" min="2" max="50" placeholder="\u5c0f\u7d44\u9810\u671f\u4eba\u6578">
+    </div>
+    <div id="fieldTeamNotes" class="field-group" style="display:none;">
+      <label>\u5c0f\u7d44\u610f\u5411\u7c21\u4ecb</label>
+      <textarea id="applyTeamNotes" rows="3" placeholder="\u8acb\u7c21\u8ff0\u5c0f\u7d44\u7684\u80cc\u666f\u548c\u610f\u5411"></textarea>
+    </div>
+    <!-- CoLinkery：行業背景 -->
+    <div id="fieldIndustry" class="field-group" style="display:none;">
+      <label>\u884c\u696d\u80cc\u666f / \u5e02\u5834\u8cc7\u6e90</label>
+      <textarea id="applyIndustry" rows="3" placeholder="\u8acb\u7c21\u8ff0\u4f60\u7684\u884c\u696d\u80cc\u666f\u53ca\u53ef\u5e36\u4f86\u7684\u5408\u4f5c\u8cc7\u6e90"></textarea>
+    </div>
+    <!-- 銀行資料 -->
+    <div class="field-group">
+      <label>\u9280\u884c\u540d\u7a31</label>
+      <select id="applyBankName">
+        <option value="">\u8acb\u64c7\u9078\u9280\u884c</option>
+        <option>\u532f\u8c50\u9280\u884c (HSBC)</option>
+        <option>\u6e63\u6f50\u9280\u884c (Hang Seng)</option>
+        <option>\u4e2d\u570b\u9280\u884c (Bank of China)</option>
+        <option>\u6e23\u6253\u9280\u884c (Standard Chartered)</option>
+        <option>\u4e2d\u4fe1\u9280\u884c\u7586</option>
+        <option>\u8377\u862d\u6613\u9280\u884c (ING)</option>
+        <option>Citibank</option>
+        <option>DBS</option>
+        <option>ZA Bank</option>
+        <option>Mox Bank</option>
+        <option>\u5176\u4ed6</option>
+      </select>
+    </div>
+    <div class="field-group">
+      <label>\u9280\u884c\u6236\u53e3\u865f\u78bc</label>
+      <input type="text" id="applyBankAcc" placeholder="\u9280\u884c\u6236\u53e3\u865f\u78bc" inputmode="numeric">
+    </div>
+    <div class="err-box" id="s4Err"></div>
+  </div>
+
+  <!-- Step 5: 上傳文件 -->
+  <div id="step5" class="section" style="display:none;">
+    <div class="section-title">&#x1F4CE; \u7b2c\u4e94\u6b65\uff1a\u4e0a\u50b3\u8eab\u4efd\u6587\u4ef6</div>
+    <p style="font-size:16px;color:#555;margin-bottom:14px;line-height:1.6;">\u8acb\u4e0a\u50b3\u8eab\u4efd\u8b49\u6b63\u9762\u7167\u7247\uff08\u6216\u516c\u53f8 BR \u767b\u8a18\u8b49\u660e\uff09\u4f9b\u5be9\u6838\u4e4b\u7528\u3002\u5c0f\u65bc 5MB\uff0cJPG / PNG / PDF\u3002</p>
+    <div class="upload-area" onclick="document.getElementById('idDocInput').click()">
+      <div style="font-size:40px;margin-bottom:8px;">&#x1F4F7;</div>
+      <div style="font-size:16px;font-weight:700;color:#8B0000;">\u9ede\u64ca\u9078\u64c7\u6a94\u6848</div>
+      <div style="font-size:14px;color:#888;margin-top:4px;">JPG / PNG / PDF \u00b7 \u4e0d\u8d85\u904e 5MB</div>
+    </div>
+    <input type="file" id="idDocInput" accept="image/*,.pdf" style="display:none" onchange="handleFileSelect(this)">
+    <div class="upload-status" id="uploadStatus">\u5c1a\u672a\u9078\u64c7\u6a94\u6848</div>
+    <div class="err-box" id="s5Err"></div>
+  </div>
+
+  <!-- Step 6: 聲明確認 -->
+  <div id="step6" class="section" style="display:none;">
+    <div class="section-title">&#x1F4DC; \u7b2c\u516d\u6b65\uff1a\u8072\u660e\u78ba\u8a8d</div>
+    <div class="declaration-box">
+      <strong>\u7533\u8acb\u8072\u660e</strong><br><br>
+      \u672c\u4eba\u7406\u89e3\u5e76\u540c\u610f\u4ee5\u4e0b\u689d\u6b3e\uff1a<br>
+      1. \u7533\u8acb\u6210\u70ba CoEldery 85 \u8a8d\u8b49\u89d2\u8272\u6301\u6709\u4eba\u5c6c\u81ea\u613f\u53c3\u8207\uff0c\u975e\u5c31\u696d\u95dc\u4fc2\u3002<br>
+      2. \u7d42\u6b62\u524d\u5c07\u5b88\u5be6 CoEldery 85 \u7ae0\u7a0b\u6a19\u6e96\uff0c\u96a8\u6642\u66f4\u65b0\u81f3\u6700\u65b0\u7248\u672c\u3002<br>
+      3. \u6388\u6b0a\u6301\u6e34\u7d50\u69cb\u67e5\u9a57\u4e2a\u4eba\u8cc7\u6599\u4f9b\u5be9\u6838\u4e4b\u7528\u3002<br>
+      4. \u7d55\u4e0d\u4ee5\u7a97\u54e3\u540d\u7fa9\u7c3d\u7d04\u3001\u627f\u8bfa\u8ca1\u52d9\u56de\u5831\u6216\u4ee3\u6536\u6b3e\u9805\u3002<br>
+      5. \u9805\u76ee\u5206\u6210\u70ba\u975e\u4fdd\u8b49\u6536\u76ca\uff0c\u5b9e\u969b\u4ee5\u6b63\u5f0f\u7d50\u7b97\u70ba\u6e96\u3002
+    </div>
+    <label class="check-row" id="declarationCheck">
+      <input type="checkbox" id="agreeCheck" onchange="updateDeclareBtn()">
+      <span style="font-size:16px;line-height:1.5;">\u672c\u4eba\u5df2\u9285\u8b80\u4e26\u540c\u610f\u4e0a\u8ff0\u8072\u660e\u6307\u5f15</span>
+    </label>
+    <div class="err-box" id="s6Err"></div>
+  </div>
+
+  <!-- Success -->
+  <div id="stepSuccess" class="section" style="display:none;">
+    <div class="success-box">
+      <div class="s-icon">&#x2705;</div>
+      <div class="s-title">\u7533\u8acb\u5df2\u63d0\u4ea4\uff01</div>
+      <div class="s-text">\u6211\u5011\u6703\u5c55\u958b\u5be9\u6838\uff0c\u9810\u8a08 3-5 \u5de5\u4f5c\u65e5\u5167\u56de\u8986\u3002\u5be9\u6838\u901a\u904e\u5f8c\u6703\u767c\u51fa\u96fb\u5b50\u6388\u6b0a\u5361\u3002</div>
+      <button onclick="goBack()" style="margin-top:24px;padding:14px 32px;background:#8B0000;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;">\u8fd4\u56de\u6211\u7684\u5361</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- 底部按鈕 -->
+<div class="nav-btns" id="navBtns">
+  <button class="btn-back" id="btnBack" onclick="prevStep()">\u8fd4\u56de</button>
+  <button class="btn-next" id="btnNext" onclick="nextStep()">\u4e0b\u4e00\u6b65</button>
+</div>
+
+<script>
+var TOTAL_STEPS = 6;
+var currentStep = 1;
+var selectedRole = '';
+var selectedType = '';
+var memberNo = '${prefillMember}';
+var uploadedKey = '';
+
+// Init step dots
+function initDots() {
+  var d = document.getElementById('stepDots');
+  d.innerHTML = '';
+  for (var i = 1; i <= TOTAL_STEPS; i++) {
+    var dot = document.createElement('div');
+    dot.className = 'step-dot' + (i === currentStep ? ' active' : (i < currentStep ? ' done' : ''));
+    dot.id = 'dot' + i;
+    d.appendChild(dot);
+  }
+}
+initDots();
+
+// Pre-fill phone if member_no provided
+if (memberNo) {
+  document.getElementById('applyPhone').value = memberNo;
+  verifyPhone();
+}
+
+function goBack() {
+  window.location.href = '/app' + (memberNo ? '?member=' + encodeURIComponent(memberNo) : '');
+}
+
+function updateDots() {
+  for (var i = 1; i <= TOTAL_STEPS; i++) {
+    var dot = document.getElementById('dot' + i);
+    if (!dot) continue;
+    dot.className = 'step-dot' + (i === currentStep ? ' active' : (i < currentStep ? ' done' : ''));
+  }
+}
+
+function showStep(n) {
+  for (var i = 1; i <= TOTAL_STEPS; i++) {
+    var el = document.getElementById('step' + i);
+    if (el) el.style.display = (i === n) ? '' : 'none';
+  }
+  var btnBack = document.getElementById('btnBack');
+  var btnNext = document.getElementById('btnNext');
+  btnBack.style.display = n === 1 ? 'none' : '';
+  btnNext.textContent = n === TOTAL_STEPS ? '\u63d0\u4ea4\u7533\u8acb' : '\u4e0b\u4e00\u6b65';
+  if (n === TOTAL_STEPS) {
+    btnNext.disabled = !document.getElementById('agreeCheck').checked;
+  } else {
+    btnNext.disabled = false;
+  }
+  currentStep = n;
+  updateDots();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function nextStep() {
+  clearErrors();
+  if (currentStep === 1) {
+    verifyPhone(function(ok) { if (ok) showStep(2); });
+    return;
+  }
+  if (currentStep === 2) {
+    if (!selectedRole) { showErr('s2Err', '\u8acb\u64c7\u9078\u89d2\u8272'); return; }
+    showStep(3); return;
+  }
+  if (currentStep === 3) {
+    if (!selectedType) { showErr('s3Err', '\u8acb\u64c7\u9078\u7533\u8acb\u4eba\u985e\u578b'); return; }
+    updateStep4Fields();
+    showStep(4); return;
+  }
+  if (currentStep === 4) {
+    if (!validateStep4()) return;
+    showStep(5); return;
+  }
+  if (currentStep === 5) {
+    // 文件上傳可選
+    showStep(6); return;
+  }
+  if (currentStep === 6) {
+    if (!document.getElementById('agreeCheck').checked) {
+      showErr('s6Err', '\u8acb\u5148\u52fe\u9078\u8072\u660e');
+      return;
+    }
+    submitApplication();
+    return;
+  }
+}
+
+function prevStep() {
+  if (currentStep > 1) showStep(currentStep - 1);
+}
+
+function verifyPhone(cb) {
+  var phone = document.getElementById('applyPhone').value.trim();
+  if (!phone) { showErr('s1Err', '\u8acb\u8f38\u5165\u96fb\u8a71\u865f\u78bc'); return; }
+  var btn = document.getElementById('btnNext');
+  btn.disabled = true;
+  btn.textContent = '\u9a57\u8b49\u4e2d\u2026';
+  fetch('/api/partner/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: phone })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    btn.disabled = false;
+    btn.textContent = '\u4e0b\u4e00\u6b65';
+    if (!d.ok) { showErr('s1Err', d.error || '\u6838\u5bfb\u5931\u6557'); return; }
+    memberNo = d.member_no;
+    var found = document.getElementById('s1Found');
+    found.style.display = '';
+    found.textContent = '\u627e\u5230\u6703\u54e1\uff1a' + d.name_zh + '\uff08' + d.member_no + '\uff09';
+    if (d.existing && (d.existing.status === 'PENDING' || d.existing.status === 'APPROVED')) {
+      showErr('s1Err', '\u4f60\u5df2\u6709 ' + d.existing.status + ' \u72c0\u614b\u7684\u7533\u8acb\uff08\u89d2\u8272\uff1a' + d.existing.role + '\uff09\uff0c\u8acb\u8010\u5fc3\u7b49\u5019\u5be9\u6838\u3002');
+      return;
+    }
+    if (cb) cb(true);
+    else showStep(2);
+  }).catch(function() {
+    btn.disabled = false;
+    btn.textContent = '\u4e0b\u4e00\u6b65';
+    showErr('s1Err', '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66');
+  });
+}
+
+function selectRole(r) {
+  selectedRole = r;
+  document.getElementById('roleCardCL').classList.toggle('selected', r === 'COLEADERY');
+  document.getElementById('roleCardCK').classList.toggle('selected', r === 'COLINKERY');
+  var desc = document.getElementById('roleDesc');
+  desc.style.display = '';
+  if (r === 'COLEADERY') {
+    desc.innerHTML = '<strong>\uD83C\uDF1F CoLeadery \u9818\u822a\u8005</strong>\uff1a\u8ca0\u8cac\u5c0e\u5165\u9805\u76ee\u3001\u5f15\u5c0e\u9577\u8005\u53c3\u8207\u3001\u5efa\u7acb\u57fa\u5c64\u6e90\u5ba2\u6236\u3002\u9069\u5408\u5177\u6709\u793e\u5340\u8fba\u7d61\u6216\u80fd\u76f4\u63a5\u5b63\u7dad\u5c0e\u5165\u9805\u76ee\u7684\u4eba\u58eb\u3002<br>\u5206\u6210\u5c55\u793a\uff1a\u9805\u76ee\u6de8\u5229\u6f64\u7684 <strong>10%</strong>\uff08\u6a19\u6e96\u5c64\u7d1a\uff09';
+  } else {
+    desc.innerHTML = '<strong>\uD83E\uDD1D CoLinkery \u9023\u7d50\u8005</strong>\uff1a\u9023\u63a5\u5546\u696d\u5ba2\u6236\u3001\u6cfd\u5c55 B2B \u5408\u4f5c\u6a5f\u6703\u3002\u9069\u5408\u64c1\u6709\u5546\u696d\u4eba\u8108\u6216\u5ba2\u6236\u8cc7\u6e90\u7684\u4eba\u58eb\u3002<br>\u5206\u6210\u5c55\u793a\uff1a\u9805\u76ee\u6de8\u5229\u6f64\u7684 <strong>10-20%</strong>\uff08\u5716\u591a\u7d50\u69cb\uff09';
+  }
+}
+
+function selectType(t) {
+  selectedType = t;
+  ['Ind','Grp','Co'].forEach(function(k, i) {
+    var types = ['INDIVIDUAL','GROUP','COMPANY'];
+    document.getElementById('type' + k).classList.toggle('selected', t === types[i]);
+    document.getElementById('type' + k).querySelector('input').checked = (t === types[i]);
+  });
+}
+
+function updateStep4Fields() {
+  var isInd = selectedType === 'INDIVIDUAL';
+  var isCo = selectedType === 'COMPANY';
+  var isGrp = selectedType === 'GROUP';
+  var isCK = selectedRole === 'COLINKERY';
+  document.getElementById('fieldIdPrefix').style.display = isInd ? '' : 'none';
+  document.getElementById('fieldCompany').style.display = isCo ? '' : 'none';
+  document.getElementById('fieldBR').style.display = isCo ? '' : 'none';
+  document.getElementById('fieldTeam').style.display = isGrp ? '' : 'none';
+  document.getElementById('fieldTeamNotes').style.display = isGrp ? '' : 'none';
+  document.getElementById('fieldIndustry').style.display = isCK ? '' : 'none';
+}
+
+function validateStep4() {
+  var name = document.getElementById('applyNameZh').value.trim();
+  var phone = document.getElementById('applyContactPhone').value.trim();
+  if (!name) { showErr('s4Err', '\u8acb\u586b\u5beb\u4e2d\u6587\u59d3\u540d'); return false; }
+  if (!phone) { showErr('s4Err', '\u8acb\u586b\u5beb\u9023\u7d61\u96fb\u8a71'); return false; }
+  if (selectedType === 'INDIVIDUAL' && !document.getElementById('applyIdPrefix').value.trim()) {
+    showErr('s4Err', '\u8acb\u586b\u5beb\u8eab\u4efd\u8b49\u524d\u7f00'); return false;
+  }
+  if (selectedType === 'COMPANY' && !document.getElementById('applyCompanyName').value.trim()) {
+    showErr('s4Err', '\u8acb\u586b\u5beb\u516c\u53f8\u540d\u7a31'); return false;
+  }
+  return true;
+}
+
+function handleFileSelect(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    document.getElementById('uploadStatus').textContent = '\u6a94\u6848\u4e0d\u80fd\u8d85\u904e 5MB';
+    document.getElementById('uploadStatus').className = 'upload-status';
+    return;
+  }
+  var statusEl = document.getElementById('uploadStatus');
+  statusEl.textContent = '\u4e0a\u50b3\u4e2d\u2026';
+  statusEl.className = 'upload-status';
+  var form = new FormData();
+  form.append('file', file);
+  fetch('/api/partner/upload', { method: 'POST', body: form })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        uploadedKey = d.key;
+        statusEl.textContent = '\u2705 ' + file.name + ' \u4e0a\u50b3\u6210\u529f';
+        statusEl.className = 'upload-status ok';
+      } else {
+        statusEl.textContent = '\u4e0a\u50b3\u5931\u6557\uff1a' + (d.error || '\u8acb\u91cd\u8a66');
+        statusEl.className = 'upload-status';
+      }
+    }).catch(function() {
+      statusEl.textContent = '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66';
+      statusEl.className = 'upload-status';
+    });
+}
+
+function updateDeclareBtn() {
+  document.getElementById('btnNext').disabled = !document.getElementById('agreeCheck').checked;
+}
+
+function submitApplication() {
+  var btn = document.getElementById('btnNext');
+  btn.disabled = true;
+  btn.textContent = '\u63d0\u4ea4\u4e2d\u2026';
+  var body = {
+    member_no: memberNo,
+    role: selectedRole,
+    applicant_type: selectedType,
+    name_zh: document.getElementById('applyNameZh').value.trim(),
+    name_en: document.getElementById('applyNameEn').value.trim(),
+    phone: document.getElementById('applyContactPhone').value.trim(),
+    address: document.getElementById('applyAddress').value.trim(),
+    id_prefix: document.getElementById('applyIdPrefix').value.trim(),
+    id_doc_r2_key: uploadedKey,
+    company_name: document.getElementById('applyCompanyName').value.trim(),
+    company_br: document.getElementById('applyCompanyBR').value.trim(),
+    industry_background: document.getElementById('applyIndustry') ? document.getElementById('applyIndustry').value.trim() : '',
+    team_size: parseInt(document.getElementById('applyTeamSize').value) || null,
+    team_notes: document.getElementById('applyTeamNotes') ? document.getElementById('applyTeamNotes').value.trim() : '',
+    bank_name: document.getElementById('applyBankName').value,
+    bank_acc_no: document.getElementById('applyBankAcc').value.trim()
+  };
+  fetch('/api/partner/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      document.getElementById('step6').style.display = 'none';
+      document.getElementById('stepSuccess').style.display = '';
+      document.getElementById('navBtns').style.display = 'none';
+      document.getElementById('stepDots').style.display = 'none';
+    } else {
+      btn.disabled = false;
+      btn.textContent = '\u63d0\u4ea4\u7533\u8acb';
+      showErr('s6Err', d.error || '\u63d0\u4ea4\u5931\u6557\uff0c\u8acb\u518d\u8a66');
+    }
+  }).catch(function() {
+    btn.disabled = false;
+    btn.textContent = '\u63d0\u4ea4\u7533\u8acb';
+    showErr('s6Err', '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66');
+  });
+}
+
+function showErr(id, msg) {
+  var el = document.getElementById(id);
+  if (el) { el.textContent = msg; el.classList.add('show'); }
+}
+function clearErrors() {
+  document.querySelectorAll('.err-box').forEach(function(e) { e.classList.remove('show'); });
+}
+</script>
+</body>
+</html>`
+}
+
+// ── 錢包頁 HTML ────────────────────────────────────────────────────────────
+function walletHtml(prefillMember: string): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>我的錢包 · CoEldery 85</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:18px;line-height:1.6;color:#111;}
+.topbar{background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;}
+.topbar .back{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;border-radius:6px;}
+.topbar .title{font-size:20px;font-weight:900;letter-spacing:1px;}
+.wrap{max-width:480px;margin:0 auto;padding:18px 16px 40px;}
+/* Login */
+.login-card{background:#fff;border-radius:14px;padding:28px 20px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px;}
+.login-card h2{font-size:22px;font-weight:900;color:#1B5E20;margin-bottom:12px;}
+.login-card p{font-size:17px;color:#555;margin-bottom:18px;line-height:1.6;}
+input.big-in{width:100%;padding:13px 14px;font-size:18px;border:2px solid #a5d6a7;border-radius:8px;font-family:inherit;outline:none;}
+input.big-in:focus{border-color:#1B5E20;}
+.big-btn{display:block;width:100%;padding:16px;margin-top:14px;background:#2E7D32;color:#fff;border:none;border-radius:10px;font-size:19px;font-weight:900;cursor:pointer;font-family:inherit;}
+.big-btn:disabled{background:#a5d6a7;cursor:not-allowed;}
+.err{margin-top:10px;padding:10px 14px;background:#ffebee;border:2px solid #c62828;border-radius:8px;color:#c62828;font-size:16px;font-weight:700;display:none;}
+.err.show{display:block;}
+/* Summary */
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.sum-card{background:#fff;border-radius:12px;padding:14px 12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+.sum-num{font-size:22px;font-weight:900;color:#1B5E20;}
+.sum-label{font-size:13px;color:#777;margin-top:4px;}
+/* Entries */
+.section-title{font-size:18px;font-weight:900;color:#1B5E20;margin:16px 0 10px;border-left:4px solid #2E7D32;padding-left:10px;}
+.entry-card{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+.entry-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.entry-project{font-size:15px;font-weight:700;color:#1B5E20;}
+.entry-role{font-size:13px;color:#888;}
+.entry-amount{font-size:20px;font-weight:900;color:#1B5E20;}
+.entry-meta{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+.status-badge{font-size:12px;font-weight:700;padding:3px 8px;border-radius:5px;}
+.status-POSTED{background:#E8F5E9;color:#1B5E20;}
+.status-PENDING_PAYOUT{background:#FFF3E0;color:#E65100;}
+.status-PAID{background:#E3F2FD;color:#1565C0;}
+.status-RESERVED{background:#F3E5F5;color:#6A1B9A;}
+.status-PENDING_CONFIRM{background:#FAFAFA;color:#777;}
+.hash-text{font-size:11px;color:#bbb;word-break:break-all;margin-top:6px;font-family:monospace;}
+.empty-box{text-align:center;padding:50px 20px;color:#999;}
+.empty-box .icon{font-size:52px;margin-bottom:14px;}
+.loading-box{text-align:center;padding:50px 20px;font-size:18px;color:#888;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="back" onclick="goBack()">&#8592;</button>
+  <span class="title">&#x1F4B0; \u6211\u7684\u9322\u5305</span>
+</div>
+<div class="wrap">
+
+  <!-- 電話登入 -->
+  <div id="loginSection" class="login-card">
+    <h2>&#x1F511; \u9a57\u8b49\u8eab\u4efd</h2>
+    <p>\u8acb\u8f38\u5165\u4f60\u7684\u6703\u54e1\u96fb\u8a71\u865f\u78bc\u4f86\u67e5\u770b\u9322\u5305</p>
+    <input class="big-in" type="tel" id="walletPhone" inputmode="numeric" placeholder="\u96fb\u8a71\u865f\u78bc">
+    <button class="big-btn" id="walletLoginBtn" onclick="loadWallet()">\uD83D\uDD0D \u67e5\u770b\u9322\u5305</button>
+    <div class="err" id="walletErr"></div>
+  </div>
+
+  <!-- 錢包內容 -->
+  <div id="walletContent" style="display:none;">
+    <!-- 角色徽章 -->
+    <div id="holdersRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"></div>
+    <!-- 彙總 -->
+    <div class="summary-grid" id="summaryGrid"></div>
+    <!-- 分成記錄 -->
+    <div class="section-title">\u5206\u6210\u8a18\u9304</div>
+    <div id="entriesList"></div>
+  </div>
+
+  <div id="loadingBox" class="loading-box" style="display:none;">\u8f09\u5165\u4e2d\u2026</div>
+  <div id="emptyBox" class="empty-box" style="display:none;">
+    <div class="icon">&#x1F4BC;</div>
+    <div>\u5c1a\u672a\u6709\u5206\u6210\u8a18\u9304\u3002<br>\u5be9\u6838\u901a\u904e\u5f8c\u5c07\u9677\u5c55\u793a\u5206\u6210\u8a18\u9304\u3002</div>
+  </div>
+
+</div>
+<script>
+var memberNo = '${prefillMember}';
+var walletPhone = '';
+
+function goBack() {
+  window.location.href = '/app' + (memberNo ? '?member=' + encodeURIComponent(memberNo) : '');
+}
+
+// If memberNo provided, pre-fill phone field and try to load
+// (we don't have phone from memberNo directly, so just show the input)
+(function init() {
+  // Try to pre-fill phone from sessionStorage if available
+  var savedPhone = sessionStorage.getItem('ce85_phone');
+  if (savedPhone) {
+    document.getElementById('walletPhone').value = savedPhone;
+  }
+})();
+
+function loadWallet() {
+  var phone = document.getElementById('walletPhone').value.trim();
+  if (!phone) {
+    showErr('\u8acb\u8f38\u5165\u96fb\u8a71\u865f\u78bc');
+    return;
+  }
+  walletPhone = phone;
+  sessionStorage.setItem('ce85_phone', phone);
+  document.getElementById('walletLoginBtn').disabled = true;
+  document.getElementById('walletLoginBtn').textContent = '\u8f09\u5165\u4e2d\u2026';
+  document.getElementById('loadingBox').style.display = '';
+  document.getElementById('loginSection').style.display = 'none';
+
+  fetch('/api/partner/wallet?phone=' + encodeURIComponent(phone))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('loadingBox').style.display = 'none';
+      document.getElementById('walletLoginBtn').disabled = false;
+      document.getElementById('walletLoginBtn').textContent = '\uD83D\uDD0D \u67e5\u770b\u9322\u5305';
+      if (!d.ok) {
+        document.getElementById('loginSection').style.display = '';
+        showErr(d.error || '\u67e5\u8a62\u5931\u6557');
+        return;
+      }
+      renderWallet(d);
+    }).catch(function() {
+      document.getElementById('loadingBox').style.display = 'none';
+      document.getElementById('loginSection').style.display = '';
+      document.getElementById('walletLoginBtn').disabled = false;
+      document.getElementById('walletLoginBtn').textContent = '\uD83D\uDD0D \u67e5\u770b\u9322\u5305';
+      showErr('\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66');
+    });
+}
+
+function renderWallet(d) {
+  document.getElementById('walletContent').style.display = '';
+
+  // Holders badges
+  var holdersRow = document.getElementById('holdersRow');
+  holdersRow.innerHTML = '';
+  (d.holders || []).forEach(function(h) {
+    var span = document.createElement('div');
+    span.style.cssText = 'background:#1B5E20;color:#fff;padding:6px 14px;border-radius:20px;font-size:14px;font-weight:700;';
+    var roleLabel = h.role === 'COLEADERY' ? '\uD83C\uDF1F CoLeadery \u9818\u822a\u8005' : '\uD83E\uDD1D CoLinkery \u9023\u7d50\u8005';
+    span.textContent = roleLabel + ' \u00b7 ' + h.holder_no;
+    holdersRow.appendChild(span);
+  });
+
+  // Summary
+  var s = d.summary || {};
+  var fmt = function(c) { return 'HK$' + ((c || 0) / 100).toLocaleString('zh-HK', { minimumFractionDigits: 0 }); };
+  document.getElementById('summaryGrid').innerHTML =
+    '<div class="sum-card"><div class="sum-num">' + fmt(s.total_posted) + '</div><div class="sum-label">\u5df2\u5165\u5e33 (POSTED)</div></div>' +
+    '<div class="sum-card"><div class="sum-num">' + fmt(s.total_pending_payout) + '</div><div class="sum-label">\u5f85\u51fa\u6b3e</div></div>' +
+    '<div class="sum-card"><div class="sum-num">' + fmt(s.total_paid) + '</div><div class="sum-label">\u5df2\u5be6\u969b\u51fa\u6b3e</div></div>' +
+    '<div class="sum-card"><div class="sum-num">' + fmt((s.total_posted||0) + (s.total_pending_payout||0) + (s.total_paid||0)) + '</div><div class="sum-label">\u7d2f\u8a08\u5206\u6210</div></div>';
+
+  // Entries
+  var list = document.getElementById('entriesList');
+  var entries = d.entries || [];
+  if (!entries.length) {
+    document.getElementById('emptyBox').style.display = '';
+    list.innerHTML = '';
+    return;
+  }
+  var statusLabels = {
+    PENDING_CONFIRM: '\u5f85\u78ba\u8a8d',
+    POSTED: '\u5df2\u5165\u5e33',
+    PENDING_PAYOUT: '\u5f85\u51fa\u6b3e',
+    PAID: '\u5df2\u51fa\u6b3e',
+    RESERVED: '\u6c60\u985e\u9810\u7559'
+  };
+  var roleLabels = {
+    COLEADERY: '\uD83C\uDF1F CoLeadery \u9818\u822a\u8005\u4efd\u984d',
+    COLINKERY: '\uD83E\uDD1D CoLinkery \u9023\u7d50\u8005\u4efd\u984d',
+    COOWNERY_POOL: '\uD83C\uDFE0 CoOwnery \u6c60',
+    COSUPPORTERY_POOL: '\uD83E\uDD1D CoSupportery \u6c60',
+    MUTUAL_FUND: '\uD83D\uDCB3 \u4e92\u52a9\u57fa\u91d1',
+    PLATFORM_FEE: '\uD83D\uDCBC \u5e73\u53f0\u8cbb',
+    SPECIAL_ACCOUNT: '\uD83C\uDF1F \u7279\u5225\u8cc7\u91d1'
+  };
+  list.innerHTML = entries.map(function(e) {
+    var statusClass = 'status-' + (e.status || 'PENDING_CONFIRM');
+    var statusText = statusLabels[e.status] || e.status;
+    var roleText = roleLabels[e.role_or_pool] || e.role_or_pool;
+    var dateStr = e.created_at ? e.created_at.slice(0,10) : '';
+    var paidStr = e.paid_at ? ' \u00b7 \u51fa\u6b3e: ' + e.paid_at.slice(0,10) : '';
+    var hashStr = e.hash ? '<div class="hash-text">\u5b58\u8b49: ' + e.hash + '</div>' : '';
+    return '<div class="entry-card">' +
+      '<div class="entry-header">' +
+        '<div><div class="entry-project">' + (e.project_name||'\u9805\u76ee') + ' <span style="font-size:13px;color:#aaa;">' + (e.project_code||'') + '</span></div>' +
+        '<div class="entry-role">' + roleText + '</div></div>' +
+        '<div class="entry-amount">' + fmt(e.amount_cents) + '</div>' +
+      '</div>' +
+      '<div class="entry-meta">' +
+        '<span class="status-badge ' + statusClass + '">' + statusText + '</span>' +
+        '<span style="font-size:13px;color:#999;">' + dateStr + paidStr + '</span>' +
+      '</div>' +
+      hashStr +
+    '</div>';
+  }).join('');
+}
+
+function showErr(msg) {
+  var el = document.getElementById('walletErr');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+</script>
+</body>
+</html>`
+}
+
+
 // 前台 role-holder route 走 /api/partner/*
 // 公開查核 /verify/:token
 // 公開影響力 /impact
