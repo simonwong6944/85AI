@@ -11785,11 +11785,11 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
 
   <!-- Step 1: 驗證身份 -->
   <div id="step1" class="section">
-    <div class="section-title">&#x1F50D; \u7b2c\u4e00\u6b65\uff1a\u9a57\u8b49\u8001\u6709\u5361\u6703\u54e1\u8eab\u4efd</div>
+    <div class="section-title">&#x1F50D; 第一步：驗證老有卡會員身份</div>
     <div class="field-group">
-      <label>\u6703\u54e1\u96fb\u8a71\u865f\u78bc <span class="req">*</span></label>
-      <input type="tel" id="applyPhone" inputmode="numeric" placeholder="\u8f38\u5165\u5df2\u767b\u8a18\u7684\u96fb\u8a71\u865f\u78bc" maxlength="20">
-      <div class="hint">\u7cfb\u7d71\u6703\u6838\u5bfb\u4f60\u7684\u8001\u6709\u5361\u6703\u54e1\u8cc7\u6599</div>
+      <label>會員電話號碼 <span class="req">*</span></label>
+      <input type="tel" id="applyPhone" inputmode="numeric" placeholder="輸入已登記的電話號碼" maxlength="20">
+      <div class="hint">系統會搜尋你的老有卡會員資料</div>
     </div>
     <div class="err-box" id="s1Err"></div>
     <div id="s1Found" style="display:none;background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:8px;padding:12px 14px;font-size:16px;color:#1B5E20;font-weight:700;"></div>
@@ -11994,19 +11994,19 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
 
   <!-- Step 6: 聲明確認 -->
   <div id="step6" class="section" style="display:none;">
-    <div class="section-title">&#x1F4DC; \u7b2c\u516d\u6b65\uff1a\u8072\u660e\u78ba\u8a8d</div>
+    <div class="section-title">&#x1F4DC; 第六步：聲明確認</div>
     <div class="declaration-box">
-      <strong>\u7533\u8acb\u8072\u660e</strong><br><br>
-      \u672c\u4eba\u7406\u89e3\u5e76\u540c\u610f\u4ee5\u4e0b\u689d\u6b3e\uff1a<br>
-      1. \u7533\u8acb\u6210\u70ba CoEldery 85 \u8a8d\u8b49\u89d2\u8272\u6301\u6709\u4eba\u5c6c\u81ea\u613f\u53c3\u8207\uff0c\u975e\u5c31\u696d\u95dc\u4fc2\u3002<br>
-      2. \u7d42\u6b62\u524d\u5c07\u5b88\u5be6 CoEldery 85 \u7ae0\u7a0b\u6a19\u6e96\uff0c\u96a8\u6642\u66f4\u65b0\u81f3\u6700\u65b0\u7248\u672c\u3002<br>
-      3. \u6388\u6b0a\u6301\u6e34\u7d50\u69cb\u67e5\u9a57\u4e2a\u4eba\u8cc7\u6599\u4f9b\u5be9\u6838\u4e4b\u7528\u3002<br>
-      4. \u7d55\u4e0d\u4ee5\u7a97\u54e3\u540d\u7fa9\u7c3d\u7d04\u3001\u627f\u8bfa\u8ca1\u52d9\u56de\u5831\u6216\u4ee3\u6536\u6b3e\u9805\u3002<br>
-      5. \u9805\u76ee\u5206\u6210\u70ba\u975e\u4fdd\u8b49\u6536\u76ca\uff0c\u5b9e\u969b\u4ee5\u6b63\u5f0f\u7d50\u7b97\u70ba\u6e96\u3002
+      <strong>申請聲明</strong><br><br>
+      本人理解並同意以下條款：<br>
+      1. 申請成為 CoEldery 85 認證角色持有人屬自願參與，非就業關係。<br>
+      2. 終止前將遵守 CoEldery 85 章程標準，隨時更新至最新版本。<br>
+      3. 授權持渴望結構查驗本人資料供審核之用。<br>
+      4. 絕不以窗口名義簽約、承諾財務回報或代收款項。<br>
+      5. 項目分成為非保證收益，實際以正式結算為準。
     </div>
     <label class="check-row" id="declarationCheck">
       <input type="checkbox" id="agreeCheck" onchange="updateDeclareBtn()">
-      <span style="font-size:16px;line-height:1.5;">\u672c\u4eba\u5df2\u9285\u8b80\u4e26\u540c\u610f\u4e0a\u8ff0\u8072\u660e\u6307\u5f15</span>
+      <span style="font-size:16px;line-height:1.5;">本人已閱讀並同意上述聲明指引</span>
     </label>
     <div class="err-box" id="s6Err"></div>
   </div>
@@ -12292,9 +12292,9 @@ function selectRole(r) {
   var desc = document.getElementById('roleDesc');
   desc.style.display = '';
   if (r === 'COLEADERY') {
-    desc.innerHTML = '<strong>\uD83C\uDF1F CoLeadery \u9818\u822a\u8005</strong>\uff1a\u8ca0\u8cac\u5c0e\u5165\u9805\u76ee\u3001\u5f15\u5c0e\u9577\u8005\u53c3\u8207\u3001\u5efa\u7acb\u57fa\u5c64\u6e90\u5ba2\u6236\u3002\u9069\u5408\u5177\u6709\u793e\u5340\u8fba\u7d61\u6216\u80fd\u76f4\u63a5\u5b63\u7dad\u5c0e\u5165\u9805\u76ee\u7684\u4eba\u58eb\u3002<br>\u5206\u6210\u5c55\u793a\uff1a\u9805\u76ee\u6de8\u5229\u6f64\u7684 <strong>10%</strong>\uff08\u6a19\u6e96\u5c64\u7d1a\uff09';
+    desc.innerHTML = '<strong>🌟 CoLeadery 領航者</strong>：負責導入項目、引導長者參與、建立基層客戶網絡。適合具有社區聯絡或能直接帶領長者參與項目的人士。<br>分成展示：項目淨利潤的 <strong>10%</strong>（標準層級）';
   } else {
-    desc.innerHTML = '<strong>\uD83E\uDD1D CoLinkery \u9023\u7d50\u8005</strong>\uff1a\u9023\u63a5\u5546\u696d\u5ba2\u6236\u3001\u6cfd\u5c55 B2B \u5408\u4f5c\u6a5f\u6703\u3002\u9069\u5408\u64c1\u6709\u5546\u696d\u4eba\u8108\u6216\u5ba2\u6236\u8cc7\u6e90\u7684\u4eba\u58eb\u3002<br>\u5206\u6210\u5c55\u793a\uff1a\u9805\u76ee\u6de8\u5229\u6f64\u7684 <strong>10-20%</strong>\uff08\u5716\u591a\u7d50\u69cb\uff09';
+    desc.innerHTML = '<strong>🤝 CoLinkery 連結者</strong>：連接商業客戶、拓展 B2B 合作機會。適合擁有商業人脈或客戶資源的人士。<br>分成展示：項目淨利潤的 <strong>10-20%</strong>（圖多結構）';
   }
 }
 
@@ -13635,9 +13635,10 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     if (!['INDIVIDUAL', 'GROUP', 'COMPANY'].includes(applicant_type))
       return c.json({ ok: false, error: '申請人類型無效' }, 400)
     const db = c.env.DB
+    try {
     // 必須先有 KYC 個人正式資料
     const kyc = await db.prepare('SELECT id_prefix, id_doc_r2_key, bank_name, bank_acc_no FROM member_kyc WHERE member_no = ? LIMIT 1').bind(member_no).first<{ id_prefix: string; id_doc_r2_key: string; bank_name: string; bank_acc_no: string }>()
-    if (!kyc) return c.json({ ok: false, error: '請先完成個人正式資料（身份證及銀行資料）登記' }, 400)
+    if (!kyc) return c.json({ ok: false, error: '請先完成第二步個人正式資料登記（身份證及銀行資料）' }, 400)
     // 使用 KYC 資料（覆蓋前端傳來的值）
     const kycIdPrefix = kyc.id_prefix || id_prefix || ''
     const kycDocKey = kyc.id_doc_r2_key || id_doc_r2_key || ''
@@ -13688,6 +13689,10 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     }
 
     return c.json({ ok: true, app_id: appId, invites })
+    } catch (err: any) {
+      console.error('[partner/apply] DB error:', err)
+      return c.json({ ok: false, error: '提交失敗：' + (err?.message || '資料庫錯誤，請重試') }, 500)
+    }
   })
 
   // ── 查詢團隊邀請資訊（供 team-confirm 頁面用）──────────────────────────────
