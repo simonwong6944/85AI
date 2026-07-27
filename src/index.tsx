@@ -13181,6 +13181,16 @@ input.big-in:focus{border-color:#1B5E20;}
 .team-chip.me{background:#ECFDF5;border-color:#6EE7B7;color:#065F46;}
 .my-share-row{font-size:13px;color:#374151;margin-top:4px;}
 .my-share-row strong{color:#8B0000;}
+/* Role group blocks */
+.role-section{margin:10px 0 4px;}
+.role-section-header{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.role-section-label{font-size:13px;font-weight:700;color:#1B5E20;}
+.role-section-pool{font-size:12px;color:#6B7280;background:#F3F4F6;padding:2px 8px;border-radius:10px;}
+.role-members-row{display:flex;flex-wrap:wrap;gap:6px;}
+.member-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;background:#F0FDF4;border:1.5px solid #BBF7D0;color:#166534;padding:4px 11px;border-radius:20px;line-height:1.4;}
+.member-chip .chip-name{font-weight:700;}
+.member-chip .chip-pct{color:#059669;font-weight:700;}
+.role-divider{border:none;border-top:1px solid #F0F0F0;margin:8px 0 0;}
 </style>
 </head>
 <body>
@@ -13308,43 +13318,77 @@ function renderWallet(d) {
     projList.innerHTML = projects.map(function(proj) {
       var stLabel = projStatusLabels[proj.project_status] || proj.project_status;
       var stKey = proj.project_status || 'DRAFT';
-      // 此人在本項目的所有角色（可能多個）
-      var myRoles = proj.myRoles || [];
-      // Build team chips（含 GROUP 成員展開）
       var team = proj.team || [];
-      var teamHtml = '';
-      if (team.length > 0) {
-        var chips = [];
-        team.forEach(function(tm) {
-          var isMe = myHolderNos.indexOf(tm.holder_no) >= 0;
-          var tmRole = roleLabelsShort[tm.role] || tm.role;
+
+      // 按 role 分組 team（COLEADERY / COLINKERY 各一組）
+      var roleOrder = ['COLEADERY', 'COLINKERY'];
+      var roleIcons = {COLEADERY: '🌟', COLINKERY: '🤝'};
+      var roleFullLabels = {COLEADERY: 'CoLeadery 領航者', COLINKERY: 'CoLinkery 連結者'};
+
+      // 建立 role → participants 的 map
+      var teamByRole = {};
+      team.forEach(function(tm) {
+        if (!teamByRole[tm.role]) teamByRole[tm.role] = [];
+        teamByRole[tm.role].push(tm);
+      });
+
+      // 我的角色 set，方便判斷 isMyRole
+      var myRoles = proj.myRoles || [];
+      var myRoleSet = {};
+      myRoles.forEach(function(mr) { myRoleSet[mr.role] = true; });
+
+      // 生成每個角色的區塊 HTML（只顯示有參與者的角色）
+      var roleSectionsHtml = '';
+      var hasAnyRole = false;
+      roleOrder.forEach(function(role) {
+        var participants = teamByRole[role];
+        if (!participants || participants.length === 0) return;
+        hasAnyRole = true;
+
+        // 計算角色池佔項目收益 %
+        var poolBps = role === 'COLEADERY' ? (proj.pct_coleadery || 0) : (proj.pct_colinkery || 0);
+        var poolPct = Math.round(poolBps / 100);
+        var poolLabel = poolPct > 0 ? '佔項目收益 ' + poolPct + '%' : '';
+
+        // 展開成員 chips
+        var memberChips = [];
+        participants.forEach(function(tm) {
           var tmShare = Math.round((tm.team_share_bps || 0) / 100);
           if (tm.applicant_type === 'GROUP' && tm.group_members && tm.group_members.length > 0) {
-            // GROUP holder：展開為每個成員的 chip
+            // GROUP holder → 展開每個小組成員
             tm.group_members.forEach(function(gm) {
-              chips.push('<span class="team-chip' + (isMe ? ' me' : '') + '" title="' + escHtml(tm.holder_no) + ' 小組成員">' +
-                tmRole + ' ' + escHtml(gm.name_zh) +
-                ' · ' + gm.share_pct + '% <span style="font-size:10px;color:rgba(255,255,255,0.7);">(小組)</span>' +
-              '</span>');
+              memberChips.push(
+                '<span class="member-chip">' +
+                  '<span class="chip-name">' + escHtml(gm.name_zh) + '</span>' +
+                  '<span style="color:#9CA3AF;margin:0 2px;">·</span>' +
+                  '<span class="chip-pct">' + gm.share_pct + '%</span>' +
+                '</span>'
+              );
             });
           } else {
-            chips.push('<span class="team-chip' + (isMe ? ' me' : '') + '">' +
-              tmRole + ' ' + escHtml(tm.name_zh) +
-              ' · ' + tmShare + '%' +
-            '</span>');
+            // INDIVIDUAL / COMPANY → 直接顯示 holder 名
+            memberChips.push(
+              '<span class="member-chip">' +
+                '<span class="chip-name">' + escHtml(tm.name_zh) + '</span>' +
+                '<span style="color:#9CA3AF;margin:0 2px;">·</span>' +
+                '<span class="chip-pct">' + tmShare + '%</span>' +
+              '</span>'
+            );
           }
         });
-        teamHtml = '<div class="team-row">' + chips.join('') + '</div>';
-      }
-      // 我的角色明細：每個角色一行，顯示角色名稱 + 分帳% + 占項目收益%
-      var myRoleLines = myRoles.map(function(mr) {
-        var rLabel = roleLabelsShort[mr.role] || mr.role;
-        var rSharePct = Math.round((mr.team_share_bps || 0) / 100);
-        var poolPct = mr.role === 'COLEADERY' ? Math.round((proj.pct_coleadery || 0) / 100) :
-                      mr.role === 'COLINKERY'  ? Math.round((proj.pct_colinkery || 0) / 100) : 0;
-        var actualPct = Math.round(poolPct * rSharePct / 100 * 10) / 10;
-        return rLabel + ' ' + rSharePct + '%' + (poolPct > 0 ? '（占項目收益 ' + actualPct + '%）' : '');
-      }).join(' ／ ');
+
+        var isMyRole = myRoleSet[role] ? true : false;
+        roleSectionsHtml +=
+          '<div class="role-section">' +
+            '<div class="role-section-header">' +
+              (isMyRole ? '<span style="font-size:10px;font-weight:700;color:#065F46;background:#D1FAE5;border-radius:4px;padding:1px 6px;margin-right:4px;">我的角色</span>' : '') +
+              '<span class="role-section-label">' + roleIcons[role] + ' ' + roleFullLabels[role] + '</span>' +
+              (poolLabel ? '<span class="role-section-pool">' + poolLabel + '</span>' : '') +
+            '</div>' +
+            '<div class="role-members-row">' + memberChips.join('') + '</div>' +
+          '</div>';
+      });
+
       return '<div class="proj-card-w ' + stKey.toLowerCase() + '">' +
         '<div class="proj-title-row">' +
           '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
@@ -13353,9 +13397,8 @@ function renderWallet(d) {
           '</div>' +
           '<span class="proj-status-w ps-' + stKey + '">' + stLabel + '</span>' +
         '</div>' +
-        teamHtml +
-        '<div class="my-share-row">我的角色：<strong>' + myRoleLines + '</strong></div>' +
-        (proj.confirm_status === 'PENDING' ? '<div style="font-size:12px;color:#D97706;margin-top:4px;">⚠️ 尚待確認參與</div>' : '') +
+        (hasAnyRole ? roleSectionsHtml : '') +
+        (proj.confirm_status === 'PENDING' ? '<div style="font-size:12px;color:#D97706;margin-top:6px;">⚠️ 尚待確認參與</div>' : '') +
       '</div>';
     }).join('');
   } else {
