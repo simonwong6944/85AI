@@ -7,6 +7,7 @@ type Bindings = {
   DB: D1Database
   ADMIN_PASSWORD: string
   FILES?: R2Bucket        // CoWorkery 身份證 / 打卡 selfie；optional：本地無 bucket 時為 undefined
+  OPENROUTER_API_KEY?: string  // CoLinkery OCR via OpenRouter
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -14898,5 +14899,1588 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
 
 // ── 呼叫 registerRevenueRoutes ──────────────────────────────────
 registerRevenueRoutes(app)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CoLinkery PWA — 後端 API 及前端頁面
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── PBKDF2 工具函數 ──────────────────────────────────────────────────────────
+async function pbkdf2Hash(password: string): Promise<string> {
+  const iter = 100000
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const enc = new TextEncoder()
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' },
+    keyMaterial, 256
+  )
+  const hashArr = new Uint8Array(bits)
+  const saltB64 = btoa(String.fromCharCode(...salt))
+  const hashB64 = btoa(String.fromCharCode(...hashArr))
+  return `pbkdf2$${iter}$${saltB64}$${hashB64}`
+}
+
+async function pbkdf2Verify(password: string, stored: string): Promise<boolean> {
+  try {
+    const [, iterStr, saltB64, hashB64] = stored.split('$')
+    const iter = parseInt(iterStr, 10)
+    const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0))
+    const expectedHash = Uint8Array.from(atob(hashB64), c => c.charCodeAt(0))
+    const enc = new TextEncoder()
+    const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits'])
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' },
+      keyMaterial, 256
+    )
+    const derived = new Uint8Array(bits)
+    if (derived.length !== expectedHash.length) return false
+    let diff = 0
+    for (let i = 0; i < derived.length; i++) diff |= derived[i] ^ expectedHash[i]
+    return diff === 0
+  } catch { return false }
+}
+
+// ─── CoLinkery Session Helpers ────────────────────────────────────────────────
+function makeCsrpnToken(bytes = 32): string {
+  const arr = new Uint8Array(bytes)
+  crypto.getRandomValues(arr)
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function verifyColinkerySess(db: D1Database, token: string | undefined): Promise<string | null> {
+  if (!token) return null
+  const row = await db.prepare(
+    `SELECT member_no FROM colinkery_sessions WHERE token=? AND expires_at > datetime('now')`
+  ).bind(token).first<{ member_no: string }>()
+  if (!row) return null
+  // 確認帳戶仍 active
+  const m = await db.prepare(`SELECT colinkery_account_status FROM members WHERE member_no=?`).bind(row.member_no).first<{ colinkery_account_status: string }>()
+  if (!m || m.colinkery_account_status !== 'active') return null
+  return row.member_no
+}
+
+function requireColinkery() {
+  return async (c: any, next: any) => {
+    const token = getCookie(c, 'colinkery_session')
+    const memberNo = await verifyColinkerySess(c.env.DB, token)
+    if (!memberNo) return c.json({ ok: false, error: '請先登入' }, 401)
+    c.set('clMemberNo', memberNo)
+    await next()
+  }
+}
+
+// ─── CoLinkery 申請 ───────────────────────────────────────────────────────────
+app.post('/api/colinkery/apply', async (c) => {
+  const db = c.env.DB
+  const contentType = c.req.header('content-type') || ''
+  let phone = '', name_zh = '', applicant_type = '', password = '', bank_info = '', agree_terms = ''
+  let docFile: File | null = null
+
+  if (contentType.includes('multipart/form-data')) {
+    const form = await c.req.formData()
+    phone = (form.get('phone') as string || '').trim()
+    name_zh = (form.get('name_zh') as string || '').trim()
+    applicant_type = (form.get('applicant_type') as string || '').toUpperCase()
+    password = (form.get('password') as string || '')
+    bank_info = (form.get('bank_info') as string || '').trim()
+    agree_terms = (form.get('agree_terms') as string || '')
+    docFile = form.get('doc_file') as File | null
+  } else {
+    const body = await c.req.json<any>()
+    phone = (body.phone || '').trim()
+    name_zh = (body.name_zh || '').trim()
+    applicant_type = (body.applicant_type || '').toUpperCase()
+    password = body.password || ''
+    bank_info = (body.bank_info || '').trim()
+    agree_terms = body.agree_terms ? 'on' : ''
+  }
+
+  if (!phone || !name_zh || !applicant_type || !password)
+    return c.json({ ok: false, error: '請填寫所有必填欄位' }, 400)
+  if (!['INDIVIDUAL', 'GROUP', 'COMPANY', 'ASSOCIATION'].includes(applicant_type))
+    return c.json({ ok: false, error: '申請身份類型無效' }, 400)
+  if (password.length < 8)
+    return c.json({ ok: false, error: '密碼最少 8 位' }, 400)
+  if (agree_terms !== 'on' && agree_terms !== 'true' && agree_terms !== '1')
+    return c.json({ ok: false, error: '請同意合作條款' }, 400)
+
+  // 找成員
+  const member = await db.prepare(`SELECT member_no, name_zh, colinkery_account_status FROM members WHERE phone=?`).bind(phone).first<{ member_no: string; name_zh: string; colinkery_account_status: string | null }>()
+  if (!member) return c.json({ ok: false, error: '電話號碼未登記為會員，請先加入老有聯盟85' }, 400)
+
+  // 檢查有否已有進行中申請
+  const existApp = await db.prepare(
+    `SELECT id FROM role_applications WHERE member_no=? AND role='COLINKERY' AND status='PENDING'`
+  ).bind(member.member_no).first()
+  if (existApp) return c.json({ ok: false, error: '你已有進行中的 CoLinkery 申請' }, 400)
+
+  if (member.colinkery_account_status === 'active')
+    return c.json({ ok: false, error: '你已是 CoLinkery 連結者' }, 400)
+
+  // 上傳文件到 R2
+  let docR2Key = ''
+  if (docFile && c.env.FILES) {
+    docR2Key = `colinkery-docs/${member.member_no}/${Date.now()}_${docFile.name || 'doc'}`
+    await c.env.FILES.put(docR2Key, await docFile.arrayBuffer(), { httpMetadata: { contentType: docFile.type || 'application/octet-stream' } })
+  }
+
+  // Hash password
+  const passwordHashPending = await pbkdf2Hash(password)
+
+  // 取下一個 CL 號碼
+  let holderNo = ''
+  try {
+    const counterRow = await db.prepare(`UPDATE role_counters SET next_val=next_val+1 WHERE role='COLINKERY' RETURNING next_val`).first<{ next_val: number }>()
+    if (counterRow) holderNo = 'CK' + String(counterRow.next_val).padStart(6, '0')
+  } catch { /* counter may not exist yet */ }
+
+  await db.prepare(`
+    INSERT INTO role_applications (member_no, role, applicant_type, name_zh, notes, status, review_notes, password_hash_pending)
+    VALUES (?, 'COLINKERY', ?, ?, ?, 'PENDING', '', ?)
+  `).bind(member.member_no, applicant_type, name_zh, `銀行/收款: ${bank_info}; 文件: ${docR2Key}`, passwordHashPending).run()
+
+  // 更新 colinkery_account_status → password_pending
+  await db.prepare(`UPDATE members SET colinkery_account_status='password_pending' WHERE member_no=?`).bind(member.member_no).run()
+
+  return c.json({ ok: true, message: '申請已收到，審核約需 3-5 個工作天，批准後可用你設定的密碼登入' })
+})
+
+// ─── CoLinkery 登入 ───────────────────────────────────────────────────────────
+app.post('/api/colinkery/login', async (c) => {
+  const { phone, password } = await c.req.json<{ phone: string; password: string }>()
+  if (!phone || !password) return c.json({ ok: false, error: '請輸入電話及密碼' }, 400)
+
+  const db = c.env.DB
+  const member = await db.prepare(
+    `SELECT member_no, name_zh, colinkery_account_status, password_hash FROM members WHERE phone=?`
+  ).bind(phone.trim()).first<{ member_no: string; name_zh: string; colinkery_account_status: string | null; password_hash: string | null }>()
+
+  if (!member) return c.json({ ok: false, error: '電話或密碼不正確' }, 401)
+
+  if (member.colinkery_account_status === 'password_pending')
+    return c.json({ ok: false, error: '帳戶審核中，請耐心等候 3-5 個工作天' }, 403)
+
+  if (member.colinkery_account_status !== 'active')
+    return c.json({ ok: false, error: '電話或密碼不正確' }, 401)
+
+  if (!member.password_hash) return c.json({ ok: false, error: '電話或密碼不正確' }, 401)
+
+  const valid = await pbkdf2Verify(password, member.password_hash)
+  if (!valid) return c.json({ ok: false, error: '電話或密碼不正確' }, 401)
+
+  const token = makeCsrpnToken(32)
+  const expiresAt = sessionExpiry(12)
+  await db.prepare(`INSERT INTO colinkery_sessions (token, member_no, expires_at) VALUES (?,?,?)`).bind(token, member.member_no, expiresAt).run()
+
+  setCookie(c, 'colinkery_session', token, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 12 * 3600 })
+  return c.json({ ok: true, member_no: member.member_no, name_zh: member.name_zh })
+})
+
+// ─── CoLinkery 登出 ───────────────────────────────────────────────────────────
+app.post('/api/colinkery/logout', async (c) => {
+  const token = getCookie(c, 'colinkery_session')
+  if (token) await c.env.DB.prepare(`DELETE FROM colinkery_sessions WHERE token=?`).bind(token).run()
+  deleteCookie(c, 'colinkery_session', { path: '/' })
+  return c.json({ ok: true })
+})
+
+// ─── CoLinkery 狀態查詢 ───────────────────────────────────────────────────────
+app.get('/api/colinkery/my-status', async (c) => {
+  const phone = c.req.query('phone')
+  if (!phone) return c.json({ ok: false, error: '請提供電話' }, 400)
+  const db = c.env.DB
+  const member = await db.prepare(
+    `SELECT member_no, name_zh, colinkery_account_status FROM members WHERE phone=?`
+  ).bind(phone.trim()).first<{ member_no: string; name_zh: string; colinkery_account_status: string | null }>()
+  if (!member) return c.json({ ok: false, error: '電話號碼未登記' }, 404)
+
+  const app2 = await db.prepare(
+    `SELECT applicant_type, status, review_notes, created_at FROM role_applications WHERE member_no=? AND role='COLINKERY' ORDER BY created_at DESC LIMIT 1`
+  ).bind(member.member_no).first<{ applicant_type: string; status: string; review_notes: string; created_at: string }>()
+
+  return c.json({ ok: true, colinkery_account_status: member.colinkery_account_status || 'none', application: app2 || null, name_zh: member.name_zh })
+})
+
+// ─── CoLinkery 忘記密碼（生成 OTP，Admin 待發）─────────────────────────────
+app.post('/api/colinkery/forgot-password', async (c) => {
+  const { phone } = await c.req.json<{ phone: string }>()
+  if (!phone) return c.json({ ok: false, error: '請輸入電話' }, 400)
+  const db = c.env.DB
+  const member = await db.prepare(
+    `SELECT member_no, name_zh FROM members WHERE phone=? AND colinkery_account_status='active'`
+  ).bind(phone.trim()).first<{ member_no: string; name_zh: string }>()
+  if (!member) return c.json({ ok: false, error: '電話號碼不存在或帳戶未啟用' }, 404)
+
+  // 生成 6 位 OTP
+  const arr = new Uint8Array(4)
+  crypto.getRandomValues(arr)
+  const otp = String(((arr[0] << 16) | (arr[1] << 8) | arr[2]) % 1000000).padStart(6, '0')
+  const otpId = makeCsrpnToken(16)
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19)
+
+  await db.prepare(
+    `INSERT INTO colinkery_otp (otp_id, member_no, otp_code, purpose, expires_at) VALUES (?,?,?,'reset_password',?)`
+  ).bind(otpId, member.member_no, otp, expiresAt).run()
+
+  return c.json({ ok: true, message: '重設碼將由職員以 WhatsApp 發送給你，請稍候（約 15 分鐘內）' })
+})
+
+// ─── CoLinkery 重設密碼 ───────────────────────────────────────────────────────
+app.post('/api/colinkery/reset-password', async (c) => {
+  const { phone, otp_code, new_password } = await c.req.json<{ phone: string; otp_code: string; new_password: string }>()
+  if (!phone || !otp_code || !new_password) return c.json({ ok: false, error: '請填寫所有欄位' }, 400)
+  if (new_password.length < 8) return c.json({ ok: false, error: '密碼最少 8 位' }, 400)
+  const db = c.env.DB
+
+  const member = await db.prepare(`SELECT member_no FROM members WHERE phone=? AND colinkery_account_status='active'`).bind(phone.trim()).first<{ member_no: string }>()
+  if (!member) return c.json({ ok: false, error: '電話號碼不存在或帳戶未啟用' }, 404)
+
+  const otpRow = await db.prepare(
+    `SELECT otp_id FROM colinkery_otp WHERE member_no=? AND otp_code=? AND purpose='reset_password' AND used=0 AND expires_at > datetime('now')`
+  ).bind(member.member_no, otp_code.trim()).first<{ otp_id: string }>()
+  if (!otpRow) return c.json({ ok: false, error: '重設碼無效或已過期，請重新申請' }, 400)
+
+  const newHash = await pbkdf2Hash(new_password)
+  await db.prepare(`UPDATE members SET password_hash=? WHERE member_no=?`).bind(newHash, member.member_no).run()
+  await db.prepare(`UPDATE colinkery_otp SET used=1 WHERE otp_id=?`).bind(otpRow.otp_id).run()
+
+  return c.json({ ok: true, message: '密碼已更新，請用新密碼登入' })
+})
+
+// ─── 名片 OCR ─────────────────────────────────────────────────────────────────
+app.post('/api/colinkery/cards/ocr', requireColinkery(), async (c) => {
+  const db = c.env.DB
+  const memberNo = c.get('clMemberNo') as string
+  const form = await c.req.formData()
+  const imgFile = form.get('image') as File | null
+  if (!imgFile) return c.json({ ok: false, error: '請上傳名片圖片' }, 400)
+
+  // 存入 R2
+  const r2Key = `b2b-cards/${memberNo}/${Date.now()}_${imgFile.name || 'card.jpg'}`
+  if (c.env.FILES) {
+    await c.env.FILES.put(r2Key, await imgFile.arrayBuffer(), { httpMetadata: { contentType: imgFile.type || 'image/jpeg' } })
+  }
+
+  // OCR via OpenRouter
+  const apiKey = c.env.OPENROUTER_API_KEY
+  if (!apiKey) return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
+
+  try {
+    const imgBytes = await imgFile.arrayBuffer()
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBytes)))
+    const dataUrl = `data:${imgFile.type || 'image/jpeg'};base64,${base64}`
+
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': 'CoLinkery OCR' },
+      body: JSON.stringify({
+        model: 'google/gemini-flash-1.5',
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: 'Extract business card info as JSON: {name_zh, name_en, company, title, phone, mobile, email, address, industry}. Return ONLY the JSON object, no explanation.' },
+          { type: 'image_url', image_url: { url: dataUrl } }
+        ]}]
+      })
+    })
+    const data = await resp.json() as any
+    const raw = data?.choices?.[0]?.message?.content || ''
+    const jsonMatch = raw.match(/\{[\s\S]*\}/)
+    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
+    return c.json({ ok: true, r2_key: r2Key, parsed, ocr_raw: raw })
+  } catch {
+    return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
+  }
+})
+
+// ─── 名片 CRUD ────────────────────────────────────────────────────────────────
+app.post('/api/colinkery/cards', requireColinkery(), async (c) => {
+  const db = c.env.DB
+  const memberNo = c.get('clMemberNo') as string
+  const body = await c.req.json<any>()
+  const cardId = makeCsrpnToken(16)
+  await db.prepare(`
+    INSERT INTO business_cards (card_id, owner_member_no, image_r2_key, name_zh, name_en, company, title, phone, mobile, email, address, industry, ocr_raw)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).bind(cardId, memberNo, body.image_r2_key || '', body.name_zh || '', body.name_en || '', body.company || '', body.title || '', body.phone || '', body.mobile || '', body.email || '', body.address || '', body.industry || '', body.ocr_raw || '').run()
+  return c.json({ ok: true, card_id: cardId })
+})
+
+app.get('/api/colinkery/cards', requireColinkery(), async (c) => {
+  const db = c.env.DB
+  const memberNo = c.get('clMemberNo') as string
+  const q = c.req.query('q') || ''
+  let sql = `SELECT * FROM business_cards WHERE owner_member_no=?`
+  const params: any[] = [memberNo]
+  if (q) { sql += ` AND (name_zh LIKE ? OR name_en LIKE ? OR company LIKE ? OR phone LIKE ? OR mobile LIKE ?)`; const lk = `%${q}%`; params.push(lk,lk,lk,lk,lk) }
+  sql += ` ORDER BY created_at DESC LIMIT 100`
+  const rows = await db.prepare(sql).bind(...params).all()
+  return c.json({ ok: true, cards: rows.results })
+})
+
+app.get('/api/colinkery/cards/:id', requireColinkery(), async (c) => {
+  const db = c.env.DB
+  const memberNo = c.get('clMemberNo') as string
+  const card = await db.prepare(`SELECT * FROM business_cards WHERE card_id=? AND owner_member_no=?`).bind(c.req.param('id'), memberNo).first()
+  if (!card) return c.json({ ok: false, error: '名片不存在' }, 404)
+  return c.json({ ok: true, card })
+})
+
+app.put('/api/colinkery/cards/:id', requireColinkery(), async (c) => {
+  const db = c.env.DB
+  const memberNo = c.get('clMemberNo') as string
+  const body = await c.req.json<any>()
+  const card = await db.prepare(`SELECT card_id FROM business_cards WHERE card_id=? AND owner_member_no=?`).bind(c.req.param('id'), memberNo).first()
+  if (!card) return c.json({ ok: false, error: '名片不存在' }, 404)
+  await db.prepare(`
+    UPDATE business_cards SET name_zh=?, name_en=?, company=?, title=?, phone=?, mobile=?, email=?, address=?, industry=?, updated_at=datetime('now')
+    WHERE card_id=?
+  `).bind(body.name_zh || '', body.name_en || '', body.company || '', body.title || '', body.phone || '', body.mobile || '', body.email || '', body.address || '', body.industry || '', c.req.param('id')).run()
+  return c.json({ ok: true })
+})
+
+// ─── 交棒（生成 b2b_token 連結）─────────────────────────────────────────────
+app.post('/api/colinkery/handover', requireColinkery(), async (c) => {
+  const db = c.env.DB
+  const memberNo = c.get('clMemberNo') as string
+  const { card_id } = await c.req.json<{ card_id: string }>()
+  if (!card_id) return c.json({ ok: false, error: '請提供名片' }, 400)
+
+  const card = await db.prepare(`SELECT * FROM business_cards WHERE card_id=? AND owner_member_no=?`).bind(card_id, memberNo).first<any>()
+  if (!card) return c.json({ ok: false, error: '名片不存在' }, 404)
+
+  const member = await db.prepare(`SELECT name_zh FROM members WHERE member_no=?`).bind(memberNo).first<{ name_zh: string }>()
+
+  // 建立 b2b_lead
+  const leadId = makeCsrpnToken(16)
+  await db.prepare(`
+    INSERT INTO b2b_leads (lead_id, card_id, referral_member_no, colinkery_name, buyer_name, buyer_company, buyer_title, buyer_phone, buyer_email, buyer_industry, source)
+    VALUES (?,?,?,?,?,?,?,?,?,?,'card_handover')
+  `).bind(leadId, card_id, memberNo, member?.name_zh || '', card.name_zh || '', card.company || '', card.title || '', card.phone || card.mobile || '', card.email || '', card.industry || '').run()
+
+  // 生成 CSPRNG token（≥32 bytes，不可枚舉）
+  const token = makeCsrpnToken(40)
+  const expiresAt = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 19)
+  await db.prepare(`INSERT INTO b2b_tokens (token, lead_id, referral_member_no, expires_at) VALUES (?,?,?,?)`).bind(token, leadId, memberNo, expiresAt).run()
+
+  // Audit log
+  await db.prepare(`INSERT INTO b2b_audit_log (lead_id, action, actor) VALUES (?,?,?)`).bind(leadId, 'handover_created', memberNo).run()
+
+  const catalogUrl = `https://coeldery85.org/b2b?token=${token}`
+  return c.json({ ok: true, lead_id: leadId, catalog_url: catalogUrl, buyer_name: card.name_zh || '', buyer_company: card.company || '' })
+})
+
+// ─── CoLinkery 成績統計 ───────────────────────────────────────────────────────
+app.get('/api/colinkery/stats', requireColinkery(), async (c) => {
+  const db = c.env.DB
+  const memberNo = c.get('clMemberNo') as string
+
+  const totals = await db.prepare(`
+    SELECT
+      COUNT(*) as total_leads,
+      SUM(CASE WHEN status='won' THEN 1 ELSE 0 END) as won_count,
+      SUM(CASE WHEN commission_status='paid' THEN commission_amount_cents ELSE 0 END) as paid_cents,
+      SUM(CASE WHEN commission_status='accrued' THEN commission_amount_cents ELSE 0 END) as accrued_cents
+    FROM b2b_leads WHERE referral_member_no=?
+  `).bind(memberNo).first<any>()
+
+  const recentWon = await db.prepare(`
+    SELECT lead_id, buyer_name, buyer_company, commission_amount_cents, commission_status, updated_at
+    FROM b2b_leads WHERE referral_member_no=? AND status='won'
+    ORDER BY updated_at DESC LIMIT 10
+  `).bind(memberNo).all()
+
+  return c.json({
+    ok: true,
+    total_leads: totals?.total_leads || 0,
+    won_count: totals?.won_count || 0,
+    paid_cents: totals?.paid_cents || 0,
+    accrued_cents: totals?.accrued_cents || 0,
+    recent_won: recentWon.results
+  })
+})
+
+// ─── Admin CoLinkery：待審批 + 待發 OTP ───────────────────────────────────────
+app.get('/api/admin/colinkery/pending', async (c) => {
+  const token = getSessionToken(c)
+  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
+  const db = c.env.DB
+
+  const apps = await db.prepare(`
+    SELECT ra.id, ra.member_no, ra.applicant_type, ra.name_zh, ra.notes, ra.review_notes, ra.created_at,
+           m.phone, m.colinkery_account_status
+    FROM role_applications ra
+    JOIN members m ON m.member_no = ra.member_no
+    WHERE ra.role='COLINKERY' AND ra.status='PENDING'
+    ORDER BY ra.created_at ASC
+  `).all()
+
+  const otps = await db.prepare(`
+    SELECT o.otp_id, o.member_no, o.otp_code, o.expires_at, o.created_at,
+           m.name_zh, m.phone
+    FROM colinkery_otp o
+    JOIN members m ON m.member_no = o.member_no
+    WHERE o.used=0 AND o.expires_at > datetime('now')
+    ORDER BY o.created_at DESC
+  `).all()
+
+  return c.json({ ok: true, applications: apps.results, pending_otps: otps.results })
+})
+
+// ─── Admin CoLinkery：批准申請 ────────────────────────────────────────────────
+app.post('/api/admin/colinkery/approve/:id', async (c) => {
+  const token = getSessionToken(c)
+  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
+  const db = c.env.DB
+  const appId = parseInt(c.req.param('id'), 10)
+
+  const appRow = await db.prepare(
+    `SELECT * FROM role_applications WHERE id=? AND role='COLINKERY' AND status='PENDING'`
+  ).bind(appId).first<any>()
+  if (!appRow) return c.json({ ok: false, error: '申請不存在' }, 404)
+
+  if (!appRow.password_hash_pending)
+    return c.json({ ok: false, error: '申請缺少密碼雜湊，無法啟用' }, 400)
+
+  // 取下一個 CK 號碼
+  let holderNo = 'CK000001'
+  try {
+    const cr = await db.prepare(`UPDATE role_counters SET next_val=next_val+1 WHERE role='COLINKERY' RETURNING next_val`).first<{ next_val: number }>()
+    if (cr) holderNo = 'CK' + String(cr.next_val).padStart(6, '0')
+  } catch { /* fallback */ }
+
+  // 批次操作
+  await db.batch([
+    db.prepare(`UPDATE role_applications SET status='APPROVED', updated_at=datetime('now') WHERE id=?`).bind(appId),
+    db.prepare(`UPDATE members SET password_hash=?, colinkery_account_status='active' WHERE member_no=?`).bind(appRow.password_hash_pending, appRow.member_no),
+    db.prepare(`INSERT OR IGNORE INTO role_holders (member_no, role, applicant_type, holder_no, status) VALUES (?,?,?,?,'ACTIVE')`).bind(appRow.member_no, 'COLINKERY', appRow.applicant_type, holderNo),
+    db.prepare(`INSERT INTO b2b_audit_log (action, old_value, new_value, actor) VALUES ('approve_colinkery',?,?,?)`).bind(appRow.member_no, holderNo, 'admin')
+  ])
+
+  // 取成員電話，生成 wa.me 連結
+  const member = await db.prepare(`SELECT phone, name_zh FROM members WHERE member_no=?`).bind(appRow.member_no).first<{ phone: string; name_zh: string }>()
+  const phoneDigits = (member?.phone || '').replace(/\D/g, '')
+  const fullPhone = phoneDigits.startsWith('852') ? phoneDigits : '852' + phoneDigits
+  const waMsg = encodeURIComponent(`你好${member?.name_zh ? '，' + member.name_zh : ''}！你的 CoLinkery 連結者帳戶已批准啟用，可用電話號碼 + 你設定的密碼登入 coeldery85.com/colinkery`)
+  const waLink = `https://wa.me/${fullPhone}?text=${waMsg}`
+
+  return c.json({ ok: true, holder_no: holderNo, wa_notify_link: waLink })
+})
+
+// ─── Admin CoLinkery：拒絕申請 ────────────────────────────────────────────────
+app.post('/api/admin/colinkery/reject/:id', async (c) => {
+  const token = getSessionToken(c)
+  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
+  const db = c.env.DB
+  const appId = parseInt(c.req.param('id'), 10)
+  const { reason } = await c.req.json<{ reason: string }>()
+
+  const appRow = await db.prepare(`SELECT member_no FROM role_applications WHERE id=? AND role='COLINKERY' AND status='PENDING'`).bind(appId).first<{ member_no: string }>()
+  if (!appRow) return c.json({ ok: false, error: '申請不存在' }, 404)
+
+  await db.batch([
+    db.prepare(`UPDATE role_applications SET status='REJECTED', review_notes=?, updated_at=datetime('now') WHERE id=?`).bind(reason || '', appId),
+    db.prepare(`UPDATE members SET colinkery_account_status='none' WHERE member_no=?`).bind(appRow.member_no),
+    db.prepare(`INSERT INTO b2b_audit_log (action, old_value, new_value, actor) VALUES ('reject_colinkery',?,'REJECTED',?)`).bind(appRow.member_no, 'admin')
+  ])
+
+  const member = await db.prepare(`SELECT phone, name_zh FROM members WHERE member_no=?`).bind(appRow.member_no).first<{ phone: string; name_zh: string }>()
+  const phoneDigits = (member?.phone || '').replace(/\D/g, '')
+  const fullPhone = phoneDigits.startsWith('852') ? phoneDigits : '852' + phoneDigits
+  const waMsg = encodeURIComponent(`你好${member?.name_zh ? '，' + member.name_zh : ''}，很抱歉，你的 CoLinkery 申請未獲批准。原因：${reason || ''}。如有疑問請 WhatsApp 聯絡我們。`)
+  const waLink = `https://wa.me/${fullPhone}?text=${waMsg}`
+
+  return c.json({ ok: true, wa_notify_link: waLink })
+})
+
+// ─── CoLinkery PWA 靜態資源 ───────────────────────────────────────────────────
+app.get('/colinkery-manifest.json', (c) => {
+  return c.json({
+    name: 'CoLinkery 連結者',
+    short_name: 'CoLinkery',
+    description: '老有聯盟 85 CoLinkery 連結者工具',
+    start_url: '/colinkery/',
+    display: 'standalone',
+    background_color: '#FAF8F3',
+    theme_color: '#1B5E20',
+    orientation: 'portrait-primary',
+    icons: [
+      { src: '/static/cl-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: '/static/cl-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+    ]
+  })
+})
+
+app.get('/colinkery-sw.js', (c) => {
+  const sw = `
+const CACHE = 'colinkery-v1';
+const OFFLINE = ['/colinkery/'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(OFFLINE)));
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  if (e.request.url.includes('/api/')) return;
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || caches.match('/colinkery/'))));
+});`
+  return new Response(sw, { headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' } })
+})
+
+// ─── CoLinkery PWA 前端頁面 ────────────────────────────────────────────────────
+function colinkerypwaHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CoLinkery">
+<meta name="theme-color" content="#1B5E20">
+<title>CoLinkery 連結者</title>
+<link rel="manifest" href="/colinkery-manifest.json">
+<link rel="apple-touch-icon" href="/static/cl-icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{--green:#1B5E20;--green2:#228B22;--green3:#2E7D32;--pale:#E8F5E9;--red:#C62828;--warm:#FAF8F3;--text:#1A1A1A;--muted:#6B7280;--border:#E5E7EB;--chip:#F0FDF4;--chip-border:#BBF7D0;}
+html,body{height:100%;background:var(--warm);font-family:'Noto Sans TC',sans-serif;color:var(--text);font-size:18px;line-height:1.6;overscroll-behavior:none;}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+/* Nav */
+.cl-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--green);color:#fff;position:sticky;top:0;z-index:100;min-height:56px;}
+.cl-nav-title{font-size:18px;font-weight:700;}
+.cl-nav-back{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;padding:4px 8px;min-width:44px;min-height:44px;display:flex;align-items:center;}
+/* Page containers */
+.page{display:none;flex-direction:column;flex:1;padding-bottom:80px;}
+.page.active{display:flex;}
+/* Bottom nav */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:flex;z-index:99;padding-bottom:env(safe-area-inset-bottom);}
+.bottom-nav button{flex:1;border:none;background:none;padding:8px 4px;font-size:11px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:56px;font-family:inherit;}
+.bottom-nav button.active{color:var(--green);}
+.bottom-nav button .icon{font-size:22px;}
+/* Cards */
+.cl-card{background:#fff;border-radius:16px;padding:20px;margin:12px 16px;box-shadow:0 2px 12px rgba(0,0,0,.08);}
+/* Buttons */
+.btn-primary{display:block;width:100%;min-height:56px;background:var(--green);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;padding:0 20px;line-height:1.4;}
+.btn-primary:active{opacity:.85;}
+.btn-secondary{display:block;width:100%;min-height:56px;background:#fff;color:var(--green);border:2px solid var(--green);border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;padding:0 20px;line-height:1.4;}
+.btn-outline{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;background:#fff;cursor:pointer;font-family:inherit;gap:6px;}
+/* Form */
+.form-group{margin-bottom:18px;}
+.form-label{display:block;font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.form-input{width:100%;min-height:52px;border:2px solid var(--border);border-radius:12px;padding:12px 16px;font-size:18px;font-family:inherit;background:#fff;color:var(--text);transition:border .2s;outline:none;}
+.form-input:focus{border-color:var(--green);}
+.form-hint{font-size:14px;color:var(--muted);margin-top:4px;}
+select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='%236B7280' viewBox='0 0 20 20'%3E%3Cpath d='M5 7l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+/* Alert */
+.alert{padding:14px 16px;border-radius:12px;font-size:16px;margin:0 16px 12px;}
+.alert-red{background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;}
+.alert-green{background:var(--pale);border:1px solid #86EFAC;color:var(--green);}
+.alert-yellow{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;}
+/* Stats */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px 16px;}
+.stat-card{background:#fff;border-radius:14px;padding:14px 10px;text-align:center;box-shadow:0 1px 8px rgba(0,0,0,.06);}
+.stat-num{font-size:26px;font-weight:900;color:var(--green);}
+.stat-lbl{font-size:13px;color:var(--muted);margin-top:2px;}
+/* Card chip */
+.card-chip{background:var(--chip);border:1px solid var(--chip-border);border-radius:10px;padding:12px 14px;margin:0 16px 10px;}
+/* Loading */
+.spinner{display:inline-block;width:36px;height:36px;border:4px solid #E5E7EB;border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px;font-size:16px;color:var(--muted);}
+/* Camera */
+#camera-preview{width:100%;max-height:60vh;object-fit:cover;border-radius:12px;background:#111;}
+#camera-canvas{display:none;}
+/* Onboarding overlay */
+.onboard-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center;}
+.onboard-box{background:#fff;border-radius:20px;padding:28px 20px;margin:20px;max-width:400px;width:100%;text-align:center;}
+.onboard-icon{font-size:56px;margin-bottom:12px;}
+.onboard-title{font-size:20px;font-weight:700;color:var(--green);margin-bottom:10px;}
+.onboard-desc{font-size:16px;color:var(--muted);line-height:1.6;margin-bottom:20px;}
+/* Share link box */
+.share-box{background:var(--pale);border-radius:12px;padding:14px;font-size:15px;color:var(--green3);word-break:break-all;border:1px solid #A7F3D0;margin-bottom:14px;}
+/* Commission item */
+.comm-item{padding:14px 0;border-bottom:1px solid var(--border);}
+.comm-item:last-child{border-bottom:none;}
+/* Responsive tweaks */
+@media(min-width:480px){
+  .page{max-width:480px;margin:0 auto;}
+  .bottom-nav{max-width:480px;left:50%;transform:translateX(-50%);}
+}
+/* Onboard step dots */
+.step-dots{display:flex;gap:6px;justify-content:center;margin-top:16px;}
+.step-dot{width:8px;height:8px;border-radius:50%;background:#E5E7EB;}
+.step-dot.active{background:var(--green);}
+/* Role badge */
+.role-badge{display:inline-block;background:var(--green);color:#fff;font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;}
+/* Industry tag */
+.ind-tag{display:inline-block;background:#F3F4F6;border-radius:8px;padding:3px 10px;font-size:14px;color:var(--muted);margin:2px;}
+/* PWA install banner */
+.pwa-banner{background:var(--green3);color:#fff;padding:12px 16px;font-size:15px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.pwa-banner button{background:#fff;color:var(--green);border:none;border-radius:8px;padding:6px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Loading overlay -->
+  <div class="loading-overlay" id="loading-overlay" style="display:none">
+    <div class="spinner"></div>
+    <span id="loading-text">載入中…</span>
+  </div>
+
+  <!-- Onboarding overlay -->
+  <div class="onboard-overlay" id="onboard-overlay" style="display:none">
+    <div class="onboard-box">
+      <div class="onboard-icon" id="ob-icon">👋</div>
+      <div class="onboard-title" id="ob-title">歡迎加入 CoLinkery！</div>
+      <div class="onboard-desc" id="ob-desc">你係老有聯盟 85 的連結者，用你的人脈連結企業採購，讓長者社群受惠。</div>
+      <button class="btn-primary" id="ob-next-btn" onclick="onboardNext()">繼續</button>
+      <div class="step-dots" id="ob-dots"></div>
+    </div>
+  </div>
+
+  <!-- PWA install banner (Android) -->
+  <div class="pwa-banner" id="pwa-banner" style="display:none">
+    <span>💡 加至主畫面，下次更快開啟</span>
+    <button onclick="triggerInstall()">加入</button>
+  </div>
+
+  <!-- ① 登入頁 -->
+  <div class="page active" id="page-login">
+    <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:40px 20px 32px;color:#fff;text-align:center;">
+      <div style="font-size:48px;margin-bottom:8px;">🤝</div>
+      <div style="font-size:24px;font-weight:900;">CoLinkery</div>
+      <div style="font-size:16px;opacity:.85;margin-top:4px;">老有聯盟 85 · 連結者工具</div>
+    </div>
+    <div style="padding:24px 16px;">
+      <div class="form-group">
+        <label class="form-label">電話號碼</label>
+        <input type="tel" class="form-input" id="login-phone" placeholder="例：52345678" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">密碼</label>
+        <input type="password" class="form-input" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password">
+      </div>
+      <div id="login-err" class="alert alert-red" style="display:none;margin:0 0 14px;"></div>
+      <button class="btn-primary" onclick="doLogin()" style="margin-bottom:14px;">登入</button>
+      <button class="btn-secondary" onclick="showPage('page-apply')" style="margin-bottom:14px;">申請成為 CoLinkery 連結者</button>
+      <button class="btn-outline" style="width:100%;margin-bottom:14px;" onclick="showPage('page-forgot')">忘記密碼？</button>
+      <p style="text-align:center;font-size:14px;color:var(--muted);">申請後 3-5 工作天審核，批准後可登入</p>
+    </div>
+  </div>
+
+  <!-- ② 申請頁 -->
+  <div class="page" id="page-apply">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-login')">←</button>
+      <div class="cl-nav-title">申請成為 CoLinkery</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:16px;overflow-y:auto;">
+      <div id="apply-err" class="alert alert-red" style="display:none;"></div>
+      <div id="apply-ok" class="alert alert-green" style="display:none;"></div>
+      <div class="form-group">
+        <label class="form-label">登記電話號碼 <span style="color:var(--red)">*</span></label>
+        <input type="tel" class="form-input" id="apply-phone" placeholder="請輸入老有聯盟85會員電話">
+        <div class="form-hint">必須已登記為老有聯盟 85 會員</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">姓名（中文）<span style="color:var(--red)">*</span></label>
+        <input type="text" class="form-input" id="apply-name" placeholder="例：陳大文">
+      </div>
+      <div class="form-group">
+        <label class="form-label">申請身份 <span style="color:var(--red)">*</span></label>
+        <select class="form-input" id="apply-type">
+          <option value="">請選擇</option>
+          <option value="INDIVIDUAL">個人 CoLinkery</option>
+          <option value="GROUP">小組 CoLinkery（多位會員組隊）</option>
+          <option value="COMPANY">公司 CoLinkery</option>
+          <option value="ASSOCIATION">協會/商會 CoLinkery</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">指定收款帳戶資料</label>
+        <input type="text" class="form-input" id="apply-bank" placeholder="例：滙豐 123-456789-001">
+        <div class="form-hint">固定佣金將存入此帳戶</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">公司/協會登記證明文件（如適用）</label>
+        <input type="file" class="form-input" id="apply-doc" accept="image/*,.pdf" style="padding:10px;">
+        <div class="form-hint">公司/協會身份必須上傳商業登記證或社團登記證</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">設定密碼 <span style="color:var(--red)">*</span></label>
+        <input type="password" class="form-input" id="apply-pw" placeholder="最少 8 位">
+      </div>
+      <div class="form-group">
+        <label class="form-label">確認密碼 <span style="color:var(--red)">*</span></label>
+        <input type="password" class="form-input" id="apply-pw2" placeholder="再輸入一次密碼">
+      </div>
+      <div class="form-group" style="display:flex;gap:12px;align-items:flex-start;">
+        <input type="checkbox" id="apply-agree" style="width:22px;height:22px;min-width:22px;margin-top:3px;cursor:pointer;">
+        <label for="apply-agree" style="font-size:16px;color:var(--text);cursor:pointer;line-height:1.5;">我同意老有聯盟 85 的 CoLinkery 合作條款，包括：固定佣金性質、單層結構、促成交易才有佣金、自僱自稅，與平台無僱傭關係。</label>
+      </div>
+      <button class="btn-primary" onclick="doApply()" style="margin-top:8px;">提交申請</button>
+    </div>
+  </div>
+
+  <!-- ③ 申請狀態頁（未登入時查閱）-->
+  <div class="page" id="page-status-check">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-login')">←</button>
+      <div class="cl-nav-title">申請狀態</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:16px;">
+      <div class="form-group">
+        <label class="form-label">電話號碼</label>
+        <input type="tel" class="form-input" id="status-phone" placeholder="請輸入電話查詢申請狀態">
+      </div>
+      <button class="btn-primary" onclick="checkStatus()">查詢</button>
+      <div id="status-result" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- ④ 忘記密碼 -->
+  <div class="page" id="page-forgot">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-login')">←</button>
+      <div class="cl-nav-title">重設密碼</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:16px;">
+      <div id="forgot-step1" >
+        <div class="cl-card" style="margin:0 0 16px;">
+          <p style="font-size:16px;color:var(--muted);line-height:1.6;">輸入你的電話號碼，職員會以 WhatsApp 發送 6 位重設碼給你（約 15 分鐘內）。</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">電話號碼</label>
+          <input type="tel" class="form-input" id="forgot-phone" placeholder="例：52345678">
+        </div>
+        <div id="forgot-err" class="alert alert-red" style="display:none;"></div>
+        <button class="btn-primary" onclick="doForgotStep1()">申請重設碼</button>
+      </div>
+      <div id="forgot-step2" style="display:none;">
+        <div class="alert alert-green" style="margin:0 0 16px;">✅ 重設碼申請已收到！職員將以 WhatsApp 發送 6 位數字給你，請稍候（約 15 分鐘內）。</div>
+        <div class="form-group">
+          <label class="form-label">6 位重設碼</label>
+          <input type="text" class="form-input" id="forgot-otp" placeholder="輸入 WhatsApp 收到的重設碼" maxlength="6" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label class="form-label">新密碼</label>
+          <input type="password" class="form-input" id="forgot-newpw" placeholder="最少 8 位">
+        </div>
+        <div class="form-group">
+          <label class="form-label">確認新密碼</label>
+          <input type="password" class="form-input" id="forgot-newpw2" placeholder="再輸入一次">
+        </div>
+        <div id="forgot-err2" class="alert alert-red" style="display:none;"></div>
+        <button class="btn-primary" onclick="doForgotStep2()">確認重設密碼</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ Dashboard -->
+  <div class="page" id="page-dashboard">
+    <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:20px 16px;color:#fff;">
+      <div style="font-size:15px;opacity:.8;">歡迎回來</div>
+      <div style="font-size:22px;font-weight:900;margin:4px 0;" id="dash-name">—</div>
+      <div class="role-badge" style="margin-top:6px;">🤝 CoLinkery 連結者</div>
+    </div>
+    <div id="dash-stats" class="stat-row" style="margin-top:16px;">
+      <div class="stat-card"><div class="stat-num" id="stat-leads">-</div><div class="stat-lbl">名片引薦</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-won">-</div><div class="stat-lbl">促成交易</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-comm">-</div><div class="stat-lbl">固定佣金(元)</div></div>
+    </div>
+    <div style="padding:0 16px 16px;">
+      <button class="btn-primary" onclick="showPage('page-camera')" style="font-size:20px;min-height:64px;margin-bottom:12px;">📷 影名片開始</button>
+      <button class="btn-secondary" onclick="showPage('page-cards')" style="margin-bottom:10px;">📋 名片庫</button>
+      <button class="btn-secondary" onclick="showPage('page-share')" style="margin-bottom:10px;">🔗 分享我的引薦連結</button>
+    </div>
+    <!-- iOS PWA install hint -->
+    <div id="ios-install-hint" class="cl-card" style="display:none;margin:0 16px;background:var(--pale);border:1px solid #86EFAC;">
+      <p style="font-size:15px;color:var(--green);font-weight:600;margin-bottom:6px;">📲 加至主畫面，下次更快</p>
+      <p style="font-size:14px;color:var(--muted);">點擊 Safari 底部的 <strong>分享</strong> 按鈕，然後選「<strong>加至主畫面</strong>」，即可像 App 般使用。</p>
+    </div>
+  </div>
+
+  <!-- ⑥ 影名片 / OCR -->
+  <div class="page" id="page-camera">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-dashboard')">←</button>
+      <div class="cl-nav-title">📷 影名片</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:16px;overflow-y:auto;">
+      <div id="camera-area">
+        <video id="camera-preview" autoplay playsinline muted></video>
+        <canvas id="camera-canvas"></canvas>
+        <div style="display:flex;gap:10px;margin-top:12px;">
+          <button class="btn-primary" onclick="capturePhoto()" style="flex:1;">📸 拍攝名片</button>
+          <label class="btn-secondary" style="flex:1;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:56px;font-size:18px;font-weight:700;">
+            🖼 選相片<input type="file" accept="image/*" id="file-input" style="display:none;" onchange="handleFileSelect(event)">
+          </label>
+        </div>
+        <p style="font-size:14px;color:var(--muted);text-align:center;margin-top:8px;">將名片正面朝向鏡頭，確保文字清晰</p>
+      </div>
+      <div id="ocr-loading" style="display:none;text-align:center;padding:30px 0;">
+        <div class="spinner" style="margin:0 auto 12px;"></div>
+        <div style="font-size:16px;color:var(--muted);">AI 讀取名片資料中…</div>
+      </div>
+      <div id="card-form" style="display:none;">
+        <div class="alert alert-green" id="ocr-ok-msg" style="display:none;">✅ AI 已自動讀取，請確認資料</div>
+        <div class="alert alert-yellow" id="ocr-fail-msg" style="display:none;">⚠️ AI 未能讀取，請手動填入名片資料</div>
+        <div class="cl-card" style="margin:0 0 12px;">
+          <img id="captured-preview" style="width:100%;border-radius:8px;margin-bottom:12px;max-height:200px;object-fit:contain;" src="" alt="名片預覽">
+        </div>
+        <div class="form-group"><label class="form-label">姓名（中文）</label><input type="text" class="form-input" id="cf-name-zh" placeholder="名片上的中文姓名"></div>
+        <div class="form-group"><label class="form-label">姓名（英文）</label><input type="text" class="form-input" id="cf-name-en" placeholder="English Name"></div>
+        <div class="form-group"><label class="form-label">公司名稱 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="cf-company" placeholder="公司/機構名稱"></div>
+        <div class="form-group"><label class="form-label">職銜</label><input type="text" class="form-input" id="cf-title" placeholder="職銜/部門"></div>
+        <div class="form-group"><label class="form-label">公司電話</label><input type="tel" class="form-input" id="cf-phone" placeholder="公司電話"></div>
+        <div class="form-group"><label class="form-label">手機</label><input type="tel" class="form-input" id="cf-mobile" placeholder="手機號碼"></div>
+        <div class="form-group"><label class="form-label">電郵</label><input type="email" class="form-input" id="cf-email" placeholder="電郵地址"></div>
+        <div class="form-group"><label class="form-label">地址</label><input type="text" class="form-input" id="cf-address" placeholder="公司地址"></div>
+        <div class="form-group"><label class="form-label">行業</label><input type="text" class="form-input" id="cf-industry" placeholder="例：零售、飲食、製造"></div>
+        <div id="card-save-err" class="alert alert-red" style="display:none;"></div>
+        <button class="btn-primary" onclick="saveCardAndHandover()">確認 → 交棒給 CoEldery 85</button>
+        <button class="btn-outline" onclick="saveCardOnly()" style="width:100%;margin-top:10px;">只儲存名片</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑦ 名片庫 -->
+  <div class="page" id="page-cards">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-dashboard')">←</button>
+      <div class="cl-nav-title">📋 名片庫</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:12px 16px;">
+      <input type="text" class="form-input" id="cards-search" placeholder="🔍 搜尋姓名、公司、電話…" oninput="searchCards()" style="margin-bottom:12px;">
+    </div>
+    <div id="cards-list" style="padding:0 16px;"></div>
+    <div id="card-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto;">
+      <div style="background:#fff;margin:20px 12px;border-radius:16px;padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 style="font-size:18px;font-weight:700;" id="detail-title">名片詳情</h3>
+          <button class="btn-outline" onclick="closeCardDetail()" style="min-height:36px;padding:0 12px;font-size:14px;">關閉</button>
+        </div>
+        <div id="detail-body"></div>
+        <button class="btn-primary" id="detail-handover-btn" onclick="handoverFromDetail()" style="margin-top:12px;">🤝 請 CoEldery 85 安排對接</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑧ 交棒完成頁 -->
+  <div class="page" id="page-handover">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-dashboard')">←</button>
+      <div class="cl-nav-title">🤝 交棒成功</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:20px 16px;text-align:center;">
+      <div style="font-size:64px;margin-bottom:16px;">🎉</div>
+      <div style="font-size:20px;font-weight:700;color:var(--green);margin-bottom:8px;">交棒成功！</div>
+      <div style="font-size:16px;color:var(--muted);margin-bottom:20px;" id="handover-buyer">系統已為買家生成專屬目錄連結</div>
+      <div class="share-box" id="handover-url" style="text-align:left;"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn-primary" onclick="copyHandoverUrl()">📋 複製連結</button>
+        <button class="btn-primary" onclick="waHandoverUrl()" style="background:#25D366;">💬 WhatsApp 發給買家</button>
+        <button class="btn-outline" onclick="emailHandoverUrl()" style="width:100%;">📧 Email 發給買家</button>
+      </div>
+      <div class="alert alert-green" style="margin:16px 0 0;text-align:left;">
+        ✅ 接下來由 CoEldery 85 系統跟進：<br>
+        • 買家在目錄揀選有興趣產品<br>
+        • 系統自動生成報價單並發給買家<br>
+        • 成交後固定佣金計回你的帳戶
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑨ 分享引薦連結 -->
+  <div class="page" id="page-share">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-dashboard')">←</button>
+      <div class="cl-nav-title">🔗 分享引薦連結</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:16px;">
+      <div class="cl-card" style="margin:0 0 16px;">
+        <p style="font-size:16px;color:var(--text);margin-bottom:10px;">將以下連結分享給有意了解 CoEldery 85 企業採購平台的聯絡人：</p>
+        <div class="share-box" id="share-link-box"></div>
+        <div style="font-size:14px;color:var(--muted);margin-bottom:12px;">連結帶有你的引薦 ID，方便系統追蹤。</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button class="btn-primary" onclick="copyShareLink()">📋 複製連結</button>
+          <button class="btn-primary" onclick="waShareLink()" style="background:#25D366;">💬 WhatsApp 分享</button>
+          <button class="btn-outline" onclick="emailShareLink()" style="width:100%;">📧 Email 分享</button>
+        </div>
+      </div>
+      <div class="cl-card" style="margin:0;background:var(--pale);">
+        <p style="font-size:15px;font-weight:600;color:var(--green);margin-bottom:6px;">📋 預載分享文案</p>
+        <div id="share-text-preview" style="font-size:14px;color:var(--text);line-height:1.6;white-space:pre-wrap;background:#fff;border-radius:8px;padding:12px;"></div>
+        <button class="btn-outline" onclick="copyShareText()" style="width:100%;margin-top:10px;">📋 複製文案</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑩ 成績 -->
+  <div class="page" id="page-results">
+    <div class="cl-nav">
+      <div style="width:44px"></div>
+      <div class="cl-nav-title">📊 我的成績</div>
+      <div style="width:44px"></div>
+    </div>
+    <div id="results-content" style="padding:16px;"></div>
+  </div>
+
+  <!-- Bottom Nav（登入後顯示）-->
+  <nav class="bottom-nav" id="bottom-nav" style="display:none;">
+    <button onclick="showPage('page-dashboard')" id="nav-home" class="active"><span class="icon">🏠</span>主頁</button>
+    <button onclick="showPage('page-camera')" id="nav-camera"><span class="icon">📷</span>影名片</button>
+    <button onclick="showPage('page-cards')" id="nav-cards"><span class="icon">📋</span>名片庫</button>
+    <button onclick="showPage('page-results')" id="nav-results"><span class="icon">📊</span>成績</button>
+  </nav>
+</div>
+
+<script>
+// ── 狀態 ──────────────────────────────────────────────────────────────────────
+var STATE = {
+  memberNo: null, nameZh: null,
+  currentCard: null,       // 剛拍攝/選取的名片圖片 R2 key
+  lastHandoverUrl: null, lastHandoverBuyer: null,
+  cameraStream: null,
+  allCards: [],
+  deferredPrompt: null
+};
+
+// ── 工具 ──────────────────────────────────────────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showLoading(txt){ document.getElementById('loading-overlay').style.display='flex'; document.getElementById('loading-text').textContent=txt||'載入中…'; }
+function hideLoading(){ document.getElementById('loading-overlay').style.display='none'; }
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  var el = document.getElementById(id);
+  if(el) el.classList.add('active');
+  // Update bottom nav active state
+  var navMap = {
+    'page-dashboard':'nav-home','page-camera':'nav-camera',
+    'page-cards':'nav-cards','page-results':'nav-results'
+  };
+  document.querySelectorAll('.bottom-nav button').forEach(function(b){ b.classList.remove('active'); });
+  var navId = navMap[id];
+  if(navId){ var nb = document.getElementById(navId); if(nb) nb.classList.add('active'); }
+  // Stop camera if leaving camera page
+  if(id !== 'page-camera') stopCamera();
+  // Auto-init pages
+  if(id==='page-camera') initCamera();
+  if(id==='page-cards') loadCards();
+  if(id==='page-results') loadResults();
+  if(id==='page-share') initSharePage();
+  if(id==='page-dashboard') loadStats();
+  window.scrollTo(0,0);
+}
+
+function showAlert(id, msg, type){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = msg;
+  el.className = 'alert alert-'+(type||'red');
+  el.style.display = 'block';
+}
+function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
+
+// ── 初始化：檢查登入狀態 ────────────────────────────────────────────────────
+(function init(){
+  var saved = sessionStorage.getItem('cl_member');
+  if(saved){
+    try{
+      var d = JSON.parse(saved);
+      STATE.memberNo = d.member_no;
+      STATE.nameZh = d.name_zh;
+      afterLogin();
+    } catch(e){ sessionStorage.removeItem('cl_member'); }
+  }
+  // Register service worker
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/colinkery-sw.js').catch(function(){});
+  }
+  // PWA install prompt (Android)
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    STATE.deferredPrompt = e;
+    document.getElementById('pwa-banner').style.display = 'flex';
+  });
+})();
+
+function triggerInstall(){
+  if(STATE.deferredPrompt){
+    STATE.deferredPrompt.prompt();
+    STATE.deferredPrompt.userChoice.then(function(r){
+      STATE.deferredPrompt = null;
+      document.getElementById('pwa-banner').style.display = 'none';
+    });
+  }
+}
+
+// ── 登入 ──────────────────────────────────────────────────────────────────────
+async function doLogin(){
+  var phone = document.getElementById('login-phone').value.trim();
+  var pw = document.getElementById('login-pw').value;
+  if(!phone||!pw){ showAlert('login-err','請填寫電話及密碼'); return; }
+  hideAlert('login-err');
+  showLoading('登入中…');
+  try{
+    var res = await fetch('/api/colinkery/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:phone,password:pw})});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('login-err', d.error||'登入失敗'); return; }
+    STATE.memberNo = d.member_no;
+    STATE.nameZh = d.name_zh;
+    sessionStorage.setItem('cl_member', JSON.stringify({member_no:d.member_no,name_zh:d.name_zh}));
+    afterLogin();
+  } catch(e){ hideLoading(); showAlert('login-err','網絡錯誤，請稍後再試'); }
+}
+
+function afterLogin(){
+  document.getElementById('dash-name').textContent = STATE.nameZh || STATE.memberNo;
+  document.getElementById('bottom-nav').style.display = 'flex';
+  showPage('page-dashboard');
+  // Check if first-time onboarding
+  if(!localStorage.getItem('cl_onboarded_'+STATE.memberNo)){
+    startOnboarding();
+  }
+  // iOS install hint
+  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var isStandalone = window.navigator.standalone;
+  if(isIos && !isStandalone){
+    setTimeout(function(){ document.getElementById('ios-install-hint').style.display='block'; },2000);
+  }
+}
+
+// ── Onboarding ────────────────────────────────────────────────────────────────
+var OB_STEPS = [
+  {icon:'👋',title:'歡迎加入 CoLinkery！',desc:'你係老有聯盟 85 的連結者，用你的人脈連結企業採購，讓長者社群受惠。'},
+  {icon:'📷',title:'第一步：影名片',desc:'遇到企業採購決策人？立即影低佢的名片，AI 自動讀取聯絡資料。'},
+  {icon:'🤝',title:'第二步：交棒',desc:'一撳「交棒」，系統為買家生成專屬報價目錄連結，由你轉發給對方。'},
+  {icon:'🎉',title:'第三步：系統跟進',desc:'其後嘅報價、跟單、物流全由 CoEldery 85 處理。成交後固定佣金直接計入你的帳戶。'},
+  {icon:'📱',title:'加至主畫面',desc:'點擊「加至主畫面」，下次開啟更方便，使用體驗更像 App！'}
+];
+var obStep = 0;
+function startOnboarding(){
+  obStep = 0;
+  renderOnboardStep();
+  document.getElementById('onboard-overlay').style.display='flex';
+}
+function renderOnboardStep(){
+  var s = OB_STEPS[obStep];
+  document.getElementById('ob-icon').textContent = s.icon;
+  document.getElementById('ob-title').textContent = s.title;
+  document.getElementById('ob-desc').textContent = s.desc;
+  document.getElementById('ob-next-btn').textContent = obStep < OB_STEPS.length-1 ? '繼續' : '開始影名片！';
+  var dots = document.getElementById('ob-dots');
+  dots.innerHTML = OB_STEPS.map(function(_,i){ return '<div class="step-dot'+(i===obStep?' active':'')+'"></div>'; }).join('');
+}
+function onboardNext(){
+  obStep++;
+  if(obStep >= OB_STEPS.length){
+    document.getElementById('onboard-overlay').style.display='none';
+    localStorage.setItem('cl_onboarded_'+STATE.memberNo,'1');
+    showPage('page-camera');
+    return;
+  }
+  renderOnboardStep();
+}
+
+// ── 申請 ──────────────────────────────────────────────────────────────────────
+async function doApply(){
+  var phone = document.getElementById('apply-phone').value.trim();
+  var name = document.getElementById('apply-name').value.trim();
+  var type = document.getElementById('apply-type').value;
+  var bank = document.getElementById('apply-bank').value.trim();
+  var docFile = document.getElementById('apply-doc').files[0];
+  var pw = document.getElementById('apply-pw').value;
+  var pw2 = document.getElementById('apply-pw2').value;
+  var agree = document.getElementById('apply-agree').checked;
+  hideAlert('apply-err'); hideAlert('apply-ok');
+  if(!phone||!name||!type||!pw){ showAlert('apply-err','請填寫所有必填欄位'); return; }
+  if(pw !== pw2){ showAlert('apply-err','兩次密碼不一致'); return; }
+  if(pw.length < 8){ showAlert('apply-err','密碼最少 8 位'); return; }
+  if(!agree){ showAlert('apply-err','請同意合作條款'); return; }
+  if((type==='COMPANY'||type==='ASSOCIATION') && !docFile){ showAlert('apply-err','公司/協會身份需要上傳登記文件'); return; }
+  showLoading('提交申請中…');
+  try{
+    var fd = new FormData();
+    fd.append('phone',phone); fd.append('name_zh',name); fd.append('applicant_type',type);
+    fd.append('bank_info',bank); fd.append('password',pw); fd.append('agree_terms','on');
+    if(docFile) fd.append('doc_file',docFile);
+    var res = await fetch('/api/colinkery/apply',{method:'POST',body:fd});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('apply-err',d.error||'申請失敗'); return; }
+    showAlert('apply-ok', d.message || '申請已提交！審核約需 3-5 個工作天。', 'green');
+    // Clear form
+    document.getElementById('apply-phone').value=''; document.getElementById('apply-name').value='';
+    document.getElementById('apply-pw').value=''; document.getElementById('apply-pw2').value='';
+  } catch(e){ hideLoading(); showAlert('apply-err','網絡錯誤，請稍後再試'); }
+}
+
+// ── 狀態查詢 ──────────────────────────────────────────────────────────────────
+async function checkStatus(){
+  var phone = document.getElementById('status-phone').value.trim();
+  if(!phone) return;
+  showLoading('查詢中…');
+  try{
+    var res = await fetch('/api/colinkery/my-status?phone='+encodeURIComponent(phone));
+    var d = await res.json();
+    hideLoading();
+    var html = '';
+    if(!d.ok){ html='<div class="alert alert-red">'+esc(d.error)+'</div>'; }
+    else {
+      var stMap={'none':'未申請','password_pending':'審核中（3-5 工作天）','active':'已啟用','suspended':'已暫停'};
+      html = '<div class="cl-card"><div style="font-size:16px;font-weight:700;margin-bottom:8px;">'+esc(d.name_zh)+'</div>';
+      html += '<div>帳戶狀態：<strong>'+(stMap[d.colinkery_account_status]||d.colinkery_account_status)+'</strong></div>';
+      if(d.application){
+        html += '<div style="margin-top:8px;font-size:14px;color:var(--muted);">申請身份：'+esc(d.application.applicant_type)+'</div>';
+        if(d.application.status==='REJECTED'&&d.application.review_notes){
+          html += '<div class="alert alert-red" style="margin-top:8px;">拒絕原因：'+esc(d.application.review_notes)+'</div>';
+          html += '<button class="btn-secondary" onclick="showPage(&quot;page-apply&quot;)" style="margin-top:8px;">重新申請</button>';
+        }
+      }
+      html += '</div>';
+    }
+    document.getElementById('status-result').innerHTML = html;
+  } catch(e){ hideLoading(); document.getElementById('status-result').innerHTML='<div class="alert alert-red">網絡錯誤</div>'; }
+}
+
+// ── 忘記密碼 ──────────────────────────────────────────────────────────────────
+var forgotPhone = '';
+async function doForgotStep1(){
+  forgotPhone = document.getElementById('forgot-phone').value.trim();
+  if(!forgotPhone){ showAlert('forgot-err','請輸入電話'); return; }
+  hideAlert('forgot-err');
+  showLoading('申請重設碼…');
+  try{
+    var res = await fetch('/api/colinkery/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:forgotPhone})});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('forgot-err',d.error||'申請失敗'); return; }
+    document.getElementById('forgot-step1').style.display='none';
+    document.getElementById('forgot-step2').style.display='block';
+  } catch(e){ hideLoading(); showAlert('forgot-err','網絡錯誤'); }
+}
+async function doForgotStep2(){
+  var otp = document.getElementById('forgot-otp').value.trim();
+  var pw = document.getElementById('forgot-newpw').value;
+  var pw2 = document.getElementById('forgot-newpw2').value;
+  hideAlert('forgot-err2');
+  if(!otp||!pw){ showAlert('forgot-err2','請填寫所有欄位'); return; }
+  if(pw!==pw2){ showAlert('forgot-err2','兩次密碼不一致'); return; }
+  if(pw.length<8){ showAlert('forgot-err2','密碼最少 8 位'); return; }
+  showLoading('重設密碼中…');
+  try{
+    var res = await fetch('/api/colinkery/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:forgotPhone,otp_code:otp,new_password:pw})});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('forgot-err2',d.error||'重設失敗'); return; }
+    alert('✅ 密碼已更新！請用新密碼登入。');
+    showPage('page-login');
+  } catch(e){ hideLoading(); showAlert('forgot-err2','網絡錯誤'); }
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+async function loadStats(){
+  if(!STATE.memberNo) return;
+  try{
+    var res = await fetch('/api/colinkery/stats');
+    var d = await res.json();
+    if(d.ok){
+      document.getElementById('stat-leads').textContent = d.total_leads;
+      document.getElementById('stat-won').textContent = d.won_count;
+      var comm = Math.round((d.paid_cents + d.accrued_cents)/100);
+      document.getElementById('stat-comm').textContent = comm.toLocaleString();
+    }
+  } catch(e){}
+}
+
+// ── Camera ────────────────────────────────────────────────────────────────────
+async function initCamera(){
+  if(STATE.cameraStream) return;
+  try{
+    var stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
+    STATE.cameraStream = stream;
+    var video = document.getElementById('camera-preview');
+    video.srcObject = stream;
+    video.play();
+  } catch(e){
+    // Camera not available — show file picker
+    document.getElementById('camera-area').innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px;">相機不可用，請選擇相片</p><label class="btn-primary" style="display:flex;align-items:center;justify-content:center;cursor:pointer;">🖼 選擇名片相片<input type="file" accept="image/*" id="file-input" style="display:none;" onchange="handleFileSelect(event)"></label>';
+  }
+}
+function stopCamera(){
+  if(STATE.cameraStream){
+    STATE.cameraStream.getTracks().forEach(function(t){ t.stop(); });
+    STATE.cameraStream = null;
+  }
+}
+function capturePhoto(){
+  var video = document.getElementById('camera-preview');
+  var canvas = document.getElementById('camera-canvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  canvas.toBlob(function(blob){ processImageBlob(blob, 'photo.jpg', 'image/jpeg'); }, 'image/jpeg', 0.92);
+}
+function handleFileSelect(e){
+  var file = e.target.files[0];
+  if(!file) return;
+  processImageBlob(file, file.name, file.type);
+}
+async function processImageBlob(blob, name, type){
+  document.getElementById('ocr-loading').style.display='block';
+  document.getElementById('card-form').style.display='none';
+  document.getElementById('camera-area').style.display='none';
+  hideAlert('ocr-ok-msg'); hideAlert('ocr-fail-msg');
+
+  // Show preview
+  var url = URL.createObjectURL(blob);
+  document.getElementById('captured-preview').src = url;
+
+  var fd = new FormData();
+  fd.append('image', blob, name);
+  var r2Key = '';
+  var parsed = {};
+  try{
+    var res = await fetch('/api/colinkery/cards/ocr',{method:'POST',body:fd});
+    var d = await res.json();
+    if(d.ok){
+      r2Key = d.r2_key || '';
+      parsed = d.parsed || {};
+      if(!d.ocr_failed && Object.keys(parsed).length > 0){
+        showAlert('ocr-ok-msg','','green');
+        document.getElementById('ocr-ok-msg').style.display='block';
+      } else {
+        document.getElementById('ocr-fail-msg').style.display='block';
+      }
+    } else {
+      document.getElementById('ocr-fail-msg').style.display='block';
+    }
+  } catch(e){ document.getElementById('ocr-fail-msg').style.display='block'; }
+
+  STATE.currentCard = {r2_key: r2Key, blob: blob};
+  // Fill form
+  document.getElementById('cf-name-zh').value = parsed.name_zh || '';
+  document.getElementById('cf-name-en').value = parsed.name_en || '';
+  document.getElementById('cf-company').value = parsed.company || '';
+  document.getElementById('cf-title').value = parsed.title || '';
+  document.getElementById('cf-phone').value = parsed.phone || '';
+  document.getElementById('cf-mobile').value = parsed.mobile || '';
+  document.getElementById('cf-email').value = parsed.email || '';
+  document.getElementById('cf-address').value = parsed.address || '';
+  document.getElementById('cf-industry').value = parsed.industry || '';
+
+  document.getElementById('ocr-loading').style.display='none';
+  document.getElementById('card-form').style.display='block';
+}
+function getCardFormData(){
+  return {
+    image_r2_key: STATE.currentCard ? STATE.currentCard.r2_key : '',
+    name_zh: document.getElementById('cf-name-zh').value.trim(),
+    name_en: document.getElementById('cf-name-en').value.trim(),
+    company: document.getElementById('cf-company').value.trim(),
+    title: document.getElementById('cf-title').value.trim(),
+    phone: document.getElementById('cf-phone').value.trim(),
+    mobile: document.getElementById('cf-mobile').value.trim(),
+    email: document.getElementById('cf-email').value.trim(),
+    address: document.getElementById('cf-address').value.trim(),
+    industry: document.getElementById('cf-industry').value.trim()
+  };
+}
+async function saveCardOnly(){
+  var data = getCardFormData();
+  if(!data.company){ showAlert('card-save-err','請填寫公司名稱'); return; }
+  showLoading('儲存名片中…');
+  try{
+    var res = await fetch('/api/colinkery/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('card-save-err',d.error||'儲存失敗'); return; }
+    alert('✅ 名片已儲存！');
+    showPage('page-dashboard');
+  } catch(e){ hideLoading(); showAlert('card-save-err','網絡錯誤'); }
+}
+async function saveCardAndHandover(){
+  var data = getCardFormData();
+  if(!data.company){ showAlert('card-save-err','請填寫公司名稱'); return; }
+  showLoading('儲存並交棒中…');
+  try{
+    // 先存名片
+    var r1 = await fetch('/api/colinkery/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    var d1 = await r1.json();
+    if(!d1.ok){ hideLoading(); showAlert('card-save-err',d1.error||'儲存失敗'); return; }
+    // 交棒
+    var r2 = await fetch('/api/colinkery/handover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:d1.card_id})});
+    var d2 = await r2.json();
+    hideLoading();
+    if(!d2.ok){ showAlert('card-save-err',d2.error||'交棒失敗'); return; }
+    STATE.lastHandoverUrl = d2.catalog_url;
+    STATE.lastHandoverBuyer = d2.buyer_name ? d2.buyer_name + (d2.buyer_company ? '（'+d2.buyer_company+'）' : '') : d2.buyer_company;
+    document.getElementById('handover-buyer').textContent = '買家：' + (STATE.lastHandoverBuyer||'—');
+    document.getElementById('handover-url').textContent = d2.catalog_url;
+    showPage('page-handover');
+  } catch(e){ hideLoading(); showAlert('card-save-err','網絡錯誤'); }
+}
+
+// ── 名片庫 ────────────────────────────────────────────────────────────────────
+async function loadCards(){
+  var q = (document.getElementById('cards-search')||{}).value || '';
+  showLoading('載入名片庫…');
+  try{
+    var url = '/api/colinkery/cards' + (q ? '?q='+encodeURIComponent(q) : '');
+    var res = await fetch(url);
+    var d = await res.json();
+    hideLoading();
+    STATE.allCards = d.cards || [];
+    renderCards(STATE.allCards);
+  } catch(e){ hideLoading(); }
+}
+function searchCards(){
+  var q = document.getElementById('cards-search').value.toLowerCase();
+  var filtered = STATE.allCards.filter(function(c){
+    return (c.name_zh||'').toLowerCase().includes(q) || (c.name_en||'').toLowerCase().includes(q) ||
+           (c.company||'').toLowerCase().includes(q) || (c.phone||'').includes(q) || (c.mobile||'').includes(q);
+  });
+  renderCards(filtered);
+}
+function renderCards(cards){
+  var list = document.getElementById('cards-list');
+  if(!cards||!cards.length){ list.innerHTML='<div style="text-align:center;padding:40px 0;color:var(--muted);">暫無名片，影名片開始！</div>'; return; }
+  list.innerHTML = cards.map(function(c){
+    return '<div class="card-chip" data-cid="'+esc(c.card_id)+'" style="cursor:pointer;">' +
+      '<div style="font-size:16px;font-weight:700;">' + esc(c.name_zh||(c.name_en||'—')) + '</div>' +
+      '<div style="font-size:14px;color:var(--muted);">' + esc(c.company||'') + (c.title?' · '+esc(c.title):'') + '</div>' +
+      '<div style="font-size:13px;color:var(--muted);margin-top:2px;">' + esc(c.phone||c.mobile||'') + (c.email?' · '+esc(c.email):'') + '</div>' +
+    '</div>';
+  }).join('');
+  // Attach click handlers via event delegation
+  list.querySelectorAll('[data-cid]').forEach(function(el){ el.addEventListener('click', function(){ openCardDetail(el.getAttribute('data-cid')); }); });
+}
+function openCardDetail(cardId){
+  var card = STATE.allCards.find(function(c){ return c.card_id===cardId; });
+  if(!card) return;
+  var fields = [
+    ['👤 姓名（中文）',card.name_zh],['👤 姓名（英文）',card.name_en],
+    ['🏢 公司',card.company],['💼 職銜',card.title],
+    ['📞 電話',card.phone],['📱 手機',card.mobile],
+    ['📧 電郵',card.email],['📍 地址',card.address],['🏭 行業',card.industry]
+  ];
+  var html = fields.filter(function(f){ return f[1]; }).map(function(f){
+    return '<div style="margin-bottom:8px;"><span style="font-size:14px;color:var(--muted);">'+f[0]+'</span><br><span style="font-size:16px;font-weight:600;">'+esc(f[1])+'</span></div>';
+  }).join('');
+  document.getElementById('detail-title').textContent = card.name_zh || card.company || '名片詳情';
+  document.getElementById('detail-body').innerHTML = html;
+  document.getElementById('detail-handover-btn').dataset.cardId = cardId;
+  document.getElementById('card-detail-modal').style.display = 'block';
+}
+function closeCardDetail(){ document.getElementById('card-detail-modal').style.display='none'; }
+async function handoverFromDetail(){
+  var cardId = document.getElementById('detail-handover-btn').dataset.cardId;
+  closeCardDetail();
+  showLoading('交棒中…');
+  try{
+    var res = await fetch('/api/colinkery/handover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:cardId})});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ alert(d.error||'交棒失敗'); return; }
+    STATE.lastHandoverUrl = d.catalog_url;
+    STATE.lastHandoverBuyer = d.buyer_name ? d.buyer_name + (d.buyer_company?' ('+d.buyer_company+')':'') : d.buyer_company;
+    document.getElementById('handover-buyer').textContent = '買家：' + (STATE.lastHandoverBuyer||'—');
+    document.getElementById('handover-url').textContent = d.catalog_url;
+    showPage('page-handover');
+  } catch(e){ hideLoading(); alert('網絡錯誤'); }
+}
+
+// ── 交棒完成 ──────────────────────────────────────────────────────────────────
+function copyHandoverUrl(){ if(STATE.lastHandoverUrl){ navigator.clipboard.writeText(STATE.lastHandoverUrl).then(function(){ alert('✅ 連結已複製'); }).catch(function(){ prompt('複製連結：',STATE.lastHandoverUrl); }); } }
+function waHandoverUrl(){
+  if(!STATE.lastHandoverUrl) return;
+  var msg = '你好！這是 CoEldery 85 為你準備的企業採購目錄，請點擊查閱及選擇有興趣的產品：\\n'+STATE.lastHandoverUrl;
+  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var url = isIos ? 'whatsapp://send?text='+encodeURIComponent(msg) : 'https://wa.me/?text='+encodeURIComponent(msg);
+  window.open(url,'_blank');
+}
+function emailHandoverUrl(){
+  if(!STATE.lastHandoverUrl) return;
+  var sub = encodeURIComponent('CoEldery 85 企業採購目錄');
+  var body = encodeURIComponent('你好，\\n\\n特此發上 CoEldery 85 為你準備的企業採購目錄連結：\\n'+STATE.lastHandoverUrl+'\\n\\n如有查詢，歡迎聯絡。');
+  window.open('mailto:?subject='+sub+'&body='+body);
+}
+
+// ── 分享頁 ────────────────────────────────────────────────────────────────────
+function initSharePage(){
+  var link = 'https://coeldery85.com/for-business.html?ref='+encodeURIComponent(STATE.memberNo||'');
+  document.getElementById('share-link-box').textContent = link;
+  var text = '你好！我係老有聯盟 85 的連結者，我哋係一個由退休長者組成的企業採購平台。\\n\\n如果你有企業採購需要，歡迎了解更多：\\n'+link;
+  document.getElementById('share-text-preview').textContent = text;
+}
+function copyShareLink(){ var t=document.getElementById('share-link-box').textContent; navigator.clipboard.writeText(t).then(function(){ alert('✅ 連結已複製'); }).catch(function(){ prompt('複製連結：',t); }); }
+function waShareLink(){ var t='你好！我係老有聯盟 85 的連結者，我哋係一個由退休長者組成的企業採購平台。如果你有企業採購需要，歡迎了解更多：\\n'+(document.getElementById('share-link-box').textContent||''); var isIos=/iphone|ipad|ipod/i.test(navigator.userAgent); window.open(isIos?'whatsapp://send?text='+encodeURIComponent(t):'https://wa.me/?text='+encodeURIComponent(t),'_blank'); }
+function emailShareLink(){ var sub=encodeURIComponent('老有聯盟 85 企業採購平台'); var body=encodeURIComponent(document.getElementById('share-text-preview').textContent||''); window.open('mailto:?subject='+sub+'&body='+body); }
+function copyShareText(){ var t=document.getElementById('share-text-preview').textContent; navigator.clipboard.writeText(t).then(function(){ alert('✅ 文案已複製'); }).catch(function(){ prompt('複製文案：',t); }); }
+
+// ── 成績頁 ────────────────────────────────────────────────────────────────────
+async function loadResults(){
+  if(!STATE.memberNo) return;
+  var cont = document.getElementById('results-content');
+  cont.innerHTML = '<div style="text-align:center;padding:40px 0;"><div class="spinner"></div></div>';
+  try{
+    var res = await fetch('/api/colinkery/stats');
+    var d = await res.json();
+    if(!d.ok){ cont.innerHTML='<div class="alert alert-red">載入失敗</div>'; return; }
+    var paid = Math.round((d.paid_cents||0)/100);
+    var accrued = Math.round((d.accrued_cents||0)/100);
+    var html = '<div class="stat-row" style="padding:0 0 16px;">' +
+      '<div class="stat-card"><div class="stat-num">'+d.total_leads+'</div><div class="stat-lbl">名片引薦</div></div>' +
+      '<div class="stat-card"><div class="stat-num">'+d.won_count+'</div><div class="stat-lbl">促成交易</div></div>' +
+      '<div class="stat-card"><div class="stat-num">'+paid.toLocaleString()+'</div><div class="stat-lbl">已收固定佣金(元)</div></div>' +
+    '</div>';
+    if(accrued > 0){
+      html += '<div class="alert alert-yellow" style="margin:0 0 16px;">💰 待發固定佣金：HK$'+accrued.toLocaleString()+'（成交已確認，待付款）</div>';
+    }
+    html += '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">最近成交記錄</h3>';
+    if(!d.recent_won||!d.recent_won.length){
+      html += '<div style="text-align:center;color:var(--muted);padding:20px 0;">尚無成交記錄</div>';
+    } else {
+      html += d.recent_won.map(function(w){
+        var comm = Math.round((w.commission_amount_cents||0)/100);
+        var stLabel = w.commission_status==='paid'?'✅ 已付':'⏳ 待付';
+        return '<div class="comm-item"><div style="font-weight:700;">'+esc(w.buyer_name||w.buyer_company||'—')+'</div>' +
+               '<div style="font-size:14px;color:var(--muted);">'+esc(w.buyer_company||'')+'</div>' +
+               '<div style="font-size:15px;color:var(--green);font-weight:700;margin-top:4px;">固定佣金：HK$'+comm.toLocaleString()+'　'+stLabel+'</div>' +
+               '</div>';
+      }).join('');
+    }
+    cont.innerHTML = html;
+  } catch(e){ cont.innerHTML='<div class="alert alert-red">網絡錯誤</div>'; }
+}
+</script>
+</body>
+</html>`
+}
+
+app.get('/colinkery', (c) => c.redirect('/colinkery/', 301))
+app.get('/colinkery/', (c) => c.html(colinkerypwaHtml()))
+app.get('/colinkery/*', (c) => c.html(colinkerypwaHtml()))
+
+// ─── Admin CoLinkery UI（整合進現有 admin shell via JS）──────────────────────
+function adminColinkerySectionHtml(): string {
+  return `
+<!-- CoLinkery 審批 section — 由 admin shell JS 動態注入 -->
+<div id="cl-admin-pending-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <h2 style="font-size:18px;font-weight:700;">🤝 CoLinkery 申請審批</h2>
+    <button onclick="loadClPending()" style="background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:14px;">重新整理</button>
+  </div>
+  <div id="cl-pending-list"><p style="color:#888;">載入中…</p></div>
+  <h2 style="font-size:18px;font-weight:700;margin:24px 0 12px;">📱 CoLinkery 待發 OTP（忘記密碼）</h2>
+  <div id="cl-otp-list"><p style="color:#888;">載入中…</p></div>
+</div>
+<script>
+async function loadClPending(){
+  try{
+    var res = await fetch('/api/admin/colinkery/pending',{credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ document.getElementById('cl-pending-list').innerHTML='<p style="color:#c00;">'+d.error+'</p>'; return; }
+
+    var apps = d.applications||[];
+    var html = apps.length===0 ? '<p style="color:#888;">目前無待審批申請</p>' : apps.map(function(a){
+      var typeMap={INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
+      return '<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,.08);">' +
+        '<div style="font-size:15px;font-weight:700;">'+a.name_zh+' （'+a.member_no+'）</div>' +
+        '<div style="font-size:13px;color:#666;">電話：'+a.phone+' ｜ 身份：'+(typeMap[a.applicant_type]||a.applicant_type)+'</div>' +
+        '<div style="font-size:13px;color:#888;margin-top:4px;">'+a.notes+'</div>' +
+        '<div style="font-size:12px;color:#aaa;">申請時間：'+a.created_at+'</div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+          '<button onclick="approveClApp('+a.id+')" style="background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px;">✅ 批准</button>' +
+          '<button onclick="rejectClApp('+a.id+')" style="background:#C62828;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px;">❌ 拒絕</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    document.getElementById('cl-pending-list').innerHTML = html;
+
+    var otps = d.pending_otps||[];
+    var otpHtml = otps.length===0 ? '<p style="color:#888;">目前無待發 OTP</p>' : otps.map(function(o){
+      var phoneDigits = (o.phone||'').replace(/\\D/g,'');
+      var fullPhone = phoneDigits.startsWith('852')?phoneDigits:'852'+phoneDigits;
+      var msg = encodeURIComponent('你好'+o.name_zh+'！你的 CoLinkery 密碼重設碼為：'+o.otp_code+'，請於 10 分鐘內使用。');
+      var waLink = 'https://wa.me/'+fullPhone+'?text='+msg;
+      return '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.08);">' +
+        '<div style="font-size:15px;font-weight:700;">'+o.name_zh+' （'+o.member_no+'）</div>' +
+        '<div style="font-size:13px;color:#666;">電話：'+o.phone+'</div>' +
+        '<div style="font-size:20px;font-weight:900;color:#1B5E20;letter-spacing:4px;margin:8px 0;">'+o.otp_code+'</div>' +
+        '<div style="font-size:12px;color:#aaa;">到期：'+o.expires_at+'</div>' +
+        '<a href="'+waLink+'" target="_blank" style="display:inline-block;background:#25D366;color:#fff;text-decoration:none;border-radius:8px;padding:8px 16px;font-size:14px;margin-top:8px;">💬 WhatsApp 發送 OTP</a>' +
+      '</div>';
+    }).join('');
+    document.getElementById('cl-otp-list').innerHTML = otpHtml;
+  } catch(e){ document.getElementById('cl-pending-list').innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
+}
+
+async function approveClApp(id){
+  if(!confirm('確認批准此 CoLinkery 申請？')) return;
+  try{
+    var res = await fetch('/api/admin/colinkery/approve/'+id,{method:'POST',credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ alert(d.error||'批准失敗'); return; }
+    alert('✅ 已批准！Holder No: '+d.holder_no+'\\n\\n點擊確定後可用以下連結 WhatsApp 通知申請人：\\n'+d.wa_notify_link);
+    // Open wa link
+    window.open(d.wa_notify_link,'_blank');
+    loadClPending();
+  } catch(e){ alert('網絡錯誤'); }
+}
+
+async function rejectClApp(id){
+  var reason = prompt('請輸入拒絕原因（會顯示給申請人）：');
+  if(reason===null) return;
+  try{
+    var res = await fetch('/api/admin/colinkery/reject/'+id,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})});
+    var d = await res.json();
+    if(!d.ok){ alert(d.error||'拒絕失敗'); return; }
+    alert('✅ 已拒絕。\\n點擊確定後可用以下連結通知申請人：\\n'+d.wa_notify_link);
+    window.open(d.wa_notify_link,'_blank');
+    loadClPending();
+  } catch(e){ alert('網絡錯誤'); }
+}
+
+// 自動載入
+loadClPending();
+<\/script>`
+}
+
+// ─── 將 CoLinkery 審批頁面注入現有 admin shell ──────────────────────────────
+app.get('/admin/colinkery', async (c) => {
+  const token = getSessionToken(c)
+  if (!await verifySession(c.env.DB, token)) return c.redirect('/membership/admin', 302)
+  return c.html(`<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CoLinkery 審批 — Admin</title>
+<style>
+*{box-sizing:border-box;}body{font-family:sans-serif;background:#F3F4F6;margin:0;padding:16px;}
+h1{font-size:20px;font-weight:700;margin-bottom:16px;}
+a{color:#1B5E20;text-decoration:none;}
+a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+<div><a href="/admin">← 返回 Admin</a></div>
+<h1>🤝 CoLinkery 管理</h1>
+${adminColinkerySectionHtml()}
+</body>
+</html>`)
+})
 
 export default app
