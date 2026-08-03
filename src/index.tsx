@@ -6557,6 +6557,36 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
     `}
   </div>
 
+  <!-- ── CoLinkery 連結者 入口 ── -->
+  ${(() => {
+    const clStatus = m.colinkery_account_status || 'none'
+    if (clStatus === 'active') {
+      return `<div style="background:#E8F5E9;border:2px solid #2E7D32;border-radius:10px;padding:20px;margin-bottom:14px;">
+        <div style="font-family:'Noto Serif TC',serif;font-size:18px;color:#1B5E20;font-weight:700;letter-spacing:2px;margin-bottom:10px;">🤝 CoLinkery 連結者</div>
+        <div style="font-size:18px;color:#2E7D32;font-weight:700;margin-bottom:14px;">✅ 你已是 CoLinkery 連結者</div>
+        <a href="/colinkery/" style="display:block;width:100%;padding:15px;background:#1B5E20;color:#fff;border:0;border-radius:6px;font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;letter-spacing:2px;cursor:pointer;text-align:center;text-decoration:none;box-sizing:border-box;">進入 CoLinkery 工具 →</a>
+      </div>`
+    } else if (clStatus === 'password_pending') {
+      return `<div style="background:#FFF9C4;border:2px solid #F9A825;border-radius:10px;padding:20px;margin-bottom:14px;">
+        <div style="font-family:'Noto Serif TC',serif;font-size:18px;color:#E65100;font-weight:700;letter-spacing:2px;margin-bottom:10px;">🤝 CoLinkery 連結者</div>
+        <div style="font-size:18px;color:#E65100;margin-bottom:6px;">⏳ 申請審核中</div>
+        <div style="font-size:17px;color:#795548;line-height:1.7;">你的申請已收到，職員將於 3-5 個工作天內審核。批准後你可使用設定的密碼登入 CoLinkery 工具。</div>
+      </div>`
+    } else if (clStatus === 'suspended') {
+      return `<div style="background:#FFEBEE;border:2px solid #C62828;border-radius:10px;padding:20px;margin-bottom:14px;">
+        <div style="font-family:'Noto Serif TC',serif;font-size:18px;color:#B71C1C;font-weight:700;letter-spacing:2px;margin-bottom:10px;">🤝 CoLinkery 連結者</div>
+        <div style="font-size:18px;color:#C62828;">⛔ 帳戶已暫停，請聯絡職員。</div>
+      </div>`
+    } else {
+      // 'none' — 顯示申請入口
+      return `<div style="background:#fff;border:2px solid #2E7D32;border-radius:10px;padding:20px;margin-bottom:14px;">
+        <div style="font-family:'Noto Serif TC',serif;font-size:18px;color:#1B5E20;font-weight:700;letter-spacing:2px;margin-bottom:6px;">🤝 CoLinkery 連結者計劃</div>
+        <div style="font-size:17px;color:#555;line-height:1.7;margin-bottom:14px;">連接商業客戶、拓展 B2B 合作機會。適合擁有商業人脈或客戶資源的會員，賺取項目分成。</div>
+        <a href="/colinkery/?action=apply&phone=${encodeURIComponent(m.phone||'')}" style="display:block;width:100%;padding:15px;background:#1B5E20;color:#fff;border:0;border-radius:6px;font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;letter-spacing:2px;cursor:pointer;text-align:center;text-decoration:none;box-sizing:border-box;">了解及申請 CoLinkery →</a>
+      </div>`
+    }
+  })()}
+
   <!-- ── 底部連結 ── -->
   <div style="text-align:center;margin-top:20px;font-size:18px;line-height:2.4;">
     <div>
@@ -15903,6 +15933,18 @@ function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.disp
       STATE.nameZh = d.name_zh;
       afterLogin();
     } catch(e){ sessionStorage.removeItem('cl_member'); }
+  } else {
+    // 從會員卡跳過來：?action=apply&phone=xxxxxxxx
+    var params = new URLSearchParams(window.location.search);
+    var action = params.get('action');
+    var prefillPhone = params.get('phone') || '';
+    if(action === 'apply'){
+      showPage('page-apply');
+      if(prefillPhone){
+        var applyPhoneEl = document.getElementById('apply-phone');
+        if(applyPhoneEl){ applyPhoneEl.value = prefillPhone; applyPhoneEl.readOnly = true; }
+      }
+    }
   }
   // Register service worker
   if('serviceWorker' in navigator){
