@@ -11162,37 +11162,32 @@ function showCard(memberNo, waClicked) {
   // partner entry section — 用 data-member attribute 避免 onclick 引號衝突
   var partnerEntryHtml =
     '<div id="partnerEntrySection" style="margin:20px 0 0;padding:0 2px;">' +
-      '<div style="font-size:16px;font-weight:900;color:#8B0000;letter-spacing:1px;margin-bottom:10px;padding-left:2px;">\uD83C\uDF1F CoEldery 85 \u9818\u822a\u8005\u8a08\u5283</div>' +
+      '<div style="font-size:16px;font-weight:900;color:#8B0000;letter-spacing:1px;margin-bottom:10px;padding-left:2px;">\uD83C\uDF1F CoEldery 85 \u5408\u4f5c\u8a08\u5283</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">' +
-        '<button id="btnPartnerApply" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
-          '\uD83C\uDF1F \u6210\u70ba\u9818\u822a\u8005<br><span style="font-size:12px;font-weight:400;opacity:0.9;">\u5206\u4eab\u9805\u76ee\u6de8\u5229\u6f64</span>' +
+        '<button id="btnPartnerApply" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;border:none;border-radius:12px;padding:18px 10px;font-size:14px;font-weight:700;cursor:pointer;line-height:1.5;min-height:90px;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">' +
+          '<span style="font-size:32px;">\uD83C\uDF1F</span>' +
+          '<div style="font-size:15px;font-weight:800;">CoLeadery</div>' +
+          '<div style="font-size:11px;font-weight:400;opacity:0.9;">\u9818\u822a\u8005\uff5c\u5206\u4eab\u9805\u76ee\u6de8\u5229\u6f64</div>' +
         '</button>' +
-        '<button id="btnWallet" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border:none;border-radius:12px;padding:16px 10px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.4;min-height:76px;font-family:inherit;">' +
-          '\uD83D\uDCB0 \u6211\u7684\u9322\u5305<br><span style="font-size:12px;font-weight:400;opacity:0.9;">\u67e5\u770b\u5206\u6210\u8a18\u9304</span>' +
+        '<button id="btnCoLinkery" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#1A237E,#283593);color:#fff;border:none;border-radius:12px;padding:18px 10px;font-size:14px;font-weight:700;cursor:pointer;line-height:1.5;min-height:90px;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">' +
+          '<span style="font-size:32px;">\uD83E\uDD1D</span>' +
+          '<div style="font-size:15px;font-weight:800;">CoLinkery</div>' +
+          '<div style="font-size:11px;font-weight:400;opacity:0.9;">\u9023\u7d50\u8005\uff5c\u9023\u63a5 B2B \u5546\u696d\u5ba2\u6236</div>' +
         '</button>' +
       '</div>' +
-      '<button id="btnCoLinkery" data-member="' + memberNo + '" style="width:100%;background:linear-gradient(135deg,#1A237E,#283593);color:#fff;border:none;border-radius:12px;padding:16px 14px;font-size:15px;font-weight:700;cursor:pointer;line-height:1.5;min-height:64px;font-family:inherit;text-align:left;display:flex;align-items:center;gap:12px;">' +
-        '<span style="font-size:28px;">\uD83E\uDD1D</span>' +
-        '<div><div>\u7533\u8acb CoLinkery \u9023\u7d50\u8005</div><span style="font-size:12px;font-weight:400;opacity:0.9;">\u9023\u63a5 B2B \u5546\u696d\u5ba2\u6236\uff0c\u8cfa\u53d6\u9805\u76ee\u4f63\u91d1</span></div>' +
-      '</button>' +
       '<div style="text-align:center;margin-top:10px;">' +
         '<a href="/impact" target="_blank" style="font-size:14px;color:#8B0000;text-decoration:none;font-weight:600;">\uD83D\uDCCA \u516c\u958b\u5f71\u97ff\u529b\u5831\u544a \u2192</a>' +
       '</div>' +
     '</div>';
   wrap.innerHTML = iframeHtml + installHtml + partnerEntryHtml;
-  // 綁定 partner 按鈕事件（避免 onclick 內嵌字串引號問題）
+  // 綁定 CoLeadery 按鈕事件
   var bpa = document.getElementById('btnPartnerApply');
   if (bpa) bpa.addEventListener('click', function() {
     var m = this.getAttribute('data-member') || '';
     var p = localStorage.getItem('ce85_phone') || '';
-    window.location.href = '/app/partner-apply?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
+    window.location.href = '/app/partner-apply?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '') + '&role=COLEADERY';
   });
-  var bw = document.getElementById('btnWallet');
-  if (bw) bw.addEventListener('click', function() {
-    var m = this.getAttribute('data-member') || '';
-    var p = localStorage.getItem('ce85_phone') || '';
-    window.location.href = '/app/wallet?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '');
-  });
+  // 綁定 CoLinkery 按鈕事件
   var bcl = document.getElementById('btnCoLinkery');
   if (bcl) bcl.addEventListener('click', function() {
     var m = this.getAttribute('data-member') || '';
@@ -11728,7 +11723,7 @@ function partnerApplyHtml(prefillMember: string, prefillPhone = '', prefillRole 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>申請成為 CoLeadery 領航者 / CoLinkery 連結者</title>
+<title>${prefillRole === 'COLINKERY' ? '申請成為 CoLinkery 連結者' : prefillRole === 'COLEADERY' ? '申請成為 CoLeadery 領航者' : '申請成為合作夥伴'}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:18px;line-height:1.6;color:#111;}
@@ -11789,7 +11784,7 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
 <body>
 <div class="topbar">
   <button class="back" onclick="goBack()">&#8592;</button>
-  <span class="title">&#x1F31F; \u7533\u8acb CoLeadery \u9818\u822a\u8005 / CoLinkery \u9023\u7d50\u8005</span>
+  <span class="title">${prefillRole === 'COLINKERY' ? '🤝 申請 CoLinkery 連結者' : prefillRole === 'COLEADERY' ? '🌟 申請 CoLeadery 領航者' : '🌟 申請合作夥伴'}</span>
 </div>
 <div class="wrap">
 
@@ -11905,6 +11900,7 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
 
   <!-- Step 4: 申請人類型 -->
   <div id="step4" class="section" style="display:none;">
+    <div id="s4RoleBanner" style="display:none;background:#EEF2FF;border:1.5px solid #6366F1;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:14px;color:#3730A3;font-weight:600;"></div>
     <div class="section-title">&#x1F4CB; \u7b2c\u56db\u6b65\uff1a\u7533\u8acb\u4eba\u985e\u578b</div>
     <div class="type-group">
       <label class="type-radio" id="typeInd" onclick="selectType('INDIVIDUAL')">
@@ -11926,6 +11922,13 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
         <div>
           <div style="font-size:17px;font-weight:700;">\uD83C\uDFE2 \u516c\u53f8</div>
           <div style="font-size:14px;color:#666;margin-top:3px;">\u4ee5\u516c\u53f8\u540d\u7fa9\u7533\u8acb\uff0c\u63d0\u4f9b BR \u767b\u8a18\u8b49\u660e</div>
+        </div>
+      </label>
+      <label class="type-radio" id="typeAssoc" onclick="selectType('ASSOCIATION')">
+        <input type="radio" name="applyType" value="ASSOCIATION">
+        <div>
+          <div style="font-size:17px;font-weight:700;">&#x1F3DB;&#xFE0F; \u5354\u6703/\u5546\u6703</div>
+          <div style="font-size:14px;color:#666;margin-top:3px;">\u4ee5\u5354\u6703\u6216\u5546\u6703\u540d\u7fa9\u7533\u8acb\uff0c\u63d0\u4f9b\u793e\u5718\u767b\u8a18\u8b49</div>
         </div>
       </label>
     </div>
@@ -12166,9 +12169,30 @@ function updateDots() {
 }
 
 function showStep(n) {
+  // 如果有預選角色，Step 3（角色選擇）跳過
+  if (n === 3 && prefillRole) {
+    // 自動預選角色，直接跳到 Step 4
+    if (!selectedRole) selectRole(prefillRole);
+    showStep(4);
+    return;
+  }
   for (var i = 1; i <= TOTAL_STEPS; i++) {
     var el = document.getElementById('step' + i);
     if (el) el.style.display = (i === n) ? '' : 'none';
+  }
+  // 隱藏/顯示 Step 3 進度點（有 prefillRole 時隱藏）
+  var dot3 = document.getElementById('dot3');
+  if (dot3) dot3.style.display = prefillRole ? 'none' : '';
+  // Step 4：有預選角色時顯示確認 banner
+  var s4Banner = document.getElementById('s4RoleBanner');
+  if (s4Banner) {
+    if (n === 4 && prefillRole) {
+      var roleLabel = prefillRole === 'COLINKERY' ? '\uD83E\uDD1D CoLinkery \u9023\u7d50\u8005' : '\uD83C\uDF1F CoLeadery \u9818\u822a\u8005';
+      s4Banner.textContent = '\u5df2\u9078\u64c7\u89d2\u8272\uff1a' + roleLabel;
+      s4Banner.style.display = '';
+    } else {
+      s4Banner.style.display = 'none';
+    }
   }
   var btnBack = document.getElementById('btnBack');
   var btnNext = document.getElementById('btnNext');
@@ -12182,10 +12206,6 @@ function showStep(n) {
   currentStep = n;
   updateDots();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  // 如果有預選角色（從會員卡 CoLinkery 入口過來），進入 Step 3 時自動預選
-  if (n === 3 && prefillRole && !selectedRole) {
-    selectRole(prefillRole);
-  }
 }
 
 function nextStep() {
@@ -12223,7 +12243,14 @@ function nextStep() {
 }
 
 function prevStep() {
-  if (currentStep > 1) showStep(currentStep - 1);
+  if (currentStep > 1) {
+    // 有預選角色時，Step 4 後退跳回 Step 2（跳過 Step 3）
+    if (currentStep === 4 && prefillRole) {
+      showStep(2);
+    } else {
+      showStep(currentStep - 1);
+    }
+  }
 }
 
 function verifyPhone(cb) {
@@ -12322,10 +12349,13 @@ function selectRole(r) {
 
 function selectType(t) {
   selectedType = t;
-  ['Ind','Grp','Co'].forEach(function(k, i) {
-    var types = ['INDIVIDUAL','GROUP','COMPANY'];
-    document.getElementById('type' + k).classList.toggle('selected', t === types[i]);
-    document.getElementById('type' + k).querySelector('input').checked = (t === types[i]);
+  var keys  = ['Ind',        'Grp',   'Co',      'Assoc'];
+  var types = ['INDIVIDUAL', 'GROUP', 'COMPANY', 'ASSOCIATION'];
+  keys.forEach(function(k, i) {
+    var el = document.getElementById('type' + k);
+    if (!el) return;
+    el.classList.toggle('selected', t === types[i]);
+    el.querySelector('input').checked = (t === types[i]);
   });
 }
 
@@ -12386,14 +12416,33 @@ function submitKyc(cb) {
 }
 
 function updateStep5Fields() {
-  var isInd = selectedType === 'INDIVIDUAL';
-  var isCo = selectedType === 'COMPANY';
-  var isGrp = selectedType === 'GROUP';
-  var isCK = selectedRole === 'COLINKERY';
-  // HKID \u5df2\u5728 Step 2 \u63d0\u4ea4\uff0c\u53ea\u986f\u793a\u63d0\u793a
+  var isCo    = selectedType === 'COMPANY';
+  var isAssoc = selectedType === 'ASSOCIATION';
+  var isGrp   = selectedType === 'GROUP';
+  var isCK    = selectedRole === 'COLINKERY';
+  var needOrgFields = isCo || isAssoc; // 公司 / 協會共用組織欄位
+
+  // 動態更新公司/協會欄位標籤
+  var companyLabel = document.querySelector('#fieldCompany label');
+  var brLabel = document.querySelector('#fieldBR label');
+  var companyInput = document.getElementById('applyCompanyName');
+  var brInput = document.getElementById('applyCompanyBR');
+  if (isAssoc) {
+    if (companyLabel) companyLabel.innerHTML = '\u5354\u6703/\u5546\u6703\u540d\u7a31 <span class="req">*</span>';
+    if (companyInput) companyInput.placeholder = '\u767b\u8a18\u5354\u6703\u6216\u5546\u6703\u540d\u7a31\uff08\u4e2d\u82f1\u6587\uff09';
+    if (brLabel) brLabel.textContent = '\u793e\u5718\u767b\u8a18\u8b49\u865f\u78bc';
+    if (brInput) brInput.placeholder = '\u793e\u5718\u767b\u8a18\u8b49\u865f\u78bc\uff08\u5982\u6709\uff09';
+  } else {
+    if (companyLabel) companyLabel.innerHTML = '\u516c\u53f8\u540d\u7a31 <span class="req">*</span>';
+    if (companyInput) companyInput.placeholder = '\u6ce8\u518a\u516c\u53f8\u540d\u7a31\uff08\u4e2d\u82f1\u6587\uff09';
+    if (brLabel) brLabel.textContent = 'BR \u767b\u8a18\u865f\u78bc';
+    if (brInput) brInput.placeholder = '\u5546\u696d\u767b\u8a18\u8b49 BR \u865f\u78bc';
+  }
+
+  // HKID 已在 Step 2 提交，只顯示提示
   document.getElementById('fieldIdPrefix').style.display = '';
-  document.getElementById('fieldCompany').style.display = isCo ? '' : 'none';
-  document.getElementById('fieldBR').style.display = isCo ? '' : 'none';
+  document.getElementById('fieldCompany').style.display = needOrgFields ? '' : 'none';
+  document.getElementById('fieldBR').style.display = needOrgFields ? '' : 'none';
   document.getElementById('fieldTeam').style.display = isGrp ? '' : 'none';
   document.getElementById('fieldGroupMembers').style.display = isGrp ? '' : 'none';
   document.getElementById('fieldTeamNotes').style.display = isGrp ? '' : 'none';
@@ -12405,8 +12454,9 @@ function validateStep5() {
   var phone = document.getElementById('applyContactPhone').value.trim();
   if (!name) { showErr('s5Err', '\u8acb\u586b\u5beb\u4e2d\u6587\u59d3\u540d'); return false; }
   if (!phone) { showErr('s5Err', '\u8acb\u586b\u5beb\u9023\u7d61\u96fb\u8a71'); return false; }
-  if (selectedType === 'COMPANY' && !document.getElementById('applyCompanyName').value.trim()) {
-    showErr('s5Err', '\u8acb\u586b\u5beb\u516c\u53f8\u540d\u7a31'); return false;
+  if ((selectedType === 'COMPANY' || selectedType === 'ASSOCIATION') && !document.getElementById('applyCompanyName').value.trim()) {
+    var orgLabel = selectedType === 'ASSOCIATION' ? '\u5354\u6703/\u5546\u6703\u540d\u7a31' : '\u516c\u53f8\u540d\u7a31';
+    showErr('s5Err', '\u8acb\u586b\u5beb' + orgLabel); return false;
   }
   if (selectedType === 'GROUP') {
     var n = parseInt(document.getElementById('applyTeamSize').value) || 0;
