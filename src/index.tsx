@@ -11779,6 +11779,7 @@ function partnerApplyHtml(prefillMember: string, prefillPhone = '', prefillRole 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>${prefillRole === 'COLINKERY' ? '申請成為 CoLinkery 連結者' : prefillRole === 'COLEADERY' ? '申請成為 CoLeadery 領航者' : '申請成為合作夥伴'}</title>
+<!-- REDESIGNED v3: Step1=基本資料+密碼, Step2=KYC, Step3=角色, Step4=類型, Step5=動態欄位, Step6=聲明 -->
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:18px;line-height:1.6;color:#111;}
@@ -11846,16 +11847,80 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
   <!-- Step indicator -->
   <div class="step-indicator" id="stepDots"></div>
 
-  <!-- Step 1: 驗證身份 -->
+  <!-- Step 1: 基本資料 + 密碼 -->
   <div id="step1" class="section">
-    <div class="section-title">&#x1F50D; 第一步：驗證老有卡會員身份</div>
+    <div class="section-title">&#x1F464; 第一步：基本資料及設定密碼</div>
+    <!-- 會員驗證狀態卡片 -->
+    <div id="s1MemberCard" style="display:none;background:#DCFCE7;border:1.5px solid #4CAF50;border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+      <div style="font-size:15px;font-weight:800;color:#1B4332;margin-bottom:2px;">✅ 已確認老有卡會員</div>
+      <div id="s1MemberInfo" style="font-size:14px;color:#1B4332;"></div>
+    </div>
+    <!-- 電話（預填後可改，改了要重新驗證） -->
     <div class="field-group">
-      <label>會員電話號碼 <span class="req">*</span></label>
-      <input type="tel" id="applyPhone" inputmode="numeric" placeholder="輸入已登記的電話號碼" maxlength="20">
-      <div class="hint">系統會搜尋你的老有卡會員資料</div>
+      <label>老有卡登記電話 <span class="req">*</span></label>
+      <div style="display:flex;gap:8px;align-items:flex-start;">
+        <input type="tel" id="applyPhone" inputmode="numeric" placeholder="輸入已登記的電話號碼" maxlength="20" style="flex:1;" oninput="onPhoneChange()">
+        <div id="s1PhoneStatus" style="font-size:20px;padding-top:10px;min-width:28px;"></div>
+      </div>
+      <div class="hint">系統自動搜尋你的會員資料並預填以下資料</div>
+    </div>
+    <!-- 中文姓名 -->
+    <div class="field-group">
+      <label>中文姓名 <span class="req">*</span></label>
+      <input type="text" id="applyNameZh" placeholder="請使用身份證上的漢字姓名">
+      <div class="hint">請使用身份證上的漢字姓名</div>
+    </div>
+    <!-- 英文姓名 -->
+    <div class="field-group">
+      <label>英文姓名</label>
+      <input type="text" id="applyNameEn" placeholder="English Name (as on HKID)">
+    </div>
+    <!-- 聯絡電話（預填，通常等同登記電話） -->
+    <div class="field-group">
+      <label>聯絡電話 <span class="req">*</span></label>
+      <input type="tel" id="applyContactPhone" inputmode="numeric" placeholder="用於聯絡的電話號碼">
+    </div>
+    <!-- 地區 -->
+    <div class="field-group">
+      <label>地區</label>
+      <select id="applyDistrict">
+        <option value="">請揀選地區（可選）</option>
+        <optgroup label="港島">
+          <option>中西區</option><option>灣仔區</option><option>南區</option><option>東區</option>
+        </optgroup>
+        <optgroup label="九龍">
+          <option>油尖旺區</option><option>深水埗區</option>
+          <option>九龍城區</option><option>黃大仙區</option><option>觀塘區</option>
+        </optgroup>
+        <optgroup label="新界">
+          <option>葵青區</option><option>荃灣區</option><option>屯門區</option>
+          <option>元朗區</option><option>北區</option><option>大埔區</option>
+          <option>西貢區</option><option>沙田區</option><option>離島區</option>
+        </optgroup>
+      </select>
+    </div>
+    <!-- 密碼設定 -->
+    <div style="background:#EEF2FF;border:1.5px solid #6366F1;border-radius:10px;padding:14px 16px;margin-top:6px;">
+      <div style="font-size:15px;font-weight:800;color:#3730A3;margin-bottom:8px;">&#x1F512; 設定工具登入密碼</div>
+      <div style="font-size:13px;color:#4338CA;margin-bottom:12px;line-height:1.5;">批准後用此密碼登入 CoLeadery／CoLinkery 工具。請設定一個只有你知道的密碼。</div>
+      <div class="field-group" style="margin-bottom:10px;">
+        <label style="font-size:15px;">登入密碼 <span class="req">*</span></label>
+        <div style="position:relative;">
+          <input type="password" id="applyPassword" placeholder="至少 8 位，英文+數字更安全" autocomplete="new-password" style="padding-right:44px;" oninput="updateStep1Btn()">
+          <button type="button" onclick="togglePwd('applyPassword','eyePwd')" id="eyePwd" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:20px;cursor:pointer;color:#888;">&#x1F441;</button>
+        </div>
+        <div class="hint">最少 8 個字符，建議包含英文字母及數字</div>
+      </div>
+      <div class="field-group" style="margin-bottom:0;">
+        <label style="font-size:15px;">確認密碼 <span class="req">*</span></label>
+        <div style="position:relative;">
+          <input type="password" id="applyPasswordConfirm" placeholder="再輸入一次密碼" autocomplete="new-password" style="padding-right:44px;" oninput="updateStep1Btn()">
+          <button type="button" onclick="togglePwd('applyPasswordConfirm','eyePwd2')" id="eyePwd2" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:20px;cursor:pointer;color:#888;">&#x1F441;</button>
+        </div>
+        <div id="pwdMatchHint" style="font-size:13px;margin-top:5px;min-height:18px;"></div>
+      </div>
     </div>
     <div class="err-box" id="s1Err"></div>
-    <div id="s1Found" style="display:none;background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:8px;padding:12px 14px;font-size:16px;color:#1B5E20;font-weight:700;"></div>
   </div>
 
   <!-- Step 2: 個人正式資料（KYC） -->
@@ -11990,103 +12055,100 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
     <div class="err-box" id="s4Err"></div>
   </div>
 
-  <!-- Step 5: 填寫申請資料 -->
+  <!-- Step 5: 按類型動態欄位（INDIVIDUAL=無, GROUP=小組, COMPANY=公司, ASSOCIATION=協會） -->
   <div id="step5" class="section" style="display:none;">
     <div class="section-title">&#x270D;&#xFE0F; 第五步：填寫申請資料</div>
-    <div class="field-group">
-      <label>中文姓名 <span class="req">*</span></label>
-      <input type="text" id="applyNameZh" placeholder="真實中文姓名（對上身份證）">
-      <div class="hint">請使用身份證上的漢字姓名</div>
-    </div>
-    <div class="field-group">
-      <label>英文姓名</label>
-      <input type="text" id="applyNameEn" placeholder="English Name (as on HKID)">
-    </div>
-    <div class="field-group">
-      <label>聯絡電話 <span class="req">*</span></label>
-      <input type="tel" id="applyContactPhone" inputmode="numeric" placeholder="用於聯絡的電話號碼">
-    </div>
-    <div class="field-group">
-      <label>地區</label>
-      <select id="applyDistrict">
-        <option value="">請揀選地區（可選）</option>
-        <optgroup label="港島">
-          <option>中西區</option><option>灣仔區</option><option>南區</option>
-          <option>東區</option>
-        </optgroup>
-        <optgroup label="九龍">
-          <option>油尖旺區</option><option>深水埗區</option>
-          <option>九龍城區</option><option>黃大仙區</option><option>觀塘區</option>
-        </optgroup>
-        <optgroup label="新界">
-          <option>葵青區</option><option>荃灣區</option><option>屯門區</option>
-          <option>元朗區</option><option>北區</option><option>大埔區</option>
-          <option>西貢區</option><option>沙田區</option><option>離島區</option>
-        </optgroup>
-      </select>
-    </div>
-    <!-- HKID 已在 Step 2 提交，此處僅顯示提示 -->
-    <div id="fieldIdPrefix" class="field-group" style="display:none;">
-      <div style="background:#DCFCE7;border:1.5px solid #4CAF50;border-radius:8px;padding:10px 12px;font-size:14px;color:#1B4332;">&#x2705; \u8eab\u4efd\u8b49\u8cc7\u6599\u5df2\u65bc\u7b2c\u4e8c\u6b65\u63d0\u4ea4</div>
-    </div>
-    <!-- 公司：公司名 + BR -->
-    <div id="fieldCompany" class="field-group" style="display:none;">
-      <label>公司名稱 <span class="req">*</span></label>
-      <input type="text" id="applyCompanyName" placeholder="注冊公司名稱（中英文）">
-    </div>
-    <div id="fieldBR" class="field-group" style="display:none;">
-      <label>BR 登記號碼</label>
-      <input type="text" id="applyCompanyBR" placeholder="商業登記証 BR 號碼">
-    </div>
-    <!-- 小組：人數 + 說明 -->
-    <div id="fieldTeam" class="field-group" style="display:none;">
-      <label>小組人數 <span class="req">*</span></label>
-      <input type="number" id="applyTeamSize" min="2" max="20" placeholder="預期參與人數（2-20）" oninput="buildGroupMemberRows()">
-    </div>
-    <!-- 小組成員動態列表 -->
-    <div id="fieldGroupMembers" style="display:none;">
-      <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#795548;">
-        💡 請填寫每位成員電話號碼，系統會自動驗證是否為會員及符合55歲資格。分成百分比合計必須等於100%。
+
+    <!-- 個人：只顯示 KYC 已提交提示 + CoLinkery 行業背景 -->
+    <div id="s5IndividualNote" style="display:none;">
+      <div style="background:#DCFCE7;border:1.5px solid #4CAF50;border-radius:8px;padding:12px 14px;font-size:15px;color:#1B4332;margin-bottom:14px;">
+        ✅ 個人申請資料已完整！<br>
+        <span style="font-size:13px;font-weight:400;">你的基本資料及 KYC 資料已在前兩步填妥。</span>
       </div>
-      <div id="groupMemberRows"></div>
-      <div id="groupPercentSum" style="text-align:right;font-size:14px;font-weight:700;margin-top:6px;color:#555;"></div>
     </div>
-    <div id="fieldTeamNotes" class="field-group" style="display:none;">
-      <label>小組簡介</label>
-      <textarea id="applyTeamNotes" rows="3" placeholder="請簡述小組的背景、意向及主要成員構成"></textarea>
+
+    <!-- 小組欄位組 -->
+    <div id="s5GroupFields" style="display:none;">
+      <div class="field-group">
+        <label>小組人數 <span class="req">*</span></label>
+        <input type="number" id="applyTeamSize" min="2" max="20" placeholder="預期參與人數（2-20）" oninput="buildGroupMemberRows()">
+      </div>
+      <div id="fieldGroupMembers">
+        <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#795548;">
+          💡 請填寫每位成員電話號碼，系統會自動驗證是否為會員及符合55歲資格。分成百分比合計必須等於100%。
+        </div>
+        <div id="groupMemberRows"></div>
+        <div id="groupPercentSum" style="text-align:right;font-size:14px;font-weight:700;margin-top:6px;color:#555;"></div>
+      </div>
+      <div class="field-group">
+        <label>小組簡介</label>
+        <textarea id="applyTeamNotes" rows="3" placeholder="請簡述小組的背景、意向及主要成員構成"></textarea>
+      </div>
     </div>
-    <!-- CoLinkery：行業背景 -->
-    <div id="fieldIndustry" class="field-group" style="display:none;">
-      <label>行業背景 / 市場資源</label>
-      <textarea id="applyIndustry" rows="3" placeholder="請簡述你的行業背景及可帶來的合作資源或客户網絡"></textarea>
+
+    <!-- 公司欄位組 -->
+    <div id="s5CompanyFields" style="display:none;">
+      <div class="field-group">
+        <label>公司名稱 <span class="req">*</span></label>
+        <input type="text" id="applyCompanyName" placeholder="注冊公司名稱（中英文）">
+      </div>
+      <div class="field-group">
+        <label>BR 商業登記號碼</label>
+        <input type="text" id="applyCompanyBR" placeholder="商業登記証 BR 號碼">
+      </div>
+      <div class="field-group">
+        <label>公司文件上傳（可選）</label>
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+          <div style="font-size:28px;margin-bottom:6px;">📎</div>
+          <div style="font-size:15px;color:#8B0000;font-weight:700;">點擊上傳 BR 或公司文件</div>
+          <div style="font-size:13px;color:#888;margin-top:4px;">支援 PDF、JPG、PNG，最大 5MB</div>
+        </div>
+        <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="handleFileSelect(this)">
+        <div class="upload-status" id="uploadStatus"></div>
+      </div>
     </div>
+
+    <!-- 協會/商會欄位組 -->
+    <div id="s5AssocFields" style="display:none;">
+      <div class="field-group">
+        <label>協會/商會名稱 <span class="req">*</span></label>
+        <input type="text" id="applyAssocName" placeholder="登記協會或商會名稱（中英文）">
+      </div>
+      <div class="field-group">
+        <label>社團登記證號碼</label>
+        <input type="text" id="applyAssocRegNo" placeholder="社團登記證號碼（如有）">
+      </div>
+      <div class="field-group">
+        <label>協會文件上傳（可選）</label>
+        <div class="upload-area" onclick="document.getElementById('fileInputAssoc').click()">
+          <div style="font-size:28px;margin-bottom:6px;">📎</div>
+          <div style="font-size:15px;color:#8B0000;font-weight:700;">點擊上傳社團登記證或相關文件</div>
+          <div style="font-size:13px;color:#888;margin-top:4px;">支援 PDF、JPG、PNG，最大 5MB</div>
+        </div>
+        <input type="file" id="fileInputAssoc" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="handleFileSelect(this)">
+        <div class="upload-status" id="uploadStatusAssoc"></div>
+      </div>
+    </div>
+
+    <!-- CoLinkery 行業背景（任何類型 + COLINKERY 角色均顯示） -->
+    <div id="s5IndustryField" style="display:none;">
+      <div class="field-group">
+        <label>行業背景 / 市場資源</label>
+        <textarea id="applyIndustry" rows="3" placeholder="請簡述你的行業背景及可帶來的合作資源或客户網絡"></textarea>
+      </div>
+    </div>
+
     <div class="err-box" id="s5Err"></div>
   </div>
 
-  <!-- Step 6: 設定密碼 + 聲明確認 -->
+  <!-- Step 6: 聲明確認（密碼已在 Step 1 設定） -->
   <div id="step6" class="section" style="display:none;">
-    <div class="section-title">&#x1F511; 第六步：設定登入密碼及確認聲明</div>
+    <div class="section-title">&#x1F4DC; 第六步：確認申請聲明</div>
 
-    <!-- 密碼設定 -->
-    <div style="background:#EEF2FF;border:1.5px solid #6366F1;border-radius:10px;padding:14px 16px;margin-bottom:18px;">
-      <div style="font-size:15px;font-weight:800;color:#3730A3;margin-bottom:10px;">&#x1F512; 設定工具登入密碼</div>
-      <div style="font-size:13px;color:#4338CA;margin-bottom:12px;line-height:1.5;">批准後用此密碼登入 CoLeadery／CoLinkery 工具。請設定一個只有你知道的密碼。</div>
-      <div class="field-group" style="margin-bottom:10px;">
-        <label style="font-size:15px;">登入密碼 <span class="req">*</span></label>
-        <div style="position:relative;">
-          <input type="password" id="applyPassword" placeholder="至少 8 位，英文+數字更安全" autocomplete="new-password" style="padding-right:44px;">
-          <button type="button" onclick="togglePwd('applyPassword','eyePwd')" id="eyePwd" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:20px;cursor:pointer;color:#888;">&#x1F441;</button>
-        </div>
-        <div class="hint">最少 8 個字符，建議包含英文字母及數字</div>
-      </div>
-      <div class="field-group" style="margin-bottom:0;">
-        <label style="font-size:15px;">確認密碼 <span class="req">*</span></label>
-        <div style="position:relative;">
-          <input type="password" id="applyPasswordConfirm" placeholder="再輸入一次密碼" autocomplete="new-password" style="padding-right:44px;">
-          <button type="button" onclick="togglePwd('applyPasswordConfirm','eyePwd2')" id="eyePwd2" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:20px;cursor:pointer;color:#888;">&#x1F441;</button>
-        </div>
-        <div id="pwdMatchHint" style="font-size:13px;margin-top:5px;"></div>
-      </div>
+    <!-- 申請摘要 -->
+    <div id="s6Summary" style="background:#F0F4FF;border:1.5px solid #6366F1;border-radius:10px;padding:14px 16px;margin-bottom:18px;">
+      <div style="font-size:14px;font-weight:800;color:#3730A3;margin-bottom:8px;">📋 申請摘要</div>
+      <div id="s6SummaryContent" style="font-size:14px;color:#374151;line-height:1.9;"></div>
     </div>
 
     <!-- 聲明 -->
@@ -12097,7 +12159,8 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
       2. 終止前將遵守 CoEldery 85 章程標準，隨時更新至最新版本。<br>
       3. 授權持渴望結構查驗本人資料供審核之用。<br>
       4. 絕不以窗口名義簽約、承諾財務回報或代收款項。<br>
-      5. 項目分成為非保證收益，實際以正式結算為準。
+      5. 項目分成為非保證收益，實際以正式結算為準。<br>
+      6. 已於第一步設定的登入密碼將於批准後啟用，請妥善保管。
     </div>
     <label class="check-row" id="declarationCheck">
       <input type="checkbox" id="agreeCheck" onchange="updateDeclareBtn()">
@@ -12138,11 +12201,12 @@ var selectedType = '';
 var memberNo = '${prefillMember}';
 var prefillPhone = '${prefillPhone}';
 var prefillRole = '${prefillRole}';  // 預選角色（從 URL ?role= 傳入）
-var uploadedKey = '';
-var selfName = '';   // 申請人姓名（Step 1 驗證後填入）
-var selfPhone = '';  // 申請人電話（Step 1 驗證後填入）
-var kycDone = false; // 是否已有 KYC 記錄
-var kycRefMemberNo = ''; // 推薦人 member_no（驗證後填入）
+var uploadedKey = '';       // 公司/協會上傳文件 key
+var selfName = '';          // 申請人中文姓名（Step 1 驗證後填入）
+var selfPhone = '';         // 申請人電話（Step 1 驗證後填入）
+var kycDone = false;        // 是否已有 KYC 記錄
+var kycRefMemberNo = '';    // 推薦人 member_no（驗證後填入）
+var s1Verified = false;     // Step 1 電話已驗證
 
 // SWIFT code 自動對照表（香港主要銀行）
 var SWIFT_MAP = {
@@ -12232,13 +12296,32 @@ initDots();
   if (p) {
     document.getElementById('applyPhone').value = p;
     // 畫面 render 後才呼叫，確保 DOM 就緒
-    setTimeout(function() { verifyPhone(); }, 100);
+    setTimeout(function() { autoVerifyPhone(); }, 200);
   }
 })();
 
-// 如果有預選角色（從會員卡「申請 CoLinkery」入口過來），
-// Step 1 驗證完成後會自動跳到 Step 3 並預選角色
-// （透過 prefillRole 全域變量在 verifyPhone 成功後觸發）
+// 密碼即時一致性檢查
+document.addEventListener('DOMContentLoaded', function() {
+  var p1 = document.getElementById('applyPassword');
+  var p2 = document.getElementById('applyPasswordConfirm');
+  function checkPwdMatch() {
+    var hint = document.getElementById('pwdMatchHint');
+    if (!hint) return;
+    if (!p2 || !p2.value) { hint.textContent = ''; return; }
+    if (p1.value === p2.value && p1.value.length >= 8) {
+      hint.textContent = '✅ 密碼一致';
+      hint.style.color = '#1B5E20';
+    } else if (p1.value !== p2.value) {
+      hint.textContent = '❌ 密碼不一致';
+      hint.style.color = '#C62828';
+    } else {
+      hint.textContent = '';
+    }
+    updateStep1Btn();
+  }
+  if (p1) p1.addEventListener('input', checkPwdMatch);
+  if (p2) p2.addEventListener('input', checkPwdMatch);
+});
 
 function goBack() {
   window.location.href = '/app' + (memberNo ? '?member=' + encodeURIComponent(memberNo) : '');
@@ -12255,7 +12338,6 @@ function updateDots() {
 function showStep(n) {
   // 如果有預選角色，Step 3（角色選擇）跳過
   if (n === 3 && prefillRole) {
-    // 自動預選角色，直接跳到 Step 4
     if (!selectedRole) selectRole(prefillRole);
     showStep(4);
     return;
@@ -12271,8 +12353,8 @@ function showStep(n) {
   var s4Banner = document.getElementById('s4RoleBanner');
   if (s4Banner) {
     if (n === 4 && prefillRole) {
-      var roleLabel = prefillRole === 'COLINKERY' ? '\uD83E\uDD1D CoLinkery \u9023\u7d50\u8005' : '\uD83C\uDF1F CoLeadery \u9818\u822a\u8005';
-      s4Banner.textContent = '\u5df2\u9078\u64c7\u89d2\u8272\uff1a' + roleLabel;
+      var rl = prefillRole === 'COLINKERY' ? '🤝 CoLinkery 連結者' : '🌟 CoLeadery 領航者';
+      s4Banner.textContent = '已選擇角色：' + rl;
       s4Banner.style.display = '';
     } else {
       s4Banner.style.display = 'none';
@@ -12281,46 +12363,81 @@ function showStep(n) {
   var btnBack = document.getElementById('btnBack');
   var btnNext = document.getElementById('btnNext');
   btnBack.style.display = n === 1 ? 'none' : '';
-  btnNext.textContent = n === TOTAL_STEPS ? '\u63d0\u4ea4\u7533\u8acb' : '\u4e0b\u4e00\u6b65';
+  btnNext.textContent = n === TOTAL_STEPS ? '提交申請' : '下一步';
   if (n === TOTAL_STEPS) {
     btnNext.disabled = !document.getElementById('agreeCheck').checked;
+    // 填入申請摘要
+    renderStep6Summary();
+  } else if (n === 1) {
+    updateStep1Btn();
   } else {
     btnNext.disabled = false;
   }
   currentStep = n;
   updateDots();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  // Step 6: 綁定密碼輸入事件以更新按鈕狀態
-  if (n === TOTAL_STEPS) {
-    ['applyPassword','applyPasswordConfirm'].forEach(function(id) {
-      var el = document.getElementById(id);
-      if (el && !el.dataset.pwdBound) {
-        el.dataset.pwdBound = '1';
-        el.addEventListener('input', updateDeclareBtn);
-      }
-    });
-    // 初始化按鈕狀態
-    updateDeclareBtn();
+}
+
+// 更新 Step 1 下一步按鈕狀態（需電話已驗證 + 密碼齊全）
+function updateStep1Btn() {
+  var pwd = (document.getElementById('applyPassword') || {}).value || '';
+  var pwd2 = (document.getElementById('applyPasswordConfirm') || {}).value || '';
+  var name = (document.getElementById('applyNameZh') || {}).value || '';
+  var phone = (document.getElementById('applyContactPhone') || {}).value || '';
+  // 如果在 Step 1 才更新按鈕
+  if (currentStep !== 1) return;
+  var ok = s1Verified && pwd.length >= 8 && pwd === pwd2 && name.trim() && phone.trim();
+  var btn = document.getElementById('btnNext');
+  if (btn) btn.disabled = !ok;
+}
+
+// Step 6 摘要渲染
+function renderStep6Summary() {
+  var el = document.getElementById('s6SummaryContent');
+  if (!el) return;
+  var roleMap = { COLEADERY: '🌟 CoLeadery 領航者', COLINKERY: '🤝 CoLinkery 連結者' };
+  var typeMap = { INDIVIDUAL: '👤 個人', GROUP: '👥 小組', COMPANY: '🏢 公司', ASSOCIATION: '🏛️ 協會/商會' };
+  var nameZh = (document.getElementById('applyNameZh') || {}).value || '';
+  var phone = (document.getElementById('applyContactPhone') || {}).value || '';
+  var role = roleMap[selectedRole] || selectedRole;
+  var type = typeMap[selectedType] || selectedType;
+  var extra = '';
+  if (selectedType === 'GROUP') {
+    var sz = (document.getElementById('applyTeamSize') || {}).value || '';
+    if (sz) extra = '<br>小組人數：<strong>' + sz + ' 人</strong>';
+  } else if (selectedType === 'COMPANY') {
+    var co = (document.getElementById('applyCompanyName') || {}).value || '';
+    if (co) extra = '<br>公司名稱：<strong>' + co + '</strong>';
+  } else if (selectedType === 'ASSOCIATION') {
+    var an = (document.getElementById('applyAssocName') || {}).value || '';
+    if (an) extra = '<br>協會名稱：<strong>' + an + '</strong>';
   }
+  el.innerHTML =
+    '申請角色：<strong>' + role + '</strong><br>' +
+    '申請類型：<strong>' + type + '</strong><br>' +
+    '申請人：<strong>' + (nameZh || '—') + '</strong><br>' +
+    '聯絡電話：<strong>' + (phone || '—') + '</strong>' +
+    extra + '<br>' +
+    '<span style="color:#6366F1;font-size:13px;">🔒 登入密碼已於第一步設定</span>';
 }
 
 function nextStep() {
   clearErrors();
   if (currentStep === 1) {
-    verifyPhone(function(ok) { if (ok) showStep(2); });
+    // Step 1: 驗證電話 + 密碼 + 基本資料
+    validateStep1(function(ok) { if (ok) showStep(2); });
     return;
   }
   if (currentStep === 2) {
-    // Step 2: KYC — \u5fc5\u9808\u63d0\u4ea4 HKID + \u9280\u884c + \u6587\u4ef6
     submitKyc(function(ok) { if (ok) showStep(3); });
     return;
   }
   if (currentStep === 3) {
-    if (!selectedRole) { showErr('s3Err', '\u8acb\u64c7\u9078\u89d2\u8272'); return; }
+    if (!selectedRole) { showErr('s3Err', '請擇選角色'); return; }
     showStep(4); return;
   }
   if (currentStep === 4) {
-    if (!selectedType) { showErr('s4Err', '\u8acb\u64c7\u9078\u7533\u8acb\u4eba\u985e\u578b'); return; }
+    if (!selectedType) { showErr('s4Err', '請擇選申請人類型'); return; }
     updateStep5Fields();
     showStep(5); return;
   }
@@ -12329,7 +12446,6 @@ function nextStep() {
     showStep(6); return;
   }
   if (currentStep === 6) {
-    // 密碼和聲明驗證在 submitApplication 內進行
     submitApplication();
     return;
   }
@@ -12346,85 +12462,152 @@ function prevStep() {
   }
 }
 
-function verifyPhone(cb) {
-  var phone = document.getElementById('applyPhone').value.trim();
-  if (!phone) { showErr('s1Err', '\u8acb\u8f38\u5165\u96fb\u8a71\u865f\u78bc'); return; }
-  var btn = document.getElementById('btnNext');
-  btn.disabled = true;
-  btn.textContent = '\u9a57\u8b49\u4e2d\u2026';
+// 電話欄位改動時重置驗證狀態
+function onPhoneChange() {
+  s1Verified = false;
+  var statusEl = document.getElementById('s1PhoneStatus');
+  if (statusEl) statusEl.textContent = '';
+  var card = document.getElementById('s1MemberCard');
+  if (card) card.style.display = 'none';
+  updateStep1Btn();
+  // Debounce 自動驗證
+  clearTimeout(window._phoneVerifyTimer);
+  window._phoneVerifyTimer = setTimeout(function() { autoVerifyPhone(); }, 700);
+}
+
+// 自動靜默驗證電話（預填後或輸入後觸發，不打擾用戶）
+function autoVerifyPhone() {
+  var phone = (document.getElementById('applyPhone') || {}).value;
+  if (!phone) return;
+  phone = phone.trim().replace(/\D/g,'');
+  if (phone.length < 8) return;
+  var statusEl = document.getElementById('s1PhoneStatus');
+  if (statusEl) statusEl.textContent = '🔍';
   fetch('/api/partner/check', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone: phone })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    btn.disabled = false;
-    btn.textContent = '\u4e0b\u4e00\u6b65';
-    if (!d.ok) { showErr('s1Err', d.error || '\u6838\u5bfb\u5931\u6557'); return; }
-    memberNo = d.member_no;
-    selfName = d.name_zh || '';
-    selfPhone = d.phone || phone;
-    sessionStorage.setItem('ce85_phone', phone); // 存起來下次預填用
-    var found = document.getElementById('s1Found');
-    found.style.display = '';
-    found.textContent = '\u627e\u5230\u6703\u54e1\uff1a' + d.name_zh + '\uff08' + d.member_no + '\uff09';
-    // \u9810\u586b Step 5 \u7533\u8acb\u8cc7\u6599
-    if (d.name_zh) document.getElementById('applyNameZh').value = d.name_zh;
-    if (d.name_en) document.getElementById('applyNameEn').value = d.name_en;
-    if (d.phone) document.getElementById('applyContactPhone').value = d.phone;
-    // Step 2 KYC \u9810\u586b\uff08\u82e5\u5df2\u6709 KYC \u8a18\u9304\uff09
-    kycDone = !!d.kyc_id;
-    if (d.kyc_id) {
-      // \u5df2\u6709 KYC\uff1a\u986f\u793a\u6458\u8981\uff0c\u5141\u8a31\u66f4\u65b0\u9280\u884c\u8cc7\u6599
-      var kyc = d.kyc;
-      document.getElementById('s2KycDone').style.display = '';
-      document.getElementById('s2KycNew').style.display = 'none';
-      var summary = document.getElementById('s2KycSummary');
-      if (summary) summary.textContent = '身份證：' + (kyc.id_prefix || '已登錄') + '　銀行：' + (kyc.bank_name || '已登錄') + '　戶口：' + (kyc.bank_acc_no || '已登錄');
-      // 預填 KYC 欄位（可改銀行資料）
-      var kycIdEl = document.getElementById('kycIdPrefix');
-      if (kycIdEl) {
-        kycIdEl.value = kyc.id_prefix || '';
-        kycIdEl.readOnly = true;
-        kycIdEl.style.background = '#F3F4F6';
-        var kycIdHint = document.getElementById('kycIdHint');
-        if (kycIdHint) kycIdHint.textContent = '✅ 已登錄身份證，如需更改請聯絡管理員';
-      }
-      if (kyc.email) { var emailEl = document.getElementById('kycEmail'); if (emailEl) emailEl.value = kyc.email; }
-      if (kyc.referral_phone) {
-        var refPhEl = document.getElementById('kycRefPhone');
-        if (refPhEl) { refPhEl.value = kyc.referral_phone; refPhEl.readOnly = true; refPhEl.style.background = '#F3F4F6'; }
-        var refNameEl = document.getElementById('kycRefNameInput');
-        if (refNameEl && kyc.referral_name) { refNameEl.value = kyc.referral_name; document.getElementById('kycRefName').style.display = ''; }
-        document.getElementById('kycRefFound').style.display = '';
-        document.getElementById('kycRefFound').textContent = '✅ 推薦人：' + (kyc.referral_name || kyc.referral_phone);
-        document.getElementById('kycRefStatus').textContent = '✅';
-        kycRefMemberNo = kyc.referral_phone; // phone used for lookup
-      }
-      if (kyc.bank_name) {
-        var kycBankSel = document.getElementById('kycBankName');
-        for (var oi = 0; oi < kycBankSel.options.length; oi++) {
-          if (kycBankSel.options[oi].text === kyc.bank_name) { kycBankSel.selectedIndex = oi; break; }
+    if (d.ok) {
+      s1Verified = true;
+      memberNo = d.member_no;
+      selfName = d.name_zh || '';
+      selfPhone = d.phone || phone;
+      sessionStorage.setItem('ce85_phone', phone);
+      // 顯示會員卡片
+      var card = document.getElementById('s1MemberCard');
+      var info = document.getElementById('s1MemberInfo');
+      if (card) card.style.display = '';
+      if (info) info.textContent = d.name_zh + '（' + d.member_no + '）';
+      if (statusEl) statusEl.textContent = '✅';
+      // 預填姓名和電話
+      var nameZhEl = document.getElementById('applyNameZh');
+      var nameEnEl = document.getElementById('applyNameEn');
+      var contactPhEl = document.getElementById('applyContactPhone');
+      if (nameZhEl && !nameZhEl.value && d.name_zh) nameZhEl.value = d.name_zh;
+      if (nameEnEl && !nameEnEl.value && d.name_en) nameEnEl.value = d.name_en;
+      if (contactPhEl && !contactPhEl.value && d.phone) contactPhEl.value = d.phone;
+      // 預填 KYC（Step 2）
+      kycDone = !!d.kyc_id;
+      if (d.kyc_id) {
+        var kyc = d.kyc;
+        document.getElementById('s2KycDone').style.display = '';
+        document.getElementById('s2KycNew').style.display = 'none';
+        var summary = document.getElementById('s2KycSummary');
+        if (summary) summary.textContent = '身份證：' + (kyc.id_prefix || '已登錄') + '　銀行：' + (kyc.bank_name || '已登錄') + '　戶口：' + (kyc.bank_acc_no || '已登錄');
+        var kycIdEl = document.getElementById('kycIdPrefix');
+        if (kycIdEl) {
+          kycIdEl.value = kyc.id_prefix || '';
+          kycIdEl.readOnly = true;
+          kycIdEl.style.background = '#F3F4F6';
+          var kycIdHint = document.getElementById('kycIdHint');
+          if (kycIdHint) kycIdHint.textContent = '✅ 已登錄身份證，如需更改請聯絡管理員';
         }
-        autoFillSwift();
+        if (kyc.email) { var emailEl = document.getElementById('kycEmail'); if (emailEl) emailEl.value = kyc.email; }
+        if (kyc.referral_phone) {
+          var refPhEl = document.getElementById('kycRefPhone');
+          if (refPhEl) { refPhEl.value = kyc.referral_phone; refPhEl.readOnly = true; refPhEl.style.background = '#F3F4F6'; }
+          var refNameEl = document.getElementById('kycRefNameInput');
+          if (refNameEl && kyc.referral_name) { refNameEl.value = kyc.referral_name; document.getElementById('kycRefName').style.display = ''; }
+          document.getElementById('kycRefFound').style.display = '';
+          document.getElementById('kycRefFound').textContent = '✅ 推薦人：' + (kyc.referral_name || kyc.referral_phone);
+          document.getElementById('kycRefStatus').textContent = '✅';
+          kycRefMemberNo = kyc.referral_phone;
+        }
+        if (kyc.bank_name) {
+          var kycBankSel = document.getElementById('kycBankName');
+          for (var oi = 0; oi < kycBankSel.options.length; oi++) {
+            if (kycBankSel.options[oi].text === kyc.bank_name) { kycBankSel.selectedIndex = oi; break; }
+          }
+          autoFillSwift();
+        }
+        if (kyc.bank_acc_no) document.getElementById('kycBankAcc').value = kyc.bank_acc_no;
+        if (kyc.swift_code) { var swEl = document.getElementById('kycSwift'); if (swEl) swEl.value = kyc.swift_code; }
+      } else {
+        document.getElementById('s2KycDone').style.display = 'none';
+        document.getElementById('s2KycNew').style.display = '';
       }
-      if (kyc.bank_acc_no) document.getElementById('kycBankAcc').value = kyc.bank_acc_no;
-      if (kyc.swift_code) {
-        var swiftEl = document.getElementById('kycSwift');
-        if (swiftEl) { swiftEl.value = kyc.swift_code; }
-      }
+      updateStep1Btn();
     } else {
-      // 首次：提示需要填寫
-      document.getElementById('s2KycDone').style.display = 'none';
-      document.getElementById('s2KycNew').style.display = '';
+      s1Verified = false;
+      if (statusEl) statusEl.textContent = '❌';
+      var card2 = document.getElementById('s1MemberCard');
+      if (card2) card2.style.display = 'none';
+      updateStep1Btn();
     }
-    // \u5141\u8a31\u591a\u6b21\u7533\u8acb\uff0c\u4e0d\u518d\u5c01\u9396\u5df2\u6709 PENDING/APPROVED \u7533\u8acb\u7684\u7528\u6236
-    if (cb) cb(true);
-    else showStep(2);
   }).catch(function() {
-    btn.disabled = false;
-    btn.textContent = '\u4e0b\u4e00\u6b65';
-    showErr('s1Err', '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66');
+    if (statusEl) statusEl.textContent = '';
   });
+}
+
+// Step 1 驗證（用戶點下一步時）
+function validateStep1(cb) {
+  var phone = (document.getElementById('applyPhone') || {}).value.trim();
+  var name = (document.getElementById('applyNameZh') || {}).value.trim();
+  var contactPhone = (document.getElementById('applyContactPhone') || {}).value.trim();
+  var pwd = (document.getElementById('applyPassword') || {}).value || '';
+  var pwd2 = (document.getElementById('applyPasswordConfirm') || {}).value || '';
+
+  if (!phone) { showErr('s1Err', '請輸入老有卡登記電話號碼'); return; }
+  if (!s1Verified) {
+    // 尚未驗證，嘗試即時驗證
+    var btn = document.getElementById('btnNext');
+    btn.disabled = true; btn.textContent = '驗證中…';
+    fetch('/api/partner/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phone.replace(/\D/g,'') })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      btn.disabled = false; btn.textContent = '下一步';
+      if (!d.ok) { showErr('s1Err', d.error || '找不到此電話的會員，請確認電話號碼'); return; }
+      // 驗證成功，填入資料
+      s1Verified = true; memberNo = d.member_no; selfName = d.name_zh||''; selfPhone = d.phone||phone;
+      sessionStorage.setItem('ce85_phone', phone);
+      var card = document.getElementById('s1MemberCard');
+      var info = document.getElementById('s1MemberInfo');
+      if (card) card.style.display = '';
+      if (info) info.textContent = d.name_zh + '（' + d.member_no + '）';
+      // 繼續驗證其他欄位
+      doStep1Validation(cb);
+    }).catch(function() {
+      btn.disabled = false; btn.textContent = '下一步';
+      showErr('s1Err', '網絡錯誤，請稍後再試');
+    });
+    return;
+  }
+  doStep1Validation(cb);
+}
+
+function doStep1Validation(cb) {
+  var name = (document.getElementById('applyNameZh') || {}).value.trim();
+  var contactPhone = (document.getElementById('applyContactPhone') || {}).value.trim();
+  var pwd = (document.getElementById('applyPassword') || {}).value || '';
+  var pwd2 = (document.getElementById('applyPasswordConfirm') || {}).value || '';
+  if (!name) { showErr('s1Err', '請填寫中文姓名'); return; }
+  if (!contactPhone) { showErr('s1Err', '請填寫聯絡電話'); return; }
+  if (!pwd || pwd.length < 8) { showErr('s1Err', '請設定登入密碼（至少 8 位）'); return; }
+  if (pwd !== pwd2) { showErr('s1Err', '兩次輸入的密碼不一致'); return; }
+  if (cb) cb(true);
 }
 
 function selectRole(r) {
@@ -12509,51 +12692,49 @@ function submitKyc(cb) {
 }
 
 function updateStep5Fields() {
+  var isInd   = selectedType === 'INDIVIDUAL';
   var isCo    = selectedType === 'COMPANY';
   var isAssoc = selectedType === 'ASSOCIATION';
   var isGrp   = selectedType === 'GROUP';
   var isCK    = selectedRole === 'COLINKERY';
-  var needOrgFields = isCo || isAssoc; // 公司 / 協會共用組織欄位
 
-  // 動態更新公司/協會欄位標籤
-  var companyLabel = document.querySelector('#fieldCompany label');
-  var brLabel = document.querySelector('#fieldBR label');
-  var companyInput = document.getElementById('applyCompanyName');
-  var brInput = document.getElementById('applyCompanyBR');
-  if (isAssoc) {
-    if (companyLabel) companyLabel.innerHTML = '\u5354\u6703/\u5546\u6703\u540d\u7a31 <span class="req">*</span>';
-    if (companyInput) companyInput.placeholder = '\u767b\u8a18\u5354\u6703\u6216\u5546\u6703\u540d\u7a31\uff08\u4e2d\u82f1\u6587\uff09';
-    if (brLabel) brLabel.textContent = '\u793e\u5718\u767b\u8a18\u8b49\u865f\u78bc';
-    if (brInput) brInput.placeholder = '\u793e\u5718\u767b\u8a18\u8b49\u865f\u78bc\uff08\u5982\u6709\uff09';
-  } else {
-    if (companyLabel) companyLabel.innerHTML = '\u516c\u53f8\u540d\u7a31 <span class="req">*</span>';
-    if (companyInput) companyInput.placeholder = '\u6ce8\u518a\u516c\u53f8\u540d\u7a31\uff08\u4e2d\u82f1\u6587\uff09';
-    if (brLabel) brLabel.textContent = 'BR \u767b\u8a18\u865f\u78bc';
-    if (brInput) brInput.placeholder = '\u5546\u696d\u767b\u8a18\u8b49 BR \u865f\u78bc';
+  // 各欄位組顯示/隱藏
+  var indNote = document.getElementById('s5IndividualNote');
+  var grpFields = document.getElementById('s5GroupFields');
+  var coFields = document.getElementById('s5CompanyFields');
+  var assocFields = document.getElementById('s5AssocFields');
+  var industryField = document.getElementById('s5IndustryField');
+
+  if (indNote) indNote.style.display = isInd ? '' : 'none';
+  if (grpFields) grpFields.style.display = isGrp ? '' : 'none';
+  if (coFields) coFields.style.display = isCo ? '' : 'none';
+  if (assocFields) assocFields.style.display = isAssoc ? '' : 'none';
+  if (industryField) industryField.style.display = isCK ? '' : 'none';
+
+  // 小組：初始化成員列表
+  if (isGrp) {
+    var sz = parseInt((document.getElementById('applyTeamSize') || {}).value) || 0;
+    if (sz >= 2) buildGroupMemberRows();
   }
-
-  // HKID 已在 Step 2 提交，只顯示提示
-  document.getElementById('fieldIdPrefix').style.display = '';
-  document.getElementById('fieldCompany').style.display = needOrgFields ? '' : 'none';
-  document.getElementById('fieldBR').style.display = needOrgFields ? '' : 'none';
-  document.getElementById('fieldTeam').style.display = isGrp ? '' : 'none';
-  document.getElementById('fieldGroupMembers').style.display = isGrp ? '' : 'none';
-  document.getElementById('fieldTeamNotes').style.display = isGrp ? '' : 'none';
-  document.getElementById('fieldIndustry').style.display = isCK ? '' : 'none';
 }
 
 function validateStep5() {
-  var name = document.getElementById('applyNameZh').value.trim();
-  var phone = document.getElementById('applyContactPhone').value.trim();
-  if (!name) { showErr('s5Err', '\u8acb\u586b\u5beb\u4e2d\u6587\u59d3\u540d'); return false; }
-  if (!phone) { showErr('s5Err', '\u8acb\u586b\u5beb\u9023\u7d61\u96fb\u8a71'); return false; }
-  if ((selectedType === 'COMPANY' || selectedType === 'ASSOCIATION') && !document.getElementById('applyCompanyName').value.trim()) {
-    var orgLabel = selectedType === 'ASSOCIATION' ? '\u5354\u6703/\u5546\u6703\u540d\u7a31' : '\u516c\u53f8\u540d\u7a31';
-    showErr('s5Err', '\u8acb\u586b\u5beb' + orgLabel); return false;
+  // INDIVIDUAL：基本資料已在 Step 1，Step 5 通常無需額外驗證
+  if (selectedType === 'INDIVIDUAL') return true;
+
+  if (selectedType === 'COMPANY') {
+    var coName = (document.getElementById('applyCompanyName') || {}).value;
+    if (!coName || !coName.trim()) { showErr('s5Err', '請填寫公司名稱'); return false; }
   }
+
+  if (selectedType === 'ASSOCIATION') {
+    var anEl = document.getElementById('applyAssocName');
+    if (!anEl || !anEl.value.trim()) { showErr('s5Err', '請填寫協會/商會名稱'); return false; }
+  }
+
   if (selectedType === 'GROUP') {
-    var n = parseInt(document.getElementById('applyTeamSize').value) || 0;
-    if (n < 2) { showErr('s5Err', '\u5c0f\u7d44\u81f3\u5c11\u9700\u8981 2 \u4eba'); return false; }
+    var n = parseInt((document.getElementById('applyTeamSize') || {}).value) || 0;
+    if (n < 2) { showErr('s5Err', '小組至少需要 2 人'); return false; }
     var rows = document.querySelectorAll('.gm-row');
     var total = 0; var unverified = 0;
     rows.forEach(function(row) {
@@ -12562,9 +12743,10 @@ function validateStep5() {
       if (!mn && !isSelf) unverified++;
       total += parseFloat(row.querySelector('.gm-pct').value) || 0;
     });
-    if (unverified > 0) { showErr('s5Err', '\u6709 ' + unverified + ' \u4f4d\u6210\u54e1\u672a\u9a57\u8b49\uff0c\u8acb\u6aa2\u67e5\u96fb\u8a71\u865f\u78bc'); return false; }
-    if (Math.abs(total - 100) > 0.01) { showErr('s5Err', '\u5206\u6210\u767e\u5206\u6bd4\u5408\u8a08\u5fc5\u9808\u7b49\u65bc 100%\uff0c\u73fe\u70ba ' + total.toFixed(1) + '%'); return false; }
+    if (unverified > 0) { showErr('s5Err', '有 ' + unverified + ' 位成員未驗證，請檢查電話號碼'); return false; }
+    if (Math.abs(total - 100) > 0.01) { showErr('s5Err', '分成百分比合計必須等於 100%，現為 ' + total.toFixed(1) + '%'); return false; }
   }
+
   return true;
 }
 
@@ -12682,13 +12864,16 @@ function updatePercentSum() {
 function handleFileSelect(input) {
   var file = input.files[0];
   if (!file) return;
+  // 找最近的 upload-status（公司或協會各自的顯示區）
+  var statusEl = input.parentElement ? input.parentElement.querySelector('.upload-status') : null;
+  if (!statusEl) statusEl = document.getElementById('uploadStatus');
+  if (!statusEl) return;
   if (file.size > 5 * 1024 * 1024) {
-    document.getElementById('uploadStatus').textContent = '\u6a94\u6848\u4e0d\u80fd\u8d85\u904e 5MB';
-    document.getElementById('uploadStatus').className = 'upload-status';
+    statusEl.textContent = '檔案不能超過 5MB';
+    statusEl.className = 'upload-status';
     return;
   }
-  var statusEl = document.getElementById('uploadStatus');
-  statusEl.textContent = '\u4e0a\u50b3\u4e2d\u2026';
+  statusEl.textContent = '上傳中…';
   statusEl.className = 'upload-status';
   var form = new FormData();
   form.append('file', file);
@@ -12697,14 +12882,14 @@ function handleFileSelect(input) {
     .then(function(d) {
       if (d.ok) {
         uploadedKey = d.key;
-        statusEl.textContent = '\u2705 ' + file.name + ' \u4e0a\u50b3\u6210\u529f';
+        statusEl.textContent = '✅ ' + file.name + ' 上傳成功';
         statusEl.className = 'upload-status ok';
       } else {
-        statusEl.textContent = '\u4e0a\u50b3\u5931\u6557\uff1a' + (d.error || '\u8acb\u91cd\u8a66');
+        statusEl.textContent = '上傳失敗：' + (d.error || '請重試');
         statusEl.className = 'upload-status';
       }
     }).catch(function() {
-      statusEl.textContent = '\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66';
+      statusEl.textContent = '網絡錯誤，請重試';
       statusEl.className = 'upload-status';
     });
 }
@@ -12723,59 +12908,49 @@ function togglePwd(inputId, btnId) {
   }
 }
 
-// 即時驗證密碼一致性
-document.addEventListener('DOMContentLoaded', function() {
-  var p1 = document.getElementById('applyPassword');
-  var p2 = document.getElementById('applyPasswordConfirm');
-  var hint = document.getElementById('pwdMatchHint');
-  function checkMatch() {
-    if (!p2.value) { hint.textContent = ''; return; }
-    if (p1.value === p2.value) {
-      hint.textContent = '✅ 密碼一致';
-      hint.style.color = '#1B5E20';
-    } else {
-      hint.textContent = '❌ 密碼不一致';
-      hint.style.color = '#C62828';
-    }
-  }
-  if (p1) p1.addEventListener('input', checkMatch);
-  if (p2) p2.addEventListener('input', checkMatch);
-});
-
 function updateDeclareBtn() {
   var agreed = document.getElementById('agreeCheck').checked;
-  var pwd = (document.getElementById('applyPassword') || {}).value || '';
-  var pwd2 = (document.getElementById('applyPasswordConfirm') || {}).value || '';
-  // 只有勾選聲明 + 密碼已填 + 兩次一致才可提交
-  document.getElementById('btnNext').disabled = !(agreed && pwd.length >= 8 && pwd === pwd2);
+  // Step 6 密碼已移至 Step 1，只需勾選聲明即可提交
+  document.getElementById('btnNext').disabled = !agreed;
 }
 
 function submitApplication() {
-  // 驗證密碼
-  var pwd = document.getElementById('applyPassword').value;
-  var pwd2 = document.getElementById('applyPasswordConfirm').value;
-  if (!pwd || pwd.length < 8) { showErr('s6Err', '請設定登入密碼（至少 8 位）'); return; }
-  if (pwd !== pwd2) { showErr('s6Err', '兩次輸入的密碼不一致，請重新輸入'); return; }
+  // 密碼已在 Step 1 設定，從 Step 1 欄位取值
+  var pwd = (document.getElementById('applyPassword') || {}).value || '';
+  var pwd2 = (document.getElementById('applyPasswordConfirm') || {}).value || '';
+  if (!pwd || pwd.length < 8) { showErr('s6Err', '請返回第一步設定登入密碼（至少 8 位）'); return; }
+  if (pwd !== pwd2) { showErr('s6Err', '兩次密碼不一致，請返回第一步重新設定'); return; }
   if (!document.getElementById('agreeCheck').checked) { showErr('s6Err', '請先勾選聲明'); return; }
 
   var btn = document.getElementById('btnNext');
   btn.disabled = true;
-  btn.textContent = '\u63d0\u4ea4\u4e2d\u2026';
+  btn.textContent = '提交中…';
+
+  // 公司名稱：公司用 applyCompanyName，協會用 applyAssocName
+  var companyName = '';
+  var companyBR = '';
+  if (selectedType === 'COMPANY') {
+    companyName = (document.getElementById('applyCompanyName') || {}).value || '';
+    companyBR = (document.getElementById('applyCompanyBR') || {}).value || '';
+  } else if (selectedType === 'ASSOCIATION') {
+    companyName = (document.getElementById('applyAssocName') || {}).value || '';
+    companyBR = (document.getElementById('applyAssocRegNo') || {}).value || '';
+  }
+
   var body = {
     member_no: memberNo,
     role: selectedRole,
     applicant_type: selectedType,
-    name_zh: document.getElementById('applyNameZh').value.trim(),
-    name_en: document.getElementById('applyNameEn').value.trim(),
-    phone: document.getElementById('applyContactPhone').value.trim(),
+    name_zh: (document.getElementById('applyNameZh') || {}).value.trim(),
+    name_en: (document.getElementById('applyNameEn') || {}).value.trim(),
+    phone: (document.getElementById('applyContactPhone') || {}).value.trim(),
     address: (document.getElementById('applyDistrict') ? document.getElementById('applyDistrict').value.trim() : ''),
     password: pwd,
-    // HKID + 銀行資料從 KYC 讀取（已在 Step 2 提交）
-    id_prefix: document.getElementById('kycIdPrefix').value.trim(),
-    company_name: document.getElementById('applyCompanyName').value.trim(),
-    company_br: document.getElementById('applyCompanyBR').value.trim(),
+    id_prefix: (document.getElementById('kycIdPrefix') || {}).value.trim(),
+    company_name: companyName.trim(),
+    company_br: companyBR.trim(),
     industry_background: document.getElementById('applyIndustry') ? document.getElementById('applyIndustry').value.trim() : '',
-    team_size: parseInt(document.getElementById('applyTeamSize').value) || null,
+    team_size: parseInt((document.getElementById('applyTeamSize') || {}).value) || null,
     team_notes: document.getElementById('applyTeamNotes') ? document.getElementById('applyTeamNotes').value.trim() : '',
     group_members: (function() {
       var rows = document.querySelectorAll('.gm-row');
@@ -12789,8 +12964,8 @@ function submitApplication() {
       });
       return arr;
     })(),
-    bank_name: document.getElementById('kycBankName').value,
-    bank_acc_no: document.getElementById('kycBankAcc').value.trim()
+    bank_name: (document.getElementById('kycBankName') || {}).value,
+    bank_acc_no: (document.getElementById('kycBankAcc') || {}).value.trim()
   };
   fetch('/api/partner/apply', {
     method: 'POST',
