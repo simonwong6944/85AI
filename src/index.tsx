@@ -11180,23 +11180,78 @@ function showCard(memberNo, waClicked) {
       '</div>' +
     '</div>';
   wrap.innerHTML = iframeHtml + installHtml + partnerEntryHtml;
-  // 綁定 CoLeadery 按鈕事件
-  var bpa = document.getElementById('btnPartnerApply');
-  if (bpa) bpa.addEventListener('click', function() {
-    var m = this.getAttribute('data-member') || '';
-    var p = localStorage.getItem('ce85_phone') || '';
-    window.location.href = '/app/partner-apply?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '') + '&role=COLEADERY';
-  });
-  // 綁定 CoLinkery 按鈕事件
-  var bcl = document.getElementById('btnCoLinkery');
-  if (bcl) bcl.addEventListener('click', function() {
-    var m = this.getAttribute('data-member') || '';
-    var p = localStorage.getItem('ce85_phone') || '';
-    window.location.href = '/app/partner-apply?member=' + encodeURIComponent(m) + (p ? '&phone=' + encodeURIComponent(p) : '') + '&role=COLINKERY';
-  });
+  // 查詢此會員的角色申請狀態，動態調整按鈕行為
+  loadPartnerStatus(memberNo);
   // 用戶已點過 WA 按鈕 → 立即展開安裝提示
   if (waClicked) {
     showInstallBanner();
+  }
+}
+
+// 查詢申請狀態並動態調整按鈕
+function loadPartnerStatus(memberNo) {
+  var p = localStorage.getItem('ce85_phone') || '';
+  fetch('/api/partner/my-status?member_no=' + encodeURIComponent(memberNo))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      setupPartnerBtns(memberNo, p, d.coleadery || null, d.colinkery || null);
+    })
+    .catch(function() {
+      // 查詢失敗時降級到普通申請入口
+      setupPartnerBtns(memberNo, p, null, null);
+    });
+}
+
+function setupPartnerBtns(memberNo, phone, clStatus, ckStatus) {
+  var bpa = document.getElementById('btnPartnerApply');
+  var bcl = document.getElementById('btnCoLinkery');
+
+  // ── CoLeadery 按鈕 ──
+  if (bpa) {
+    if (clStatus === 'APPROVED') {
+      // 已批准：進入錢包/工具
+      bpa.querySelector('div:last-child').textContent = '領航者｜進入工具 →';
+      bpa.style.background = 'linear-gradient(135deg,#1B5E20,#2E7D32)';
+      bpa.addEventListener('click', function() {
+        window.location.href = '/app/wallet?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '');
+      });
+    } else if (clStatus === 'PENDING') {
+      // 待審核：顯示狀態
+      bpa.querySelector('div:last-child').textContent = '審核中… ⏳';
+      bpa.style.opacity = '0.75';
+      bpa.addEventListener('click', function() {
+        alert('⏳ 你的 CoLeadery 申請正在審核中（預計 3–5 個工作天），請耐心等候。');
+      });
+    } else {
+      // 未申請：進入申請
+      bpa.addEventListener('click', function() {
+        window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLEADERY';
+      });
+    }
+  }
+
+  // ── CoLinkery 按鈕 ──
+  if (bcl) {
+    if (ckStatus === 'APPROVED') {
+      // 已批准：進入 CoLinkery 工具
+      bcl.querySelector('div:last-child').textContent = '連結者｜進入工具 →';
+      bcl.style.background = 'linear-gradient(135deg,#0D47A1,#1565C0)';
+      bcl.addEventListener('click', function() {
+        window.location.href = '/colinkery/';
+      });
+    } else if (ckStatus === 'PENDING') {
+      // 待審核：顯示狀態
+      bcl.querySelector('div:last-child').textContent = '審核中… ⏳';
+      bcl.style.opacity = '0.75';
+      bcl.addEventListener('click', function() {
+        alert('⏳ 你的 CoLinkery 申請正在審核中（預計 3–5 個工作天），請耐心等候。');
+      });
+    } else {
+      // 未申請：進入申請
+      bcl.addEventListener('click', function() {
+        window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLINKERY';
+      });
+    }
   }
 }
 
@@ -12008,9 +12063,33 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
     <div class="err-box" id="s5Err"></div>
   </div>
 
-  <!-- Step 6: 聲明確認 -->
+  <!-- Step 6: 設定密碼 + 聲明確認 -->
   <div id="step6" class="section" style="display:none;">
-    <div class="section-title">&#x1F4DC; 第六步：聲明確認</div>
+    <div class="section-title">&#x1F511; 第六步：設定登入密碼及確認聲明</div>
+
+    <!-- 密碼設定 -->
+    <div style="background:#EEF2FF;border:1.5px solid #6366F1;border-radius:10px;padding:14px 16px;margin-bottom:18px;">
+      <div style="font-size:15px;font-weight:800;color:#3730A3;margin-bottom:10px;">&#x1F512; 設定工具登入密碼</div>
+      <div style="font-size:13px;color:#4338CA;margin-bottom:12px;line-height:1.5;">批准後用此密碼登入 CoLeadery／CoLinkery 工具。請設定一個只有你知道的密碼。</div>
+      <div class="field-group" style="margin-bottom:10px;">
+        <label style="font-size:15px;">登入密碼 <span class="req">*</span></label>
+        <div style="position:relative;">
+          <input type="password" id="applyPassword" placeholder="至少 8 位，英文+數字更安全" autocomplete="new-password" style="padding-right:44px;">
+          <button type="button" onclick="togglePwd('applyPassword','eyePwd')" id="eyePwd" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:20px;cursor:pointer;color:#888;">&#x1F441;</button>
+        </div>
+        <div class="hint">最少 8 個字符，建議包含英文字母及數字</div>
+      </div>
+      <div class="field-group" style="margin-bottom:0;">
+        <label style="font-size:15px;">確認密碼 <span class="req">*</span></label>
+        <div style="position:relative;">
+          <input type="password" id="applyPasswordConfirm" placeholder="再輸入一次密碼" autocomplete="new-password" style="padding-right:44px;">
+          <button type="button" onclick="togglePwd('applyPasswordConfirm','eyePwd2')" id="eyePwd2" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:20px;cursor:pointer;color:#888;">&#x1F441;</button>
+        </div>
+        <div id="pwdMatchHint" style="font-size:13px;margin-top:5px;"></div>
+      </div>
+    </div>
+
+    <!-- 聲明 -->
     <div class="declaration-box">
       <strong>申請聲明</strong><br><br>
       本人理解並同意以下條款：<br>
@@ -12030,11 +12109,16 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
   <!-- Success -->
   <div id="stepSuccess" class="section" style="display:none;">
     <div class="success-box">
-      <div class="s-icon">&#x2705;</div>
-      <div class="s-title">\u7533\u8acb\u5df2\u63d0\u4ea4\uff01</div>
-      <div class="s-text">\u6211\u5011\u6703\u5c55\u958b\u5be9\u6838\uff0c\u9810\u8a08 3-5 \u5de5\u4f5c\u65e5\u5167\u56de\u8986\u3002\u5be9\u6838\u901a\u904e\u5f8c\u6703\u767c\u51fa\u96fb\u5b50\u6388\u6b0a\u5361\u3002</div>
+      <div class="s-icon">&#x1F4EC;</div>
+      <div class="s-title" id="successTitle">\u7533\u8acb\u5df2\u63d0\u4ea4\uff01</div>
+      <!-- 審核狀態卡片 -->
+      <div id="successStatusCard" style="background:#FFF8E1;border:1.5px solid #FFB300;border-radius:12px;padding:16px 18px;margin:16px 0;text-align:left;">
+        <div style="font-size:15px;font-weight:800;color:#E65100;margin-bottom:10px;">&#x23F3; 等待審核中</div>
+        <div id="successDetail" style="font-size:14px;color:#555;line-height:1.8;"></div>
+      </div>
+      <div class="s-text" style="font-size:14px;color:#666;line-height:1.7;">審核期間如有疑問，請透過 WhatsApp 聯絡我們。<br>批准後你的工具頁面會立即開通，屆時可用你設定的密碼登入。</div>
       <div id="teamInviteSection"></div>
-      <button onclick="goBack()" style="margin-top:24px;padding:14px 32px;background:#8B0000;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;">\u8fd4\u56de\u6211\u7684\u5361</button>
+      <button onclick="goBack()" style="margin-top:20px;padding:14px 32px;background:#8B0000;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;">\u8fd4\u56de\u6211\u7684\u5361</button>
     </div>
   </div>
 
@@ -12206,6 +12290,18 @@ function showStep(n) {
   currentStep = n;
   updateDots();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Step 6: 綁定密碼輸入事件以更新按鈕狀態
+  if (n === TOTAL_STEPS) {
+    ['applyPassword','applyPasswordConfirm'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && !el.dataset.pwdBound) {
+        el.dataset.pwdBound = '1';
+        el.addEventListener('input', updateDeclareBtn);
+      }
+    });
+    // 初始化按鈕狀態
+    updateDeclareBtn();
+  }
 }
 
 function nextStep() {
@@ -12233,10 +12329,7 @@ function nextStep() {
     showStep(6); return;
   }
   if (currentStep === 6) {
-    if (!document.getElementById('agreeCheck').checked) {
-      showErr('s6Err', '\u8acb\u5148\u52fe\u9078\u8072\u660e');
-      return;
-    }
+    // 密碼和聲明驗證在 submitApplication 內進行
     submitApplication();
     return;
   }
@@ -12616,11 +12709,55 @@ function handleFileSelect(input) {
     });
 }
 
+// 密碼顯示/隱藏切換
+function togglePwd(inputId, btnId) {
+  var el = document.getElementById(inputId);
+  var btn = document.getElementById(btnId);
+  if (!el) return;
+  if (el.type === 'password') {
+    el.type = 'text';
+    if (btn) btn.innerHTML = '&#x1F576;';
+  } else {
+    el.type = 'password';
+    if (btn) btn.innerHTML = '&#x1F441;';
+  }
+}
+
+// 即時驗證密碼一致性
+document.addEventListener('DOMContentLoaded', function() {
+  var p1 = document.getElementById('applyPassword');
+  var p2 = document.getElementById('applyPasswordConfirm');
+  var hint = document.getElementById('pwdMatchHint');
+  function checkMatch() {
+    if (!p2.value) { hint.textContent = ''; return; }
+    if (p1.value === p2.value) {
+      hint.textContent = '✅ 密碼一致';
+      hint.style.color = '#1B5E20';
+    } else {
+      hint.textContent = '❌ 密碼不一致';
+      hint.style.color = '#C62828';
+    }
+  }
+  if (p1) p1.addEventListener('input', checkMatch);
+  if (p2) p2.addEventListener('input', checkMatch);
+});
+
 function updateDeclareBtn() {
-  document.getElementById('btnNext').disabled = !document.getElementById('agreeCheck').checked;
+  var agreed = document.getElementById('agreeCheck').checked;
+  var pwd = (document.getElementById('applyPassword') || {}).value || '';
+  var pwd2 = (document.getElementById('applyPasswordConfirm') || {}).value || '';
+  // 只有勾選聲明 + 密碼已填 + 兩次一致才可提交
+  document.getElementById('btnNext').disabled = !(agreed && pwd.length >= 8 && pwd === pwd2);
 }
 
 function submitApplication() {
+  // 驗證密碼
+  var pwd = document.getElementById('applyPassword').value;
+  var pwd2 = document.getElementById('applyPasswordConfirm').value;
+  if (!pwd || pwd.length < 8) { showErr('s6Err', '請設定登入密碼（至少 8 位）'); return; }
+  if (pwd !== pwd2) { showErr('s6Err', '兩次輸入的密碼不一致，請重新輸入'); return; }
+  if (!document.getElementById('agreeCheck').checked) { showErr('s6Err', '請先勾選聲明'); return; }
+
   var btn = document.getElementById('btnNext');
   btn.disabled = true;
   btn.textContent = '\u63d0\u4ea4\u4e2d\u2026';
@@ -12632,6 +12769,7 @@ function submitApplication() {
     name_en: document.getElementById('applyNameEn').value.trim(),
     phone: document.getElementById('applyContactPhone').value.trim(),
     address: (document.getElementById('applyDistrict') ? document.getElementById('applyDistrict').value.trim() : ''),
+    password: pwd,
     // HKID + 銀行資料從 KYC 讀取（已在 Step 2 提交）
     id_prefix: document.getElementById('kycIdPrefix').value.trim(),
     company_name: document.getElementById('applyCompanyName').value.trim(),
@@ -12668,6 +12806,19 @@ function submitApplication() {
       document.getElementById('step6').style.display = 'none';
       document.getElementById('navBtns').style.display = 'none';
       document.getElementById('stepDots').style.display = 'none';
+      // 填入審核狀態詳情
+      var roleLabel = selectedRole === 'COLINKERY' ? '🤝 CoLinkery 連結者' : '🌟 CoLeadery 領航者';
+      var typeMap = { INDIVIDUAL: '個人', GROUP: '小組', COMPANY: '公司', ASSOCIATION: '協會/商會' };
+      var typeLabel = typeMap[selectedType] || selectedType;
+      var appIdText = d.app_id ? ('APP-' + String(d.app_id).padStart(4, '0')) : '已記錄';
+      document.getElementById('successTitle').textContent = '✅ 申請已成功提交！';
+      document.getElementById('successDetail').innerHTML =
+        '申請編號：<strong>' + appIdText + '</strong><br>' +
+        '申請角色：<strong>' + roleLabel + '</strong><br>' +
+        '申請類型：<strong>' + typeLabel + '</strong><br>' +
+        '狀態：<span style="color:#E65100;font-weight:700;">等待審核中 ⏳</span><br>' +
+        '預計時間：<strong>3–5 個工作天</strong><br><br>' +
+        '批准後系統會開通你的工具帳號，<br>屆時可用你設定的密碼直接登入。';
       // 如有團隊邀請，顯示 WA 邀請區
       if (d.invites && d.invites.length > 0) {
         renderTeamInvites(d.invites, selectedRole);
@@ -13647,6 +13798,39 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
     return c.json({ ok: true, member_no: m.member_no, name_zh: m.name_zh || '', name_en: m.name_en || '' })
   })
 
+  // ── 查詢會員的角色申請狀態（CoLeadery / CoLinkery）──
+  app.get('/api/partner/my-status', async (c) => {
+    const member_no = c.req.query('member_no')
+    if (!member_no) return c.json({ ok: false, coleadery: null, colinkery: null })
+    const db = c.env.DB
+    try {
+      // 查詢最新的 COLEADERY 申請
+      const clRow = await db.prepare(`
+        SELECT status FROM role_applications
+        WHERE member_no=? AND role='COLEADERY'
+        ORDER BY created_at DESC LIMIT 1
+      `).bind(member_no).first<{ status: string }>()
+      // 查詢最新的 COLINKERY 申請
+      const ckRow = await db.prepare(`
+        SELECT status FROM role_applications
+        WHERE member_no=? AND role='COLINKERY'
+        ORDER BY created_at DESC LIMIT 1
+      `).bind(member_no).first<{ status: string }>()
+      // 同時檢查 colinkery_account_status（舊路徑）
+      const memberRow = await db.prepare(`
+        SELECT colinkery_account_status FROM members WHERE member_no=? LIMIT 1
+      `).bind(member_no).first<{ colinkery_account_status: string }>()
+      const ckLegacyApproved = memberRow?.colinkery_account_status === 'active'
+      return c.json({
+        ok: true,
+        coleadery: clRow?.status || null,
+        colinkery: ckLegacyApproved ? 'APPROVED' : (ckRow?.status || null)
+      })
+    } catch {
+      return c.json({ ok: true, coleadery: null, colinkery: null })
+    }
+  })
+
   // 驗證是否為老有卡會員
   app.post('/api/partner/check', async (c) => {
     const { phone } = await c.req.json()
@@ -13747,13 +13931,18 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
       return c.json({ ok: false, error: '缺少必填欄位' }, 400)
     if (!['COLEADERY', 'COLINKERY'].includes(role))
       return c.json({ ok: false, error: '角色無效' }, 400)
-    if (!['INDIVIDUAL', 'GROUP', 'COMPANY'].includes(applicant_type))
+    if (!['INDIVIDUAL', 'GROUP', 'COMPANY', 'ASSOCIATION'].includes(applicant_type))
       return c.json({ ok: false, error: '申請人類型無效' }, 400)
+    const password = body.password || ''
+    if (!password || password.length < 8)
+      return c.json({ ok: false, error: '請設定登入密碼（至少 8 位）' }, 400)
     const db = c.env.DB
     try {
     // 必須先有 KYC 個人正式資料
     const kyc = await db.prepare('SELECT id_prefix, id_doc_r2_key, bank_name, bank_acc_no FROM member_kyc WHERE member_no = ? LIMIT 1').bind(member_no).first<{ id_prefix: string; id_doc_r2_key: string; bank_name: string; bank_acc_no: string }>()
     if (!kyc) return c.json({ ok: false, error: '請先完成第二步個人正式資料登記（身份證及銀行資料）' }, 400)
+    // 雜湊密碼
+    const passwordHashPending = await pbkdf2Hash(password)
     // 使用 KYC 資料（覆蓋前端傳來的值）
     const kycIdPrefix = kyc.id_prefix || id_prefix || ''
     const kycDocKey = kyc.id_doc_r2_key || id_doc_r2_key || ''
@@ -13765,14 +13954,14 @@ function registerRevenueRoutes(app: Hono<{ Bindings: Bindings }>) {
       INSERT INTO role_applications
         (member_no, role, applicant_type, name_zh, name_en, id_prefix, id_doc_r2_key,
          address, phone, bank_name, bank_acc_no, company_name, company_br,
-         industry_background, team_size, team_notes)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         industry_background, team_size, team_notes, password_hash_pending)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).bind(
       member_no, role, applicant_type,
       name_zh, name_en || '', kycIdPrefix, kycDocKey,
       address || '', phone || '', kycBankName, kycBankAcc,
       company_name || '', company_br || '', industry_background || '',
-      team_size || null, team_notes || ''
+      team_size || null, team_notes || '', passwordHashPending
     ).run()
     const appId = insertResult.meta.last_row_id as number
 
