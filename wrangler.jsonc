@@ -1,6 +1,22 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "webapp",
+
+  // ============================================================
+  // DEPLOY TARGET: coeldery85-com  (serves coeldery85.com)
+  // CF Account:    Simon Green (3ab8041c94abe632de363610d166ad47)
+  // D1 Database:   coeldery85-db (222f9afc-4312-47a0-8d91-585443cd35c0)
+  //                *** PRODUCTION DATA - DO NOT WIPE OR RECREATE ***
+  // R2 Bucket:     coeldery85-files
+  //
+  // NEVER deploy to:
+  //   - "coeldery85"   → that project serves coeldery85.ORG
+  //   - "webapp"       → generic name, wrong target
+  //
+  // ALWAYS deploy with:
+  //   npx wrangler pages deploy dist --project-name coeldery85-com
+  // ============================================================
+
+  "name": "coeldery85-com",
   "compatibility_date": "2026-04-26",
   "pages_build_output_dir": "./dist",
   "compatibility_flags": ["nodejs_compat"],
