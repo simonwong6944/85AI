@@ -170,20 +170,12 @@ app.use('/shared.css', serveStatic({ root: './public' }))
 app.use('/static/*', serveStatic({ root: './public' }))
 app.use('/vendor/*', serveStatic({ root: './public' }))
 app.use('/assets/*', serveStatic({ root: './public' }))
-// PWA static files — manifest & icons with no-cache headers so Android PWA picks up icon updates
-app.use('/manifest.webmanifest', async (c, next) => {
-  await next()
-  c.res.headers.set('Cache-Control', 'no-cache, must-revalidate')
-}, serveStatic({ root: './public' }))
-app.use('/sw.js', serveStatic({ root: './public' }))
-app.use('/icon-192.png', async (c, next) => {
-  await next()
-  c.res.headers.set('Cache-Control', 'no-cache, must-revalidate')
-}, serveStatic({ root: './public' }))
-app.use('/icon-512.png', async (c, next) => {
-  await next()
-  c.res.headers.set('Cache-Control', 'no-cache, must-revalidate')
-}, serveStatic({ root: './public' }))
+// PWA root-level static files — served via explicit GET + ASSETS binding
+// (serveStatic with double-middleware caused 500 in CF Pages; direct ASSETS fetch is reliable)
+app.get('/manifest.webmanifest', serveStatic({ root: './public' }))
+app.get('/sw.js', serveStatic({ root: './public' }))
+app.get('/icon-192.png', serveStatic({ root: './public' }))
+app.get('/icon-512.png', serveStatic({ root: './public' }))
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function nextMemberNo(db: D1Database): Promise<string> {
@@ -11492,11 +11484,14 @@ function setupPartnerBtns(memberNo, phone, clStatus, ckStatus) {
         window.location.href = '/app/wallet?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '');
       });
     } else if (clStatus === 'PENDING') {
-      // 待審核：顯示狀態
+      // 待審核：顯示狀態，仍可用其他類型申請
       bpa.querySelector('div:last-child').textContent = '審核中… ⏳';
-      bpa.style.opacity = '0.75';
+      bpa.style.opacity = '0.85';
+      bpa.style.background = 'linear-gradient(135deg,#78350F,#B45309)';
       bpa.addEventListener('click', function() {
-        alert('⏳ 你的 CoLeadery 申請正在審核中（預計 3–5 個工作天），請耐心等候。');
+        if (confirm('⏳ 你的 CoLeadery 申請正在審核中（預計 3–5 個工作天）。\n\n如想以【不同申請類型】再申請（例如：個人 → 小組），請按「確定」前往。\n按「取消」留在此頁。')) {
+          window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLEADERY';
+        }
       });
     } else {
       // 未申請：進入申請
@@ -11516,11 +11511,14 @@ function setupPartnerBtns(memberNo, phone, clStatus, ckStatus) {
         window.location.href = '/colinkery/';
       });
     } else if (ckStatus === 'PENDING') {
-      // 待審核：顯示狀態
+      // 待審核：顯示狀態，仍可用其他類型申請
       bcl.querySelector('div:last-child').textContent = '審核中… ⏳';
-      bcl.style.opacity = '0.75';
+      bcl.style.opacity = '0.85';
+      bcl.style.background = 'linear-gradient(135deg,#0A2F6F,#1A4BA0)';
       bcl.addEventListener('click', function() {
-        alert('⏳ 你的 CoLinkery 申請正在審核中（預計 3–5 個工作天），請耐心等候。');
+        if (confirm('⏳ 你的 CoLinkery 申請正在審核中（預計 3–5 個工作天）。\n\n如想以【不同申請類型】再申請（例如：個人 → 公司），請按「確定」前往。\n按「取消」留在此頁。')) {
+          window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLINKERY';
+        }
       });
     } else {
       // 未申請：進入申請
