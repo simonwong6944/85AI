@@ -8807,7 +8807,7 @@ async function ckApproveApp(id) {
     var d = await res.json();
     if(!d.ok){ alert('批准失敗：'+(d.error||'未知錯誤')); return; }
     // 成功後顯示 WA 通知連結
-    var confirmed = confirm('✅ 已批准！CoLinkery 號碼：'+d.holder_no+'\n\n點擊「確定」用 WhatsApp 通知申請人，或「取消」跳過。');
+    var confirmed = confirm('✅ 已批准！CoLinkery 號碼：'+d.holder_no+'。點擊確定用 WhatsApp 通知申請人。');
     if(confirmed) window.open(d.wa_notify_link,'_blank');
     loadCkAdminData(); // 刷新列表
   } catch(e) { alert('網絡錯誤：'+e.message); }
@@ -8824,7 +8824,7 @@ async function ckRejectApp(id) {
     });
     var d = await res.json();
     if(!d.ok){ alert('拒絕失敗：'+(d.error||'未知錯誤')); return; }
-    var confirmed = confirm('✅ 已拒絕。\n\n點擊「確定」用 WhatsApp 通知申請人，或「取消」跳過。');
+    var confirmed = confirm('✅ 已拒絕。點擊確定用 WhatsApp 通知申請人。');
     if(confirmed) window.open(d.wa_notify_link,'_blank');
     loadCkAdminData();
   } catch(e) { alert('網絡錯誤：'+e.message); }
