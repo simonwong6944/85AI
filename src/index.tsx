@@ -16381,7 +16381,7 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
       </div>
       <div id="login-err" class="alert alert-red" style="display:none;margin:0 0 14px;"></div>
       <button class="btn-primary" onclick="doLogin()" style="margin-bottom:14px;">登入</button>
-      <button class="btn-secondary" onclick="showPage('page-apply')" style="margin-bottom:14px;">申請成為 CoLinkery 連結者</button>
+      <button class="btn-secondary" onclick="window.location.href='/app/partner-apply?role=COLINKERY'" style="margin-bottom:14px;">申請成為 CoLinkery 連結者</button>
       <button class="btn-outline" style="width:100%;margin-bottom:14px;" onclick="showPage('page-forgot')">忘記密碼？</button>
       <p style="text-align:center;font-size:14px;color:var(--muted);">申請後 3-5 工作天審核，批准後可登入</p>
     </div>
@@ -16394,52 +16394,16 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
       <div class="cl-nav-title">申請成為 CoLinkery</div>
       <div style="width:44px"></div>
     </div>
-    <div style="padding:16px;overflow-y:auto;">
-      <div id="apply-err" class="alert alert-red" style="display:none;"></div>
-      <div id="apply-ok" class="alert alert-green" style="display:none;"></div>
-      <div class="form-group">
-        <label class="form-label">登記電話號碼 <span style="color:var(--red)">*</span></label>
-        <input type="tel" class="form-input" id="apply-phone" placeholder="請輸入老有聯盟85會員電話">
-        <div class="form-hint">必須已登記為老有聯盟 85 會員</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">姓名（中文）<span style="color:var(--red)">*</span></label>
-        <input type="text" class="form-input" id="apply-name" placeholder="例：陳大文">
-      </div>
-      <div class="form-group">
-        <label class="form-label">申請身份 <span style="color:var(--red)">*</span></label>
-        <select class="form-input" id="apply-type">
-          <option value="">請選擇</option>
-          <option value="INDIVIDUAL">個人 CoLinkery</option>
-          <option value="GROUP">小組 CoLinkery（多位會員組隊）</option>
-          <option value="COMPANY">公司 CoLinkery</option>
-          <option value="ASSOCIATION">協會/商會 CoLinkery</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">指定收款帳戶資料</label>
-        <input type="text" class="form-input" id="apply-bank" placeholder="例：滙豐 123-456789-001">
-        <div class="form-hint">固定佣金將存入此帳戶</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">公司/協會登記證明文件（如適用）</label>
-        <input type="file" class="form-input" id="apply-doc" accept="image/*,.pdf" style="padding:10px;">
-        <div class="form-hint">公司/協會身份必須上傳商業登記證或社團登記證</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">設定密碼 <span style="color:var(--red)">*</span></label>
-        <input type="password" class="form-input" id="apply-pw" placeholder="最少 8 位">
-      </div>
-      <div class="form-group">
-        <label class="form-label">確認密碼 <span style="color:var(--red)">*</span></label>
-        <input type="password" class="form-input" id="apply-pw2" placeholder="再輸入一次密碼">
-      </div>
-      <div class="form-group" style="display:flex;gap:12px;align-items:flex-start;">
-        <input type="checkbox" id="apply-agree" style="width:22px;height:22px;min-width:22px;margin-top:3px;cursor:pointer;">
-        <label for="apply-agree" style="font-size:16px;color:var(--text);cursor:pointer;line-height:1.5;">我同意老有聯盟 85 的 CoLinkery 合作條款，包括：固定佣金性質、單層結構、促成交易才有佣金、自僱自稅，與平台無僱傭關係。</label>
-      </div>
-      <button class="btn-primary" onclick="doApply()" style="margin-top:8px;">提交申請</button>
+    <div style="padding:32px 16px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:16px;">🤝</div>
+      <div style="font-size:17px;font-weight:700;color:var(--primary);margin-bottom:8px;">正在跳轉至申請頁面…</div>
+      <div style="font-size:14px;color:var(--muted);margin-bottom:24px;">如未自動跳轉，請點擊下方按鈕</div>
+      <button class="btn-primary" onclick="window.location.href='/app/partner-apply?role=COLINKERY'">前往申請表格</button>
     </div>
+    <script>
+      // Auto-redirect on entering this page
+      (function(){ window.location.href = '/app/partner-apply?role=COLINKERY'; })();
+    <\/script>
   </div>
 
   <!-- ③ 申請狀態頁（未登入時查閱）-->
@@ -16720,16 +16684,14 @@ function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.disp
       afterLogin();
     } catch(e){ sessionStorage.removeItem('cl_member'); }
   } else {
-    // 從會員卡跳過來：?action=apply&phone=xxxxxxxx
+    // 從會員卡跳過來：?action=apply&phone=xxxxxxxx → 直接跳轉新申請頁
     var params = new URLSearchParams(window.location.search);
     var action = params.get('action');
     var prefillPhone = params.get('phone') || '';
     if(action === 'apply'){
-      showPage('page-apply');
-      if(prefillPhone){
-        var applyPhoneEl = document.getElementById('apply-phone');
-        if(applyPhoneEl){ applyPhoneEl.value = prefillPhone; applyPhoneEl.readOnly = true; }
-      }
+      var applyUrl = '/app/partner-apply?role=COLINKERY';
+      if(prefillPhone) applyUrl += '&phone=' + encodeURIComponent(prefillPhone);
+      window.location.href = applyUrl;
     }
   }
   // Register service worker
@@ -16875,7 +16837,7 @@ async function checkStatus(){
         html += '<div style="margin-top:8px;font-size:14px;color:var(--muted);">申請身份：'+esc(d.application.applicant_type)+'</div>';
         if(d.application.status==='REJECTED'&&d.application.review_notes){
           html += '<div class="alert alert-red" style="margin-top:8px;">拒絕原因：'+esc(d.application.review_notes)+'</div>';
-          html += '<button class="btn-secondary" onclick="showPage(&quot;page-apply&quot;)" style="margin-top:8px;">重新申請</button>';
+          html += '<button class="btn-secondary" onclick="window.location.href=\'/app/partner-apply?role=COLINKERY\'" style="margin-top:8px;">重新申請</button>';
         }
       }
       html += '</div>';
