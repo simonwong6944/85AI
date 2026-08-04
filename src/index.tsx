@@ -2729,7 +2729,11 @@ app.get('/api/admin/coworkery/files/*', async (c) => {
 })
 
 // ─── /admin — New unified admin shell with login protection ─────────────────
-app.get('/admin', (c) => c.html(newAdminShellHtml()))
+app.get('/admin', (c) => {
+  const res = c.html(newAdminShellHtml())
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+  return res
+})
 
 // ─── Legacy redirects (old URLs → new URLs, keeps old links working) ──────────
 app.get('/login',       (c) => c.redirect('/membership', 301))
@@ -7796,9 +7800,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="login-err" id="login-err"></div>
     <div class="login-field">
       <label>管理員密碼</label>
-      <input type="password" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password">
+      <input type="password" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAdminLogin()">
     </div>
-    <button class="login-btn" id="login-btn">
+    <button class="login-btn" id="login-btn" onclick="doAdminLogin()">
       <i class="fas fa-sign-in-alt" style="margin-right:8px"></i>登入
     </button>
   </div>
@@ -8560,38 +8564,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 
 <script>
-// ── State ──
-var allStores = [];
-var allDistricts = [];
-var rsCache = {}; // roadshow id -> object cache
-
-// ── Init ──
-(function(){
-  fetch('/api/admin/me').then(function(r){return r.json();}).then(function(d){
-    if(d.loggedIn){
-      showAppShell();
-    } else {
-      document.getElementById('login-screen').style.display='flex';
-    }
-  }).catch(function(){
-    document.getElementById('login-screen').style.display='flex';
-  });
-})();
-
-function showAppShell(){
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app-shell').style.display='flex';
-  loadRoadshows();
-  loadDistricts();
-  loadStoreDropdown();
-}
-
+// v2 2026-08-04
 // ── Login ──
-document.getElementById('login-pw').addEventListener('keydown',function(e){
-  if(e.key==='Enter') doAdminLogin();
-});
-document.getElementById('login-btn').addEventListener('click', doAdminLogin);
-
 function doAdminLogin(){
   var pw = document.getElementById('login-pw').value;
   var btn = document.getElementById('login-btn');
@@ -8612,6 +8586,29 @@ function doAdminLogout(){
     window.location.reload();
   });
 }
+
+function showAppShell(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app-shell').style.display='flex';
+  loadRoadshows();
+  loadDistricts();
+  loadStoreDropdown();
+}
+
+// ── State ──
+var allStores = [];
+var allDistricts = [];
+var rsCache = {};
+
+// ── Init: check existing session ──
+(function(){
+  fetch('/api/admin/me').then(function(r){return r.json();}).then(function(d){
+    if(d.loggedIn){ showAppShell(); }
+    else { document.getElementById('login-screen').style.display='flex'; }
+  }).catch(function(){
+    document.getElementById('login-screen').style.display='flex';
+  });
+})();
 
 // ── Sidebar nav ──
 var _membershipFrameLoaded = false;
