@@ -7840,7 +7840,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <i class="fas fa-hard-hat"></i> CoWorkery 人手
       </div>
       <div class="nav-item" onclick="switchMod('mod-revenue')">
-        <i class="fas fa-star"></i> 領航者申請
+        <i class="fas fa-star"></i> CoLeadery 申請
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-colinkery-admin')">
+        <i class="fas fa-handshake"></i> CoLinkery 申請
       </div>
     </div>
     <div class="sidebar-footer">
@@ -8482,6 +8485,87 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════
+     MOD: CoLinkery 申請審核
+════════════════════════════════════════════════════════════════════ -->
+<div id="mod-colinkery-admin" class="mod-page">
+  <style>
+    .ck-app-card{background:#fff;border-radius:10px;border:1.5px solid #BAE6FD;padding:16px 18px;margin-bottom:12px;}
+    .ck-app-card .cka-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+    .ck-app-card .cka-name{font-size:17px;font-weight:700;color:#0C4A6E;}
+    .ck-app-card .cka-meta{font-size:13px;color:#6B7280;margin-top:4px;}
+    .ck-app-card .cka-notes{font-size:13px;color:#374151;margin-top:8px;background:#F0F9FF;border-radius:6px;padding:8px 10px;}
+    .ck-filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+    .ck-filter-btn{padding:6px 16px;border:1.5px solid #BAE6FD;background:#fff;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;color:#0369A1;}
+    .ck-filter-btn.active{background:#0284C7;color:#fff;border-color:#0284C7;}
+    .ck-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+    .btn-ck-approve{padding:8px 18px;background:#065F46;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+    .btn-ck-reject{padding:8px 18px;background:#991B1B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+    .btn-ck-wa{padding:8px 18px;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+    .ck-otp-card{background:#fff;border-radius:10px;border:1.5px solid #A7F3D0;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+    .ck-otp-code{font-size:26px;font-weight:900;color:#065F46;letter-spacing:6px;font-family:monospace;}
+    .ck-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
+    .ck-stat-card{background:#fff;border-radius:10px;border:1.5px solid #E5E7EB;padding:14px 16px;text-align:center;}
+    .ck-stat-num{font-size:28px;font-weight:900;color:#0284C7;}
+    .ck-stat-lbl{font-size:12px;color:#6B7280;margin-top:2px;}
+    .ck-tab-bar{display:flex;gap:0;border-bottom:2px solid #E5E7EB;margin-bottom:20px;}
+    .ck-tab{padding:10px 20px;border:none;background:none;font-size:14px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;}
+    .ck-tab.active{color:#0284C7;border-bottom-color:#0284C7;}
+    .ck-type-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#E0F2FE;color:#0369A1;}
+    .ck-holder-card{background:#fff;border-radius:10px;border:1.5px solid #BAE6FD;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  </style>
+
+  <!-- 統計卡片 -->
+  <div id="ckStatGrid" class="ck-stat-grid"></div>
+
+  <!-- Tab 列 -->
+  <div class="ck-tab-bar">
+    <button class="ck-tab active" id="ckTab-pending" onclick="ckSwitchTab('pending',this)">⏳ 待審批</button>
+    <button class="ck-tab" id="ckTab-approved" onclick="ckSwitchTab('approved',this)">✅ 已批准</button>
+    <button class="ck-tab" id="ckTab-rejected" onclick="ckSwitchTab('rejected',this)">❌ 已拒絕</button>
+    <button class="ck-tab" id="ckTab-otp" onclick="ckSwitchTab('otp',this)">📱 OTP 管理</button>
+  </div>
+
+  <!-- 待審批 -->
+  <div id="ckPanel-pending" style="max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="font-size:14px;color:#6B7280;">點擊「批准」或「拒絕」處理申請</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadCkAdminData()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckPendingList">載入中…</div>
+  </div>
+
+  <!-- 已批准 -->
+  <div id="ckPanel-approved" style="display:none;max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="font-size:14px;color:#6B7280;">已批准的 CoLinkery 連結者</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadCkApproved()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckApprovedList">載入中…</div>
+  </div>
+
+  <!-- 已拒絕 -->
+  <div id="ckPanel-rejected" style="display:none;max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="font-size:14px;color:#6B7280;">已拒絕的 CoLinkery 申請</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadCkRejected()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckRejectedList">載入中…</div>
+  </div>
+
+  <!-- OTP 管理 -->
+  <div id="ckPanel-otp" style="display:none;max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#374151;">📱 待發 OTP（忘記密碼）</div>
+        <div style="font-size:13px;color:#6B7280;margin-top:2px;">用 WhatsApp 發送 OTP 給申請重設密碼的用戶</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="loadCkAdminData()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckOtpList">載入中…</div>
+  </div>
+</div>
+
 
 <script>
 // ── State ──
@@ -8544,7 +8628,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'CoLeadery / CoLinkery 申請審核'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -8557,12 +8641,204 @@ function switchMod(id){
   if(id==='mod-jobs') loadJobs();
   if(id==='mod-coworkery') cwTab('cw-overview');
   if(id==='mod-revenue') { loadRevApps('PENDING'); loadRevStats(); }
+  if(id==='mod-colinkery-admin') { loadCkAdminData(); }
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
   f.src = '/membership/admin';
   _membershipFrameLoaded = true;
 }
+
+// ══════════════════════════════════════════════════════════
+// ── CoLinkery Admin Tab ──
+// ══════════════════════════════════════════════════════════
+var _ckAllData = { applications: [], pending_otps: [] };
+var _ckCurrentTab = 'pending';
+
+function ckSwitchTab(tab, btnEl) {
+  _ckCurrentTab = tab;
+  document.querySelectorAll('.ck-tab').forEach(function(t){ t.classList.remove('active'); });
+  if(btnEl) btnEl.classList.add('active');
+  ['pending','approved','rejected','otp'].forEach(function(p){
+    document.getElementById('ckPanel-'+p).style.display = p===tab ? '' : 'none';
+  });
+  if(tab==='approved') loadCkApproved();
+  if(tab==='rejected') loadCkRejected();
+}
+
+async function loadCkAdminData() {
+  // 載入待審批 + OTP
+  try {
+    var res = await fetch('/api/admin/colinkery/pending', {credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ document.getElementById('ckPendingList').innerHTML='<p style="color:#c00;">'+d.error+'</p>'; return; }
+    _ckAllData = d;
+    renderCkPending(d.applications||[]);
+    renderCkOtp(d.pending_otps||[]);
+    renderCkStats(d);
+  } catch(e) {
+    document.getElementById('ckPendingList').innerHTML='<p style="color:#c00;">網絡錯誤：'+e.message+'</p>';
+  }
+}
+
+function renderCkStats(d) {
+  var apps = d.applications||[];
+  var otps = d.pending_otps||[];
+  var grid = document.getElementById('ckStatGrid');
+  if(!grid) return;
+  grid.innerHTML =
+    '<div class="ck-stat-card"><div class="ck-stat-num">'+apps.length+'</div><div class="ck-stat-lbl">待審批申請</div></div>' +
+    '<div class="ck-stat-card"><div class="ck-stat-num" style="color:#065F46;">'+otps.length+'</div><div class="ck-stat-lbl">待發 OTP</div></div>' +
+    '<div class="ck-stat-card"><div class="ck-stat-num" id="ckStatApproved" style="color:#6B7280;">–</div><div class="ck-stat-lbl">已批准總數</div></div>';
+  // Lazy load approved count
+  fetch('/api/admin/colinkery/pending?status=APPROVED&count=1', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .catch(function(){ return null; })
+    .then(function(dd){
+      var el = document.getElementById('ckStatApproved');
+      if(el && dd && dd.total_approved !== undefined) el.textContent = dd.total_approved;
+    });
+}
+
+function renderCkPending(apps) {
+  var typeMap = {INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
+  var list = document.getElementById('ckPendingList');
+  if(!list) return;
+  if(apps.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;"><i class="fas fa-check-circle" style="font-size:32px;margin-bottom:12px;display:block;color:#6EE7B7;"></i>目前無待審批申請</div>'; return; }
+  list.innerHTML = apps.map(function(a){
+    var typeLabel = typeMap[a.applicant_type]||a.applicant_type||'–';
+    var dateStr = a.created_at ? a.created_at.slice(0,16) : '–';
+    return '<div class="ck-app-card">' +
+      '<div class="cka-top">' +
+        '<div>' +
+          '<div class="cka-name">'+escHtml(a.name_zh||'')+'</div>' +
+          '<div class="cka-meta">'+escHtml(a.member_no)+' ｜ 電話：'+escHtml(a.phone||'')+'</div>' +
+          '<div style="margin-top:6px;"><span class="ck-type-badge">'+typeLabel+'</span></div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:#9CA3AF;white-space:nowrap;">'+dateStr+'</div>' +
+      '</div>' +
+      (a.notes ? '<div class="cka-notes">'+escHtml(a.notes)+'</div>' : '') +
+      '<div class="ck-actions">' +
+        '<button class="btn-ck-approve" onclick="ckApproveApp('+a.id+')">✅ 批准</button>' +
+        '<button class="btn-ck-reject" onclick="ckRejectApp('+a.id+')">❌ 拒絕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderCkOtp(otps) {
+  var list = document.getElementById('ckOtpList');
+  if(!list) return;
+  if(otps.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;"><i class="fas fa-mobile-alt" style="font-size:32px;margin-bottom:12px;display:block;"></i>目前無待發 OTP</div>'; return; }
+  list.innerHTML = otps.map(function(o){
+    var phoneDigits = (o.phone||'').replace(/\D/g,'');
+    var fullPhone = phoneDigits.startsWith('852') ? phoneDigits : '852'+phoneDigits;
+    var msg = encodeURIComponent('你好'+o.name_zh+'！你的 CoLinkery 密碼重設碼為：'+o.otp_code+'，請於 10 分鐘內使用。');
+    var waLink = 'https://wa.me/'+fullPhone+'?text='+msg;
+    var expiryStr = o.expires_at ? o.expires_at.slice(0,16) : '–';
+    return '<div class="ck-otp-card">' +
+      '<div>' +
+        '<div style="font-size:15px;font-weight:700;color:#0C4A6E;">'+escHtml(o.name_zh||'')+'</div>' +
+        '<div style="font-size:13px;color:#6B7280;">'+escHtml(o.member_no)+' ｜ '+escHtml(o.phone||'')+'</div>' +
+        '<div class="ck-otp-code">'+escHtml(o.otp_code||'')+'</div>' +
+        '<div style="font-size:12px;color:#9CA3AF;">到期：'+expiryStr+'</div>' +
+      '</div>' +
+      '<a href="'+waLink+'" target="_blank" class="btn-ck-wa">💬 WhatsApp 發送</a>' +
+    '</div>';
+  }).join('');
+}
+
+async function loadCkApproved() {
+  var list = document.getElementById('ckApprovedList');
+  if(!list) return;
+  list.innerHTML='<div style="padding:20px;color:#6B7280;text-align:center;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
+  try {
+    var res = await fetch('/api/admin/colinkery/approved', {credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ list.innerHTML='<p style="color:#c00;">'+d.error+'</p>'; return; }
+    var holders = d.holders||[];
+    var typeMap = {INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
+    if(holders.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;">尚無已批准記錄</div>'; return; }
+    list.innerHTML = holders.map(function(h){
+      var typeLabel = typeMap[h.applicant_type]||h.applicant_type||'–';
+      var dateStr = h.approved_at ? h.approved_at.slice(0,10) : (h.updated_at ? h.updated_at.slice(0,10) : '–');
+      var phoneDigits = (h.phone||'').replace(/\D/g,'');
+      var fullPhone = phoneDigits.startsWith('852') ? phoneDigits : '852'+phoneDigits;
+      var waMsg = encodeURIComponent('你好'+h.name_zh+'！你的 CoLinkery 連結者帳戶已批准啟用，可用電話號碼 + 你設定的密碼登入 coeldery85.com/colinkery');
+      var waLink = 'https://wa.me/'+fullPhone+'?text='+waMsg;
+      return '<div class="ck-holder-card">' +
+        '<div>' +
+          '<div style="font-size:16px;font-weight:700;color:#065F46;">'+escHtml(h.name_zh||'')+' <span style="font-size:12px;background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:10px;font-weight:700;">'+escHtml(h.holder_no||'')+'</span></div>' +
+          '<div style="font-size:13px;color:#6B7280;margin-top:3px;">'+escHtml(h.member_no)+' ｜ '+escHtml(h.phone||'')+'</div>' +
+          '<div style="margin-top:4px;"><span class="ck-type-badge">'+typeLabel+'</span></div>' +
+          '<div style="font-size:12px;color:#9CA3AF;margin-top:4px;">批准：'+dateStr+'</div>' +
+        '</div>' +
+        '<a href="'+waLink+'" target="_blank" class="btn-ck-wa" style="font-size:13px;padding:7px 14px;">💬 WA</a>' +
+      '</div>';
+    }).join('');
+  } catch(e) { list.innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
+}
+
+async function loadCkRejected() {
+  var list = document.getElementById('ckRejectedList');
+  if(!list) return;
+  list.innerHTML='<div style="padding:20px;color:#6B7280;text-align:center;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
+  try {
+    var res = await fetch('/api/admin/colinkery/rejected', {credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ list.innerHTML='<p style="color:#c00;">'+d.error+'</p>'; return; }
+    var apps = d.applications||[];
+    if(apps.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;">尚無已拒絕記錄</div>'; return; }
+    var typeMap = {INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
+    list.innerHTML = apps.map(function(a){
+      var typeLabel = typeMap[a.applicant_type]||a.applicant_type||'–';
+      var dateStr = a.updated_at ? a.updated_at.slice(0,10) : '–';
+      return '<div class="ck-app-card" style="border-color:#FCA5A5;opacity:0.9;">' +
+        '<div class="cka-top">' +
+          '<div>' +
+            '<div class="cka-name" style="color:#991B1B;">'+escHtml(a.name_zh||'')+'</div>' +
+            '<div class="cka-meta">'+escHtml(a.member_no)+' ｜ 電話：'+escHtml(a.phone||'')+'</div>' +
+            '<div style="margin-top:6px;"><span class="ck-type-badge" style="background:#FEE2E2;color:#991B1B;">'+typeLabel+'</span></div>' +
+          '</div>' +
+          '<div style="font-size:12px;color:#9CA3AF;white-space:nowrap;">拒絕：'+dateStr+'</div>' +
+        '</div>' +
+        (a.review_notes ? '<div class="cka-notes" style="background:#FFF1F2;">原因：'+escHtml(a.review_notes)+'</div>' : '') +
+      '</div>';
+    }).join('');
+  } catch(e) { list.innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
+}
+
+async function ckApproveApp(id) {
+  if(!confirm('確認批准此 CoLinkery 申請？審批後申請人可立即登入。')) return;
+  try {
+    var res = await fetch('/api/admin/colinkery/approve/'+id, {method:'POST',credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ alert('批准失敗：'+(d.error||'未知錯誤')); return; }
+    // 成功後顯示 WA 通知連結
+    var confirmed = confirm('✅ 已批准！CoLinkery 號碼：'+d.holder_no+'\n\n點擊「確定」用 WhatsApp 通知申請人，或「取消」跳過。');
+    if(confirmed) window.open(d.wa_notify_link,'_blank');
+    loadCkAdminData(); // 刷新列表
+  } catch(e) { alert('網絡錯誤：'+e.message); }
+}
+
+async function ckRejectApp(id) {
+  var reason = prompt('請輸入拒絕原因（會顯示給申請人）：');
+  if(reason===null) return; // 用戶取消
+  try {
+    var res = await fetch('/api/admin/colinkery/reject/'+id, {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({reason: reason})
+    });
+    var d = await res.json();
+    if(!d.ok){ alert('拒絕失敗：'+(d.error||'未知錯誤')); return; }
+    var confirmed = confirm('✅ 已拒絕。\n\n點擊「確定」用 WhatsApp 通知申請人，或「取消」跳過。');
+    if(confirmed) window.open(d.wa_notify_link,'_blank');
+    loadCkAdminData();
+  } catch(e) { alert('網絡錯誤：'+e.message); }
+}
+
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ── Roadshow Tab ──
 function rsTab(name){
@@ -12181,7 +12457,13 @@ input:focus,select:focus,textarea:focus{border-color:#C62828;box-shadow:0 0 0 3p
       </div>
       <div class="s-text" style="font-size:14px;color:#666;line-height:1.7;">審核期間如有疑問，請透過 WhatsApp 聯絡我們。<br>批准後你的工具頁面會立即開通，屆時可用你設定的密碼登入。</div>
       <div id="teamInviteSection"></div>
-      <button onclick="goBack()" style="margin-top:20px;padding:14px 32px;background:#8B0000;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;">\u8fd4\u56de\u6211\u7684\u5361</button>
+      <!-- 再次以不同類型申請 -->
+      <div id="btnApplyAnother" style="display:none;margin-top:16px;padding:14px;background:#F0F4FF;border:1.5px solid #6366F1;border-radius:10px;text-align:left;">
+        <div style="font-size:14px;font-weight:800;color:#3730A3;margin-bottom:6px;">🔁 想以不同方式申請？</div>
+        <div style="font-size:13px;color:#4338CA;margin-bottom:10px;line-height:1.5;">除個人申請外，你可以同時以小組、公司或協會名義再次申請，各申請獨立審核。</div>
+        <button onclick="applyAgain()" style="padding:10px 20px;background:#6366F1;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">➕ 以不同類型再次申請</button>
+      </div>
+      <button onclick="goBack()" style="margin-top:14px;padding:14px 32px;background:#8B0000;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;">返回我的卡</button>
     </div>
   </div>
 
@@ -12998,6 +13280,9 @@ function submitApplication() {
       if (d.invites && d.invites.length > 0) {
         renderTeamInvites(d.invites, selectedRole);
       }
+      // 顯示「以不同類型再次申請」提示
+      var anotherBtn = document.getElementById('btnApplyAnother');
+      if (anotherBtn) anotherBtn.style.display = '';
       document.getElementById('stepSuccess').style.display = '';
     } else {
       btn.disabled = false;
@@ -13089,6 +13374,37 @@ function copyText(btn, text) {
 
 function showWaCopyFallback(el) {
   // WA Business 用戶的備用提示（若 window.open 被攔截，文字區已常態顯示，不需額外操作）
+}
+
+// 再次以不同類型申請（重置 selectedType 返回 Step 4）
+function applyAgain() {
+  // 保留已驗證的 memberNo / selfName / selfPhone / selectedRole
+  // 重置申請類型和 Step 5 欄位
+  selectedType = '';
+  uploadedKey = '';
+  // 清除類型選擇視覺狀態
+  ['Ind','Grp','Co','Assoc'].forEach(function(k) {
+    var el = document.getElementById('type' + k);
+    if (el) { el.classList.remove('selected'); el.querySelector('input').checked = false; }
+  });
+  // 清除 Step 5 欄位
+  ['applyCompanyName','applyCompanyBR','applyAssocName','applyAssocRegNo','applyTeamNotes','applyIndustry'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var tsEl = document.getElementById('applyTeamSize');
+  if (tsEl) tsEl.value = '';
+  var grRows = document.getElementById('groupMemberRows');
+  if (grRows) grRows.innerHTML = '';
+  // 清除 Step 6 聲明
+  var ck = document.getElementById('agreeCheck');
+  if (ck) ck.checked = false;
+  // 隱藏 success，顯示 navBtns
+  document.getElementById('stepSuccess').style.display = 'none';
+  document.getElementById('navBtns').style.display = '';
+  document.getElementById('stepDots').style.display = '';
+  // 跳回 Step 4
+  showStep(4);
 }
 
 function showErr(id, msg) {
@@ -14818,6 +15134,35 @@ body{background:#F0EBD8;font-family:"Noto Serif TC",serif;margin:0;padding:20px 
           await appendHashChain(db, 'CARD_ISSUED', cardRow.id, `${holder_no}|${token}|${expires}`)
         }
       }
+
+      // ── 批准後啟用對應工具帳號 ─────────────────────────────────────────────
+      if (app_.role === 'COLINKERY') {
+        // CoLinkery：把 password_hash_pending 複製到 password_hash，並啟用帳號
+        const pwdHashPending = app_.password_hash_pending
+        if (pwdHashPending) {
+          await db.prepare(`
+            UPDATE members SET password_hash=?, colinkery_account_status='active'
+            WHERE member_no=?
+          `).bind(pwdHashPending, app_.member_no).run()
+        } else {
+          // 沒有密碼（舊申請），只啟用帳號狀態
+          await db.prepare(`
+            UPDATE members SET colinkery_account_status='active'
+            WHERE member_no=?
+          `).bind(app_.member_no).run()
+        }
+      } else if (app_.role === 'COLEADERY') {
+        // CoLeadery：啟用 coleadery_account_status（若欄位存在）；同時把密碼存入 members
+        const pwdHashPending = app_.password_hash_pending
+        if (pwdHashPending) {
+          await db.prepare(`
+            UPDATE members SET coleadery_password_hash=?
+            WHERE member_no=?
+          `).bind(pwdHashPending, app_.member_no).run().catch(() => {
+            // 欄位不存在時靜默忽略
+          })
+        }
+      }
     }
     return c.json({ ok: true, holder_no })
     } catch (err: any) {
@@ -15823,6 +16168,43 @@ app.post('/api/admin/colinkery/reject/:id', async (c) => {
   const waLink = `https://wa.me/${fullPhone}?text=${waMsg}`
 
   return c.json({ ok: true, wa_notify_link: waLink })
+})
+
+// ─── Admin CoLinkery：已批准列表 ──────────────────────────────────────────────
+app.get('/api/admin/colinkery/approved', async (c) => {
+  const token = getSessionToken(c)
+  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
+  const db = c.env.DB
+
+  const holders = await db.prepare(`
+    SELECT rh.member_no, rh.holder_no, rh.applicant_type, rh.updated_at AS approved_at,
+           m.phone, m.name_zh
+    FROM role_holders rh
+    JOIN members m ON m.member_no = rh.member_no
+    WHERE rh.role='COLINKERY' AND rh.status='ACTIVE'
+    ORDER BY rh.updated_at DESC
+  `).all()
+
+  return c.json({ ok: true, holders: holders.results })
+})
+
+// ─── Admin CoLinkery：已拒絕列表 ──────────────────────────────────────────────
+app.get('/api/admin/colinkery/rejected', async (c) => {
+  const token = getSessionToken(c)
+  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
+  const db = c.env.DB
+
+  const apps = await db.prepare(`
+    SELECT ra.id, ra.member_no, ra.applicant_type, ra.name_zh, ra.review_notes, ra.updated_at,
+           m.phone
+    FROM role_applications ra
+    JOIN members m ON m.member_no = ra.member_no
+    WHERE ra.role='COLINKERY' AND ra.status='REJECTED'
+    ORDER BY ra.updated_at DESC
+    LIMIT 50
+  `).all()
+
+  return c.json({ ok: true, applications: apps.results })
 })
 
 // ─── CoLinkery PWA 靜態資源 ───────────────────────────────────────────────────
