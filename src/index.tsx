@@ -16126,9 +16126,9 @@ app.post('/api/admin/colinkery/approve/:id', async (c) => {
 
   // 批次操作
   await db.batch([
-    db.prepare(`UPDATE role_applications SET status='APPROVED', updated_at=datetime('now') WHERE id=?`).bind(appId),
+    db.prepare(`UPDATE role_applications SET status='APPROVED', reviewed_at=datetime('now') WHERE id=?`).bind(appId),
     db.prepare(`UPDATE members SET password_hash=?, colinkery_account_status='active' WHERE member_no=?`).bind(appRow.password_hash_pending, appRow.member_no),
-    db.prepare(`INSERT OR IGNORE INTO role_holders (member_no, role, applicant_type, holder_no, status) VALUES (?,?,?,?,'ACTIVE')`).bind(appRow.member_no, 'COLINKERY', appRow.applicant_type, holderNo),
+    db.prepare(`INSERT OR IGNORE INTO role_holders (member_no, role, applicant_type, holder_no, name_zh, status) VALUES (?,?,?,?,?,'ACTIVE')`).bind(appRow.member_no, 'COLINKERY', appRow.applicant_type, holderNo, appRow.name_zh || ''),
     db.prepare(`INSERT INTO b2b_audit_log (action, old_value, new_value, actor) VALUES ('approve_colinkery',?,?,?)`).bind(appRow.member_no, holderNo, 'admin')
   ])
 
@@ -16154,7 +16154,7 @@ app.post('/api/admin/colinkery/reject/:id', async (c) => {
   if (!appRow) return c.json({ ok: false, error: '申請不存在' }, 404)
 
   await db.batch([
-    db.prepare(`UPDATE role_applications SET status='REJECTED', review_notes=?, updated_at=datetime('now') WHERE id=?`).bind(reason || '', appId),
+    db.prepare(`UPDATE role_applications SET status='REJECTED', review_notes=?, reviewed_at=datetime('now') WHERE id=?`).bind(reason || '', appId),
     db.prepare(`UPDATE members SET colinkery_account_status='none' WHERE member_no=?`).bind(appRow.member_no),
     db.prepare(`INSERT INTO b2b_audit_log (action, old_value, new_value, actor) VALUES ('reject_colinkery',?,'REJECTED',?)`).bind(appRow.member_no, 'admin')
   ])
@@ -16175,12 +16175,12 @@ app.get('/api/admin/colinkery/approved', async (c) => {
   const db = c.env.DB
 
   const holders = await db.prepare(`
-    SELECT rh.member_no, rh.holder_no, rh.applicant_type, rh.updated_at AS approved_at,
+    SELECT rh.member_no, rh.holder_no, rh.applicant_type, rh.created_at AS approved_at,
            m.phone, m.name_zh
     FROM role_holders rh
     JOIN members m ON m.member_no = rh.member_no
     WHERE rh.role='COLINKERY' AND rh.status='ACTIVE'
-    ORDER BY rh.updated_at DESC
+    ORDER BY rh.created_at DESC
   `).all()
 
   return c.json({ ok: true, holders: holders.results })
@@ -16193,12 +16193,12 @@ app.get('/api/admin/colinkery/rejected', async (c) => {
   const db = c.env.DB
 
   const apps = await db.prepare(`
-    SELECT ra.id, ra.member_no, ra.applicant_type, ra.name_zh, ra.review_notes, ra.updated_at,
+    SELECT ra.id, ra.member_no, ra.applicant_type, ra.name_zh, ra.review_notes, ra.reviewed_at AS updated_at,
            m.phone
     FROM role_applications ra
     JOIN members m ON m.member_no = ra.member_no
     WHERE ra.role='COLINKERY' AND ra.status='REJECTED'
-    ORDER BY ra.updated_at DESC
+    ORDER BY ra.reviewed_at DESC
     LIMIT 50
   `).all()
 
