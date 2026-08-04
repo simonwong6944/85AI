@@ -11489,7 +11489,7 @@ function setupPartnerBtns(memberNo, phone, clStatus, ckStatus) {
       bpa.style.opacity = '0.85';
       bpa.style.background = 'linear-gradient(135deg,#78350F,#B45309)';
       bpa.addEventListener('click', function() {
-        if (confirm('⏳ 你的 CoLeadery 申請正在審核中（預計 3–5 個工作天）。\n\n如想以【不同申請類型】再申請（例如：個人 → 小組），請按「確定」前往。\n按「取消」留在此頁。')) {
+        if (confirm('⏳ CoLeadery 申請審核中（3-5 工作天）。如想以不同類型再申請（如：個人→小組），請按確定前往申請頁。')) {
           window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLEADERY';
         }
       });
@@ -11516,7 +11516,7 @@ function setupPartnerBtns(memberNo, phone, clStatus, ckStatus) {
       bcl.style.opacity = '0.85';
       bcl.style.background = 'linear-gradient(135deg,#0A2F6F,#1A4BA0)';
       bcl.addEventListener('click', function() {
-        if (confirm('⏳ 你的 CoLinkery 申請正在審核中（預計 3–5 個工作天）。\n\n如想以【不同申請類型】再申請（例如：個人 → 公司），請按「確定」前往。\n按「取消」留在此頁。')) {
+        if (confirm('⏳ CoLinkery 申請審核中（3-5 工作天）。如想以不同類型再申請（如：個人→公司），請按確定前往申請頁。')) {
           window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLINKERY';
         }
       });
