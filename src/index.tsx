@@ -11505,7 +11505,7 @@ function setupPartnerBtns(memberNo, phone, clStatus, ckStatus) {
       bcl.querySelector('div:last-child').textContent = '連結者｜進入工具 →';
       bcl.style.background = 'linear-gradient(135deg,#0D47A1,#1565C0)';
       bcl.addEventListener('click', function() {
-        window.location.href = '/colinkery/';
+        window.location.href = '/colinkery/' + (phone ? '?phone=' + encodeURIComponent(phone) : '');
       });
     } else if (ckStatus === 'PENDING') {
       // 待審核：顯示狀態，仍可用其他類型申請
@@ -16633,6 +16633,7 @@ var STATE = {
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function showLoading(txt){ document.getElementById('loading-overlay').style.display='flex'; document.getElementById('loading-text').textContent=txt||'載入中…'; }
 function hideLoading(){ document.getElementById('loading-overlay').style.display='none'; }
+function goApply(){ window.location.href='/app/partner-apply?role=COLINKERY'; }
 
 function showPage(id){
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
@@ -16686,6 +16687,13 @@ function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.disp
       var applyUrl = '/app/partner-apply?role=COLINKERY';
       if(prefillPhone) applyUrl += '&phone=' + encodeURIComponent(prefillPhone);
       window.location.href = applyUrl;
+    } else if(prefillPhone){
+      // 從 /app 帶過來的電話號碼：自動填入登入表格
+      var loginPhoneEl = document.getElementById('login-phone');
+      if(loginPhoneEl) loginPhoneEl.value = prefillPhone;
+      // 聚焦到密碼欄位，讓用戶直接輸入密碼
+      var loginPwEl = document.getElementById('login-pw');
+      if(loginPwEl) loginPwEl.focus();
     }
   }
   // Register service worker
@@ -16831,7 +16839,7 @@ async function checkStatus(){
         html += '<div style="margin-top:8px;font-size:14px;color:var(--muted);">申請身份：'+esc(d.application.applicant_type)+'</div>';
         if(d.application.status==='REJECTED'&&d.application.review_notes){
           html += '<div class="alert alert-red" style="margin-top:8px;">拒絕原因：'+esc(d.application.review_notes)+'</div>';
-          html += '<button class="btn-secondary" onclick="window.location.href=\'/app/partner-apply?role=COLINKERY\'" style="margin-top:8px;">重新申請</button>';
+          html += '<button class="btn-secondary" onclick="goApply()" style="margin-top:8px;">重新申請</button>';
         }
       }
       html += '</div>';
