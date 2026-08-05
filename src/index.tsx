@@ -16846,6 +16846,7 @@ document.addEventListener('DOMContentLoaded', function(){
     window.location.href = applyUrl;
   } else if(prefillPhone){
     // Pre-fill phone from /app navigation — DOM is ready here
+    showPage('page-login');
     var loginPhoneEl = document.getElementById('login-phone');
     if(loginPhoneEl){
       loginPhoneEl.value = prefillPhone;
@@ -16855,6 +16856,9 @@ document.addEventListener('DOMContentLoaded', function(){
         if(pw) pw.focus();
       }, 300);
     }
+  } else {
+    // No session, no params — show login page
+    showPage('page-login');
   }
 });
 
