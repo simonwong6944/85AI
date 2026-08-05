@@ -15899,10 +15899,10 @@ app.post('/api/colinkery/login', async (c) => {
   if (!valid) return c.json({ ok: false, error: '電話或密碼不正確' }, 401)
 
   const token = makeCsrpnToken(32)
-  const expiresAt = sessionExpiry(12)
+  const expiresAt = sessionExpiry(30 * 24)  // 30-day persistent session
   await db.prepare(`INSERT INTO colinkery_sessions (token, member_no, expires_at) VALUES (?,?,?)`).bind(token, member.member_no, expiresAt).run()
 
-  setCookie(c, 'colinkery_session', token, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 12 * 3600 })
+  setCookie(c, 'colinkery_session', token, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 30 * 24 * 3600 })
   return c.json({ ok: true, member_no: member.member_no, name_zh: member.name_zh })
 })
 
@@ -15977,6 +15977,33 @@ app.post('/api/colinkery/reset-password', async (c) => {
   return c.json({ ok: true, message: '密碼已更新，請用新密碼登入' })
 })
 
+// ─── OCR API Key Debug (admin only — checks if key works with a simple text request) ───
+app.get('/api/colinkery/ocr-test', requireColinkery(), async (c) => {
+  const apiKey = c.env.OPENROUTER_API_KEY
+  if (!apiKey) return c.json({ ok: false, error: 'OPENROUTER_API_KEY not set in env' })
+  const keyPrefix = apiKey.substring(0, 20) + '...'
+  try {
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'X-Title': 'CoLinkery OCR Test',
+        'HTTP-Referer': 'https://coeldery85.com'
+      },
+      body: JSON.stringify({
+        model: 'nvidia/nemotron-nano-12b-v2-vl:free',
+        max_tokens: 20,
+        messages: [{ role: 'user', content: 'Say "OK" only.' }]
+      })
+    })
+    const data = await resp.json() as any
+    return c.json({ ok: true, key_prefix: keyPrefix, http_status: resp.status, response: data })
+  } catch(err: any) {
+    return c.json({ ok: false, key_prefix: keyPrefix, error: err?.message })
+  }
+})
+
 // ─── 名片 OCR ─────────────────────────────────────────────────────────────────
 app.post('/api/colinkery/cards/ocr', requireColinkery(), async (c) => {
   const db = c.env.DB
@@ -16019,8 +16046,11 @@ Rules: use empty string "" for any missing field. Combine multiple phones if nee
 
   const models = [
     'nvidia/nemotron-nano-12b-v2-vl:free',
-    'google/gemma-3-27b-it:free'
+    'google/gemma-3-27b-it:free',
+    'meta-llama/llama-4-scout:free'
   ]
+
+  const debugLog: string[] = []
 
   for (const model of models) {
     try {
@@ -16041,7 +16071,10 @@ Rules: use empty string "" for any missing field. Combine multiple phones if nee
           ]}]
         })
       })
+      const httpStatus = resp.status
       const data = await resp.json() as any
+      // Log for debug
+      debugLog.push(`${model}: HTTP ${httpStatus}, error=${JSON.stringify(data?.error)}, choices=${data?.choices?.length}`)
       // Check for API-level error (rate limit, model unavailable etc.)
       if (data?.error) continue
       const raw = data?.choices?.[0]?.message?.content || ''
@@ -16049,16 +16082,20 @@ Rules: use empty string "" for any missing field. Combine multiple phones if nee
       // Strip markdown code fences if model wraps output
       const cleaned = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim()
       const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) continue
+      if (!jsonMatch) {
+        // Model returned text but not JSON — still save the raw text for manual entry assistance
+        debugLog.push(`${model}: no JSON in response, raw="${raw.substring(0,100)}"`)
+        continue
+      }
       const parsed = JSON.parse(jsonMatch[0])
       return c.json({ ok: true, r2_key: r2Key, parsed, ocr_raw: raw, ocr_model: model })
-    } catch {
-      // Try next model
+    } catch(err: any) {
+      debugLog.push(`${model}: exception ${err?.message || String(err)}`)
       continue
     }
   }
-  // All models failed
-  return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
+  // All models failed — return debug info so frontend can show useful error
+  return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {}, debug: debugLog })
 })
 
 // ─── 名片 CRUD ────────────────────────────────────────────────────────────────
@@ -16641,6 +16678,7 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
       <div id="card-form" style="display:none;">
         <div class="alert alert-green" id="ocr-ok-msg" style="display:none;">✅ AI 已自動讀取，請確認資料</div>
         <div class="alert alert-yellow" id="ocr-fail-msg" style="display:none;">⚠️ AI 未能讀取，請手動填入名片資料</div>
+        <div id="ocr-debug-msg" style="display:none;font-size:12px;color:#999;padding:4px 0;word-break:break-all;"></div>
         <div class="cl-card" style="margin:0 0 12px;">
           <img id="captured-preview" style="width:100%;border-radius:8px;margin-bottom:12px;max-height:200px;object-fit:contain;" src="" alt="名片預覽">
         </div>
@@ -16807,14 +16845,23 @@ function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.disp
 
 // ── 初始化：檢查登入狀態 ────────────────────────────────────────────────────
 (function init(){
-  var saved = sessionStorage.getItem('cl_member');
+  // 1. Try localStorage persistent session (survives tab close & PWA restart)
+  var saved = localStorage.getItem('cl_member');
+  // 2. Fallback: legacy sessionStorage (old sessions before this update)
+  if(!saved) saved = sessionStorage.getItem('cl_member');
   if(saved){
     try{
       var d = JSON.parse(saved);
       STATE.memberNo = d.member_no;
       STATE.nameZh = d.name_zh;
+      // Migrate to localStorage if still in sessionStorage
+      localStorage.setItem('cl_member', JSON.stringify(d));
+      sessionStorage.removeItem('cl_member');
       afterLogin();
-    } catch(e){ sessionStorage.removeItem('cl_member'); }
+    } catch(e){
+      localStorage.removeItem('cl_member');
+      sessionStorage.removeItem('cl_member');
+    }
   } else {
     // 從會員卡跳過來：?action=apply&phone=xxxxxxxx → 直接跳轉新申請頁
     var params = new URLSearchParams(window.location.search);
@@ -16824,13 +16871,19 @@ function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.disp
       var applyUrl = '/app/partner-apply?role=COLINKERY';
       if(prefillPhone) applyUrl += '&phone=' + encodeURIComponent(prefillPhone);
       window.location.href = applyUrl;
-    } else if(prefillPhone){
-      // 從 /app 帶過來的電話號碼：自動填入登入表格
+    } else {
+      // Pre-fill phone: URL param takes priority, then saved phone
+      var savedPhone = localStorage.getItem('cl_saved_phone') || '';
       var loginPhoneEl = document.getElementById('login-phone');
-      if(loginPhoneEl) loginPhoneEl.value = prefillPhone;
-      // 聚焦到密碼欄位，讓用戶直接輸入密碼
-      var loginPwEl = document.getElementById('login-pw');
-      if(loginPwEl) loginPwEl.focus();
+      if(prefillPhone){
+        if(loginPhoneEl) loginPhoneEl.value = prefillPhone;
+      } else if(savedPhone && loginPhoneEl){
+        loginPhoneEl.value = savedPhone;
+      }
+      if(prefillPhone || savedPhone){
+        var loginPwEl = document.getElementById('login-pw');
+        if(loginPwEl) loginPwEl.focus();
+      }
     }
   }
   // Register service worker
@@ -16868,6 +16921,29 @@ function triggerInstall(){
   }
 }
 
+// ── 登出 ──────────────────────────────────────────────────────────────────────
+async function doClLogout(){
+  if(!confirm('確認登出？')) return;
+  // Clear local state
+  localStorage.removeItem('cl_member');
+  sessionStorage.removeItem('cl_member');
+  STATE.memberNo = null;
+  STATE.nameZh = null;
+  // Call server to invalidate cookie
+  try{ await fetch('/api/colinkery/logout',{method:'POST',credentials:'include'}); } catch(e){}
+  // Reset UI
+  document.getElementById('bottom-nav').style.display = 'none';
+  showPage('page-login');
+  // Keep phone pre-filled for convenience
+  var savedPhone = localStorage.getItem('cl_saved_phone') || '';
+  if(savedPhone){
+    var el = document.getElementById('login-phone');
+    if(el) el.value = savedPhone;
+    var pwEl = document.getElementById('login-pw');
+    if(pwEl){ pwEl.value=''; pwEl.focus(); }
+  }
+}
+
 // ── 登入 ──────────────────────────────────────────────────────────────────────
 async function doLogin(){
   var phone = document.getElementById('login-phone').value.trim();
@@ -16882,7 +16958,10 @@ async function doLogin(){
     if(!d.ok){ showAlert('login-err', d.error||'登入失敗'); return; }
     STATE.memberNo = d.member_no;
     STATE.nameZh = d.name_zh;
-    sessionStorage.setItem('cl_member', JSON.stringify({member_no:d.member_no,name_zh:d.name_zh}));
+    // Persist session in localStorage (survives tab close & PWA restart)
+    localStorage.setItem('cl_member', JSON.stringify({member_no:d.member_no,name_zh:d.name_zh}));
+    // Remember phone for next login
+    localStorage.setItem('cl_saved_phone', phone);
     afterLogin();
   } catch(e){ hideLoading(); showAlert('login-err','網絡錯誤，請稍後再試'); }
 }
@@ -17195,10 +17274,14 @@ async function processImageBlob(blob, name, type){
       r2Key = d.r2_key || '';
       parsed = d.parsed || {};
       if(!d.ocr_failed && Object.keys(parsed).length > 0){
-        showAlert('ocr-ok-msg','','green');
         document.getElementById('ocr-ok-msg').style.display='block';
       } else {
         document.getElementById('ocr-fail-msg').style.display='block';
+        // Show debug info if available (helps diagnose API issues)
+        if(d.debug && d.debug.length){
+          var dbgEl = document.getElementById('ocr-debug-msg');
+          if(dbgEl){ dbgEl.textContent = d.debug.join(' | '); dbgEl.style.display='block'; }
+        }
       }
     } else {
       document.getElementById('ocr-fail-msg').style.display='block';
@@ -17522,92 +17605,155 @@ ${adminColinkerySectionHtml()}
 // ─── B2B 採購目錄頁 ─────────────────────────────────────────────────────────
 app.get('/b2b', (c) => {
   const ref = c.req.query('ref') || ''
-  const token = c.req.query('token') || ''
+  const waMsg = encodeURIComponent('你好！我想了解 CoEldery 85 企業採購平台' + (ref ? '（由連結者 ' + ref + ' 介紹）' : '') + '，請問可以提供更多資料嗎？')
   return c.html(`<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>CoEldery 85 老有聯盟 · 企業採購平台</title>
+<meta name="description" content="CoEldery 85 老有聯盟 B2B 採購平台。一站式社企採購，85% 回流長者社群，可提供 ESG 報告。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:#F0EBD8;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-size:18px;color:#111;min-height:100vh;}
+body{background:#F0EBD8;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-size:16px;color:#111;min-height:100vh;}
 .topbar{background:#1a6b1a;color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;}
 .topbar img{width:40px;height:40px;border-radius:8px;}
-.topbar .brand{font-size:20px;font-weight:900;letter-spacing:1px;}
-.topbar .sub{font-size:15px;opacity:.8;margin-top:2px;}
-.wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px;}
-.hero{background:#fff;border-radius:14px;padding:28px 22px;margin-bottom:20px;box-shadow:0 4px 16px rgba(0,0,0,.08);text-align:center;}
-.hero h1{font-size:26px;font-weight:900;color:#1a6b1a;margin-bottom:10px;line-height:1.3;}
-.hero p{font-size:18px;color:#444;line-height:1.7;margin-bottom:16px;}
-.badge{display:inline-block;background:#e8f5e9;color:#1a6b1a;font-size:15px;font-weight:700;padding:6px 14px;border-radius:20px;margin:4px;}
-.section{background:#fff;border-radius:14px;padding:22px 18px;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
-.section h2{font-size:20px;font-weight:900;color:#1a6b1a;margin-bottom:14px;}
-.feature-item{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;}
-.feature-icon{font-size:28px;flex-shrink:0;margin-top:2px;}
-.feature-text h3{font-size:18px;font-weight:700;color:#222;margin-bottom:4px;}
-.feature-text p{font-size:16px;color:#555;line-height:1.6;}
-.cta-btn{display:block;width:100%;padding:18px;background:#228B22;color:#fff;border:none;border-radius:10px;
-  font-size:20px;font-weight:900;cursor:pointer;text-align:center;text-decoration:none;
-  letter-spacing:1px;margin-top:8px;transition:background .15s;}
-.cta-btn:active{background:#1a6b1a;}
-.ref-badge{background:#f1f8e9;border:1.5px solid #a5d6a7;border-radius:8px;padding:10px 14px;
-  font-size:15px;color:#388e3c;margin-bottom:20px;text-align:center;}
-.footer{text-align:center;color:#888;font-size:14px;margin-top:32px;padding-top:16px;border-top:1px solid #e0e0e0;}
+.topbar-brand{font-size:19px;font-weight:900;letter-spacing:.5px;}
+.topbar-sub{font-size:13px;opacity:.8;margin-top:2px;}
+.wrap{max-width:640px;margin:0 auto;padding:20px 16px 80px;}
+.ref-bar{background:#e8f5e9;border-left:4px solid #2e7d32;border-radius:8px;padding:10px 14px;font-size:14px;color:#1b5e20;margin-bottom:16px;font-weight:500;}
+.hero{background:#fff;border-radius:14px;padding:24px 20px;margin-bottom:16px;box-shadow:0 4px 16px rgba(0,0,0,.07);text-align:center;}
+.hero h1{font-size:24px;font-weight:900;color:#1a6b1a;margin-bottom:8px;line-height:1.35;}
+.hero p{font-size:15px;color:#444;line-height:1.75;margin-bottom:14px;}
+.badge{display:inline-block;background:#e8f5e9;color:#1a6b1a;font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;margin:3px;}
+.card{background:#fff;border-radius:14px;padding:20px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
+.card h2{font-size:17px;font-weight:900;color:#1a6b1a;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+/* Product card */
+.product{border:1px solid #e8f5e9;border-radius:12px;padding:16px;margin-bottom:12px;background:#fafff8;}
+.product-name{font-size:17px;font-weight:900;color:#1b5e20;margin-bottom:4px;}
+.product-name-en{font-size:13px;color:#666;margin-bottom:10px;}
+.product-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.product-tag{background:#e8f5e9;color:#2e7d32;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;}
+.product-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:#555;margin-bottom:6px;}
+.product-row strong{color:#1b5e20;}
+.product-moq{font-size:13px;color:#888;background:#f5f5f5;padding:6px 10px;border-radius:8px;margin-top:8px;}
+.product-note{font-size:13px;color:#e65100;font-weight:700;margin-top:6px;}
+/* ESG section */
+.esg-row{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;}
+.esg-icon{font-size:26px;flex-shrink:0;}
+.esg-text h3{font-size:15px;font-weight:700;color:#222;margin-bottom:3px;}
+.esg-text p{font-size:14px;color:#555;line-height:1.6;}
+/* CTA */
+.cta{display:block;width:100%;padding:16px;background:#228B22;color:#fff;border:none;border-radius:12px;
+  font-size:18px;font-weight:900;cursor:pointer;text-align:center;text-decoration:none;
+  letter-spacing:.5px;margin-top:10px;transition:background .15s;}
+.cta:active,.cta:hover{background:#1a6b1a;}
+.cta-wa{background:#25D366;}
+.cta-wa:active,.cta-wa:hover{background:#1da851;}
+/* How it works */
+.step{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px;}
+.step-num{min-width:32px;height:32px;background:#1a6b1a;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;flex-shrink:0;}
+.step-body h3{font-size:15px;font-weight:700;color:#222;margin-bottom:3px;}
+.step-body p{font-size:14px;color:#555;line-height:1.6;}
+.footer{text-align:center;color:#999;font-size:13px;margin-top:24px;padding-top:16px;border-top:1px solid #ddd;}
 </style>
 </head>
 <body>
 <div class="topbar">
   <img src="/icon-192.png" alt="CoEldery 85">
   <div>
-    <div class="brand">CoEldery 85 老有聯盟</div>
-    <div class="sub">企業採購平台</div>
+    <div class="topbar-brand">CoEldery 85 老有聯盟</div>
+    <div class="topbar-sub">企業社責採購平台</div>
   </div>
 </div>
 <div class="wrap">
-  ${ref ? `<div class="ref-badge">🤝 由老有聯盟連結者為您介紹</div>` : ''}
+  ${ref ? `<div class="ref-bar">🤝 由連結者 <strong>${ref}</strong> 為您介紹</div>` : ''}
+
   <div class="hero">
-    <div style="font-size:48px;margin-bottom:12px;">🏢</div>
-    <h1>讓退休長者智慧<br>助力您的企業</h1>
-    <p>CoEldery 85 老有聯盟是香港首個以退休長者為核心的企業採購及 B2B 平台，連結有豐富行業經驗的長者與需要採購的企業。</p>
-    <span class="badge">🌟 誠信推介</span>
-    <span class="badge">💼 行業經驗</span>
-    <span class="badge">🤝 雙贏合作</span>
+    <div style="font-size:44px;margin-bottom:10px;">🌿</div>
+    <h1>一份採購，直接支持<br>香港長者社群</h1>
+    <p>CoEldery 85 老有聯盟是香港社企採購平台。每筆訂單 <strong>85% 收益</strong>回流長者社群，同時為貴司提供 ESG 採購數據。</p>
+    <span class="badge">🌟 社企認證</span>
+    <span class="badge">📊 ESG 報告</span>
+    <span class="badge">🤝 零風險合作</span>
+    <span class="badge">🇭🇰 香港製造</span>
   </div>
-  <div class="section">
-    <h2>✅ 我們提供什麼？</h2>
-    <div class="feature-item">
-      <div class="feature-icon">🔍</div>
-      <div class="feature-text">
-        <h3>精準企業配對</h3>
-        <p>由具行業背景的長者連結者親身推介，比廣告更可信。</p>
+
+  <!-- Product Catalogue -->
+  <div class="card">
+    <h2>📦 採購目錄</h2>
+
+    <!-- Product 1: 竹漿紙巾 -->
+    <div class="product">
+      <div class="product-name">竹漿紙巾（廁紙）</div>
+      <div class="product-name-en">Bamboo Pulp Toilet Paper</div>
+      <div class="product-tags">
+        <span class="product-tag">🌿 環保認證</span>
+        <span class="product-tag">🌿 無添加</span>
+        <span class="product-tag">🌿 社企支持</span>
+        <span class="product-tag">🌿 低碳生產</span>
       </div>
+      <div class="product-row"><span>規格</span><strong>每包 20 卷 · 3 層竹漿</strong></div>
+      <div class="product-row"><span>交貨期</span><strong>下單後 7 個工作天</strong></div>
+      <div class="product-row"><span>產地</span><strong>香港社企生產</strong></div>
+      <div class="product-moq">📦 起訂量及批發報價：WhatsApp 查詢（視乎訂量提供階梯式折扣）</div>
+      <div class="product-note">✅ 適合寫字樓、酒店、餐廳、物業管理等大量消耗場所</div>
     </div>
-    <div class="feature-item">
-      <div class="feature-icon">🤲</div>
-      <div class="feature-text">
-        <h3>長者智慧增值</h3>
-        <p>每位連結者均有數十年業界經驗，了解您的業務需求。</p>
-      </div>
-    </div>
-    <div class="feature-item">
-      <div class="feature-icon">📊</div>
-      <div class="feature-text">
-        <h3>透明佣金制度</h3>
-        <p>成交後才支付固定佣金，無前期費用，零風險合作。</p>
-      </div>
+
+    <div style="background:#f8fdf8;border-radius:10px;padding:14px;font-size:14px;color:#555;text-align:center;margin-top:4px;">
+      📋 更多產品陸續上架 · 如有特定採購需要歡迎查詢
     </div>
   </div>
-  <div class="section">
-    <h2>📞 立即聯絡我們</h2>
-    <p style="margin-bottom:16px;color:#444;line-height:1.7;">如有企業採購需要，歡迎透過 WhatsApp 聯絡我們的團隊，我們將安排連結者與您跟進。</p>
-    <a class="cta-btn" href="https://wa.me/85200000000?text=${encodeURIComponent('你好！我想了解 CoEldery 85 企業採購平台' + (ref ? '（由 ' + ref + ' 介紹）' : ''))}" target="_blank">
-      💬 WhatsApp 聯絡我們
+
+  <!-- ESG Value -->
+  <div class="card">
+    <h2>📊 為何選擇我們？</h2>
+    <div class="esg-row">
+      <div class="esg-icon">🌿</div>
+      <div class="esg-text"><h3>ESG 採購報告</h3><p>每筆訂單自動生成 ESG 社會效益報告，可直接用於企業年報及 ESG 披露。</p></div>
+    </div>
+    <div class="esg-row">
+      <div class="esg-icon">👴</div>
+      <div class="esg-text"><h3>85% 回流長者社群</h3><p>收益直接支持香港退休長者社群的培訓、就業及社區活動。</p></div>
+    </div>
+    <div class="esg-row">
+      <div class="esg-icon">💼</div>
+      <div class="esg-text"><h3>誠信推介 · 零廣告費</h3><p>由具行業背景的長者連結者親身推介，成交後才計佣金，零前期費用。</p></div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="card">
+    <h2>🔄 採購流程</h2>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body"><h3>WhatsApp 查詢</h3><p>告知採購需求及數量，我們即日回覆報價。</p></div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body"><h3>確認訂單</h3><p>確認規格及交貨安排，系統自動生成採購單及 ESG 證明。</p></div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body"><h3>送貨上門</h3><p>下單後 7 個工作天內送達，港九新界均可安排。</p></div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="card">
+    <h2>📞 立即查詢採購報價</h2>
+    <p style="font-size:14px;color:#555;line-height:1.7;margin-bottom:14px;">WhatsApp 我們的採購團隊，告知您的採購需求，即日提供報價單。</p>
+    <a class="cta cta-wa" href="https://wa.me/85254429749?text=${waMsg}" target="_blank">
+      💬 WhatsApp 查詢報價
     </a>
+    <p style="font-size:13px;color:#888;text-align:center;margin-top:10px;">WhatsApp：5442-9749 · 辦公時間回覆</p>
   </div>
+
   <div class="footer">
-    <p>CoEldery 85 老有聯盟</p>
-    <p style="margin-top:4px;"><a href="https://coeldery85.com" style="color:#1a6b1a;">coeldery85.com</a></p>
+    <p>CoEldery 85 老有聯盟 · 香港社企採購平台</p>
+    <p style="margin-top:4px;"><a href="https://coeldery85.com" style="color:#1a6b1a;">coeldery85.com</a> · <a href="https://coeldery85.org" style="color:#1a6b1a;">coeldery85.org</a></p>
   </div>
 </div>
 </body>
