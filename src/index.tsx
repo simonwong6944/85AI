@@ -16943,7 +16943,7 @@ async function doForgotStep2(){
 async function loadStats(){
   if(!STATE.memberNo) return;
   try{
-    var res = await fetch('/api/colinkery/stats');
+    var res = await fetch('/api/colinkery/stats', { credentials: 'include' });
     var d = await res.json();
     if(d.ok){
       document.getElementById('stat-leads').textContent = d.total_leads;
@@ -17001,7 +17001,7 @@ async function processImageBlob(blob, name, type){
   var r2Key = '';
   var parsed = {};
   try{
-    var res = await fetch('/api/colinkery/cards/ocr',{method:'POST',body:fd});
+    var res = await fetch('/api/colinkery/cards/ocr',{method:'POST',body:fd,credentials:'include'});
     var d = await res.json();
     if(d.ok){
       r2Key = d.r2_key || '';
@@ -17051,7 +17051,7 @@ async function saveCardOnly(){
   if(!data.company){ showAlert('card-save-err','請填寫公司名稱'); return; }
   showLoading('儲存名片中…');
   try{
-    var res = await fetch('/api/colinkery/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    var res = await fetch('/api/colinkery/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'include'});
     var d = await res.json();
     hideLoading();
     if(!d.ok){ showAlert('card-save-err',d.error||'儲存失敗'); return; }
@@ -17065,11 +17065,11 @@ async function saveCardAndHandover(){
   showLoading('儲存並交棒中…');
   try{
     // 先存名片
-    var r1 = await fetch('/api/colinkery/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    var r1 = await fetch('/api/colinkery/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'include'});
     var d1 = await r1.json();
     if(!d1.ok){ hideLoading(); showAlert('card-save-err',d1.error||'儲存失敗'); return; }
     // 交棒
-    var r2 = await fetch('/api/colinkery/handover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:d1.card_id})});
+    var r2 = await fetch('/api/colinkery/handover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:d1.card_id}),credentials:'include'});
     var d2 = await r2.json();
     hideLoading();
     if(!d2.ok){ showAlert('card-save-err',d2.error||'交棒失敗'); return; }
@@ -17087,7 +17087,7 @@ async function loadCards(){
   showLoading('載入名片庫…');
   try{
     var url = '/api/colinkery/cards' + (q ? '?q='+encodeURIComponent(q) : '');
-    var res = await fetch(url);
+    var res = await fetch(url, { credentials: 'include' });
     var d = await res.json();
     hideLoading();
     STATE.allCards = d.cards || [];
@@ -17138,7 +17138,7 @@ async function handoverFromDetail(){
   closeCardDetail();
   showLoading('交棒中…');
   try{
-    var res = await fetch('/api/colinkery/handover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:cardId})});
+    var res = await fetch('/api/colinkery/handover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:cardId}),credentials:'include'});
     var d = await res.json();
     hideLoading();
     if(!d.ok){ alert(d.error||'交棒失敗'); return; }
@@ -17168,7 +17168,7 @@ function emailHandoverUrl(){
 
 // ── 分享頁 ────────────────────────────────────────────────────────────────────
 function initSharePage(){
-  var link = 'https://coeldery85.com/for-business.html?ref='+encodeURIComponent(STATE.memberNo||'');
+  var link = 'https://coeldery85.com/b2b?ref='+encodeURIComponent(STATE.memberNo||'');
   document.getElementById('share-link-box').textContent = link;
   var text = '你好！我係老有聯盟 85 的連結者，我哋係一個由退休長者組成的企業採購平台。\\n\\n如果你有企業採購需要，歡迎了解更多：\\n'+link;
   document.getElementById('share-text-preview').textContent = text;
@@ -17184,7 +17184,7 @@ async function loadResults(){
   var cont = document.getElementById('results-content');
   cont.innerHTML = '<div style="text-align:center;padding:40px 0;"><div class="spinner"></div></div>';
   try{
-    var res = await fetch('/api/colinkery/stats');
+    var res = await fetch('/api/colinkery/stats', { credentials: 'include' });
     var d = await res.json();
     if(!d.ok){ cont.innerHTML='<div class="alert alert-red">載入失敗</div>'; return; }
     var paid = Math.round((d.paid_cents||0)/100);
@@ -17327,6 +17327,101 @@ a:hover{text-decoration:underline;}
 <div><a href="/admin">← 返回 Admin</a></div>
 <h1>🤝 CoLinkery 管理</h1>
 ${adminColinkerySectionHtml()}
+</body>
+</html>`)
+})
+
+// ─── B2B 採購目錄頁 ─────────────────────────────────────────────────────────
+app.get('/b2b', (c) => {
+  const ref = c.req.query('ref') || ''
+  const token = c.req.query('token') || ''
+  return c.html(`<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>CoEldery 85 老有聯盟 · 企業採購平台</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#F0EBD8;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-size:18px;color:#111;min-height:100vh;}
+.topbar{background:#1a6b1a;color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;}
+.topbar img{width:40px;height:40px;border-radius:8px;}
+.topbar .brand{font-size:20px;font-weight:900;letter-spacing:1px;}
+.topbar .sub{font-size:15px;opacity:.8;margin-top:2px;}
+.wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px;}
+.hero{background:#fff;border-radius:14px;padding:28px 22px;margin-bottom:20px;box-shadow:0 4px 16px rgba(0,0,0,.08);text-align:center;}
+.hero h1{font-size:26px;font-weight:900;color:#1a6b1a;margin-bottom:10px;line-height:1.3;}
+.hero p{font-size:18px;color:#444;line-height:1.7;margin-bottom:16px;}
+.badge{display:inline-block;background:#e8f5e9;color:#1a6b1a;font-size:15px;font-weight:700;padding:6px 14px;border-radius:20px;margin:4px;}
+.section{background:#fff;border-radius:14px;padding:22px 18px;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
+.section h2{font-size:20px;font-weight:900;color:#1a6b1a;margin-bottom:14px;}
+.feature-item{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;}
+.feature-icon{font-size:28px;flex-shrink:0;margin-top:2px;}
+.feature-text h3{font-size:18px;font-weight:700;color:#222;margin-bottom:4px;}
+.feature-text p{font-size:16px;color:#555;line-height:1.6;}
+.cta-btn{display:block;width:100%;padding:18px;background:#228B22;color:#fff;border:none;border-radius:10px;
+  font-size:20px;font-weight:900;cursor:pointer;text-align:center;text-decoration:none;
+  letter-spacing:1px;margin-top:8px;transition:background .15s;}
+.cta-btn:active{background:#1a6b1a;}
+.ref-badge{background:#f1f8e9;border:1.5px solid #a5d6a7;border-radius:8px;padding:10px 14px;
+  font-size:15px;color:#388e3c;margin-bottom:20px;text-align:center;}
+.footer{text-align:center;color:#888;font-size:14px;margin-top:32px;padding-top:16px;border-top:1px solid #e0e0e0;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <img src="/icon-192.png" alt="CoEldery 85">
+  <div>
+    <div class="brand">CoEldery 85 老有聯盟</div>
+    <div class="sub">企業採購平台</div>
+  </div>
+</div>
+<div class="wrap">
+  ${ref ? `<div class="ref-badge">🤝 由老有聯盟連結者為您介紹</div>` : ''}
+  <div class="hero">
+    <div style="font-size:48px;margin-bottom:12px;">🏢</div>
+    <h1>讓退休長者智慧<br>助力您的企業</h1>
+    <p>CoEldery 85 老有聯盟是香港首個以退休長者為核心的企業採購及 B2B 平台，連結有豐富行業經驗的長者與需要採購的企業。</p>
+    <span class="badge">🌟 誠信推介</span>
+    <span class="badge">💼 行業經驗</span>
+    <span class="badge">🤝 雙贏合作</span>
+  </div>
+  <div class="section">
+    <h2>✅ 我們提供什麼？</h2>
+    <div class="feature-item">
+      <div class="feature-icon">🔍</div>
+      <div class="feature-text">
+        <h3>精準企業配對</h3>
+        <p>由具行業背景的長者連結者親身推介，比廣告更可信。</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">🤲</div>
+      <div class="feature-text">
+        <h3>長者智慧增值</h3>
+        <p>每位連結者均有數十年業界經驗，了解您的業務需求。</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">📊</div>
+      <div class="feature-text">
+        <h3>透明佣金制度</h3>
+        <p>成交後才支付固定佣金，無前期費用，零風險合作。</p>
+      </div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>📞 立即聯絡我們</h2>
+    <p style="margin-bottom:16px;color:#444;line-height:1.7;">如有企業採購需要，歡迎透過 WhatsApp 聯絡我們的團隊，我們將安排連結者與您跟進。</p>
+    <a class="cta-btn" href="https://wa.me/85200000000?text=${encodeURIComponent('你好！我想了解 CoEldery 85 企業採購平台' + (ref ? '（由 ' + ref + ' 介紹）' : ''))}" target="_blank">
+      💬 WhatsApp 聯絡我們
+    </a>
+  </div>
+  <div class="footer">
+    <p>CoEldery 85 老有聯盟</p>
+    <p style="margin-top:4px;"><a href="https://coeldery85.com" style="color:#1a6b1a;">coeldery85.com</a></p>
+  </div>
+</div>
 </body>
 </html>`)
 })
