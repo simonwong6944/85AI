@@ -16052,33 +16052,46 @@ Return ONLY a raw JSON object (no markdown, no code fences, no explanation) with
 }
 Rules: use empty string "" for any missing field. Combine multiple phones if needed. The card may be in Chinese, English, or both — extract all.`
 
+  // Free vision models on OpenRouter (verified 2026-08-05)
+  // gemma-4-26b: MoE model, fast for vision, works reliably
+  // nemotron-nano-12b-v2-vl: OCR-optimised, may timeout on large images (mitigated by client-side resize)
+  // nemotron-3-nano-omni: multimodal, good fallback
   const models = [
+    'google/gemma-4-26b-a4b-it:free',
     'nvidia/nemotron-nano-12b-v2-vl:free',
-    'google/gemma-3-27b-it:free',
-    'meta-llama/llama-4-scout:free'
+    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'
   ]
 
   const debugLog: string[] = []
 
   for (const model of models) {
     try {
-      const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'X-Title': 'CoLinkery OCR',
-          'HTTP-Referer': 'https://coeldery85.com'
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 512,
-          messages: [{ role: 'user', content: [
-            { type: 'image_url', image_url: { url: dataUrl } },
-            { type: 'text', text: prompt }
-          ]}]
+      // 20s per-model timeout (Worker hard limit is 30s total)
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 20000)
+      let resp: Response
+      try {
+        resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'X-Title': 'CoLinkery OCR',
+            'HTTP-Referer': 'https://coeldery85.com'
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: 512,
+            messages: [{ role: 'user', content: [
+              { type: 'image_url', image_url: { url: dataUrl } },
+              { type: 'text', text: prompt }
+            ]}]
+          })
         })
-      })
+      } finally {
+        clearTimeout(timer)
+      }
       const httpStatus = resp.status
       const data = await resp.json() as any
       // Log for debug
@@ -17258,19 +17271,47 @@ function onCameraTap(e){
   }, 800);
 }
 
+// Resize image to max 900px before sending to OCR (reduces timeout risk significantly)
+function resizeAndProcess(blob, name){
+  var MAX = 900;
+  var img = new Image();
+  var url = URL.createObjectURL(blob);
+  img.onload = function(){
+    URL.revokeObjectURL(url);
+    var w = img.naturalWidth, h = img.naturalHeight;
+    if(w <= MAX && h <= MAX){
+      // Already small enough
+      processImageBlob(blob, name, 'image/jpeg');
+      return;
+    }
+    var scale = Math.min(MAX/w, MAX/h);
+    var rw = Math.round(w*scale), rh = Math.round(h*scale);
+    var c = document.createElement('canvas');
+    c.width = rw; c.height = rh;
+    c.getContext('2d').drawImage(img, 0, 0, rw, rh);
+    c.toBlob(function(resized){
+      processImageBlob(resized, name, 'image/jpeg');
+    }, 'image/jpeg', 0.88);
+  };
+  img.onerror = function(){ URL.revokeObjectURL(url); processImageBlob(blob, name, 'image/jpeg'); };
+  img.src = url;
+}
 function capturePhoto(){
   var video = document.getElementById('camera-preview');
   var canvas = document.getElementById('camera-canvas');
   if(!video.videoWidth) return; // not ready
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video,0,0);
-  canvas.toBlob(function(blob){ processImageBlob(blob, 'photo.jpg', 'image/jpeg'); }, 'image/jpeg', 0.92);
+  var MAX = 900;
+  var w = video.videoWidth, h = video.videoHeight;
+  var scale = (w > MAX || h > MAX) ? Math.min(MAX/w, MAX/h) : 1;
+  canvas.width = Math.round(w*scale);
+  canvas.height = Math.round(h*scale);
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob(function(blob){ processImageBlob(blob, 'photo.jpg', 'image/jpeg'); }, 'image/jpeg', 0.88);
 }
 function handleFileSelect(e){
   var file = e.target.files[0];
   if(!file) return;
-  processImageBlob(file, file.name, file.type);
+  resizeAndProcess(file, 'card.jpg');
 }
 async function processImageBlob(blob, name, type){
   document.getElementById('ocr-loading').style.display='block';
