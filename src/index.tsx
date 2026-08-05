@@ -16037,20 +16037,38 @@ app.post('/api/colinkery/cards/ocr', requireColinkery(), async (c) => {
   const mimeType = imgFile.type || 'image/jpeg'
   const dataUrl = `data:${mimeType};base64,${base64}`
 
-  const prompt = `You are a business card OCR specialist. Extract ALL text from this business card image.
-Return ONLY a raw JSON object (no markdown, no code fences, no explanation) with these exact fields:
+  const prompt = `You are a business card OCR specialist. Extract ALL text from this business card image with maximum detail.
+Return ONLY a raw JSON object (no markdown, no code fences, no explanation) with these EXACT fields:
 {
-  "name_zh": "Chinese name if present, else empty string",
-  "name_en": "English name if present, else empty string",
-  "company": "company or organisation name",
-  "title": "job title or position",
-  "phone": "office/direct phone number",
-  "mobile": "mobile or cell number",
-  "email": "email address",
-  "address": "full address",
-  "industry": "inferred industry e.g. retail, F&B, manufacturing, finance, etc."
+  "name_zh": "Person's Chinese full name only (e.g. 陳大文). Empty string if not present.",
+  "name_en": "Person's English full name only (e.g. David Chan). Empty string if not present.",
+  "company_zh": "Company/organisation Chinese name only (e.g. 大中華有限公司). Empty string if not present.",
+  "company_en": "Company/organisation English name only (e.g. Greater China Ltd). Empty string if not present.",
+  "department_zh": "Department or division in Chinese (e.g. 市場部). Empty string if not present.",
+  "department_en": "Department or division in English (e.g. Marketing Department). Empty string if not present.",
+  "title_zh": "Job title in Chinese (e.g. 總經理). Empty string if not present.",
+  "title_en": "Job title in English (e.g. General Manager). Empty string if not present.",
+  "phone": "Office or direct landline phone number(s). Comma-separate if multiple.",
+  "mobile": "Mobile or cell phone number(s). Comma-separate if multiple.",
+  "fax": "Fax number if present. Empty string if not present.",
+  "email": "Email address. Comma-separate if multiple.",
+  "website": "Website URL (e.g. www.example.com). Empty string if not present.",
+  "address_zh": "Full address in Chinese. Empty string if not present.",
+  "address_en": "Full address in English. Empty string if not present.",
+  "wechat": "WeChat ID if present. Empty string if not present.",
+  "whatsapp": "WhatsApp number if explicitly labelled. Empty string if not present.",
+  "linkedin": "LinkedIn URL or username if present. Empty string if not present.",
+  "telegram": "Telegram handle if present. Empty string if not present.",
+  "industry_en": "Inferred industry in English (e.g. Retail, F&B, Manufacturing, Finance, Real Estate, Technology, Healthcare, Logistics, Education, Hospitality, etc.)",
+  "industry_zh": "Same inferred industry in Chinese (e.g. 零售, 飲食, 製造, 金融, 地產, 科技, 醫療, 物流, 教育, 酒店等)"
 }
-Rules: use empty string "" for any missing field. Combine multiple phones if needed. The card may be in Chinese, English, or both — extract all.`
+RULES:
+- Use empty string "" for any missing field — never use null.
+- Keep Chinese text in Chinese fields, English text in English fields.
+- If a field has both languages on the card, split them accordingly.
+- For phone/fax/mobile: include country/area code if shown (e.g. +852 2345 6789).
+- Extract every piece of information visible on the card.
+- The card may be in Chinese only, English only, or bilingual — extract all text found.`
 
   // Free vision models on OpenRouter (verified 2026-08-05)
   // gemma-4-26b: MoE model, fast for vision, works reliably
@@ -16129,9 +16147,30 @@ app.post('/api/colinkery/cards', requireColinkery(), async (c) => {
   const body = await c.req.json<any>()
   const cardId = makeCsrpnToken(16)
   await db.prepare(`
-    INSERT INTO business_cards (card_id, owner_member_no, image_r2_key, name_zh, name_en, company, title, phone, mobile, email, address, industry, ocr_raw)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).bind(cardId, memberNo, body.image_r2_key || '', body.name_zh || '', body.name_en || '', body.company || '', body.title || '', body.phone || '', body.mobile || '', body.email || '', body.address || '', body.industry || '', body.ocr_raw || '').run()
+    INSERT INTO business_cards (
+      card_id, owner_member_no, image_r2_key,
+      name_zh, name_en,
+      company_zh, company_en, company,
+      department_zh, department_en,
+      title_zh, title_en, title,
+      phone, mobile, fax, email, website,
+      address_zh, address_en, address,
+      wechat, whatsapp, linkedin, telegram,
+      industry_zh, industry_en, industry,
+      notes, ocr_raw
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).bind(
+    cardId, memberNo, body.image_r2_key || '',
+    body.name_zh || '', body.name_en || '',
+    body.company_zh || body.company || '', body.company_en || body.company || '', body.company || body.company_zh || body.company_en || '',
+    body.department_zh || '', body.department_en || '',
+    body.title_zh || body.title || '', body.title_en || body.title || '', body.title || body.title_zh || body.title_en || '',
+    body.phone || '', body.mobile || '', body.fax || '', body.email || '', body.website || '',
+    body.address_zh || body.address || '', body.address_en || body.address || '', body.address || body.address_zh || body.address_en || '',
+    body.wechat || '', body.whatsapp || '', body.linkedin || '', body.telegram || '',
+    body.industry_zh || body.industry || '', body.industry_en || body.industry || '', body.industry || body.industry_zh || body.industry_en || '',
+    body.notes || '', body.ocr_raw || ''
+  ).run()
   return c.json({ ok: true, card_id: cardId })
 })
 
@@ -16141,7 +16180,7 @@ app.get('/api/colinkery/cards', requireColinkery(), async (c) => {
   const q = c.req.query('q') || ''
   let sql = `SELECT * FROM business_cards WHERE owner_member_no=?`
   const params: any[] = [memberNo]
-  if (q) { sql += ` AND (name_zh LIKE ? OR name_en LIKE ? OR company LIKE ? OR phone LIKE ? OR mobile LIKE ?)`; const lk = `%${q}%`; params.push(lk,lk,lk,lk,lk) }
+  if (q) { sql += ` AND (name_zh LIKE ? OR name_en LIKE ? OR company_zh LIKE ? OR company_en LIKE ? OR company LIKE ? OR phone LIKE ? OR mobile LIKE ? OR email LIKE ? OR whatsapp LIKE ?)`; const lk = `%${q}%`; params.push(lk,lk,lk,lk,lk,lk,lk,lk,lk) }
   sql += ` ORDER BY created_at DESC LIMIT 100`
   const rows = await db.prepare(sql).bind(...params).all()
   return c.json({ ok: true, cards: rows.results })
@@ -16714,15 +16753,60 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
         <div class="cl-card" style="margin:0 0 12px;">
           <img id="captured-preview" style="width:100%;border-radius:8px;margin-bottom:12px;max-height:200px;object-fit:contain;" src="" alt="名片預覽">
         </div>
-        <div class="form-group"><label class="form-label">姓名（中文）</label><input type="text" class="form-input" id="cf-name-zh" placeholder="名片上的中文姓名"></div>
-        <div class="form-group"><label class="form-label">姓名（英文）</label><input type="text" class="form-input" id="cf-name-en" placeholder="English Name"></div>
-        <div class="form-group"><label class="form-label">公司名稱 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="cf-company" placeholder="公司/機構名稱"></div>
-        <div class="form-group"><label class="form-label">職銜</label><input type="text" class="form-input" id="cf-title" placeholder="職銜/部門"></div>
-        <div class="form-group"><label class="form-label">公司電話</label><input type="tel" class="form-input" id="cf-phone" placeholder="公司電話"></div>
-        <div class="form-group"><label class="form-label">手機</label><input type="tel" class="form-input" id="cf-mobile" placeholder="手機號碼"></div>
-        <div class="form-group"><label class="form-label">電郵</label><input type="email" class="form-input" id="cf-email" placeholder="電郵地址"></div>
-        <div class="form-group"><label class="form-label">地址</label><input type="text" class="form-input" id="cf-address" placeholder="公司地址"></div>
-        <div class="form-group"><label class="form-label">行業</label><input type="text" class="form-input" id="cf-industry" placeholder="例：零售、飲食、製造"></div>
+        <!-- === 姓名 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:4px 0 8px;padding-top:4px;border-top:1px solid #eee;">👤 姓名</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">中文姓名</label><input type="text" class="form-input" id="cf-name-zh" placeholder="例：陳大文"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">英文姓名</label><input type="text" class="form-input" id="cf-name-en" placeholder="e.g. David Chan"></div>
+        </div>
+        <!-- === 公司 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">🏢 公司 <span style="color:var(--red)">*</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">公司（中文）</label><input type="text" class="form-input" id="cf-company-zh" placeholder="例：大中華有限公司"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Company (EN)</label><input type="text" class="form-input" id="cf-company-en" placeholder="e.g. Greater China Ltd"></div>
+        </div>
+        <!-- === 部門 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">🗂 部門</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">部門（中文）</label><input type="text" class="form-input" id="cf-dept-zh" placeholder="例：市場部"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Department (EN)</label><input type="text" class="form-input" id="cf-dept-en" placeholder="e.g. Marketing Dept"></div>
+        </div>
+        <!-- === 職銜 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">💼 職銜</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">職銜（中文）</label><input type="text" class="form-input" id="cf-title-zh" placeholder="例：總經理"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Title (EN)</label><input type="text" class="form-input" id="cf-title-en" placeholder="e.g. General Manager"></div>
+        </div>
+        <!-- === 聯絡方式 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">📞 聯絡方式</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">公司電話</label><input type="tel" class="form-input" id="cf-phone" placeholder="例：+852 2345 6789"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">手機</label><input type="tel" class="form-input" id="cf-mobile" placeholder="例：+852 9123 4567"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">傳真 Fax</label><input type="tel" class="form-input" id="cf-fax" placeholder="例：+852 2345 6780"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">WhatsApp</label><input type="tel" class="form-input" id="cf-whatsapp" placeholder="例：+852 9123 4567"></div>
+        </div>
+        <div class="form-group"><label class="form-label">電郵 Email</label><input type="email" class="form-input" id="cf-email" placeholder="例：info@company.com"></div>
+        <div class="form-group"><label class="form-label">網站 Website</label><input type="url" class="form-input" id="cf-website" placeholder="例：www.company.com"></div>
+        <!-- === 社交媒體 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">📱 社交媒體</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">WeChat 微信</label><input type="text" class="form-input" id="cf-wechat" placeholder="WeChat ID"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">LinkedIn</label><input type="text" class="form-input" id="cf-linkedin" placeholder="linkedin.com/in/..."></div>
+          <div class="form-group" style="margin:0 0 0;grid-column:1/-1;"><label class="form-label">Telegram</label><input type="text" class="form-input" id="cf-telegram" placeholder="@username"></div>
+        </div>
+        <!-- === 地址 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">📍 地址</div>
+        <div class="form-group"><label class="form-label">地址（中文）</label><input type="text" class="form-input" id="cf-address-zh" placeholder="例：香港九龍旺角彌敦道XXX號"></div>
+        <div class="form-group"><label class="form-label">Address (EN)</label><input type="text" class="form-input" id="cf-address-en" placeholder="e.g. XXX Nathan Rd, Mong Kok, Kowloon, HK"></div>
+        <!-- === 行業 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">🏭 行業</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">行業（中文）</label><input type="text" class="form-input" id="cf-industry-zh" placeholder="例：零售、飲食、製造"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Industry (EN)</label><input type="text" class="form-input" id="cf-industry-en" placeholder="e.g. Retail, F&B, Mfg"></div>
+        </div>
+        <!-- === 備註 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">📝 備註</div>
+        <div class="form-group"><label class="form-label">備註 Notes</label><textarea class="form-input" id="cf-notes" placeholder="任何補充備註…" rows="3" style="resize:vertical;"></textarea></div>
         <div id="card-save-err" class="alert alert-red" style="display:none;"></div>
         <button class="btn-primary" onclick="saveCardAndHandover()">確認 → 交棒給 CoEldery 85</button>
         <button class="btn-outline" onclick="saveCardOnly()" style="width:100%;margin-top:10px;">只儲存名片</button>
@@ -16742,13 +16826,18 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     </div>
     <div id="cards-list" style="padding:0 16px;"></div>
     <div id="card-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto;">
-      <div style="background:#fff;margin:20px 12px;border-radius:16px;padding:20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="background:#fff;margin:20px 12px;border-radius:16px;padding:20px;padding-bottom:28px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <h3 style="font-size:18px;font-weight:700;" id="detail-title">名片詳情</h3>
           <button class="btn-outline" onclick="closeCardDetail()" style="min-height:36px;padding:0 12px;font-size:14px;">關閉</button>
         </div>
         <div id="detail-body"></div>
-        <button class="btn-primary" id="detail-handover-btn" onclick="handoverFromDetail()" style="margin-top:12px;">🤝 請 CoEldery 85 安排對接</button>
+        <!-- WA action buttons -->
+        <div id="detail-wa-btns" style="display:none;gap:8px;margin-top:14px;">
+          <button id="detail-wa-link-btn" style="flex:1;background:#25D366;color:#fff;border:none;border-radius:10px;padding:12px 8px;font-size:14px;font-weight:700;cursor:pointer;">💬+🔗 發目錄 + WA</button>
+          <button id="detail-wa-only-btn" style="flex:1;background:#128C7E;color:#fff;border:none;border-radius:10px;padding:12px 8px;font-size:14px;font-weight:700;cursor:pointer;">💬 只發 WA 訊息</button>
+        </div>
+        <button class="btn-primary" id="detail-handover-btn" onclick="handoverFromDetail()" style="margin-top:10px;">🤝 請 CoEldery 85 安排對接</button>
       </div>
     </div>
   </div>
@@ -17349,37 +17438,62 @@ async function processImageBlob(blob, name, type){
   } catch(e){ document.getElementById('ocr-fail-msg').style.display='block'; }
 
   STATE.currentCard = {r2_key: r2Key, blob: blob};
-  // Fill form
-  document.getElementById('cf-name-zh').value = parsed.name_zh || '';
-  document.getElementById('cf-name-en').value = parsed.name_en || '';
-  document.getElementById('cf-company').value = parsed.company || '';
-  document.getElementById('cf-title').value = parsed.title || '';
-  document.getElementById('cf-phone').value = parsed.phone || '';
-  document.getElementById('cf-mobile').value = parsed.mobile || '';
-  document.getElementById('cf-email').value = parsed.email || '';
-  document.getElementById('cf-address').value = parsed.address || '';
-  document.getElementById('cf-industry').value = parsed.industry || '';
+  // Fill form — support both new bilingual fields and legacy single-lang fallbacks
+  var s = function(id, val){ var el = document.getElementById(id); if(el) el.value = val || ''; };
+  s('cf-name-zh', parsed.name_zh);
+  s('cf-name-en', parsed.name_en);
+  s('cf-company-zh', parsed.company_zh || parsed.company);
+  s('cf-company-en', parsed.company_en || parsed.company);
+  s('cf-dept-zh', parsed.department_zh);
+  s('cf-dept-en', parsed.department_en);
+  s('cf-title-zh', parsed.title_zh || parsed.title);
+  s('cf-title-en', parsed.title_en || parsed.title);
+  s('cf-phone', parsed.phone);
+  s('cf-mobile', parsed.mobile);
+  s('cf-fax', parsed.fax);
+  s('cf-whatsapp', parsed.whatsapp);
+  s('cf-email', parsed.email);
+  s('cf-website', parsed.website);
+  s('cf-wechat', parsed.wechat);
+  s('cf-linkedin', parsed.linkedin);
+  s('cf-telegram', parsed.telegram);
+  s('cf-address-zh', parsed.address_zh || parsed.address);
+  s('cf-address-en', parsed.address_en || parsed.address);
+  s('cf-industry-zh', parsed.industry_zh || parsed.industry);
+  s('cf-industry-en', parsed.industry_en || parsed.industry);
+  s('cf-notes', '');
 
   document.getElementById('ocr-loading').style.display='none';
   document.getElementById('card-form').style.display='block';
 }
 function getCardFormData(){
+  var g = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  var czh = g('cf-company-zh'), cen = g('cf-company-en');
+  var tzh = g('cf-title-zh'), ten = g('cf-title-en');
+  var azh = g('cf-address-zh'), aen = g('cf-address-en');
+  var izh = g('cf-industry-zh'), ien = g('cf-industry-en');
   return {
     image_r2_key: STATE.currentCard ? STATE.currentCard.r2_key : '',
-    name_zh: document.getElementById('cf-name-zh').value.trim(),
-    name_en: document.getElementById('cf-name-en').value.trim(),
-    company: document.getElementById('cf-company').value.trim(),
-    title: document.getElementById('cf-title').value.trim(),
-    phone: document.getElementById('cf-phone').value.trim(),
-    mobile: document.getElementById('cf-mobile').value.trim(),
-    email: document.getElementById('cf-email').value.trim(),
-    address: document.getElementById('cf-address').value.trim(),
-    industry: document.getElementById('cf-industry').value.trim()
+    name_zh: g('cf-name-zh'),
+    name_en: g('cf-name-en'),
+    company_zh: czh, company_en: cen,
+    company: czh || cen,
+    department_zh: g('cf-dept-zh'), department_en: g('cf-dept-en'),
+    title_zh: tzh, title_en: ten,
+    title: tzh || ten,
+    phone: g('cf-phone'), mobile: g('cf-mobile'), fax: g('cf-fax'),
+    whatsapp: g('cf-whatsapp'), email: g('cf-email'), website: g('cf-website'),
+    wechat: g('cf-wechat'), linkedin: g('cf-linkedin'), telegram: g('cf-telegram'),
+    address_zh: azh, address_en: aen,
+    address: azh || aen,
+    industry_zh: izh, industry_en: ien,
+    industry: izh || ien,
+    notes: g('cf-notes')
   };
 }
 async function saveCardOnly(){
   var data = getCardFormData();
-  if(!data.company){ showAlert('card-save-err','請填寫公司名稱'); return; }
+  if(!data.company_zh && !data.company_en){ showAlert('card-save-err','請填寫公司名稱（中文或英文）'); return; }
   showLoading('儲存名片中…');
   try{
     var res = await fetch('/api/colinkery/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'include'});
@@ -17392,7 +17506,7 @@ async function saveCardOnly(){
 }
 async function saveCardAndHandover(){
   var data = getCardFormData();
-  if(!data.company){ showAlert('card-save-err','請填寫公司名稱'); return; }
+  if(!data.company_zh && !data.company_en){ showAlert('card-save-err','請填寫公司名稱（中文或英文）'); return; }
   showLoading('儲存並交棒中…');
   try{
     // 先存名片
@@ -17429,7 +17543,10 @@ function searchCards(){
   var q = document.getElementById('cards-search').value.toLowerCase();
   var filtered = STATE.allCards.filter(function(c){
     return (c.name_zh||'').toLowerCase().includes(q) || (c.name_en||'').toLowerCase().includes(q) ||
-           (c.company||'').toLowerCase().includes(q) || (c.phone||'').includes(q) || (c.mobile||'').includes(q);
+           (c.company_zh||'').toLowerCase().includes(q) || (c.company_en||'').toLowerCase().includes(q) ||
+           (c.company||'').toLowerCase().includes(q) || (c.phone||'').includes(q) ||
+           (c.mobile||'').includes(q) || (c.whatsapp||'').includes(q) ||
+           (c.email||'').toLowerCase().includes(q);
   });
   renderCards(filtered);
 }
@@ -17437,29 +17554,126 @@ function renderCards(cards){
   var list = document.getElementById('cards-list');
   if(!cards||!cards.length){ list.innerHTML='<div style="text-align:center;padding:40px 0;color:var(--muted);">暫無名片，影名片開始！</div>'; return; }
   list.innerHTML = cards.map(function(c){
-    return '<div class="card-chip" data-cid="'+esc(c.card_id)+'" style="cursor:pointer;">' +
-      '<div style="font-size:16px;font-weight:700;">' + esc(c.name_zh||(c.name_en||'—')) + '</div>' +
-      '<div style="font-size:14px;color:var(--muted);">' + esc(c.company||'') + (c.title?' · '+esc(c.title):'') + '</div>' +
-      '<div style="font-size:13px;color:var(--muted);margin-top:2px;">' + esc(c.phone||c.mobile||'') + (c.email?' · '+esc(c.email):'') + '</div>' +
+    var companyZh = c.company_zh || c.company || '';
+    var companyEn = c.company_en || (c.company_zh ? '' : c.company) || '';
+    var nameZh = c.name_zh || '';
+    var nameEn = c.name_en || '';
+    var titleLine = c.title_zh || c.title_en || c.title || '';
+    // Contact for WA buttons
+    var waNum = c.whatsapp || c.mobile || c.phone || '';
+    var displayName = nameZh || nameEn || companyZh || companyEn || '—';
+    return '<div class="card-chip" style="padding:14px 16px;margin-bottom:10px;border-radius:14px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08);border:1px solid #f0f0f0;">' +
+      // Top: company names
+      '<div style="font-size:15px;font-weight:800;color:#1B5E20;margin-bottom:2px;">' +
+        (companyZh ? esc(companyZh) : '') +
+        (companyZh && companyEn ? '<span style="color:#ccc;margin:0 5px;">|</span>' : '') +
+        (companyEn ? '<span style="font-size:14px;font-weight:700;color:#2E7D32;">'+esc(companyEn)+'</span>' : '') +
+      '</div>' +
+      // Name row
+      '<div style="font-size:16px;font-weight:700;color:#111;margin:4px 0 2px;">' +
+        (nameZh ? esc(nameZh) : '') +
+        (nameZh && nameEn ? '<span style="color:#ccc;margin:0 6px;">·</span>' : '') +
+        (nameEn ? '<span style="font-size:15px;">'+esc(nameEn)+'</span>' : '') +
+        (!nameZh && !nameEn ? '<span style="color:var(--muted);">—</span>' : '') +
+      '</div>' +
+      // Title row
+      (titleLine ? '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">'+esc(titleLine)+'</div>' : '<div style="margin-bottom:8px;"></div>') +
+      // Action buttons row
+      '<div style="display:flex;gap:8px;">' +
+        (waNum ?
+          '<button onclick="event.stopPropagation();waSendWithLink(\''+esc(waNum)+'\',\''+esc(displayName)+'\')" style="flex:1;background:#25D366;color:#fff;border:none;border-radius:10px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer;">💬+🔗 發目錄</button>' +
+          '<button onclick="event.stopPropagation();waSendOnly(\''+esc(waNum)+'\')" style="flex:1;background:#128C7E;color:#fff;border:none;border-radius:10px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer;">💬 WA 訊息</button>' +
+          '<button onclick="openCardDetail(\''+esc(c.card_id)+'\')" style="flex:0 0 44px;background:#f5f5f5;color:#444;border:none;border-radius:10px;padding:10px 6px;font-size:18px;cursor:pointer;">⋯</button>'
+        :
+          '<button onclick="openCardDetail(\''+esc(c.card_id)+'\')" style="flex:1;background:#f5f5f5;color:#444;border:none;border-radius:10px;padding:10px 6px;font-size:14px;font-weight:700;cursor:pointer;">詳情 ⋯</button>'
+        ) +
+      '</div>' +
     '</div>';
   }).join('');
-  // Attach click handlers via event delegation
-  list.querySelectorAll('[data-cid]').forEach(function(el){ el.addEventListener('click', function(){ openCardDetail(el.getAttribute('data-cid')); }); });
 }
+
+// WA Button 1: Send catalog link + greeting message
+function waSendWithLink(waNum, displayName){
+  var memberNo = STATE.memberNo || '';
+  var catalogUrl = 'https://coeldery85.com/b2b?ref=' + encodeURIComponent(memberNo);
+  var msg = '你好' + (displayName ? ' ' + displayName : '') + '！\n\n我係老有聯盟 85 的連結者，呢個係 CoEldery 85 為你準備的企業採購目錄，裡面有竹漿環保紙巾等優質產品：\n\n' + catalogUrl + '\n\n如有興趣，歡迎點擊了解更多，或直接聯絡我！';
+  var phone = waNum.replace(/[^0-9+]/g,'');
+  if(!phone.startsWith('+')) phone = '+852' + phone;
+  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var url = isIos ? 'whatsapp://send?phone='+encodeURIComponent(phone)+'&text='+encodeURIComponent(msg) : 'https://wa.me/'+phone.replace('+','')+'?text='+encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
+// WA Button 2: Send WA message only (no link)
+function waSendOnly(waNum){
+  var memberNo = STATE.memberNo || '';
+  var nameZh = STATE.nameZh || '';
+  var msg = '你好！我係老有聯盟 85 的連結者' + (nameZh ? ' ' + nameZh : '') + '，想了解一下貴公司的採購需求，有唔有方便嘅時間傾下？😊';
+  var phone = waNum.replace(/[^0-9+]/g,'');
+  if(!phone.startsWith('+')) phone = '+852' + phone;
+  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var url = isIos ? 'whatsapp://send?phone='+encodeURIComponent(phone)+'&text='+encodeURIComponent(msg) : 'https://wa.me/'+phone.replace('+','')+'?text='+encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
 function openCardDetail(cardId){
   var card = STATE.allCards.find(function(c){ return c.card_id===cardId; });
   if(!card) return;
-  var fields = [
-    ['👤 姓名（中文）',card.name_zh],['👤 姓名（英文）',card.name_en],
-    ['🏢 公司',card.company],['💼 職銜',card.title],
-    ['📞 電話',card.phone],['📱 手機',card.mobile],
-    ['📧 電郵',card.email],['📍 地址',card.address],['🏭 行業',card.industry]
-  ];
-  var html = fields.filter(function(f){ return f[1]; }).map(function(f){
-    return '<div style="margin-bottom:8px;"><span style="font-size:14px;color:var(--muted);">'+f[0]+'</span><br><span style="font-size:16px;font-weight:600;">'+esc(f[1])+'</span></div>';
-  }).join('');
-  document.getElementById('detail-title').textContent = card.name_zh || card.company || '名片詳情';
-  document.getElementById('detail-body').innerHTML = html;
+  var rows = [];
+  var addRow = function(label, val){ if(val && val.trim()) rows.push('<div style="margin-bottom:10px;"><div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">'+label+'</div><div style="font-size:15px;font-weight:600;color:#111;">'+esc(val)+'</div></div>'); };
+  var addPair = function(labelZh, valZh, labelEn, valEn){
+    if(valZh||valEn){
+      rows.push('<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">' +
+        (valZh ? '<div><div style="font-size:12px;font-weight:700;color:var(--muted);">'+labelZh+'</div><div style="font-size:15px;font-weight:600;">'+esc(valZh)+'</div></div>' : '<div></div>') +
+        (valEn ? '<div><div style="font-size:12px;font-weight:700;color:var(--muted);">'+labelEn+'</div><div style="font-size:15px;font-weight:600;">'+esc(valEn)+'</div></div>' : '<div></div>') +
+        '</div>');
+    }
+  };
+  var sep = function(label){ rows.push('<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:8px 0 4px;border-top:1px solid #eee;margin-top:4px;">'+label+'</div>'); };
+
+  sep('👤 姓名');
+  addPair('中文姓名', card.name_zh, 'EN Name', card.name_en);
+  sep('🏢 公司');
+  addPair('公司（中）', card.company_zh||card.company, 'Company (EN)', card.company_en||(card.company_zh?'':card.company) );
+  sep('🗂 部門 / 職銜');
+  addPair('部門（中）', card.department_zh, 'Department (EN)', card.department_en);
+  addPair('職銜（中）', card.title_zh||card.title, 'Title (EN)', card.title_en||(card.title_zh?'':card.title));
+  sep('📞 聯絡方式');
+  addRow('公司電話', card.phone);
+  addRow('手機', card.mobile);
+  addRow('傳真 Fax', card.fax);
+  addRow('WhatsApp', card.whatsapp);
+  addRow('電郵 Email', card.email);
+  addRow('網站 Website', card.website);
+  sep('📱 社交媒體');
+  addRow('WeChat 微信', card.wechat);
+  addRow('LinkedIn', card.linkedin);
+  addRow('Telegram', card.telegram);
+  sep('📍 地址');
+  addRow('地址（中文）', card.address_zh||(!card.address_en ? card.address : ''));
+  addRow('Address (EN)', card.address_en||(!card.address_zh ? card.address : ''));
+  sep('🏭 行業');
+  addPair('行業（中）', card.industry_zh||card.industry, 'Industry (EN)', card.industry_en||(card.industry_zh?'':card.industry));
+  if(card.notes){ sep('📝 備註'); addRow('Notes', card.notes); }
+
+  var displayName = card.name_zh || card.name_en || '';
+  document.getElementById('detail-title').textContent = displayName || (card.company_zh||card.company||'名片詳情');
+  document.getElementById('detail-body').innerHTML = rows.join('');
+
+  // WA buttons in modal
+  var waNum = card.whatsapp || card.mobile || card.phone || '';
+  var waBtns = document.getElementById('detail-wa-btns');
+  if(waBtns){
+    if(waNum){
+      waBtns.style.display='flex';
+      var btn1 = document.getElementById('detail-wa-link-btn');
+      var btn2 = document.getElementById('detail-wa-only-btn');
+      if(btn1) btn1.onclick = function(){ waSendWithLink(waNum, displayName); };
+      if(btn2) btn2.onclick = function(){ waSendOnly(waNum); };
+    } else {
+      waBtns.style.display='none';
+    }
+  }
   document.getElementById('detail-handover-btn').dataset.cardId = cardId;
   document.getElementById('card-detail-modal').style.display = 'block';
 }
