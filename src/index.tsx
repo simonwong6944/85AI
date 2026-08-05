@@ -17578,25 +17578,34 @@ function renderCards(cards){
       '</div>' +
       // Title row
       (titleLine ? '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">'+esc(titleLine)+'</div>' : '<div style="margin-bottom:8px;"></div>') +
-      // Action buttons row
+      // Action buttons row — use data-* to avoid inline quote escaping issues
       '<div style="display:flex;gap:8px;">' +
         (waNum ?
-          '<button onclick="event.stopPropagation();waSendWithLink(\''+esc(waNum)+'\',\''+esc(displayName)+'\')" style="flex:1;background:#25D366;color:#fff;border:none;border-radius:10px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer;">💬+🔗 發目錄</button>' +
-          '<button onclick="event.stopPropagation();waSendOnly(\''+esc(waNum)+'\')" style="flex:1;background:#128C7E;color:#fff;border:none;border-radius:10px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer;">💬 WA 訊息</button>' +
-          '<button onclick="openCardDetail(\''+esc(c.card_id)+'\')" style="flex:0 0 44px;background:#f5f5f5;color:#444;border:none;border-radius:10px;padding:10px 6px;font-size:18px;cursor:pointer;">⋯</button>'
+          '<button class="wa-link-btn" data-wa="'+esc(waNum)+'" data-name="'+esc(displayName)+'" style="flex:1;background:#25D366;color:#fff;border:none;border-radius:10px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer;">💬+🔗 發目錄</button>' +
+          '<button class="wa-only-btn" data-wa="'+esc(waNum)+'" style="flex:1;background:#128C7E;color:#fff;border:none;border-radius:10px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer;">💬 WA 訊息</button>' +
+          '<button class="card-detail-btn" data-cid="'+esc(c.card_id)+'" style="flex:0 0 44px;background:#f5f5f5;color:#444;border:none;border-radius:10px;padding:10px 6px;font-size:18px;cursor:pointer;">⋯</button>'
         :
-          '<button onclick="openCardDetail(\''+esc(c.card_id)+'\')" style="flex:1;background:#f5f5f5;color:#444;border:none;border-radius:10px;padding:10px 6px;font-size:14px;font-weight:700;cursor:pointer;">詳情 ⋯</button>'
+          '<button class="card-detail-btn" data-cid="'+esc(c.card_id)+'" style="flex:1;background:#f5f5f5;color:#444;border:none;border-radius:10px;padding:10px 6px;font-size:14px;font-weight:700;cursor:pointer;">詳情 ⋯</button>'
         ) +
       '</div>' +
     '</div>';
   }).join('');
+  // Event delegation — replace onclick handler each render
+  var list2 = document.getElementById('cards-list');
+  list2.onclick = function(ev){
+    var t = ev.target;
+    if(!t) return;
+    if(t.classList.contains('wa-link-btn')){ ev.stopPropagation(); waSendWithLink(t.dataset.wa, t.dataset.name||''); }
+    else if(t.classList.contains('wa-only-btn')){ ev.stopPropagation(); waSendOnly(t.dataset.wa); }
+    else if(t.classList.contains('card-detail-btn')){ openCardDetail(t.dataset.cid); }
+  };
 }
 
 // WA Button 1: Send catalog link + greeting message
 function waSendWithLink(waNum, displayName){
   var memberNo = STATE.memberNo || '';
   var catalogUrl = 'https://coeldery85.com/b2b?ref=' + encodeURIComponent(memberNo);
-  var msg = '你好' + (displayName ? ' ' + displayName : '') + '！\n\n我係老有聯盟 85 的連結者，呢個係 CoEldery 85 為你準備的企業採購目錄，裡面有竹漿環保紙巾等優質產品：\n\n' + catalogUrl + '\n\n如有興趣，歡迎點擊了解更多，或直接聯絡我！';
+  var msg = '你好' + (displayName ? ' ' + displayName : '') + '！\\n\\n我係老有聯盟 85 的連結者，呢個係 CoEldery 85 為你準備的企業採購目錄，裡面有竹漿環保紙巾等優質產品：\\n\\n' + catalogUrl + '\\n\\n如有興趣，歡迎點擊了解更多，或直接聯絡我！';
   var phone = waNum.replace(/[^0-9+]/g,'');
   if(!phone.startsWith('+')) phone = '+852' + phone;
   var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -17608,7 +17617,7 @@ function waSendWithLink(waNum, displayName){
 function waSendOnly(waNum){
   var memberNo = STATE.memberNo || '';
   var nameZh = STATE.nameZh || '';
-  var msg = '你好！我係老有聯盟 85 的連結者' + (nameZh ? ' ' + nameZh : '') + '，想了解一下貴公司的採購需求，有唔有方便嘅時間傾下？😊';
+  var msg = '你好！我係老有聯盟 85 的連結者' + (nameZh ? ' ' + nameZh : '') + '，想了解一下貴公司的採購需求，有唔有方便嘅時間傾下？\uD83D\uDE0A';
   var phone = waNum.replace(/[^0-9+]/g,'');
   if(!phone.startsWith('+')) phone = '+852' + phone;
   var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
