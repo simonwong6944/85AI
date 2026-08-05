@@ -8517,9 +8517,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <!-- Tab 列 -->
   <div class="ck-tab-bar">
     <button class="ck-tab active" id="ckTab-pending" onclick="ckSwitchTab('pending',this)">⏳ 待審批</button>
+    <button class="ck-tab" id="ckTab-members" onclick="ckSwitchTab('members',this)">👥 會員管理</button>
+    <button class="ck-tab" id="ckTab-leads" onclick="ckSwitchTab('leads',this)">📋 Leads</button>
     <button class="ck-tab" id="ckTab-approved" onclick="ckSwitchTab('approved',this)">✅ 已批准</button>
     <button class="ck-tab" id="ckTab-rejected" onclick="ckSwitchTab('rejected',this)">❌ 已拒絕</button>
-    <button class="ck-tab" id="ckTab-otp" onclick="ckSwitchTab('otp',this)">📱 OTP 管理</button>
+    <button class="ck-tab" id="ckTab-otp" onclick="ckSwitchTab('otp',this)">📱 OTP</button>
   </div>
 
   <!-- 待審批 -->
@@ -8529,6 +8531,63 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="btn btn-secondary btn-sm" onclick="loadCkAdminData()"><i class="fas fa-rotate-right"></i> 刷新</button>
     </div>
     <div id="ckPendingList">載入中…</div>
+  </div>
+
+  <!-- 會員管理 -->
+  <div id="ckPanel-members" style="display:none;">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <input type="text" id="ckMembersQ" placeholder="搜尋姓名/電話/號碼…" style="flex:1;min-width:160px;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;" oninput="loadCkMembers()">
+      <button class="btn btn-secondary btn-sm" onclick="loadCkMembers()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckMembersList"><p style="color:#9CA3AF;padding:20px 0;">載入中…</p></div>
+  </div>
+
+  <!-- Leads 管理 -->
+  <div id="ckPanel-leads" style="display:none;">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <input type="text" id="ckLeadsQ" placeholder="搜尋買家/公司/連結者…" style="flex:1;min-width:160px;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;" oninput="loadCkLeads()">
+      <select id="ckLeadsStatus" onchange="loadCkLeads()" style="padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;">
+        <option value="">全部狀態</option>
+        <option value="pending">待處理</option>
+        <option value="catalog_sent">目錄已發</option>
+        <option value="interest_submitted">已表達興趣</option>
+        <option value="quoted">已報價</option>
+        <option value="negotiating">洽談中</option>
+        <option value="won">成交</option>
+        <option value="lost">失敗</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="loadCkLeads()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckLeadsList"><p style="color:#9CA3AF;padding:20px 0;">載入中…</p></div>
+  </div>
+
+  <!-- Lead 編輯 Modal -->
+  <div id="ckLeadModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;overflow-y:auto;">
+    <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:500px;margin:40px auto;">
+      <div style="font-size:17px;font-weight:700;margin-bottom:16px;">編輯 Lead</div>
+      <input type="hidden" id="ckLmLeadId">
+      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">買家</label><input id="ckLmBuyer" type="text" readonly style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;background:#F9FAFB;font-size:14px;"></div>
+      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">電話</label><input id="ckLmPhone" type="text" readonly style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;background:#F9FAFB;font-size:14px;"></div>
+      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">連結者</label><input id="ckLmLinker" type="text" readonly style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;background:#F9FAFB;font-size:14px;"></div>
+      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">狀態</label>
+        <select id="ckLmStatus" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;">
+          <option value="pending">待處理</option>
+          <option value="catalog_sent">目錄已發</option>
+          <option value="interest_submitted">已表達興趣</option>
+          <option value="quoted">已報價</option>
+          <option value="negotiating">洽談中</option>
+          <option value="won">成交 ✅</option>
+          <option value="lost">失敗 ❌</option>
+        </select>
+      </div>
+      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">指定供應商/產品</label><input id="ckLmSupplier" type="text" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;" placeholder="留空=不指定"></div>
+      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">佣金(%)</label><input id="ckLmCommission" type="number" min="0" max="100" step="0.1" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;" placeholder="例：5"></div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">備注</label><textarea id="ckLmNote" rows="3" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;resize:vertical;" placeholder="內部備注…"></textarea></div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="saveCkLead()" style="flex:1;padding:10px;background:#065F46;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;">儲存</button>
+        <button onclick="document.getElementById('ckLeadModal').style.display='none'" style="padding:10px 20px;background:#E5E7EB;color:#374151;border:none;border-radius:8px;font-size:15px;cursor:pointer;">取消</button>
+      </div>
+    </div>
   </div>
 
   <!-- 已批准 -->
@@ -8648,11 +8707,14 @@ function ckSwitchTab(tab, btnEl) {
   _ckCurrentTab = tab;
   document.querySelectorAll('.ck-tab').forEach(function(t){ t.classList.remove('active'); });
   if(btnEl) btnEl.classList.add('active');
-  ['pending','approved','rejected','otp'].forEach(function(p){
-    document.getElementById('ckPanel-'+p).style.display = p===tab ? '' : 'none';
+  ['pending','members','leads','approved','rejected','otp'].forEach(function(p){
+    var el = document.getElementById('ckPanel-'+p);
+    if(el) el.style.display = p===tab ? '' : 'none';
   });
   if(tab==='approved') loadCkApproved();
   if(tab==='rejected') loadCkRejected();
+  if(tab==='members') loadCkMembers();
+  if(tab==='leads') loadCkLeads();
 }
 
 async function loadCkAdminData() {
@@ -8825,6 +8887,144 @@ async function ckRejectApp(id) {
     if(confirmed) window.open(d.wa_notify_link,'_blank');
     loadCkAdminData();
   } catch(e) { alert('網絡錯誤：'+e.message); }
+}
+
+async function loadCkMembers() {
+  var list = document.getElementById('ckMembersList');
+  if(!list) return;
+  var q = (document.getElementById('ckMembersQ')||{}).value || '';
+  list.innerHTML='<div style="padding:20px;color:#6B7280;text-align:center;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
+  try {
+    var url = '/api/admin/colinkery/members' + (q ? '?q='+encodeURIComponent(q) : '');
+    var res = await fetch(url, {credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ list.innerHTML='<p style="color:#c00;">'+escHtml(d.error||'錯誤')+'</p>'; return; }
+    var members = d.members||[];
+    if(members.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;">沒有符合的會員</div>'; return; }
+    list.innerHTML = members.map(function(m){
+      var statusColor = m.colinkery_account_status==='active'?'#065F46':m.colinkery_account_status==='suspended'?'#991B1B':'#6B7280';
+      var statusBg = m.colinkery_account_status==='active'?'#D1FAE5':m.colinkery_account_status==='suspended'?'#FEE2E2':'#F3F4F6';
+      var statusLabel = m.colinkery_account_status==='active'?'啟用':m.colinkery_account_status==='suspended'?'已停用':m.colinkery_account_status||'–';
+      var phoneDigits = (m.phone||'').replace(/\D/g,'');
+      var fullPhone = phoneDigits.startsWith('852')?phoneDigits:'852'+phoneDigits;
+      var waLink = 'https://wa.me/'+fullPhone;
+      return '<div style="background:#fff;border-radius:10px;border:1.5px solid #BAE6FD;padding:14px 16px;margin-bottom:10px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+          '<div>' +
+            '<div style="font-size:16px;font-weight:700;color:#0C4A6E;">'+escHtml(m.name_zh||'')+'</div>' +
+            '<div style="font-size:13px;color:#6B7280;margin-top:3px;">'+escHtml(m.member_no)+' ｜ 📞 '+escHtml(m.phone||'')+'</div>' +
+            (m.holder_no?'<div style="font-size:12px;color:#0369A1;margin-top:2px;">CK號：'+escHtml(m.holder_no)+'</div>':'') +
+            '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;">' +
+              '<span style="background:'+statusBg+';color:'+statusColor+';padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;">'+statusLabel+'</span>' +
+              '<span style="font-size:12px;color:#9CA3AF;">Leads: '+(m.lead_count||0)+'件 ｜ 成交: '+(m.won_count||0)+'件</span>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:6px;">' +
+            '<a href="'+waLink+'" target="_blank" style="padding:6px 12px;background:#25D366;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;text-align:center;">💬 WA</a>' +
+            (m.colinkery_account_status==='active'?
+              '<button onclick="ckSuspendMember(\''+escHtml(m.member_no)+'\')" style="padding:6px 12px;background:#C62828;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">停用</button>':
+              '<button onclick="ckReinstateMember(\''+escHtml(m.member_no)+'\')" style="padding:6px 12px;background:#065F46;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">恢復</button>'
+            ) +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) { list.innerHTML='<p style="color:#c00;">網絡錯誤：'+e.message+'</p>'; }
+}
+
+async function ckSuspendMember(memberNo) {
+  if(!confirm('確認停用此 CoLinkery 帳號？')) return;
+  try {
+    var res = await fetch('/api/admin/colinkery/members/'+encodeURIComponent(memberNo)+'/suspend', {method:'POST',credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ alert('失敗：'+(d.error||'未知錯誤')); return; }
+    loadCkMembers();
+  } catch(e){ alert('網絡錯誤'); }
+}
+
+async function ckReinstateMember(memberNo) {
+  if(!confirm('確認恢復此 CoLinkery 帳號？')) return;
+  try {
+    var res = await fetch('/api/admin/colinkery/members/'+encodeURIComponent(memberNo)+'/reinstate', {method:'POST',credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ alert('失敗：'+(d.error||'未知錯誤')); return; }
+    loadCkMembers();
+  } catch(e){ alert('網絡錯誤'); }
+}
+
+async function loadCkLeads() {
+  var list = document.getElementById('ckLeadsList');
+  if(!list) return;
+  var q = (document.getElementById('ckLeadsQ')||{}).value || '';
+  var status = (document.getElementById('ckLeadsStatus')||{}).value || '';
+  list.innerHTML='<div style="padding:20px;color:#6B7280;text-align:center;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
+  try {
+    var params = [];
+    if(q) params.push('q='+encodeURIComponent(q));
+    if(status) params.push('status='+encodeURIComponent(status));
+    var res = await fetch('/api/admin/colinkery/leads'+(params.length?'?'+params.join('&'):''), {credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ list.innerHTML='<p style="color:#c00;">'+escHtml(d.error||'錯誤')+'</p>'; return; }
+    var leads = d.leads||[];
+    if(leads.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;">沒有符合的 Lead</div>'; return; }
+    var statusMap={'pending':'待處理','catalog_sent':'目錄已發','interest_submitted':'已表達興趣','quoted':'已報價','negotiating':'洽談中','won':'成交✅','lost':'失敗❌'};
+    var statusColors={'pending':'#6B7280','catalog_sent':'#1D4ED8','interest_submitted':'#0369A1','quoted':'#7C3AED','negotiating':'#B45309','won':'#065F46','lost':'#991B1B'};
+    var statusBgs={'pending':'#F3F4F6','catalog_sent':'#DBEAFE','interest_submitted':'#E0F2FE','quoted':'#EDE9FE','negotiating':'#FEF3C7','won':'#D1FAE5','lost':'#FEE2E2'};
+    list.innerHTML = leads.map(function(l){
+      var s = l.status||'pending';
+      var dateStr = l.created_at ? l.created_at.slice(0,10) : '–';
+      return '<div style="background:#fff;border-radius:10px;border:1.5px solid #E5E7EB;padding:14px 16px;margin-bottom:10px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+          '<div style="flex:1;">' +
+            '<div style="font-size:15px;font-weight:700;color:#111;">'+escHtml(l.buyer_name||'–')+'</div>' +
+            '<div style="font-size:13px;color:#6B7280;margin-top:2px;">'+escHtml(l.buyer_company||'')+(l.buyer_phone?' ｜ '+escHtml(l.buyer_phone):'')+'</div>' +
+            '<div style="font-size:12px;color:#0369A1;margin-top:3px;">連結者：'+escHtml(l.linker_name||l.colinkery_member_no||'–')+'</div>' +
+            (l.admin_note?'<div style="font-size:12px;color:#374151;margin-top:4px;background:#F9FAFB;padding:4px 8px;border-radius:6px;">備注：'+escHtml(l.admin_note)+'</div>':'') +
+            '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;">' +
+              '<span style="background:'+(statusBgs[s]||'#F3F4F6')+';color:'+(statusColors[s]||'#6B7280')+';padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;">'+(statusMap[s]||s)+'</span>' +
+              '<span style="font-size:12px;color:#9CA3AF;">'+dateStr+'</span>' +
+              (l.supplier_assigned?'<span style="font-size:12px;color:#7C3AED;">供應商：'+escHtml(l.supplier_assigned)+'</span>':'') +
+            '</div>' +
+          '</div>' +
+          '<button onclick="ckOpenLeadModal('+JSON.stringify(l)+')" style="padding:7px 14px;background:#1D4ED8;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✏️ 編輯</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) { list.innerHTML='<p style="color:#c00;">網絡錯誤：'+e.message+'</p>'; }
+}
+
+function ckOpenLeadModal(lead) {
+  document.getElementById('ckLmLeadId').value = lead.id||'';
+  document.getElementById('ckLmBuyer').value = (lead.buyer_name||'')+(lead.buyer_company?' / '+lead.buyer_company:'');
+  document.getElementById('ckLmPhone').value = lead.buyer_phone||'';
+  document.getElementById('ckLmLinker').value = lead.linker_name||lead.colinkery_member_no||'';
+  document.getElementById('ckLmStatus').value = lead.status||'pending';
+  document.getElementById('ckLmSupplier').value = lead.supplier_assigned||'';
+  document.getElementById('ckLmCommission').value = lead.commission_pct||'';
+  document.getElementById('ckLmNote').value = lead.admin_note||'';
+  document.getElementById('ckLeadModal').style.display = 'block';
+}
+
+async function saveCkLead() {
+  var id = document.getElementById('ckLmLeadId').value;
+  if(!id) return;
+  var body = {
+    status: document.getElementById('ckLmStatus').value,
+    supplier_assigned: document.getElementById('ckLmSupplier').value,
+    commission_pct: document.getElementById('ckLmCommission').value,
+    admin_note: document.getElementById('ckLmNote').value
+  };
+  try {
+    var res = await fetch('/api/admin/colinkery/leads/'+id+'/update', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    var d = await res.json();
+    if(!d.ok){ alert('儲存失敗：'+(d.error||'未知錯誤')); return; }
+    document.getElementById('ckLeadModal').style.display='none';
+    loadCkLeads();
+  } catch(e){ alert('網絡錯誤'); }
 }
 
 function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
