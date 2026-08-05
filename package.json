@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "vite",
     "dev:sandbox": "wrangler pages dev dist --d1=webapp-db --local --ip 0.0.0.0 --port 3000",
-    "build": "vite build && node -e \"const fs=require('fs');const r=JSON.parse(fs.readFileSync('dist/_routes.json','utf8'));const extra=['/icon-192.png','/icon-512.png','/manifest.webmanifest','/sw.js'];extra.forEach(p=>{if(!r.exclude.includes(p))r.exclude.push(p);});fs.writeFileSync('dist/_routes.json',JSON.stringify(r));console.log('_routes.json updated:',r.exclude);\"",
+    "build": "vite build && node -e \"const fs=require('fs');const r=JSON.parse(fs.readFileSync('dist/_routes.json','utf8'));const extra=['/icon-192.png','/icon-512.png','/manifest.webmanifest'];extra.forEach(p=>{if(!r.exclude.includes(p))r.exclude.push(p);});r.exclude=r.exclude.filter(p=>p!=='/sw.js');fs.writeFileSync('dist/_routes.json',JSON.stringify(r));console.log('_routes.json updated:',r.exclude);\"",
     "preview": "wrangler pages dev dist",
     "deploy": "npm run build && wrangler pages deploy dist",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",

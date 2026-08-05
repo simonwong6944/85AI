@@ -1,6 +1,6 @@
 // CoEldery 85 Service Worker
-// v3: icons & manifest use network-first so updates are picked up immediately
-const CACHE_NAME = 'coeldery85-v3';
+// v4: no-store for navigation, force fresh /app always
+const CACHE_NAME = 'coeldery85-v4';
 const OFFLINE_URLS = [
   '/app'
 ];
@@ -33,10 +33,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Navigation: network first, fallback to cache
+  // Navigation: ALWAYS network, no cache, no fallback to stale HTML
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() =>
+      fetch(event.request, { cache: 'no-store' }).catch(() =>
         caches.match('/app').then((r) => r || caches.match('/'))
       )
     );

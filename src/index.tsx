@@ -173,7 +173,24 @@ app.use('/assets/*', serveStatic({ root: './public' }))
 // PWA root-level static files — served via explicit GET + ASSETS binding
 // (serveStatic with double-middleware caused 500 in CF Pages; direct ASSETS fetch is reliable)
 app.get('/manifest.webmanifest', serveStatic({ root: './public' }))
-app.get('/sw.js', serveStatic({ root: './public' }))
+app.get('/sw.js', async (c) => {
+  const res = await (serveStatic({ root: './public' }))(c, async () => {})
+  if (res) {
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    return res
+  }
+  // fallback: read via ASSETS
+  const url = new URL(c.req.url)
+  url.pathname = '/sw.js'
+  const r = await (c.env as any).ASSETS?.fetch(new Request(url.toString()))
+  if (r) {
+    return new Response(r.body, {
+      status: r.status,
+      headers: { ...Object.fromEntries(r.headers), 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+    })
+  }
+  return c.notFound()
+})
 app.get('/icon-192.png', serveStatic({ root: './public' }))
 app.get('/icon-512.png', serveStatic({ root: './public' }))
 
