@@ -175,14 +175,15 @@ app.use('/assets/*', serveStatic({ root: './public' }))
 app.get('/manifest.webmanifest', serveStatic({ root: './public' }))
 app.get('/sw.js', (c) => {
   const swContent = `// CoEldery 85 Service Worker
-// v4: no-store navigation, always fresh /app
-const CACHE_NAME = 'coeldery85-v4';
+// v5: force skip-waiting, SKIP_WAITING message handler
+const CACHE_NAME = 'coeldery85-v5';
 const OFFLINE_URLS = ['/app'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(OFFLINE_URLS).catch(() => {}))
   );
+  // 立即跳過 waiting，不等舊 SW 釋放
   self.skipWaiting();
 });
 
@@ -190,9 +191,15 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
+});
+
+// 接收來自頁面的 SKIP_WAITING 訊息
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
@@ -11147,6 +11154,42 @@ function pwaAppHtml() {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>CoEldery 85 老有聯盟</title>
+<!-- SW 強制更新：必須在所有資源載入前執行，清除舊版 Service Worker -->
+<script>
+(function(){
+  if(!('serviceWorker' in navigator)) return;
+  // 取得所有已注冊的 SW
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    if(!regs || regs.length === 0) return;
+    var hadOld = false;
+    var ops = regs.map(function(reg){
+      // 檢查是否為舊版（非 v5）
+      var isOld = false;
+      var sw = reg.active || reg.waiting || reg.installing;
+      if(sw){
+        // 強制叫 update，讓瀏覽器立即拉最新 sw.js
+        isOld = true;
+      }
+      if(isOld) hadOld = true;
+      return reg.update().catch(function(){});
+    });
+    Promise.all(ops).then(function(){
+      // 如果有舊 SW 正在執行，強制它們 skip waiting
+      regs.forEach(function(reg){
+        if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
+      });
+    });
+  });
+  // 當 SW controller 改變（新版 SW 接管），刷新頁面
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    // 避免無限刷新：用 sessionStorage 標記
+    if(sessionStorage.getItem('sw_reload')) return;
+    sessionStorage.setItem('sw_reload','1');
+    window.location.reload();
+  });
+})();
+</script>
+<!-- /SW 強制更新 -->
 <!-- PWA -->
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#228B22">
@@ -11529,12 +11572,39 @@ window.addEventListener('message', function(e) {
   }
 });
 
-// ── Service Worker 注冊 ──
+// ── Service Worker 強制更新：先清除舊版 SW，再注冊新版 ──
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/sw.js').catch(function(e) {
-      console.warn('SW register failed:', e);
+  // 立即執行：不等 load 事件，因為要在舊 SW 攔截前先清除
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    var promises = [];
+    regs.forEach(function(reg) {
+      // 強制所有已注冊的 SW 更新（無論版本）
+      promises.push(reg.update().catch(function(){}));
     });
+    return Promise.all(promises);
+  }).then(function() {
+    // 注冊/更新 sw.js
+    return navigator.serviceWorker.register('/sw.js?v=5', { updateViaCache: 'none' });
+  }).then(function(reg) {
+    // 若有 waiting 的新 SW，立即激活
+    if (reg.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    reg.addEventListener('updatefound', function() {
+      var newSW = reg.installing;
+      if (!newSW) return;
+      newSW.addEventListener('statechange', function() {
+        if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+          // 有新版本裝好了，強制刷新頁面
+          newSW.postMessage({ type: 'SKIP_WAITING' });
+          navigator.serviceWorker.addEventListener('controllerchange', function() {
+            window.location.reload();
+          }, { once: true });
+        }
+      });
+    });
+  }).catch(function(e) {
+    console.warn('SW register failed:', e);
   });
 }
 
