@@ -15991,34 +15991,74 @@ app.post('/api/colinkery/cards/ocr', requireColinkery(), async (c) => {
     await c.env.FILES.put(r2Key, await imgFile.arrayBuffer(), { httpMetadata: { contentType: imgFile.type || 'image/jpeg' } })
   }
 
-  // OCR via OpenRouter
+  // OCR via OpenRouter — free model: nvidia/nemotron-nano-12b-v2-vl:free
+  // Fallback: google/gemma-3-27b-it:free
   const apiKey = c.env.OPENROUTER_API_KEY
   if (!apiKey) return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
 
-  try {
-    const imgBytes = await imgFile.arrayBuffer()
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBytes)))
-    const dataUrl = `data:${imgFile.type || 'image/jpeg'};base64,${base64}`
+  const imgBytes = await imgFile.arrayBuffer()
+  // Resize large images to avoid token limits — cap at 1200px wide
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBytes)))
+  const mimeType = imgFile.type || 'image/jpeg'
+  const dataUrl = `data:${mimeType};base64,${base64}`
 
-    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': 'CoLinkery OCR' },
-      body: JSON.stringify({
-        model: 'google/gemini-flash-1.5',
-        messages: [{ role: 'user', content: [
-          { type: 'text', text: 'Extract business card info as JSON: {name_zh, name_en, company, title, phone, mobile, email, address, industry}. Return ONLY the JSON object, no explanation.' },
-          { type: 'image_url', image_url: { url: dataUrl } }
-        ]}]
+  const prompt = `You are a business card OCR specialist. Extract ALL text from this business card image.
+Return ONLY a raw JSON object (no markdown, no code fences, no explanation) with these exact fields:
+{
+  "name_zh": "Chinese name if present, else empty string",
+  "name_en": "English name if present, else empty string",
+  "company": "company or organisation name",
+  "title": "job title or position",
+  "phone": "office/direct phone number",
+  "mobile": "mobile or cell number",
+  "email": "email address",
+  "address": "full address",
+  "industry": "inferred industry e.g. retail, F&B, manufacturing, finance, etc."
+}
+Rules: use empty string "" for any missing field. Combine multiple phones if needed. The card may be in Chinese, English, or both — extract all.`
+
+  const models = [
+    'nvidia/nemotron-nano-12b-v2-vl:free',
+    'google/gemma-3-27b-it:free'
+  ]
+
+  for (const model of models) {
+    try {
+      const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'X-Title': 'CoLinkery OCR',
+          'HTTP-Referer': 'https://coeldery85.com'
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 512,
+          messages: [{ role: 'user', content: [
+            { type: 'image_url', image_url: { url: dataUrl } },
+            { type: 'text', text: prompt }
+          ]}]
+        })
       })
-    })
-    const data = await resp.json() as any
-    const raw = data?.choices?.[0]?.message?.content || ''
-    const jsonMatch = raw.match(/\{[\s\S]*\}/)
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
-    return c.json({ ok: true, r2_key: r2Key, parsed, ocr_raw: raw })
-  } catch {
-    return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
+      const data = await resp.json() as any
+      // Check for API-level error (rate limit, model unavailable etc.)
+      if (data?.error) continue
+      const raw = data?.choices?.[0]?.message?.content || ''
+      if (!raw) continue
+      // Strip markdown code fences if model wraps output
+      const cleaned = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim()
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) continue
+      const parsed = JSON.parse(jsonMatch[0])
+      return c.json({ ok: true, r2_key: r2Key, parsed, ocr_raw: raw, ocr_model: model })
+    } catch {
+      // Try next model
+      continue
+    }
   }
+  // All models failed
+  return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
 })
 
 // ─── 名片 CRUD ────────────────────────────────────────────────────────────────
@@ -16360,8 +16400,23 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px;font-size:16px;color:var(--muted);}
 /* Camera */
-#camera-preview{width:100%;max-height:60vh;object-fit:cover;border-radius:12px;background:#111;}
+.camera-wrap{position:relative;width:100%;border-radius:12px;overflow:hidden;background:#111;touch-action:none;}
+#camera-preview{width:100%;max-height:62vh;object-fit:cover;display:block;cursor:pointer;}
 #camera-canvas{display:none;}
+#camera-focus-ring{
+  position:absolute;width:72px;height:72px;
+  border:3px solid #fff;border-radius:50%;
+  box-shadow:0 0 0 1px rgba(0,0,0,.5);
+  pointer-events:none;display:none;
+  transform:translate(-50%,-50%);
+  transition:opacity .3s;
+}
+#camera-tap-hint{
+  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.55);color:#fff;border-radius:20px;
+  padding:6px 16px;font-size:13px;pointer-events:none;
+  white-space:nowrap;
+}
 /* Onboarding overlay */
 .onboard-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center;}
 .onboard-box{background:#fff;border-radius:20px;padding:28px 20px;margin:20px;max-width:400px;width:100%;text-align:center;}
@@ -16544,15 +16599,19 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     </div>
     <div style="padding:16px;overflow-y:auto;">
       <div id="camera-area">
-        <video id="camera-preview" autoplay playsinline muted></video>
-        <canvas id="camera-canvas"></canvas>
+        <div class="camera-wrap" id="camera-wrap" onclick="onCameraTap(event)">
+          <video id="camera-preview" autoplay playsinline muted></video>
+          <canvas id="camera-canvas"></canvas>
+          <div id="camera-focus-ring"></div>
+          <div id="camera-tap-hint">👆 點擊對焦並自動拍攝</div>
+        </div>
         <div style="display:flex;gap:10px;margin-top:12px;">
-          <button class="btn-primary" onclick="capturePhoto()" style="flex:1;">📸 拍攝名片</button>
+          <button class="btn-primary" onclick="capturePhoto()" style="flex:1;">📸 立即拍攝</button>
           <label class="btn-secondary" style="flex:1;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:56px;font-size:18px;font-weight:700;">
             🖼 選相片<input type="file" accept="image/*" id="file-input" style="display:none;" onchange="handleFileSelect(event)">
           </label>
         </div>
-        <p style="font-size:14px;color:var(--muted);text-align:center;margin-top:8px;">將名片正面朝向鏡頭，確保文字清晰</p>
+        <p style="font-size:13px;color:var(--muted);text-align:center;margin-top:8px;">📌 名片橫放效果最佳 · 確保文字清晰不反光</p>
       </div>
       <div id="ocr-loading" style="display:none;text-align:center;padding:30px 0;">
         <div class="spinner" style="margin:0 auto 12px;"></div>
@@ -16681,6 +16740,7 @@ var STATE = {
   currentCard: null,       // 剛拍攝/選取的名片圖片 R2 key
   lastHandoverUrl: null, lastHandoverBuyer: null,
   cameraStream: null,
+  focusTimer: null,        // tap-to-focus auto-capture timer
   allCards: [],
   deferredPrompt: null
 };
@@ -16958,14 +17018,27 @@ async function loadStats(){
 async function initCamera(){
   if(STATE.cameraStream) return;
   try{
-    var stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
+    // Request rear camera, high res for OCR
+    var stream = await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1920}, height:{ideal:1080},
+        focusMode:{ideal:'continuous'}
+      }
+    });
     STATE.cameraStream = stream;
     var video = document.getElementById('camera-preview');
     video.srcObject = stream;
     video.play();
+    // Show hint briefly then fade
+    var hint = document.getElementById('camera-tap-hint');
+    if(hint){ setTimeout(function(){ hint.style.opacity='0'; setTimeout(function(){ hint.style.display='none'; },600); }, 3000); }
   } catch(e){
-    // Camera not available — show file picker
-    document.getElementById('camera-area').innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px;">相機不可用，請選擇相片</p><label class="btn-primary" style="display:flex;align-items:center;justify-content:center;cursor:pointer;">🖼 選擇名片相片<input type="file" accept="image/*" id="file-input" style="display:none;" onchange="handleFileSelect(event)"></label>';
+    // Camera not available — show file picker only
+    document.getElementById('camera-area').innerHTML =
+      '<p style="color:var(--muted);text-align:center;padding:20px;">相機不可用，請選擇相片</p>' +
+      '<label class="btn-primary" style="display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:56px;">🖼 選擇名片相片' +
+      '<input type="file" accept="image/*" id="file-input" style="display:none;" onchange="handleFileSelect(event)"></label>';
   }
 }
 function stopCamera(){
@@ -16973,11 +17046,55 @@ function stopCamera(){
     STATE.cameraStream.getTracks().forEach(function(t){ t.stop(); });
     STATE.cameraStream = null;
   }
+  // Clear any pending auto-capture timer
+  if(STATE.focusTimer){ clearTimeout(STATE.focusTimer); STATE.focusTimer = null; }
 }
+
+// Tap-to-focus: show focus ring, attempt hardware focus, then auto-capture after 0.8s
+function onCameraTap(e){
+  var wrap = document.getElementById('camera-wrap');
+  var ring = document.getElementById('camera-focus-ring');
+  var video = document.getElementById('camera-preview');
+  if(!wrap||!ring||!video||!STATE.cameraStream) return;
+
+  var rect = wrap.getBoundingClientRect();
+  var x = (e.clientX||e.touches&&e.touches[0].clientX||rect.width/2) - rect.left;
+  var y = (e.clientY||e.touches&&e.touches[0].clientY||rect.height/2) - rect.top;
+
+  // Show focus ring at tap position
+  ring.style.left = x+'px';
+  ring.style.top  = y+'px';
+  ring.style.display='block';
+  ring.style.opacity='1';
+  ring.style.transform='translate(-50%,-50%) scale(1.3)';
+  setTimeout(function(){ ring.style.transform='translate(-50%,-50%) scale(1)'; },150);
+
+  // Try hardware focus via constraint
+  try{
+    var track = STATE.cameraStream.getVideoTracks()[0];
+    var relX = x/rect.width;
+    var relY = y/rect.height;
+    track.applyConstraints({advanced:[{pointsOfInterest:[{x:relX,y:relY}],focusMode:'manual'}]}).catch(function(){
+      // Not supported on this device — silent fail, still auto-capture
+    });
+  } catch(_){}
+
+  // Cancel previous timer, set new auto-capture after 0.8s
+  if(STATE.focusTimer) clearTimeout(STATE.focusTimer);
+  STATE.focusTimer = setTimeout(function(){
+    // Fade out ring before capture
+    ring.style.opacity='0';
+    setTimeout(function(){ ring.style.display='none'; },300);
+    capturePhoto();
+  }, 800);
+}
+
 function capturePhoto(){
   var video = document.getElementById('camera-preview');
   var canvas = document.getElementById('camera-canvas');
-  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  if(!video.videoWidth) return; // not ready
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video,0,0);
   canvas.toBlob(function(blob){ processImageBlob(blob, 'photo.jpg', 'image/jpeg'); }, 'image/jpeg', 0.92);
 }
