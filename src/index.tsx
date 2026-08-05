@@ -16111,9 +16111,6 @@ app.post('/api/admin/colinkery/approve/:id', async (c) => {
   ).bind(appId).first<any>()
   if (!appRow) return c.json({ ok: false, error: '申請不存在' }, 404)
 
-  if (!appRow.password_hash_pending)
-    return c.json({ ok: false, error: '申請缺少密碼雜湊，無法啟用' }, 400)
-
   // 取下一個 CK 號碼
   let holderNo = 'CK000001'
   try {
@@ -16121,13 +16118,18 @@ app.post('/api/admin/colinkery/approve/:id', async (c) => {
     if (cr) holderNo = 'CK' + String(cr.next_val).padStart(6, '0')
   } catch { /* fallback */ }
 
-  // 批次操作
-  await db.batch([
+  // 批次操作：若有 password_hash_pending 就同時寫入 password_hash，否則只改 status
+  const batchOps = [
     db.prepare(`UPDATE role_applications SET status='APPROVED', reviewed_at=datetime('now') WHERE id=?`).bind(appId),
-    db.prepare(`UPDATE members SET password_hash=?, colinkery_account_status='active' WHERE member_no=?`).bind(appRow.password_hash_pending, appRow.member_no),
     db.prepare(`INSERT OR IGNORE INTO role_holders (member_no, role, applicant_type, holder_no, name_zh, status) VALUES (?,?,?,?,?,'ACTIVE')`).bind(appRow.member_no, 'COLINKERY', appRow.applicant_type, holderNo, appRow.name_zh || ''),
     db.prepare(`INSERT INTO b2b_audit_log (action, old_value, new_value, actor) VALUES ('approve_colinkery',?,?,?)`).bind(appRow.member_no, holderNo, 'admin')
-  ])
+  ]
+  if (appRow.password_hash_pending) {
+    batchOps.push(db.prepare(`UPDATE members SET password_hash=?, colinkery_account_status='active' WHERE member_no=?`).bind(appRow.password_hash_pending, appRow.member_no))
+  } else {
+    batchOps.push(db.prepare(`UPDATE members SET colinkery_account_status='active' WHERE member_no=?`).bind(appRow.member_no))
+  }
+  await db.batch(batchOps)
 
   // 取成員電話，生成 wa.me 連結
   const member = await db.prepare(`SELECT phone, name_zh FROM members WHERE member_no=?`).bind(appRow.member_no).first<{ phone: string; name_zh: string }>()
@@ -16222,7 +16224,7 @@ app.get('/colinkery-manifest.json', (c) => {
 
 app.get('/colinkery-sw.js', (c) => {
   const sw = `
-const CACHE = 'colinkery-v1';
+const CACHE = 'colinkery-v3';
 const OFFLINE = ['/colinkery/'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(OFFLINE)));
@@ -16236,7 +16238,7 @@ self.addEventListener('fetch', e => {
   if (e.request.url.includes('/api/')) return;
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || caches.match('/colinkery/'))));
 });`
-  return new Response(sw, { headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' } })
+  return new Response(sw, { headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-store, no-cache' } })
 })
 
 // ─── CoLinkery PWA 前端頁面 ────────────────────────────────────────────────────
@@ -16382,7 +16384,7 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     </div>
   </div>
 
-  <!-- ② 申請頁 -->
+  <!-- ② 申請頁 (展示后由 showPage 觸發 redirect，不在此處直接執行) -->
   <div class="page" id="page-apply">
     <div class="cl-nav">
       <button class="cl-nav-back" onclick="showPage('page-login')">←</button>
@@ -16391,14 +16393,10 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     </div>
     <div style="padding:32px 16px;text-align:center;">
       <div style="font-size:40px;margin-bottom:16px;">🤝</div>
-      <div style="font-size:17px;font-weight:700;color:var(--primary);margin-bottom:8px;">正在跳轉至申請頁面…</div>
+      <div style="font-size:17px;font-weight:700;color:var(--green);margin-bottom:8px;">正在跳轉至申請頁面…</div>
       <div style="font-size:14px;color:var(--muted);margin-bottom:24px;">如未自動跳轉，請點擊下方按鈕</div>
       <button class="btn-primary" onclick="window.location.href='/app/partner-apply?role=COLINKERY'">前往申請表格</button>
     </div>
-    <script>
-      // Auto-redirect on entering this page
-      (function(){ window.location.href = '/app/partner-apply?role=COLINKERY'; })();
-    <\/script>
   </div>
 
   <!-- ③ 申請狀態頁（未登入時查閱）-->
@@ -16656,6 +16654,7 @@ function showPage(id){
   if(id==='page-results') loadResults();
   if(id==='page-share') initSharePage();
   if(id==='page-dashboard') loadStats();
+  if(id==='page-apply') { window.location.href='/app/partner-apply?role=COLINKERY'; return; }
   window.scrollTo(0,0);
 }
 
