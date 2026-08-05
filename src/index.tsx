@@ -16346,19 +16346,27 @@ app.get('/colinkery-manifest.json', (c) => {
 
 app.get('/colinkery-sw.js', (c) => {
   const sw = `
-const CACHE = 'colinkery-v3';
+const CACHE = 'colinkery-v5';
 const OFFLINE = ['/colinkery/'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(OFFLINE)));
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  // Delete ALL old caches
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.map(k=>caches.delete(k)))));
   self.clients.claim();
 });
 self.addEventListener('fetch', e => {
+  // API requests: always network, no cache
   if (e.request.url.includes('/api/')) return;
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || caches.match('/colinkery/'))));
+  // HTML pages: network-first (get fresh content, fallback to cache for offline)
+  if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
+    e.respondWith(fetch(e.request, {cache:'no-store'}).catch(() => caches.match('/colinkery/')));
+    return;
+  }
+  // Other assets: network-first with cache fallback
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });`
   return new Response(sw, { headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-store, no-cache' } })
 })
@@ -16375,6 +16383,23 @@ function colinkerypwaHtml(): string {
 <meta name="apple-mobile-web-app-title" content="CoLinkery">
 <meta name="theme-color" content="#1B5E20">
 <title>CoLinkery 連結者</title>
+<script>
+// Force clear old service worker caches on every load
+(function(){
+  if('serviceWorker' in navigator){
+    // Unregister any old SW scopes
+    navigator.serviceWorker.getRegistrations().then(function(regs){
+      regs.forEach(function(r){ if(r.scope.includes('colinkery') || r.scope.includes(location.origin)) r.update(); });
+    });
+    // Clear all caches except current version
+    if(window.caches){
+      caches.keys().then(function(ks){
+        ks.forEach(function(k){ if(k!=='colinkery-v5') caches.delete(k); });
+      });
+    }
+  }
+})();
+<\/script>
 <link rel="manifest" href="/colinkery-manifest.json">
 <link rel="apple-touch-icon" href="/static/cl-icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -16495,17 +16520,18 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     <div style="padding:24px 16px;">
       <div class="form-group">
         <label class="form-label">電話號碼</label>
-        <input type="tel" class="form-input" id="login-phone" placeholder="例：52345678" autocomplete="username">
+        <input type="tel" class="form-input" id="login-phone" placeholder="例：52345678" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()">
       </div>
       <div class="form-group">
         <label class="form-label">密碼</label>
-        <input type="password" class="form-input" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password">
+        <input type="password" class="form-input" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <div id="login-err" class="alert alert-red" style="display:none;margin:0 0 14px;"></div>
-      <button class="btn-primary" onclick="doLogin()" style="margin-bottom:14px;">登入</button>
+      <button class="btn-primary" id="login-btn" onclick="doLogin()" style="margin-bottom:14px;">登入</button>
       <button class="btn-secondary" onclick="window.location.href='/app/partner-apply?role=COLINKERY'" style="margin-bottom:14px;">申請成為 CoLinkery 連結者</button>
       <button class="btn-outline" style="width:100%;margin-bottom:14px;" onclick="showPage('page-forgot')">忘記密碼？</button>
       <p style="text-align:center;font-size:14px;color:var(--muted);">申請後 3-5 工作天審核，批准後可登入</p>
+      <p style="text-align:center;margin-top:16px;"><a href="/colinkery/install" style="font-size:14px;color:var(--green);text-decoration:none;">📲 如何加入手機主畫面？</a></p>
     </div>
   </div>
 
@@ -16798,7 +16824,29 @@ function showAlert(id, msg, type){
 function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
 
 // ── 初始化：檢查登入狀態 ────────────────────────────────────────────────────
-(function init(){
+// Use DOMContentLoaded to guarantee DOM is ready before manipulating elements
+document.addEventListener('DOMContentLoaded', function(){
+  // Register service worker (network-first v5)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/colinkery-sw.js').then(function(reg){
+      reg.update(); // Always check for SW updates
+    }).catch(function(){});
+  }
+
+  // PWA install prompt (Android)
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    STATE.deferredPrompt = e;
+    var banner = document.getElementById('pwa-banner');
+    if(banner) banner.style.display = 'flex';
+  });
+
+  // Parse URL params
+  var params = new URLSearchParams(window.location.search);
+  var action = params.get('action');
+  var prefillPhone = params.get('phone') || '';
+
+  // Check existing session
   var saved = sessionStorage.getItem('cl_member');
   if(saved){
     try{
@@ -16807,35 +16855,24 @@ function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.disp
       STATE.nameZh = d.name_zh;
       afterLogin();
     } catch(e){ sessionStorage.removeItem('cl_member'); }
-  } else {
-    // 從會員卡跳過來：?action=apply&phone=xxxxxxxx → 直接跳轉新申請頁
-    var params = new URLSearchParams(window.location.search);
-    var action = params.get('action');
-    var prefillPhone = params.get('phone') || '';
-    if(action === 'apply'){
-      var applyUrl = '/app/partner-apply?role=COLINKERY';
-      if(prefillPhone) applyUrl += '&phone=' + encodeURIComponent(prefillPhone);
-      window.location.href = applyUrl;
-    } else if(prefillPhone){
-      // 從 /app 帶過來的電話號碼：自動填入登入表格
-      var loginPhoneEl = document.getElementById('login-phone');
-      if(loginPhoneEl) loginPhoneEl.value = prefillPhone;
-      // 聚焦到密碼欄位，讓用戶直接輸入密碼
-      var loginPwEl = document.getElementById('login-pw');
-      if(loginPwEl) loginPwEl.focus();
+  } else if(action === 'apply'){
+    // Redirect to apply page
+    var applyUrl = '/app/partner-apply?role=COLINKERY';
+    if(prefillPhone) applyUrl += '&phone=' + encodeURIComponent(prefillPhone);
+    window.location.href = applyUrl;
+  } else if(prefillPhone){
+    // Pre-fill phone from /app navigation — DOM is ready here
+    var loginPhoneEl = document.getElementById('login-phone');
+    if(loginPhoneEl){
+      loginPhoneEl.value = prefillPhone;
+      // Focus password field so user just types password
+      setTimeout(function(){
+        var pw = document.getElementById('login-pw');
+        if(pw) pw.focus();
+      }, 300);
     }
   }
-  // Register service worker
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/colinkery-sw.js').catch(function(){});
-  }
-  // PWA install prompt (Android)
-  window.addEventListener('beforeinstallprompt', function(e){
-    e.preventDefault();
-    STATE.deferredPrompt = e;
-    document.getElementById('pwa-banner').style.display = 'flex';
-  });
-})();
+});
 
 function triggerInstall(){
   if(STATE.deferredPrompt){
@@ -16849,21 +16886,33 @@ function triggerInstall(){
 
 // ── 登入 ──────────────────────────────────────────────────────────────────────
 async function doLogin(){
-  var phone = document.getElementById('login-phone').value.trim();
-  var pw = document.getElementById('login-pw').value;
-  if(!phone||!pw){ showAlert('login-err','請填寫電話及密碼'); return; }
+  var phone = (document.getElementById('login-phone').value||'').trim();
+  var pw = document.getElementById('login-pw').value||'';
+  if(!phone){ showAlert('login-err','請輸入電話號碼'); return; }
+  if(!pw){ showAlert('login-err','請輸入密碼'); return; }
   hideAlert('login-err');
-  showLoading('登入中…');
+  var btn = document.getElementById('login-btn');
+  if(btn){ btn.disabled=true; btn.textContent='登入中…'; }
   try{
-    var res = await fetch('/api/colinkery/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:phone,password:pw})});
+    var res = await fetch('/api/colinkery/login',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:phone, password:pw})
+    });
     var d = await res.json();
-    hideLoading();
-    if(!d.ok){ showAlert('login-err', d.error||'登入失敗'); return; }
+    if(!d.ok){
+      showAlert('login-err', d.error||'電話或密碼錯誤');
+      if(btn){ btn.disabled=false; btn.textContent='登入'; }
+      return;
+    }
     STATE.memberNo = d.member_no;
     STATE.nameZh = d.name_zh;
-    sessionStorage.setItem('cl_member', JSON.stringify({member_no:d.member_no,name_zh:d.name_zh}));
+    sessionStorage.setItem('cl_member', JSON.stringify({member_no:d.member_no, name_zh:d.name_zh}));
     afterLogin();
-  } catch(e){ hideLoading(); showAlert('login-err','網絡錯誤，請稍後再試'); }
+  } catch(e){
+    showAlert('login-err','網絡錯誤，請檢查連線後再試');
+    if(btn){ btn.disabled=false; btn.textContent='登入'; }
+  }
 }
 
 function afterLogin(){
@@ -17323,8 +17372,185 @@ async function loadResults(){
 }
 
 app.get('/colinkery', (c) => c.redirect('/colinkery/', 301))
+app.get('/colinkery/install', (c) => c.html(colinkerypwaInstallHtml()))
 app.get('/colinkery/', (c) => c.html(colinkerypwaHtml()))
 app.get('/colinkery/*', (c) => c.html(colinkerypwaHtml()))
+
+// ─── CoLinkery PWA Install Guide ─────────────────────────────────────────────
+function colinkerypwaInstallHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1B5E20">
+<title>加入主畫面 — CoLinkery</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F9FAFB;color:#111;font-size:16px;line-height:1.6;}
+.topbar{background:#1B5E20;color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px;}
+.topbar h1{font-size:18px;font-weight:700;}
+.topbar a{color:#fff;text-decoration:none;font-size:22px;line-height:1;}
+.section{margin:20px 16px;}
+.card{background:#fff;border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 8px rgba(0,0,0,.07);}
+.os-tab{display:flex;gap:8px;margin-bottom:20px;}
+.os-btn{flex:1;padding:12px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-size:15px;font-weight:700;cursor:pointer;text-align:center;transition:.15s;}
+.os-btn.active{border-color:#1B5E20;background:#E8F5E9;color:#1B5E20;}
+.step{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px;}
+.step-num{width:32px;height:32px;border-radius:50%;background:#1B5E20;color:#fff;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.step-body h3{font-size:16px;font-weight:700;margin-bottom:4px;}
+.step-body p{font-size:14px;color:#555;margin-bottom:4px;}
+.step-img{width:100%;border-radius:10px;border:1px solid #E5E7EB;margin-top:8px;}
+.tip{background:#FEF9C3;border:1px solid #FDE047;border-radius:10px;padding:12px 14px;font-size:14px;color:#713F12;margin-top:4px;}
+.icon-demo{display:inline-block;background:#1B5E20;color:#fff;border-radius:12px;width:48px;height:48px;font-size:28px;text-align:center;line-height:48px;vertical-align:middle;margin:0 4px;}
+.launch-btn{display:block;background:#1B5E20;color:#fff;text-align:center;padding:16px;border-radius:14px;font-size:17px;font-weight:700;text-decoration:none;margin:20px 16px;}
+.panel{display:none;} .panel.active{display:block;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/colinkery/">←</a>
+  <h1>📲 加入主畫面教學</h1>
+</div>
+
+<div class="section">
+  <div class="os-tab">
+    <button class="os-btn active" id="btn-ios" onclick="switchOS('ios')">🍎 iPhone / iPad</button>
+    <button class="os-btn" id="btn-android" onclick="switchOS('android')">🤖 Android</button>
+  </div>
+
+  <!-- iOS -->
+  <div class="panel active" id="panel-ios">
+    <div class="card">
+      <div style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:16px;">iPhone / iPad 安裝步驟</div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>用 Safari 開啟連結</h3>
+          <p>必須使用 <strong>Safari</strong> 瀏覽器（Chrome 不支援 iOS 安裝）</p>
+          <p>前往：<strong>coeldery85.com/colinkery</strong></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>點擊「分享」按鈕</h3>
+          <p>點擊 Safari 底部中間的 <strong>⬆️ 分享按鈕</strong>（方框配箭頭圖示）</p>
+          <div class="tip">💡 如果看不到底部工具列，先向上滑動頁面讓它出現</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>選擇「加入主畫面」</h3>
+          <p>在分享選單中向下捲動，找到並點擊 <strong>「加入主畫面」</strong></p>
+          <div class="tip">💡 圖示是一個方框配加號 ＋</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>確認名稱並點擊「加入」</h3>
+          <p>名稱預設為「CoLinkery 連結者」，直接點擊右上角 <strong>「加入」</strong></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>完成！從主畫面開啟</h3>
+          <p>主畫面會出現 <span class="icon-demo">🤝</span> 圖示，點擊即可全屏啟動 CoLinkery，體驗如原生 App！</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px;">⚠️ 常見問題</div>
+      <p style="font-size:14px;color:#555;margin-bottom:8px;"><strong>Q：找不到「加入主畫面」選項？</strong><br>A：確保使用 Safari 而非 Chrome。分享選單需要向下捲動才能找到此選項。</p>
+      <p style="font-size:14px;color:#555;"><strong>Q：登入後記得密碼嗎？</strong><br>A：CoLinkery 使用 session 記住登入狀態，下次開啟毋需重新登入（直至退出登入或清除 Safari 資料）。</p>
+    </div>
+  </div>
+
+  <!-- Android -->
+  <div class="panel" id="panel-android">
+    <div class="card">
+      <div style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:16px;">Android 安裝步驟（自動提示）</div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>用 Chrome 開啟連結</h3>
+          <p>使用 <strong>Google Chrome</strong> 瀏覽器前往：<strong>coeldery85.com/colinkery</strong></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>等待安裝提示橫幅</h3>
+          <p>頁面底部會自動彈出綠色橫幅：<strong>「加入」CoLinkery 連結者</strong></p>
+          <p>點擊橫幅上的 <strong>「加入」</strong> 按鈕即可安裝</p>
+          <div class="tip">💡 橫幅在首次訪問幾秒後出現。如沒有出現，請用下面的手動方法。</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num" style="background:#6B7280;">?</div>
+        <div class="step-body">
+          <h3>手動安裝（若無橫幅）</h3>
+          <p>點擊 Chrome 右上角 <strong>⋮ 三點選單</strong></p>
+          <p>選擇 <strong>「加至主畫面」</strong> 或 <strong>「安裝應用程式」</strong></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>確認安裝</h3>
+          <p>點擊彈出視窗的 <strong>「安裝」</strong>，CoLinkery 圖示即會出現在手機桌面</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>完成！從桌面開啟</h3>
+          <p>桌面出現 <span class="icon-demo">🤝</span> 圖示，點擊即可全屏啟動 CoLinkery！</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px;">✅ Android 優勢</div>
+      <p style="font-size:14px;color:#555;margin-bottom:6px;">• 安裝後可<strong>完全離線</strong>瀏覽已加載的名片</p>
+      <p style="font-size:14px;color:#555;margin-bottom:6px;">• 支援<strong>推送通知</strong>（未來功能）</p>
+      <p style="font-size:14px;color:#555;">• 安裝包只有幾 KB，佔用極少空間</p>
+    </div>
+  </div>
+</div>
+
+<a href="/colinkery/" class="launch-btn">🚀 立即開啟 CoLinkery</a>
+
+<script>
+function switchOS(os){
+  document.getElementById('btn-ios').classList.toggle('active', os==='ios');
+  document.getElementById('btn-android').classList.toggle('active', os==='android');
+  document.getElementById('panel-ios').classList.toggle('active', os==='ios');
+  document.getElementById('panel-android').classList.toggle('active', os==='android');
+}
+// Auto-detect OS
+(function(){
+  var ua = navigator.userAgent;
+  if(/android/i.test(ua)) switchOS('android');
+})();
+<\/script>
+</body>
+</html>`
+}
 
 // ─── Admin CoLinkery：完整管理後台 ──────────────────────────────────────────
 app.get('/admin/colinkery', async (c) => {
