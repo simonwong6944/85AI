@@ -15934,50 +15934,34 @@ app.post('/api/colinkery/cards/ocr', requireColinkery(), async (c) => {
     await c.env.FILES.put(r2Key, await imgFile.arrayBuffer(), { httpMetadata: { contentType: imgFile.type || 'image/jpeg' } })
   }
 
-  // OCR — 優先用 Google Gemini API，後備 OpenRouter
-  const geminiKey = c.env.GEMINI_API_KEY
-  const openrouterKey = c.env.OPENROUTER_API_KEY
-  if (!geminiKey && !openrouterKey) return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
+  // OCR — OpenRouter only (google/gemini-2.0-flash-001)
+  const apiKey = c.env.OPENROUTER_API_KEY
+  if (!apiKey) return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
 
   const imgBytes = await imgFile.arrayBuffer()
   const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBytes)))
   const mimeType = imgFile.type || 'image/jpeg'
+  const dataUrl = `data:${mimeType};base64,${base64}`
   const prompt = 'You are a business card OCR engine. Extract ALL text from this business card image and return a JSON object with these fields: name_zh (Chinese name), name_en (English name), company (company/organization name), title (job title/position), phone (office phone), mobile (mobile/cell number), email (email address), address (full address), industry (industry type e.g. retail/manufacturing/F&B). Use empty string "" for missing fields. Return ONLY the raw JSON object, no markdown, no explanation.'
 
   try {
-    let raw = ''
-    if (geminiKey) {
-      // Google Gemini Vision API (direct)
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: base64 } }
-          ]}],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 512 }
-        })
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'X-Title': 'CoLinkery OCR'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.0-flash-001',
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: dataUrl } }
+        ]}]
       })
-      const data = await resp.json() as any
-      raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    } else {
-      // Fallback: OpenRouter with gemini-2.0-flash
-      const dataUrl = `data:${mimeType};base64,${base64}`
-      const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${openrouterKey}`, 'Content-Type': 'application/json', 'X-Title': 'CoLinkery OCR' },
-        body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-001',
-          messages: [{ role: 'user', content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: dataUrl } }
-          ]}]
-        })
-      })
-      const data = await resp.json() as any
-      raw = data?.choices?.[0]?.message?.content || ''
-    }
+    })
+    const data = await resp.json() as any
+    const raw = data?.choices?.[0]?.message?.content || ''
     // Strip markdown code fences if present
     const stripped = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim()
     const jsonMatch = stripped.match(/\{[\s\S]*\}/)
