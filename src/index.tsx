@@ -173,23 +173,65 @@ app.use('/assets/*', serveStatic({ root: './public' }))
 // PWA root-level static files — served via explicit GET + ASSETS binding
 // (serveStatic with double-middleware caused 500 in CF Pages; direct ASSETS fetch is reliable)
 app.get('/manifest.webmanifest', serveStatic({ root: './public' }))
-app.get('/sw.js', async (c) => {
-  const res = await (serveStatic({ root: './public' }))(c, async () => {})
-  if (res) {
-    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
-    return res
+app.get('/sw.js', (c) => {
+  const swContent = `// CoEldery 85 Service Worker
+// v4: no-store navigation, always fresh /app
+const CACHE_NAME = 'coeldery85-v4';
+const OFFLINE_URLS = ['/app'];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(OFFLINE_URLS).catch(() => {}))
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+
+  // Navigation: ALWAYS network, no-store — never serve stale HTML
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' }).catch(() =>
+        caches.match('/app').then((r) => r || new Response('Offline', { status: 503 }))
+      )
+    );
+    return;
   }
-  // fallback: read via ASSETS
-  const url = new URL(c.req.url)
-  url.pathname = '/sw.js'
-  const r = await (c.env as any).ASSETS?.fetch(new Request(url.toString()))
-  if (r) {
-    return new Response(r.body, {
-      status: r.status,
-      headers: { ...Object.fromEntries(r.headers), 'Cache-Control': 'no-store, no-cache, must-revalidate' }
-    })
+
+  // Icons & manifest: network first
+  if (url.pathname === '/icon-192.png' || url.pathname === '/icon-512.png' || url.pathname === '/manifest.webmanifest') {
+    event.respondWith(
+      fetch(event.request).then((r) => {
+        const clone = r.clone();
+        caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+        return r;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
   }
-  return c.notFound()
+
+  // Everything else: network first, fallback to cache
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+});
+`
+  return new Response(swContent, {
+    headers: {
+      'Content-Type': 'application/javascript',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache'
+    }
+  })
 })
 app.get('/icon-192.png', serveStatic({ root: './public' }))
 app.get('/icon-512.png', serveStatic({ root: './public' }))
