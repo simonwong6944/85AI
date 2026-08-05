@@ -175,15 +175,14 @@ app.use('/assets/*', serveStatic({ root: './public' }))
 app.get('/manifest.webmanifest', serveStatic({ root: './public' }))
 app.get('/sw.js', (c) => {
   const swContent = `// CoEldery 85 Service Worker
-// v5: force skip-waiting, SKIP_WAITING message handler
-const CACHE_NAME = 'coeldery85-v5';
+// v4: no-store for navigation, force fresh /app always
+const CACHE_NAME = 'coeldery85-v4';
 const OFFLINE_URLS = ['/app'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(OFFLINE_URLS).catch(() => {}))
   );
-  // 立即跳過 waiting，不等舊 SW 釋放
   self.skipWaiting();
 });
 
@@ -191,44 +190,35 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    )
   );
-});
-
-// 接收來自頁面的 SKIP_WAITING 訊息
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // Navigation: ALWAYS network, no-store — never serve stale HTML
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request, { cache: 'no-store' }).catch(() =>
-        caches.match('/app').then((r) => r || new Response('Offline', { status: 503 }))
+        caches.match('/app').then((r) => r || caches.match('/'))
       )
     );
     return;
   }
 
-  // Icons & manifest: network first
   if (url.pathname === '/icon-192.png' || url.pathname === '/icon-512.png' || url.pathname === '/manifest.webmanifest') {
     event.respondWith(
-      fetch(event.request).then((r) => {
-        const clone = r.clone();
-        caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
-        return r;
+      fetch(event.request).then((response) => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        return response;
       }).catch(() => caches.match(event.request))
     );
     return;
   }
 
-  // Everything else: network first, fallback to cache
   event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });
 `
@@ -8583,11 +8573,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <!-- Tab 列 -->
   <div class="ck-tab-bar">
     <button class="ck-tab active" id="ckTab-pending" onclick="ckSwitchTab('pending',this)">⏳ 待審批</button>
-    <button class="ck-tab" id="ckTab-members" onclick="ckSwitchTab('members',this)">👥 會員管理</button>
-    <button class="ck-tab" id="ckTab-leads" onclick="ckSwitchTab('leads',this)">📋 Leads</button>
     <button class="ck-tab" id="ckTab-approved" onclick="ckSwitchTab('approved',this)">✅ 已批准</button>
     <button class="ck-tab" id="ckTab-rejected" onclick="ckSwitchTab('rejected',this)">❌ 已拒絕</button>
-    <button class="ck-tab" id="ckTab-otp" onclick="ckSwitchTab('otp',this)">📱 OTP</button>
+    <button class="ck-tab" id="ckTab-otp" onclick="ckSwitchTab('otp',this)">📱 OTP 管理</button>
   </div>
 
   <!-- 待審批 -->
@@ -8597,63 +8585,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="btn btn-secondary btn-sm" onclick="loadCkAdminData()"><i class="fas fa-rotate-right"></i> 刷新</button>
     </div>
     <div id="ckPendingList">載入中…</div>
-  </div>
-
-  <!-- 會員管理 -->
-  <div id="ckPanel-members" style="display:none;">
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-      <input type="text" id="ckMembersQ" placeholder="搜尋姓名/電話/號碼…" style="flex:1;min-width:160px;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;" oninput="loadCkMembers()">
-      <button class="btn btn-secondary btn-sm" onclick="loadCkMembers()"><i class="fas fa-rotate-right"></i> 刷新</button>
-    </div>
-    <div id="ckMembersList"><p style="color:#9CA3AF;padding:20px 0;">載入中…</p></div>
-  </div>
-
-  <!-- Leads 管理 -->
-  <div id="ckPanel-leads" style="display:none;">
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-      <input type="text" id="ckLeadsQ" placeholder="搜尋買家/公司/連結者…" style="flex:1;min-width:160px;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;" oninput="loadCkLeads()">
-      <select id="ckLeadsStatus" onchange="loadCkLeads()" style="padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;">
-        <option value="">全部狀態</option>
-        <option value="pending">待處理</option>
-        <option value="catalog_sent">目錄已發</option>
-        <option value="interest_submitted">已表達興趣</option>
-        <option value="quoted">已報價</option>
-        <option value="negotiating">洽談中</option>
-        <option value="won">成交</option>
-        <option value="lost">失敗</option>
-      </select>
-      <button class="btn btn-secondary btn-sm" onclick="loadCkLeads()"><i class="fas fa-rotate-right"></i> 刷新</button>
-    </div>
-    <div id="ckLeadsList"><p style="color:#9CA3AF;padding:20px 0;">載入中…</p></div>
-  </div>
-
-  <!-- Lead 編輯 Modal -->
-  <div id="ckLeadModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;overflow-y:auto;">
-    <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:500px;margin:40px auto;">
-      <div style="font-size:17px;font-weight:700;margin-bottom:16px;">編輯 Lead</div>
-      <input type="hidden" id="ckLmLeadId">
-      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">買家</label><input id="ckLmBuyer" type="text" readonly style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;background:#F9FAFB;font-size:14px;"></div>
-      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">電話</label><input id="ckLmPhone" type="text" readonly style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;background:#F9FAFB;font-size:14px;"></div>
-      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">連結者</label><input id="ckLmLinker" type="text" readonly style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;background:#F9FAFB;font-size:14px;"></div>
-      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">狀態</label>
-        <select id="ckLmStatus" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;">
-          <option value="pending">待處理</option>
-          <option value="catalog_sent">目錄已發</option>
-          <option value="interest_submitted">已表達興趣</option>
-          <option value="quoted">已報價</option>
-          <option value="negotiating">洽談中</option>
-          <option value="won">成交 ✅</option>
-          <option value="lost">失敗 ❌</option>
-        </select>
-      </div>
-      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">指定供應商/產品</label><input id="ckLmSupplier" type="text" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;" placeholder="留空=不指定"></div>
-      <div style="margin-bottom:10px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">佣金(%)</label><input id="ckLmCommission" type="number" min="0" max="100" step="0.1" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;" placeholder="例：5"></div>
-      <div style="margin-bottom:16px;"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">備注</label><textarea id="ckLmNote" rows="3" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;resize:vertical;" placeholder="內部備注…"></textarea></div>
-      <div style="display:flex;gap:8px;">
-        <button onclick="saveCkLead()" style="flex:1;padding:10px;background:#065F46;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;">儲存</button>
-        <button onclick="document.getElementById('ckLeadModal').style.display='none'" style="padding:10px 20px;background:#E5E7EB;color:#374151;border:none;border-radius:8px;font-size:15px;cursor:pointer;">取消</button>
-      </div>
-    </div>
   </div>
 
   <!-- 已批准 -->
@@ -8773,14 +8704,11 @@ function ckSwitchTab(tab, btnEl) {
   _ckCurrentTab = tab;
   document.querySelectorAll('.ck-tab').forEach(function(t){ t.classList.remove('active'); });
   if(btnEl) btnEl.classList.add('active');
-  ['pending','members','leads','approved','rejected','otp'].forEach(function(p){
-    var el = document.getElementById('ckPanel-'+p);
-    if(el) el.style.display = p===tab ? '' : 'none';
+  ['pending','approved','rejected','otp'].forEach(function(p){
+    document.getElementById('ckPanel-'+p).style.display = p===tab ? '' : 'none';
   });
   if(tab==='approved') loadCkApproved();
   if(tab==='rejected') loadCkRejected();
-  if(tab==='members') loadCkMembers();
-  if(tab==='leads') loadCkLeads();
 }
 
 async function loadCkAdminData() {
@@ -8953,144 +8881,6 @@ async function ckRejectApp(id) {
     if(confirmed) window.open(d.wa_notify_link,'_blank');
     loadCkAdminData();
   } catch(e) { alert('網絡錯誤：'+e.message); }
-}
-
-async function loadCkMembers() {
-  var list = document.getElementById('ckMembersList');
-  if(!list) return;
-  var q = (document.getElementById('ckMembersQ')||{}).value || '';
-  list.innerHTML='<div style="padding:20px;color:#6B7280;text-align:center;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
-  try {
-    var url = '/api/admin/colinkery/members' + (q ? '?q='+encodeURIComponent(q) : '');
-    var res = await fetch(url, {credentials:'include'});
-    var d = await res.json();
-    if(!d.ok){ list.innerHTML='<p style="color:#c00;">'+escHtml(d.error||'錯誤')+'</p>'; return; }
-    var members = d.members||[];
-    if(members.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;">沒有符合的會員</div>'; return; }
-    list.innerHTML = members.map(function(m){
-      var statusColor = m.colinkery_account_status==='active'?'#065F46':m.colinkery_account_status==='suspended'?'#991B1B':'#6B7280';
-      var statusBg = m.colinkery_account_status==='active'?'#D1FAE5':m.colinkery_account_status==='suspended'?'#FEE2E2':'#F3F4F6';
-      var statusLabel = m.colinkery_account_status==='active'?'啟用':m.colinkery_account_status==='suspended'?'已停用':m.colinkery_account_status||'–';
-      var phoneDigits = (m.phone||'').replace(/\D/g,'');
-      var fullPhone = phoneDigits.startsWith('852')?phoneDigits:'852'+phoneDigits;
-      var waLink = 'https://wa.me/'+fullPhone;
-      return '<div style="background:#fff;border-radius:10px;border:1.5px solid #BAE6FD;padding:14px 16px;margin-bottom:10px;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
-          '<div>' +
-            '<div style="font-size:16px;font-weight:700;color:#0C4A6E;">'+escHtml(m.name_zh||'')+'</div>' +
-            '<div style="font-size:13px;color:#6B7280;margin-top:3px;">'+escHtml(m.member_no)+' ｜ 📞 '+escHtml(m.phone||'')+'</div>' +
-            (m.holder_no?'<div style="font-size:12px;color:#0369A1;margin-top:2px;">CK號：'+escHtml(m.holder_no)+'</div>':'') +
-            '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;">' +
-              '<span style="background:'+statusBg+';color:'+statusColor+';padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;">'+statusLabel+'</span>' +
-              '<span style="font-size:12px;color:#9CA3AF;">Leads: '+(m.lead_count||0)+'件 ｜ 成交: '+(m.won_count||0)+'件</span>' +
-            '</div>' +
-          '</div>' +
-          '<div style="display:flex;flex-direction:column;gap:6px;">' +
-            '<a href="'+waLink+'" target="_blank" style="padding:6px 12px;background:#25D366;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;text-align:center;">💬 WA</a>' +
-            (m.colinkery_account_status==='active'?
-              '<button onclick="ckSuspendMember(\''+escHtml(m.member_no)+'\')" style="padding:6px 12px;background:#C62828;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">停用</button>':
-              '<button onclick="ckReinstateMember(\''+escHtml(m.member_no)+'\')" style="padding:6px 12px;background:#065F46;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">恢復</button>'
-            ) +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  } catch(e) { list.innerHTML='<p style="color:#c00;">網絡錯誤：'+e.message+'</p>'; }
-}
-
-async function ckSuspendMember(memberNo) {
-  if(!confirm('確認停用此 CoLinkery 帳號？')) return;
-  try {
-    var res = await fetch('/api/admin/colinkery/members/'+encodeURIComponent(memberNo)+'/suspend', {method:'POST',credentials:'include'});
-    var d = await res.json();
-    if(!d.ok){ alert('失敗：'+(d.error||'未知錯誤')); return; }
-    loadCkMembers();
-  } catch(e){ alert('網絡錯誤'); }
-}
-
-async function ckReinstateMember(memberNo) {
-  if(!confirm('確認恢復此 CoLinkery 帳號？')) return;
-  try {
-    var res = await fetch('/api/admin/colinkery/members/'+encodeURIComponent(memberNo)+'/reinstate', {method:'POST',credentials:'include'});
-    var d = await res.json();
-    if(!d.ok){ alert('失敗：'+(d.error||'未知錯誤')); return; }
-    loadCkMembers();
-  } catch(e){ alert('網絡錯誤'); }
-}
-
-async function loadCkLeads() {
-  var list = document.getElementById('ckLeadsList');
-  if(!list) return;
-  var q = (document.getElementById('ckLeadsQ')||{}).value || '';
-  var status = (document.getElementById('ckLeadsStatus')||{}).value || '';
-  list.innerHTML='<div style="padding:20px;color:#6B7280;text-align:center;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
-  try {
-    var params = [];
-    if(q) params.push('q='+encodeURIComponent(q));
-    if(status) params.push('status='+encodeURIComponent(status));
-    var res = await fetch('/api/admin/colinkery/leads'+(params.length?'?'+params.join('&'):''), {credentials:'include'});
-    var d = await res.json();
-    if(!d.ok){ list.innerHTML='<p style="color:#c00;">'+escHtml(d.error||'錯誤')+'</p>'; return; }
-    var leads = d.leads||[];
-    if(leads.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;">沒有符合的 Lead</div>'; return; }
-    var statusMap={'pending':'待處理','catalog_sent':'目錄已發','interest_submitted':'已表達興趣','quoted':'已報價','negotiating':'洽談中','won':'成交✅','lost':'失敗❌'};
-    var statusColors={'pending':'#6B7280','catalog_sent':'#1D4ED8','interest_submitted':'#0369A1','quoted':'#7C3AED','negotiating':'#B45309','won':'#065F46','lost':'#991B1B'};
-    var statusBgs={'pending':'#F3F4F6','catalog_sent':'#DBEAFE','interest_submitted':'#E0F2FE','quoted':'#EDE9FE','negotiating':'#FEF3C7','won':'#D1FAE5','lost':'#FEE2E2'};
-    list.innerHTML = leads.map(function(l){
-      var s = l.status||'pending';
-      var dateStr = l.created_at ? l.created_at.slice(0,10) : '–';
-      return '<div style="background:#fff;border-radius:10px;border:1.5px solid #E5E7EB;padding:14px 16px;margin-bottom:10px;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
-          '<div style="flex:1;">' +
-            '<div style="font-size:15px;font-weight:700;color:#111;">'+escHtml(l.buyer_name||'–')+'</div>' +
-            '<div style="font-size:13px;color:#6B7280;margin-top:2px;">'+escHtml(l.buyer_company||'')+(l.buyer_phone?' ｜ '+escHtml(l.buyer_phone):'')+'</div>' +
-            '<div style="font-size:12px;color:#0369A1;margin-top:3px;">連結者：'+escHtml(l.linker_name||l.colinkery_member_no||'–')+'</div>' +
-            (l.admin_note?'<div style="font-size:12px;color:#374151;margin-top:4px;background:#F9FAFB;padding:4px 8px;border-radius:6px;">備注：'+escHtml(l.admin_note)+'</div>':'') +
-            '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;">' +
-              '<span style="background:'+(statusBgs[s]||'#F3F4F6')+';color:'+(statusColors[s]||'#6B7280')+';padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;">'+(statusMap[s]||s)+'</span>' +
-              '<span style="font-size:12px;color:#9CA3AF;">'+dateStr+'</span>' +
-              (l.supplier_assigned?'<span style="font-size:12px;color:#7C3AED;">供應商：'+escHtml(l.supplier_assigned)+'</span>':'') +
-            '</div>' +
-          '</div>' +
-          '<button onclick="ckOpenLeadModal('+JSON.stringify(l)+')" style="padding:7px 14px;background:#1D4ED8;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✏️ 編輯</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  } catch(e) { list.innerHTML='<p style="color:#c00;">網絡錯誤：'+e.message+'</p>'; }
-}
-
-function ckOpenLeadModal(lead) {
-  document.getElementById('ckLmLeadId').value = lead.id||'';
-  document.getElementById('ckLmBuyer').value = (lead.buyer_name||'')+(lead.buyer_company?' / '+lead.buyer_company:'');
-  document.getElementById('ckLmPhone').value = lead.buyer_phone||'';
-  document.getElementById('ckLmLinker').value = lead.linker_name||lead.colinkery_member_no||'';
-  document.getElementById('ckLmStatus').value = lead.status||'pending';
-  document.getElementById('ckLmSupplier').value = lead.supplier_assigned||'';
-  document.getElementById('ckLmCommission').value = lead.commission_pct||'';
-  document.getElementById('ckLmNote').value = lead.admin_note||'';
-  document.getElementById('ckLeadModal').style.display = 'block';
-}
-
-async function saveCkLead() {
-  var id = document.getElementById('ckLmLeadId').value;
-  if(!id) return;
-  var body = {
-    status: document.getElementById('ckLmStatus').value,
-    supplier_assigned: document.getElementById('ckLmSupplier').value,
-    commission_pct: document.getElementById('ckLmCommission').value,
-    admin_note: document.getElementById('ckLmNote').value
-  };
-  try {
-    var res = await fetch('/api/admin/colinkery/leads/'+id+'/update', {
-      method:'POST', credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body)
-    });
-    var d = await res.json();
-    if(!d.ok){ alert('儲存失敗：'+(d.error||'未知錯誤')); return; }
-    document.getElementById('ckLeadModal').style.display='none';
-    loadCkLeads();
-  } catch(e){ alert('網絡錯誤'); }
 }
 
 function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -11154,42 +10944,6 @@ function pwaAppHtml() {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>CoEldery 85 老有聯盟</title>
-<!-- SW 強制更新：必須在所有資源載入前執行，清除舊版 Service Worker -->
-<script>
-(function(){
-  if(!('serviceWorker' in navigator)) return;
-  // 取得所有已注冊的 SW
-  navigator.serviceWorker.getRegistrations().then(function(regs){
-    if(!regs || regs.length === 0) return;
-    var hadOld = false;
-    var ops = regs.map(function(reg){
-      // 檢查是否為舊版（非 v5）
-      var isOld = false;
-      var sw = reg.active || reg.waiting || reg.installing;
-      if(sw){
-        // 強制叫 update，讓瀏覽器立即拉最新 sw.js
-        isOld = true;
-      }
-      if(isOld) hadOld = true;
-      return reg.update().catch(function(){});
-    });
-    Promise.all(ops).then(function(){
-      // 如果有舊 SW 正在執行，強制它們 skip waiting
-      regs.forEach(function(reg){
-        if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
-      });
-    });
-  });
-  // 當 SW controller 改變（新版 SW 接管），刷新頁面
-  navigator.serviceWorker.addEventListener('controllerchange', function(){
-    // 避免無限刷新：用 sessionStorage 標記
-    if(sessionStorage.getItem('sw_reload')) return;
-    sessionStorage.setItem('sw_reload','1');
-    window.location.reload();
-  });
-})();
-</script>
-<!-- /SW 強制更新 -->
 <!-- PWA -->
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#228B22">
@@ -11572,39 +11326,12 @@ window.addEventListener('message', function(e) {
   }
 });
 
-// ── Service Worker 強制更新：先清除舊版 SW，再注冊新版 ──
+// ── Service Worker 注冊 ──
 if ('serviceWorker' in navigator) {
-  // 立即執行：不等 load 事件，因為要在舊 SW 攔截前先清除
-  navigator.serviceWorker.getRegistrations().then(function(regs) {
-    var promises = [];
-    regs.forEach(function(reg) {
-      // 強制所有已注冊的 SW 更新（無論版本）
-      promises.push(reg.update().catch(function(){}));
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function(e) {
+      console.warn('SW register failed:', e);
     });
-    return Promise.all(promises);
-  }).then(function() {
-    // 注冊/更新 sw.js
-    return navigator.serviceWorker.register('/sw.js?v=5', { updateViaCache: 'none' });
-  }).then(function(reg) {
-    // 若有 waiting 的新 SW，立即激活
-    if (reg.waiting) {
-      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-    }
-    reg.addEventListener('updatefound', function() {
-      var newSW = reg.installing;
-      if (!newSW) return;
-      newSW.addEventListener('statechange', function() {
-        if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-          // 有新版本裝好了，強制刷新頁面
-          newSW.postMessage({ type: 'SKIP_WAITING' });
-          navigator.serviceWorker.addEventListener('controllerchange', function() {
-            window.location.reload();
-          }, { once: true });
-        }
-      });
-    });
-  }).catch(function(e) {
-    console.warn('SW register failed:', e);
   });
 }
 
@@ -16252,6 +15979,7 @@ app.post('/api/colinkery/reset-password', async (c) => {
 
 // ─── 名片 OCR ─────────────────────────────────────────────────────────────────
 app.post('/api/colinkery/cards/ocr', requireColinkery(), async (c) => {
+  const db = c.env.DB
   const memberNo = c.get('clMemberNo') as string
   const form = await c.req.formData()
   const imgFile = form.get('image') as File | null
@@ -16263,41 +15991,32 @@ app.post('/api/colinkery/cards/ocr', requireColinkery(), async (c) => {
     await c.env.FILES.put(r2Key, await imgFile.arrayBuffer(), { httpMetadata: { contentType: imgFile.type || 'image/jpeg' } })
   }
 
-  // OCR — OpenRouter only (google/gemini-2.0-flash-001)
+  // OCR via OpenRouter
   const apiKey = c.env.OPENROUTER_API_KEY
   if (!apiKey) return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
 
-  const imgBytes = await imgFile.arrayBuffer()
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBytes)))
-  const mimeType = imgFile.type || 'image/jpeg'
-  const dataUrl = `data:${mimeType};base64,${base64}`
-  const prompt = 'You are a business card OCR engine. Extract ALL text from this business card image and return a JSON object with these fields: name_zh (Chinese name), name_en (English name), company (company/organization name), title (job title/position), phone (office phone), mobile (mobile/cell number), email (email address), address (full address), industry (industry type e.g. retail/manufacturing/F&B). Use empty string "" for missing fields. Return ONLY the raw JSON object, no markdown, no explanation.'
-
   try {
+    const imgBytes = await imgFile.arrayBuffer()
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBytes)))
+    const dataUrl = `data:${imgFile.type || 'image/jpeg'};base64,${base64}`
+
     const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-Title': 'CoLinkery OCR'
-      },
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': 'CoLinkery OCR' },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-001',
+        model: 'google/gemini-flash-1.5',
         messages: [{ role: 'user', content: [
-          { type: 'text', text: prompt },
+          { type: 'text', text: 'Extract business card info as JSON: {name_zh, name_en, company, title, phone, mobile, email, address, industry}. Return ONLY the JSON object, no explanation.' },
           { type: 'image_url', image_url: { url: dataUrl } }
         ]}]
       })
     })
     const data = await resp.json() as any
     const raw = data?.choices?.[0]?.message?.content || ''
-    // Strip markdown code fences if present
-    const stripped = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim()
-    const jsonMatch = stripped.match(/\{[\s\S]*\}/)
+    const jsonMatch = raw.match(/\{[\s\S]*\}/)
     const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
     return c.json({ ok: true, r2_key: r2Key, parsed, ocr_raw: raw })
-  } catch (e) {
-    console.error('OCR error:', e)
+  } catch {
     return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
   }
 })
@@ -16394,9 +16113,9 @@ app.get('/api/colinkery/stats', requireColinkery(), async (c) => {
   `).bind(memberNo).first<any>()
 
   const recentWon = await db.prepare(`
-    SELECT lead_id, buyer_name, buyer_company, commission_amount_cents, commission_status, created_at
+    SELECT lead_id, buyer_name, buyer_company, commission_amount_cents, commission_status, updated_at
     FROM b2b_leads WHERE referral_member_no=? AND status='won'
-    ORDER BY created_at DESC LIMIT 10
+    ORDER BY updated_at DESC LIMIT 10
   `).bind(memberNo).all()
 
   return c.json({
@@ -16541,104 +16260,6 @@ app.get('/api/admin/colinkery/rejected', async (c) => {
   return c.json({ ok: true, applications: apps.results })
 })
 
-// ─── Admin CoLinkery：會員列表 + 暫停/恢復 ──────────────────────────────────
-app.get('/api/admin/colinkery/members', async (c) => {
-  const token = getSessionToken(c)
-  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
-  const db = c.env.DB
-  const q = c.req.query('q') || ''
-
-  const rows = await db.prepare(`
-    SELECT rh.member_no, rh.holder_no, rh.applicant_type, rh.status AS holder_status, rh.created_at AS approved_at,
-           m.name_zh, m.phone, m.colinkery_account_status,
-           (SELECT COUNT(*) FROM b2b_leads bl WHERE bl.referral_member_no=rh.member_no) AS lead_count,
-           (SELECT COUNT(*) FROM b2b_leads bl WHERE bl.referral_member_no=rh.member_no AND bl.status='won') AS won_count
-    FROM role_holders rh
-    JOIN members m ON m.member_no = rh.member_no
-    WHERE rh.role='COLINKERY'
-    ${q ? "AND (m.name_zh LIKE ? OR m.phone LIKE ? OR rh.holder_no LIKE ?)" : ''}
-    ORDER BY rh.created_at DESC LIMIT 100
-  `).bind(...(q ? [`%${q}%`, `%${q}%`, `%${q}%`] : [])).all()
-
-  return c.json({ ok: true, members: rows.results })
-})
-
-app.post('/api/admin/colinkery/members/:memberNo/suspend', async (c) => {
-  const token = getSessionToken(c)
-  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
-  const db = c.env.DB
-  const memberNo = c.req.param('memberNo')
-  await db.batch([
-    db.prepare(`UPDATE members SET colinkery_account_status='suspended' WHERE member_no=?`).bind(memberNo),
-    db.prepare(`UPDATE role_holders SET status='SUSPENDED' WHERE member_no=? AND role='COLINKERY'`).bind(memberNo),
-    db.prepare(`DELETE FROM colinkery_sessions WHERE member_no=?`).bind(memberNo)
-  ])
-  return c.json({ ok: true })
-})
-
-app.post('/api/admin/colinkery/members/:memberNo/reinstate', async (c) => {
-  const token = getSessionToken(c)
-  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
-  const db = c.env.DB
-  const memberNo = c.req.param('memberNo')
-  await db.batch([
-    db.prepare(`UPDATE members SET colinkery_account_status='active' WHERE member_no=?`).bind(memberNo),
-    db.prepare(`UPDATE role_holders SET status='ACTIVE' WHERE member_no=? AND role='COLINKERY'`).bind(memberNo)
-  ])
-  return c.json({ ok: true })
-})
-
-// ─── Admin CoLinkery：B2B Leads 管理 ────────────────────────────────────────
-app.get('/api/admin/colinkery/leads', async (c) => {
-  const token = getSessionToken(c)
-  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
-  const db = c.env.DB
-  const status = c.req.query('status') || ''
-  const q = c.req.query('q') || ''
-
-  const rows = await db.prepare(`
-    SELECT bl.lead_id, bl.buyer_name, bl.buyer_company, bl.buyer_title, bl.buyer_phone, bl.buyer_email,
-           bl.buyer_industry, bl.status, bl.note, bl.assigned_supplier,
-           bl.commission_status, bl.commission_amount_cents, bl.created_at,
-           bl.referral_member_no, m.name_zh AS colinkery_name, m.phone AS colinkery_phone,
-           rh.holder_no
-    FROM b2b_leads bl
-    LEFT JOIN members m ON m.member_no = bl.referral_member_no
-    LEFT JOIN role_holders rh ON rh.member_no = bl.referral_member_no AND rh.role='COLINKERY'
-    WHERE 1=1
-    ${status ? "AND bl.status=?" : ''}
-    ${q ? "AND (bl.buyer_name LIKE ? OR bl.buyer_company LIKE ? OR m.name_zh LIKE ?)" : ''}
-    ORDER BY bl.created_at DESC LIMIT 100
-  `).bind(...([
-    ...(status ? [status] : []),
-    ...(q ? [`%${q}%`, `%${q}%`, `%${q}%`] : [])
-  ])).all()
-
-  return c.json({ ok: true, leads: rows.results })
-})
-
-app.post('/api/admin/colinkery/leads/:leadId/update', async (c) => {
-  const token = getSessionToken(c)
-  if (!await verifySession(c.env.DB, token)) return c.json({ ok: false, error: '未授權' }, 401)
-  const db = c.env.DB
-  const leadId = c.req.param('leadId')
-  const body = await c.req.json<{ status?: string; note?: string; assigned_supplier?: string; commission_status?: string; commission_amount_cents?: number }>()
-
-  const fields: string[] = []
-  const vals: any[] = []
-  if (body.status !== undefined) { fields.push('status=?'); vals.push(body.status) }
-  if (body.note !== undefined) { fields.push('note=?'); vals.push(body.note) }
-  if (body.assigned_supplier !== undefined) { fields.push('assigned_supplier=?'); vals.push(body.assigned_supplier) }
-  if (body.commission_status !== undefined) { fields.push('commission_status=?'); vals.push(body.commission_status) }
-  if (body.commission_amount_cents !== undefined) { fields.push('commission_amount_cents=?'); vals.push(body.commission_amount_cents) }
-  if (!fields.length) return c.json({ ok: false, error: '無更新欄位' })
-
-  vals.push(leadId)
-  await db.prepare(`UPDATE b2b_leads SET ${fields.join(',')} WHERE lead_id=?`).bind(...vals).run()
-  await db.prepare(`INSERT INTO b2b_audit_log (lead_id, action, new_value, actor) VALUES (?,?,?,?)`).bind(leadId, 'admin_update', JSON.stringify(body), 'admin').run()
-  return c.json({ ok: true })
-})
-
 // ─── CoLinkery PWA 靜態資源 ───────────────────────────────────────────────────
 app.get('/colinkery-manifest.json', (c) => {
   return c.json({
@@ -16659,27 +16280,19 @@ app.get('/colinkery-manifest.json', (c) => {
 
 app.get('/colinkery-sw.js', (c) => {
   const sw = `
-const CACHE = 'colinkery-v5';
+const CACHE = 'colinkery-v3';
 const OFFLINE = ['/colinkery/'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(OFFLINE)));
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
-  // Delete ALL old caches
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.map(k=>caches.delete(k)))));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
   self.clients.claim();
 });
 self.addEventListener('fetch', e => {
-  // API requests: always network, no cache
   if (e.request.url.includes('/api/')) return;
-  // HTML pages: network-first (get fresh content, fallback to cache for offline)
-  if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
-    e.respondWith(fetch(e.request, {cache:'no-store'}).catch(() => caches.match('/colinkery/')));
-    return;
-  }
-  // Other assets: network-first with cache fallback
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || caches.match('/colinkery/'))));
 });`
   return new Response(sw, { headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-store, no-cache' } })
 })
@@ -16696,23 +16309,6 @@ function colinkerypwaHtml(): string {
 <meta name="apple-mobile-web-app-title" content="CoLinkery">
 <meta name="theme-color" content="#1B5E20">
 <title>CoLinkery 連結者</title>
-<script>
-// Force clear old service worker caches on every load
-(function(){
-  if('serviceWorker' in navigator){
-    // Unregister any old SW scopes
-    navigator.serviceWorker.getRegistrations().then(function(regs){
-      regs.forEach(function(r){ if(r.scope.includes('colinkery') || r.scope.includes(location.origin)) r.update(); });
-    });
-    // Clear all caches except current version
-    if(window.caches){
-      caches.keys().then(function(ks){
-        ks.forEach(function(k){ if(k!=='colinkery-v5') caches.delete(k); });
-      });
-    }
-  }
-})();
-<\/script>
 <link rel="manifest" href="/colinkery-manifest.json">
 <link rel="apple-touch-icon" href="/static/cl-icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -16764,10 +16360,7 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px;font-size:16px;color:var(--muted);}
 /* Camera */
-#camera-preview{width:100%;max-height:60vh;object-fit:cover;border-radius:12px;background:#111;cursor:pointer;}
-#camera-tap-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.55);color:#fff;border-radius:50px;padding:8px 18px;font-size:14px;pointer-events:none;transition:opacity .4s;}
-#camera-focus-ring{position:absolute;width:64px;height:64px;border:3px solid #FFF;border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);display:none;box-shadow:0 0 0 1px rgba(0,0,0,.4);}
-.camera-wrap{position:relative;overflow:hidden;border-radius:12px;background:#111;}
+#camera-preview{width:100%;max-height:60vh;object-fit:cover;border-radius:12px;background:#111;}
 #camera-canvas{display:none;}
 /* Onboarding overlay */
 .onboard-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center;}
@@ -16833,18 +16426,17 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     <div style="padding:24px 16px;">
       <div class="form-group">
         <label class="form-label">電話號碼</label>
-        <input type="tel" class="form-input" id="login-phone" placeholder="例：52345678" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()">
+        <input type="tel" class="form-input" id="login-phone" placeholder="例：52345678" autocomplete="username">
       </div>
       <div class="form-group">
         <label class="form-label">密碼</label>
-        <input type="password" class="form-input" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        <input type="password" class="form-input" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password">
       </div>
       <div id="login-err" class="alert alert-red" style="display:none;margin:0 0 14px;"></div>
-      <button class="btn-primary" id="login-btn" onclick="doLogin()" style="margin-bottom:14px;">登入</button>
+      <button class="btn-primary" onclick="doLogin()" style="margin-bottom:14px;">登入</button>
       <button class="btn-secondary" onclick="window.location.href='/app/partner-apply?role=COLINKERY'" style="margin-bottom:14px;">申請成為 CoLinkery 連結者</button>
       <button class="btn-outline" style="width:100%;margin-bottom:14px;" onclick="showPage('page-forgot')">忘記密碼？</button>
       <p style="text-align:center;font-size:14px;color:var(--muted);">申請後 3-5 工作天審核，批准後可登入</p>
-      <p style="text-align:center;margin-top:16px;"><a href="/colinkery/install" style="font-size:14px;color:var(--green);text-decoration:none;">📲 如何加入手機主畫面？</a></p>
     </div>
   </div>
 
@@ -16952,19 +16544,15 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     </div>
     <div style="padding:16px;overflow-y:auto;">
       <div id="camera-area">
-        <div class="camera-wrap" id="camera-wrap" onclick="onCameraTap(event)" style="touch-action:manipulation;">
-          <video id="camera-preview" autoplay playsinline muted></video>
-          <div id="camera-tap-hint">👆 點擊拍攝名片</div>
-          <div id="camera-focus-ring"></div>
-        </div>
-        <canvas id="camera-canvas" style="display:none;"></canvas>
+        <video id="camera-preview" autoplay playsinline muted></video>
+        <canvas id="camera-canvas"></canvas>
         <div style="display:flex;gap:10px;margin-top:12px;">
           <button class="btn-primary" onclick="capturePhoto()" style="flex:1;">📸 拍攝名片</button>
           <label class="btn-secondary" style="flex:1;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:56px;font-size:18px;font-weight:700;">
             🖼 選相片<input type="file" accept="image/*" id="file-input" style="display:none;" onchange="handleFileSelect(event)">
           </label>
         </div>
-        <p style="font-size:14px;color:var(--muted);text-align:center;margin-top:8px;">點擊畫面自動對焦後拍攝，或按「📸 拍攝名片」</p>
+        <p style="font-size:14px;color:var(--muted);text-align:center;margin-top:8px;">將名片正面朝向鏡頭，確保文字清晰</p>
       </div>
       <div id="ocr-loading" style="display:none;text-align:center;padding:30px 0;">
         <div class="spinner" style="margin:0 auto 12px;"></div>
@@ -17137,29 +16725,7 @@ function showAlert(id, msg, type){
 function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
 
 // ── 初始化：檢查登入狀態 ────────────────────────────────────────────────────
-// Use DOMContentLoaded to guarantee DOM is ready before manipulating elements
-document.addEventListener('DOMContentLoaded', function(){
-  // Register service worker (network-first v5)
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/colinkery-sw.js').then(function(reg){
-      reg.update(); // Always check for SW updates
-    }).catch(function(){});
-  }
-
-  // PWA install prompt (Android)
-  window.addEventListener('beforeinstallprompt', function(e){
-    e.preventDefault();
-    STATE.deferredPrompt = e;
-    var banner = document.getElementById('pwa-banner');
-    if(banner) banner.style.display = 'flex';
-  });
-
-  // Parse URL params
-  var params = new URLSearchParams(window.location.search);
-  var action = params.get('action');
-  var prefillPhone = params.get('phone') || '';
-
-  // Check existing session
+(function init(){
   var saved = sessionStorage.getItem('cl_member');
   if(saved){
     try{
@@ -17168,28 +16734,35 @@ document.addEventListener('DOMContentLoaded', function(){
       STATE.nameZh = d.name_zh;
       afterLogin();
     } catch(e){ sessionStorage.removeItem('cl_member'); }
-  } else if(action === 'apply'){
-    // Redirect to apply page
-    var applyUrl = '/app/partner-apply?role=COLINKERY';
-    if(prefillPhone) applyUrl += '&phone=' + encodeURIComponent(prefillPhone);
-    window.location.href = applyUrl;
-  } else if(prefillPhone){
-    // Pre-fill phone from /app navigation — DOM is ready here
-    showPage('page-login');
-    var loginPhoneEl = document.getElementById('login-phone');
-    if(loginPhoneEl){
-      loginPhoneEl.value = prefillPhone;
-      // Focus password field so user just types password
-      setTimeout(function(){
-        var pw = document.getElementById('login-pw');
-        if(pw) pw.focus();
-      }, 300);
-    }
   } else {
-    // No session, no params — show login page
-    showPage('page-login');
+    // 從會員卡跳過來：?action=apply&phone=xxxxxxxx → 直接跳轉新申請頁
+    var params = new URLSearchParams(window.location.search);
+    var action = params.get('action');
+    var prefillPhone = params.get('phone') || '';
+    if(action === 'apply'){
+      var applyUrl = '/app/partner-apply?role=COLINKERY';
+      if(prefillPhone) applyUrl += '&phone=' + encodeURIComponent(prefillPhone);
+      window.location.href = applyUrl;
+    } else if(prefillPhone){
+      // 從 /app 帶過來的電話號碼：自動填入登入表格
+      var loginPhoneEl = document.getElementById('login-phone');
+      if(loginPhoneEl) loginPhoneEl.value = prefillPhone;
+      // 聚焦到密碼欄位，讓用戶直接輸入密碼
+      var loginPwEl = document.getElementById('login-pw');
+      if(loginPwEl) loginPwEl.focus();
+    }
   }
-});
+  // Register service worker
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/colinkery-sw.js').catch(function(){});
+  }
+  // PWA install prompt (Android)
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    STATE.deferredPrompt = e;
+    document.getElementById('pwa-banner').style.display = 'flex';
+  });
+})();
 
 function triggerInstall(){
   if(STATE.deferredPrompt){
@@ -17203,33 +16776,21 @@ function triggerInstall(){
 
 // ── 登入 ──────────────────────────────────────────────────────────────────────
 async function doLogin(){
-  var phone = (document.getElementById('login-phone').value||'').trim();
-  var pw = document.getElementById('login-pw').value||'';
-  if(!phone){ showAlert('login-err','請輸入電話號碼'); return; }
-  if(!pw){ showAlert('login-err','請輸入密碼'); return; }
+  var phone = document.getElementById('login-phone').value.trim();
+  var pw = document.getElementById('login-pw').value;
+  if(!phone||!pw){ showAlert('login-err','請填寫電話及密碼'); return; }
   hideAlert('login-err');
-  var btn = document.getElementById('login-btn');
-  if(btn){ btn.disabled=true; btn.textContent='登入中…'; }
+  showLoading('登入中…');
   try{
-    var res = await fetch('/api/colinkery/login',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({phone:phone, password:pw})
-    });
+    var res = await fetch('/api/colinkery/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:phone,password:pw})});
     var d = await res.json();
-    if(!d.ok){
-      showAlert('login-err', d.error||'電話或密碼錯誤');
-      if(btn){ btn.disabled=false; btn.textContent='登入'; }
-      return;
-    }
+    hideLoading();
+    if(!d.ok){ showAlert('login-err', d.error||'登入失敗'); return; }
     STATE.memberNo = d.member_no;
     STATE.nameZh = d.name_zh;
-    sessionStorage.setItem('cl_member', JSON.stringify({member_no:d.member_no, name_zh:d.name_zh}));
+    sessionStorage.setItem('cl_member', JSON.stringify({member_no:d.member_no,name_zh:d.name_zh}));
     afterLogin();
-  } catch(e){
-    showAlert('login-err','網絡錯誤，請檢查連線後再試');
-    if(btn){ btn.disabled=false; btn.textContent='登入'; }
-  }
+  } catch(e){ hideLoading(); showAlert('login-err','網絡錯誤，請稍後再試'); }
 }
 
 function afterLogin(){
@@ -17397,17 +16958,11 @@ async function loadStats(){
 async function initCamera(){
   if(STATE.cameraStream) return;
   try{
-    // 優先後置鏡頭，高解析度，開啟自動對焦
-    var constraints = {video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},focusMode:{ideal:'continuous'},advanced:[{focusMode:'continuous'}]}};
-    var stream;
-    try{ stream = await navigator.mediaDevices.getUserMedia(constraints); }
-    catch(_){ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}}); }
+    var stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
     STATE.cameraStream = stream;
     var video = document.getElementById('camera-preview');
     video.srcObject = stream;
     video.play();
-    // 隱藏 tap hint 2 秒後
-    setTimeout(function(){ var h=document.getElementById('camera-tap-hint'); if(h) h.style.opacity='0'; }, 2000);
   } catch(e){
     // Camera not available — show file picker
     document.getElementById('camera-area').innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px;">相機不可用，請選擇相片</p><label class="btn-primary" style="display:flex;align-items:center;justify-content:center;cursor:pointer;">🖼 選擇名片相片<input type="file" accept="image/*" id="file-input" style="display:none;" onchange="handleFileSelect(event)"></label>';
@@ -17419,37 +16974,12 @@ function stopCamera(){
     STATE.cameraStream = null;
   }
 }
-// Tap on video to focus (and capture after brief delay)
-function onCameraTap(event){
-  var wrap = document.getElementById('camera-wrap');
-  var rect = wrap.getBoundingClientRect();
-  var x = event.clientX - rect.left;
-  var y = event.clientY - rect.top;
-  // Show focus ring
-  var ring = document.getElementById('camera-focus-ring');
-  ring.style.left = x+'px'; ring.style.top = y+'px'; ring.style.display='block';
-  ring.style.opacity='1'; ring.style.transform='translate(-50%,-50%) scale(1.3)';
-  setTimeout(function(){ ring.style.transform='translate(-50%,-50%) scale(1)'; },150);
-  setTimeout(function(){ ring.style.opacity='0'; setTimeout(function(){ ring.style.display='none'; },300); },700);
-  // Try hardware tap-to-focus
-  var video = document.getElementById('camera-preview');
-  if(STATE.cameraStream){
-    var track = STATE.cameraStream.getVideoTracks()[0];
-    if(track && track.getCapabilities && track.getCapabilities().focusMode){
-      var relX = x / rect.width; var relY = y / rect.height;
-      try{ track.applyConstraints({advanced:[{focusMode:'manual',focusDistance:0,pointsOfInterest:[{x:relX,y:relY}]}]}).catch(function(){}); } catch(_){}
-    }
-  }
-  // Auto-capture after 600ms (enough for focus)
-  setTimeout(function(){ capturePhoto(); }, 600);
-}
 function capturePhoto(){
   var video = document.getElementById('camera-preview');
-  if(!video.videoWidth) return; // Not ready
   var canvas = document.getElementById('camera-canvas');
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video,0,0);
-  canvas.toBlob(function(blob){ processImageBlob(blob, 'photo.jpg', 'image/jpeg'); }, 'image/jpeg', 0.95);
+  canvas.toBlob(function(blob){ processImageBlob(blob, 'photo.jpg', 'image/jpeg'); }, 'image/jpeg', 0.92);
 }
 function handleFileSelect(e){
   var file = e.target.files[0];
@@ -17638,9 +17168,9 @@ function emailHandoverUrl(){
 
 // ── 分享頁 ────────────────────────────────────────────────────────────────────
 function initSharePage(){
-  var link = 'https://coeldery85.org/b2b?ref='+encodeURIComponent(STATE.memberNo||'');
+  var link = 'https://coeldery85.com/for-business.html?ref='+encodeURIComponent(STATE.memberNo||'');
   document.getElementById('share-link-box').textContent = link;
-  var text = '你好！我係老有聯盟 85 的連結者，我哋係一個由退休長者組成的企業採購平台。\n\n如果你有企業採購需要，歡迎瀏覽我哋的 B2B 目錄：\n'+link;
+  var text = '你好！我係老有聯盟 85 的連結者，我哋係一個由退休長者組成的企業採購平台。\\n\\n如果你有企業採購需要，歡迎了解更多：\\n'+link;
   document.getElementById('share-text-preview').textContent = text;
 }
 function copyShareLink(){ var t=document.getElementById('share-link-box').textContent; navigator.clipboard.writeText(t).then(function(){ alert('✅ 連結已複製'); }).catch(function(){ prompt('複製連結：',t); }); }
@@ -17681,7 +17211,7 @@ async function loadResults(){
       }).join('');
     }
     cont.innerHTML = html;
-  } catch(e){ cont.innerHTML='<div class="alert alert-red">載入失敗，請稍後再試</div>'; }
+  } catch(e){ cont.innerHTML='<div class="alert alert-red">網絡錯誤</div>'; }
 }
 </script>
 </body>
@@ -17689,401 +17219,61 @@ async function loadResults(){
 }
 
 app.get('/colinkery', (c) => c.redirect('/colinkery/', 301))
-app.get('/colinkery/install', (c) => c.html(colinkerypwaInstallHtml()))
 app.get('/colinkery/', (c) => c.html(colinkerypwaHtml()))
 app.get('/colinkery/*', (c) => c.html(colinkerypwaHtml()))
 
-// ─── CoLinkery PWA Install Guide ─────────────────────────────────────────────
-function colinkerypwaInstallHtml(): string {
-  return `<!DOCTYPE html>
-<html lang="zh-HK">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#1B5E20">
-<title>加入主畫面 — CoLinkery</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F9FAFB;color:#111;font-size:16px;line-height:1.6;}
-.topbar{background:#1B5E20;color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px;}
-.topbar h1{font-size:18px;font-weight:700;}
-.topbar a{color:#fff;text-decoration:none;font-size:22px;line-height:1;}
-.section{margin:20px 16px;}
-.card{background:#fff;border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 8px rgba(0,0,0,.07);}
-.os-tab{display:flex;gap:8px;margin-bottom:20px;}
-.os-btn{flex:1;padding:12px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-size:15px;font-weight:700;cursor:pointer;text-align:center;transition:.15s;}
-.os-btn.active{border-color:#1B5E20;background:#E8F5E9;color:#1B5E20;}
-.step{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px;}
-.step-num{width:32px;height:32px;border-radius:50%;background:#1B5E20;color:#fff;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
-.step-body h3{font-size:16px;font-weight:700;margin-bottom:4px;}
-.step-body p{font-size:14px;color:#555;margin-bottom:4px;}
-.step-img{width:100%;border-radius:10px;border:1px solid #E5E7EB;margin-top:8px;}
-.tip{background:#FEF9C3;border:1px solid #FDE047;border-radius:10px;padding:12px 14px;font-size:14px;color:#713F12;margin-top:4px;}
-.icon-demo{display:inline-block;background:#1B5E20;color:#fff;border-radius:12px;width:48px;height:48px;font-size:28px;text-align:center;line-height:48px;vertical-align:middle;margin:0 4px;}
-.launch-btn{display:block;background:#1B5E20;color:#fff;text-align:center;padding:16px;border-radius:14px;font-size:17px;font-weight:700;text-decoration:none;margin:20px 16px;}
-.panel{display:none;} .panel.active{display:block;}
-</style>
-</head>
-<body>
-<div class="topbar">
-  <a href="/colinkery/">←</a>
-  <h1>📲 加入主畫面教學</h1>
-</div>
-
-<div class="section">
-  <div class="os-tab">
-    <button class="os-btn active" id="btn-ios" onclick="switchOS('ios')">🍎 iPhone / iPad</button>
-    <button class="os-btn" id="btn-android" onclick="switchOS('android')">🤖 Android</button>
-  </div>
-
-  <!-- iOS -->
-  <div class="panel active" id="panel-ios">
-    <div class="card">
-      <div style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:16px;">iPhone / iPad 安裝步驟</div>
-
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-body">
-          <h3>用 Safari 開啟連結</h3>
-          <p>必須使用 <strong>Safari</strong> 瀏覽器（Chrome 不支援 iOS 安裝）</p>
-          <p>前往：<strong>coeldery85.com/colinkery</strong></p>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-body">
-          <h3>點擊「分享」按鈕</h3>
-          <p>點擊 Safari 底部中間的 <strong>⬆️ 分享按鈕</strong>（方框配箭頭圖示）</p>
-          <div class="tip">💡 如果看不到底部工具列，先向上滑動頁面讓它出現</div>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-body">
-          <h3>選擇「加入主畫面」</h3>
-          <p>在分享選單中向下捲動，找到並點擊 <strong>「加入主畫面」</strong></p>
-          <div class="tip">💡 圖示是一個方框配加號 ＋</div>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-body">
-          <h3>確認名稱並點擊「加入」</h3>
-          <p>名稱預設為「CoLinkery 連結者」，直接點擊右上角 <strong>「加入」</strong></p>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">5</div>
-        <div class="step-body">
-          <h3>完成！從主畫面開啟</h3>
-          <p>主畫面會出現 <span class="icon-demo">🤝</span> 圖示，點擊即可全屏啟動 CoLinkery，體驗如原生 App！</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div style="font-size:15px;font-weight:700;margin-bottom:12px;">⚠️ 常見問題</div>
-      <p style="font-size:14px;color:#555;margin-bottom:8px;"><strong>Q：找不到「加入主畫面」選項？</strong><br>A：確保使用 Safari 而非 Chrome。分享選單需要向下捲動才能找到此選項。</p>
-      <p style="font-size:14px;color:#555;"><strong>Q：登入後記得密碼嗎？</strong><br>A：CoLinkery 使用 session 記住登入狀態，下次開啟毋需重新登入（直至退出登入或清除 Safari 資料）。</p>
-    </div>
-  </div>
-
-  <!-- Android -->
-  <div class="panel" id="panel-android">
-    <div class="card">
-      <div style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:16px;">Android 安裝步驟（自動提示）</div>
-
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-body">
-          <h3>用 Chrome 開啟連結</h3>
-          <p>使用 <strong>Google Chrome</strong> 瀏覽器前往：<strong>coeldery85.com/colinkery</strong></p>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-body">
-          <h3>等待安裝提示橫幅</h3>
-          <p>頁面底部會自動彈出綠色橫幅：<strong>「加入」CoLinkery 連結者</strong></p>
-          <p>點擊橫幅上的 <strong>「加入」</strong> 按鈕即可安裝</p>
-          <div class="tip">💡 橫幅在首次訪問幾秒後出現。如沒有出現，請用下面的手動方法。</div>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num" style="background:#6B7280;">?</div>
-        <div class="step-body">
-          <h3>手動安裝（若無橫幅）</h3>
-          <p>點擊 Chrome 右上角 <strong>⋮ 三點選單</strong></p>
-          <p>選擇 <strong>「加至主畫面」</strong> 或 <strong>「安裝應用程式」</strong></p>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-body">
-          <h3>確認安裝</h3>
-          <p>點擊彈出視窗的 <strong>「安裝」</strong>，CoLinkery 圖示即會出現在手機桌面</p>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-body">
-          <h3>完成！從桌面開啟</h3>
-          <p>桌面出現 <span class="icon-demo">🤝</span> 圖示，點擊即可全屏啟動 CoLinkery！</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div style="font-size:15px;font-weight:700;margin-bottom:12px;">✅ Android 優勢</div>
-      <p style="font-size:14px;color:#555;margin-bottom:6px;">• 安裝後可<strong>完全離線</strong>瀏覽已加載的名片</p>
-      <p style="font-size:14px;color:#555;margin-bottom:6px;">• 支援<strong>推送通知</strong>（未來功能）</p>
-      <p style="font-size:14px;color:#555;">• 安裝包只有幾 KB，佔用極少空間</p>
-    </div>
-  </div>
-</div>
-
-<a href="/colinkery/" class="launch-btn">🚀 立即開啟 CoLinkery</a>
-
-<script>
-function switchOS(os){
-  document.getElementById('btn-ios').classList.toggle('active', os==='ios');
-  document.getElementById('btn-android').classList.toggle('active', os==='android');
-  document.getElementById('panel-ios').classList.toggle('active', os==='ios');
-  document.getElementById('panel-android').classList.toggle('active', os==='android');
-}
-// Auto-detect OS
-(function(){
-  var ua = navigator.userAgent;
-  if(/android/i.test(ua)) switchOS('android');
-})();
-<\/script>
-</body>
-</html>`
-}
-
-// ─── Admin CoLinkery：完整管理後台 ──────────────────────────────────────────
-app.get('/admin/colinkery', async (c) => {
-  const token = getSessionToken(c)
-  if (!await verifySession(c.env.DB, token)) return c.redirect('/admin', 302)
-  const res = c.html(`<!DOCTYPE html>
-<html lang="zh-HK">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CoLinkery 管理後台</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F3F4F6;color:#111;}
-.topbar{background:#1B5E20;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
-.topbar a{color:#fff;text-decoration:none;font-size:14px;opacity:.8;}
-.topbar a:hover{opacity:1;}
-.topbar h1{font-size:18px;font-weight:700;flex:1;}
-.tabs{display:flex;background:#fff;border-bottom:2px solid #E5E7EB;overflow-x:auto;}
-.tab{padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px;color:#666;}
-.tab.active{border-bottom-color:#1B5E20;color:#1B5E20;}
-.tab-panel{display:none;padding:16px;}
-.tab-panel.active{display:block;}
-.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);}
-.card-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:600;}
-.badge-green{background:#D1FAE5;color:#065F46;}
-.badge-red{background:#FEE2E2;color:#991B1B;}
-.badge-yellow{background:#FEF9C3;color:#854D0E;}
-.badge-blue{background:#DBEAFE;color:#1E40AF;}
-.badge-gray{background:#F3F4F6;color:#6B7280;}
-.btn{border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;}
-.btn-g{background:#1B5E20;color:#fff;}
-.btn-r{background:#C62828;color:#fff;}
-.btn-y{background:#B45309;color:#fff;}
-.btn-b{background:#1D4ED8;color:#fff;}
-.btn-gray{background:#E5E7EB;color:#374151;}
-.row-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
-input,select,textarea{border:1.5px solid #D1D5DB;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;}
-input:focus,select:focus,textarea:focus{border-color:#1B5E20;}
-.search-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
-.search-bar input{flex:1;min-width:160px;}
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
-.stat-box{background:#fff;border-radius:10px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06);}
-.stat-num{font-size:24px;font-weight:900;color:#1B5E20;}
-.stat-lbl{font-size:12px;color:#6B7280;margin-top:2px;}
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto;}
-.modal.show{display:flex;align-items:flex-start;justify-content:center;padding:20px 12px;}
-.modal-box{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:540px;}
-.modal-title{font-size:17px;font-weight:700;margin-bottom:16px;}
-.form-row{margin-bottom:12px;}
-.form-row label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;}
-.form-row input,.form-row select,.form-row textarea{width:100%;}
-.form-row textarea{resize:vertical;min-height:72px;}
-</style>
-</head>
-<body>
-<div class="topbar">
-  <a href="/admin">← Admin</a>
-  <h1>🤝 CoLinkery 管理後台</h1>
-</div>
-
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('pending')">⏳ 待審批</div>
-  <div class="tab" onclick="switchTab('members')">👥 會員管理</div>
-  <div class="tab" onclick="switchTab('leads')">📋 Leads 管理</div>
-  <div class="tab" onclick="switchTab('otp')">🔑 OTP</div>
-</div>
-
-<!-- ① 待審批 -->
-<div class="tab-panel active" id="tab-pending">
+// ─── Admin CoLinkery UI（整合進現有 admin shell via JS）──────────────────────
+function adminColinkerySectionHtml(): string {
+  return `
+<!-- CoLinkery 審批 section — 由 admin shell JS 動態注入 -->
+<div id="cl-admin-pending-wrap">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <span style="font-size:15px;font-weight:700;">CoLinkery 申請審批</span>
-    <button class="btn btn-g" onclick="loadPending()">🔄 重新整理</button>
+    <h2 style="font-size:18px;font-weight:700;">🤝 CoLinkery 申請審批</h2>
+    <button onclick="loadClPending()" style="background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:14px;">重新整理</button>
   </div>
-  <div id="pending-list"><p style="color:#888;padding:20px 0;">載入中…</p></div>
+  <div id="cl-pending-list"><p style="color:#888;">載入中…</p></div>
+  <h2 style="font-size:18px;font-weight:700;margin:24px 0 12px;">📱 CoLinkery 待發 OTP（忘記密碼）</h2>
+  <div id="cl-otp-list"><p style="color:#888;">載入中…</p></div>
 </div>
-
-<!-- ② 會員管理 -->
-<div class="tab-panel" id="tab-members">
-  <div class="search-bar">
-    <input type="text" id="members-q" placeholder="搜尋姓名/電話/CK號碼…" oninput="debounce(loadMembers,500)()">
-    <button class="btn btn-g" onclick="loadMembers()">搜尋</button>
-  </div>
-  <div id="members-stats" class="stat-grid"></div>
-  <div id="members-list"><p style="color:#888;padding:20px 0;">載入中…</p></div>
-</div>
-
-<!-- ③ Leads 管理 -->
-<div class="tab-panel" id="tab-leads">
-  <div class="search-bar">
-    <input type="text" id="leads-q" placeholder="搜尋買家/公司/連結者…" oninput="debounce(loadLeads,500)()">
-    <select id="leads-status" onchange="loadLeads()">
-      <option value="">全部狀態</option>
-      <option value="pending">待處理</option>
-      <option value="catalog_sent">目錄已發</option>
-      <option value="interest_submitted">已表達興趣</option>
-      <option value="quoted">已報價</option>
-      <option value="negotiating">洽談中</option>
-      <option value="won">成交</option>
-      <option value="lost">失敗</option>
-    </select>
-    <button class="btn btn-g" onclick="loadLeads()">搜尋</button>
-  </div>
-  <div id="leads-stats" class="stat-grid"></div>
-  <div id="leads-list"><p style="color:#888;padding:20px 0;">載入中…</p></div>
-</div>
-
-<!-- ④ OTP -->
-<div class="tab-panel" id="tab-otp">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <span style="font-size:15px;font-weight:700;">待發 OTP（忘記密碼）</span>
-    <button class="btn btn-g" onclick="loadPending()">🔄 重新整理</button>
-  </div>
-  <div id="otp-list"><p style="color:#888;padding:20px 0;">載入中…</p></div>
-</div>
-
-<!-- Lead 編輯 Modal -->
-<div class="modal" id="lead-modal">
-  <div class="modal-box">
-    <div class="modal-title" id="lead-modal-title">Lead 詳情</div>
-    <input type="hidden" id="lm-lead-id">
-    <div class="form-row"><label>買家姓名</label><input id="lm-buyer-name" type="text" readonly style="background:#F9FAFB;"></div>
-    <div class="form-row"><label>公司</label><input id="lm-buyer-company" type="text" readonly style="background:#F9FAFB;"></div>
-    <div class="form-row"><label>電話</label><input id="lm-buyer-phone" type="text" readonly style="background:#F9FAFB;"></div>
-    <div class="form-row"><label>電郵</label><input id="lm-buyer-email" type="text" readonly style="background:#F9FAFB;"></div>
-    <div class="form-row"><label>行業</label><input id="lm-buyer-industry" type="text" readonly style="background:#F9FAFB;"></div>
-    <div class="form-row"><label>CoLinkery 連結者</label><input id="lm-colinkery" type="text" readonly style="background:#F9FAFB;"></div>
-    <div class="form-row"><label>狀態</label>
-      <select id="lm-status">
-        <option value="pending">待處理</option>
-        <option value="catalog_sent">目錄已發</option>
-        <option value="interest_submitted">已表達興趣</option>
-        <option value="quoted">已報價</option>
-        <option value="negotiating">洽談中</option>
-        <option value="won">成交 ✅</option>
-        <option value="lost">失敗 ❌</option>
-      </select>
-    </div>
-    <div class="form-row"><label>指派供應商/負責人</label><input id="lm-supplier" type="text" placeholder="例：王大文、ABC公司"></div>
-    <div class="form-row"><label>固定佣金（元）</label><input id="lm-comm" type="number" min="0" placeholder="0"></div>
-    <div class="form-row"><label>佣金狀態</label>
-      <select id="lm-comm-status">
-        <option value="none">未計算</option>
-        <option value="accrued">已確認待付</option>
-        <option value="paid">已付款 ✅</option>
-      </select>
-    </div>
-    <div class="form-row"><label>備註</label><textarea id="lm-note" placeholder="內部備註，不對外顯示"></textarea></div>
-    <div style="display:flex;gap:8px;margin-top:4px;">
-      <button class="btn btn-g" onclick="saveLead()" style="flex:1;">💾 儲存</button>
-      <button class="btn btn-gray" onclick="closeLeadModal()" style="flex:1;">取消</button>
-    </div>
-  </div>
-</div>
-
 <script>
-var CL_ADMIN = { tab: 'pending' };
-
-function switchTab(t){
-  CL_ADMIN.tab = t;
-  document.querySelectorAll('.tab').forEach(function(el,i){ el.classList.toggle('active', ['pending','members','leads','otp'][i]===t); });
-  document.querySelectorAll('.tab-panel').forEach(function(el){ el.classList.remove('active'); });
-  document.getElementById('tab-'+t).classList.add('active');
-  if(t==='pending'||t==='otp') loadPending();
-  if(t==='members') loadMembers();
-  if(t==='leads') loadLeads();
-}
-
-function debounce(fn, ms){ var t; return function(){ clearTimeout(t); t=setTimeout(fn, ms); }; }
-
-var TYPE_MAP = {INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
-var STATUS_MAP = {pending:'待處理',catalog_sent:'目錄已發',interest_submitted:'已表達興趣',quoted:'已報價',negotiating:'洽談中',won:'✅成交',lost:'❌失敗'};
-var COMM_MAP = {none:'未計算',accrued:'⏳待付',paid:'✅已付'};
-
-function esc(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
-
-// ── 待審批 + OTP ──────────────────────────────────────────────────────────────
-async function loadPending(){
-  document.getElementById('pending-list').innerHTML='<p style="color:#888;padding:20px 0;">載入中…</p>';
-  document.getElementById('otp-list').innerHTML='<p style="color:#888;padding:20px 0;">載入中…</p>';
+async function loadClPending(){
   try{
     var res = await fetch('/api/admin/colinkery/pending',{credentials:'include'});
     var d = await res.json();
-    if(!d.ok){ document.getElementById('pending-list').innerHTML='<p style="color:#c00;">'+esc(d.error)+'</p>'; return; }
+    if(!d.ok){ document.getElementById('cl-pending-list').innerHTML='<p style="color:#c00;">'+d.error+'</p>'; return; }
 
     var apps = d.applications||[];
-    document.getElementById('pending-list').innerHTML = apps.length===0
-      ? '<div class="card" style="text-align:center;color:#888;">目前無待審批申請 🎉</div>'
-      : apps.map(function(a){
-          return '<div class="card"><div class="card-row"><div>' +
-            '<div style="font-size:15px;font-weight:700;">'+esc(a.name_zh)+' <span style="color:#888;font-weight:400;font-size:13px;">'+esc(a.member_no)+'</span></div>' +
-            '<div style="font-size:13px;color:#666;margin-top:3px;">📞 '+esc(a.phone)+'　身份：'+(TYPE_MAP[a.applicant_type]||a.applicant_type)+'</div>' +
-            (a.notes?'<div style="font-size:13px;color:#555;margin-top:4px;background:#F9FAFB;border-radius:6px;padding:6px 8px;">'+esc(a.notes)+'</div>':'') +
-            '<div style="font-size:11px;color:#aaa;margin-top:4px;">申請時間：'+esc(a.created_at)+'</div>' +
-          '</div></div>' +
-          '<div class="row-btns">' +
-            '<button class="btn btn-g" onclick="approveClApp('+a.id+')">✅ 批准</button>' +
-            '<button class="btn btn-r" onclick="rejectClApp('+a.id+')">❌ 拒絕</button>' +
-          '</div></div>';
-        }).join('');
+    var html = apps.length===0 ? '<p style="color:#888;">目前無待審批申請</p>' : apps.map(function(a){
+      var typeMap={INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
+      return '<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,.08);">' +
+        '<div style="font-size:15px;font-weight:700;">'+a.name_zh+' （'+a.member_no+'）</div>' +
+        '<div style="font-size:13px;color:#666;">電話：'+a.phone+' ｜ 身份：'+(typeMap[a.applicant_type]||a.applicant_type)+'</div>' +
+        '<div style="font-size:13px;color:#888;margin-top:4px;">'+a.notes+'</div>' +
+        '<div style="font-size:12px;color:#aaa;">申請時間：'+a.created_at+'</div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+          '<button onclick="approveClApp('+a.id+')" style="background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px;">✅ 批准</button>' +
+          '<button onclick="rejectClApp('+a.id+')" style="background:#C62828;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px;">❌ 拒絕</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    document.getElementById('cl-pending-list').innerHTML = html;
 
     var otps = d.pending_otps||[];
-    document.getElementById('otp-list').innerHTML = otps.length===0
-      ? '<div class="card" style="text-align:center;color:#888;">目前無待發 OTP 🎉</div>'
-      : otps.map(function(o){
-          var phoneDigits=(o.phone||'').replace(/\\D/g,'');
-          var full=phoneDigits.startsWith('852')?phoneDigits:'852'+phoneDigits;
-          var msg=encodeURIComponent('你好'+o.name_zh+'！你的 CoLinkery 密碼重設碼為：'+o.otp_code+'，請於 10 分鐘內使用。如非你申請，請忽略。');
-          return '<div class="card"><div style="font-size:15px;font-weight:700;">'+esc(o.name_zh)+' <span style="color:#888;font-size:13px;">'+esc(o.member_no)+'</span></div>' +
-            '<div style="font-size:13px;color:#666;">📞 '+esc(o.phone)+'</div>' +
-            '<div style="font-size:28px;font-weight:900;color:#1B5E20;letter-spacing:6px;margin:10px 0;">'+esc(o.otp_code)+'</div>' +
-            '<div style="font-size:11px;color:#aaa;">到期：'+esc(o.expires_at)+'</div>' +
-            '<a href="https://wa.me/'+full+'?text='+msg+'" target="_blank" class="btn btn-g" style="display:inline-block;text-decoration:none;margin-top:10px;">💬 WhatsApp 發送</a>' +
-          '</div>';
-        }).join('');
-  } catch(e){ document.getElementById('pending-list').innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
+    var otpHtml = otps.length===0 ? '<p style="color:#888;">目前無待發 OTP</p>' : otps.map(function(o){
+      var phoneDigits = (o.phone||'').replace(/\\D/g,'');
+      var fullPhone = phoneDigits.startsWith('852')?phoneDigits:'852'+phoneDigits;
+      var msg = encodeURIComponent('你好'+o.name_zh+'！你的 CoLinkery 密碼重設碼為：'+o.otp_code+'，請於 10 分鐘內使用。');
+      var waLink = 'https://wa.me/'+fullPhone+'?text='+msg;
+      return '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.08);">' +
+        '<div style="font-size:15px;font-weight:700;">'+o.name_zh+' （'+o.member_no+'）</div>' +
+        '<div style="font-size:13px;color:#666;">電話：'+o.phone+'</div>' +
+        '<div style="font-size:20px;font-weight:900;color:#1B5E20;letter-spacing:4px;margin:8px 0;">'+o.otp_code+'</div>' +
+        '<div style="font-size:12px;color:#aaa;">到期：'+o.expires_at+'</div>' +
+        '<a href="'+waLink+'" target="_blank" style="display:inline-block;background:#25D366;color:#fff;text-decoration:none;border-radius:8px;padding:8px 16px;font-size:14px;margin-top:8px;">💬 WhatsApp 發送 OTP</a>' +
+      '</div>';
+    }).join('');
+    document.getElementById('cl-otp-list').innerHTML = otpHtml;
+  } catch(e){ document.getElementById('cl-pending-list').innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
 }
 
 async function approveClApp(id){
@@ -18092,8 +17282,10 @@ async function approveClApp(id){
     var res = await fetch('/api/admin/colinkery/approve/'+id,{method:'POST',credentials:'include'});
     var d = await res.json();
     if(!d.ok){ alert(d.error||'批准失敗'); return; }
-    if(confirm('✅ 已批准！CoLinkery No: '+d.holder_no+'\\n\\n點擊確定用 WhatsApp 通知申請人')) window.open(d.wa_notify_link,'_blank');
-    loadPending();
+    alert('✅ 已批准！Holder No: '+d.holder_no+'\\n\\n點擊確定後可用以下連結 WhatsApp 通知申請人：\\n'+d.wa_notify_link);
+    // Open wa link
+    window.open(d.wa_notify_link,'_blank');
+    loadClPending();
   } catch(e){ alert('網絡錯誤'); }
 }
 
@@ -18104,167 +17296,39 @@ async function rejectClApp(id){
     var res = await fetch('/api/admin/colinkery/reject/'+id,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})});
     var d = await res.json();
     if(!d.ok){ alert(d.error||'拒絕失敗'); return; }
-    if(confirm('✅ 已拒絕。點擊確定用 WhatsApp 通知申請人')) window.open(d.wa_notify_link,'_blank');
-    loadPending();
+    alert('✅ 已拒絕。\\n點擊確定後可用以下連結通知申請人：\\n'+d.wa_notify_link);
+    window.open(d.wa_notify_link,'_blank');
+    loadClPending();
   } catch(e){ alert('網絡錯誤'); }
 }
-
-// ── 會員管理 ──────────────────────────────────────────────────────────────────
-async function loadMembers(){
-  var q = (document.getElementById('members-q').value||'').trim();
-  document.getElementById('members-list').innerHTML='<p style="color:#888;padding:20px 0;">載入中…</p>';
-  try{
-    var url = '/api/admin/colinkery/members'+(q?'?q='+encodeURIComponent(q):'');
-    var res = await fetch(url,{credentials:'include'});
-    var d = await res.json();
-    if(!d.ok){ document.getElementById('members-list').innerHTML='<p style="color:#c00;">'+esc(d.error)+'</p>'; return; }
-    var members = d.members||[];
-    var active = members.filter(function(m){ return m.holder_status==='ACTIVE'; }).length;
-    var susp = members.filter(function(m){ return m.holder_status==='SUSPENDED'; }).length;
-    var leads = members.reduce(function(s,m){ return s+(m.lead_count||0); },0);
-    var won = members.reduce(function(s,m){ return s+(m.won_count||0); },0);
-    document.getElementById('members-stats').innerHTML =
-      '<div class="stat-box"><div class="stat-num">'+members.length+'</div><div class="stat-lbl">總連結者</div></div>'+
-      '<div class="stat-box"><div class="stat-num">'+active+'</div><div class="stat-lbl">活躍</div></div>'+
-      '<div class="stat-box"><div class="stat-num">'+susp+'</div><div class="stat-lbl">已暫停</div></div>'+
-      '<div class="stat-box"><div class="stat-num">'+leads+'</div><div class="stat-lbl">總 Leads</div></div>'+
-      '<div class="stat-box"><div class="stat-num">'+won+'</div><div class="stat-lbl">成交</div></div>';
-    document.getElementById('members-list').innerHTML = members.length===0
-      ? '<div class="card" style="text-align:center;color:#888;">無記錄</div>'
-      : members.map(function(m){
-          var isSusp = m.holder_status==='SUSPENDED';
-          return '<div class="card"><div class="card-row"><div>' +
-            '<div style="font-size:15px;font-weight:700;">'+esc(m.name_zh)+
-              ' <span style="font-size:12px;background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:10px;">'+esc(m.holder_no)+'</span>' +
-              (isSusp?'<span class="badge badge-red" style="margin-left:4px;">已暫停</span>':'') +
-            '</div>' +
-            '<div style="font-size:13px;color:#666;margin-top:3px;">📞 '+esc(m.phone)+'　身份：'+(TYPE_MAP[m.applicant_type]||m.applicant_type)+'</div>' +
-            '<div style="font-size:13px;color:#888;margin-top:2px;">Leads: '+esc(String(m.lead_count||0))+'　成交: '+esc(String(m.won_count||0))+'</div>' +
-            '<div style="font-size:11px;color:#aaa;margin-top:2px;">加入：'+esc(m.approved_at)+'</div>' +
-          '</div></div><div class="row-btns">' +
-          (isSusp
-            ? '<button class="btn btn-g" onclick="reinstateM('+JSON.stringify(m.member_no)+')">✅ 恢復帳戶</button>'
-            : '<button class="btn btn-r" onclick="suspendM('+JSON.stringify(m.member_no)+')">⏸ 暫停帳戶</button>') +
-          '<button class="btn btn-b" onclick="viewLeadsByMember('+JSON.stringify(m.member_no)+')">📋 查看 Leads</button>' +
-          '</div></div>';
-        }).join('');
-  } catch(e){ document.getElementById('members-list').innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
-}
-
-async function suspendM(memberNo){
-  if(!confirm('確定暫停此連結者帳戶？其 CoLinkery session 將立即失效。')) return;
-  var res = await fetch('/api/admin/colinkery/members/'+encodeURIComponent(memberNo)+'/suspend',{method:'POST',credentials:'include'});
-  var d = await res.json();
-  if(!d.ok){ alert(d.error||'操作失敗'); return; }
-  loadMembers();
-}
-async function reinstateM(memberNo){
-  if(!confirm('確定恢復此連結者帳戶？')) return;
-  var res = await fetch('/api/admin/colinkery/members/'+encodeURIComponent(memberNo)+'/reinstate',{method:'POST',credentials:'include'});
-  var d = await res.json();
-  if(!d.ok){ alert(d.error||'操作失敗'); return; }
-  loadMembers();
-}
-function viewLeadsByMember(memberNo){
-  document.getElementById('leads-q').value = '';
-  switchTab('leads');
-  setTimeout(function(){
-    document.getElementById('leads-q').value = memberNo;
-    loadLeads();
-  },100);
-}
-
-// ── Leads 管理 ────────────────────────────────────────────────────────────────
-async function loadLeads(){
-  var q = (document.getElementById('leads-q').value||'').trim();
-  var status = document.getElementById('leads-status').value;
-  document.getElementById('leads-list').innerHTML='<p style="color:#888;padding:20px 0;">載入中…</p>';
-  try{
-    var params = [];
-    if(q) params.push('q='+encodeURIComponent(q));
-    if(status) params.push('status='+encodeURIComponent(status));
-    var res = await fetch('/api/admin/colinkery/leads'+(params.length?'?'+params.join('&'):''),{credentials:'include'});
-    var d = await res.json();
-    if(!d.ok){ document.getElementById('leads-list').innerHTML='<p style="color:#c00;">'+esc(d.error)+'</p>'; return; }
-    var leads = d.leads||[];
-    var won = leads.filter(function(l){ return l.status==='won'; }).length;
-    var pending = leads.filter(function(l){ return l.status==='pending'; }).length;
-    var commPaid = leads.filter(function(l){ return l.commission_status==='paid'; }).reduce(function(s,l){ return s+(l.commission_amount_cents||0); },0);
-    document.getElementById('leads-stats').innerHTML =
-      '<div class="stat-box"><div class="stat-num">'+leads.length+'</div><div class="stat-lbl">總 Leads</div></div>'+
-      '<div class="stat-box"><div class="stat-num">'+won+'</div><div class="stat-lbl">成交</div></div>'+
-      '<div class="stat-box"><div class="stat-num">'+pending+'</div><div class="stat-lbl">待處理</div></div>'+
-      '<div class="stat-box"><div class="stat-num">HK$'+Math.round(commPaid/100).toLocaleString()+'</div><div class="stat-lbl">已付佣金</div></div>';
-    document.getElementById('leads-list').innerHTML = leads.length===0
-      ? '<div class="card" style="text-align:center;color:#888;">無記錄</div>'
-      : leads.map(function(l){
-          var statusBadge = l.status==='won'?'badge-green':l.status==='lost'?'badge-red':l.status==='pending'?'badge-yellow':'badge-blue';
-          var commBadge = l.commission_status==='paid'?'badge-green':l.commission_status==='accrued'?'badge-yellow':'badge-gray';
-          return '<div class="card"><div class="card-row"><div style="flex:1;">' +
-            '<div style="font-size:15px;font-weight:700;">'+esc(l.buyer_name||'—')+'</div>' +
-            '<div style="font-size:13px;color:#555;margin-top:2px;">🏢 '+esc(l.buyer_company||'—')+'　📞 '+esc(l.buyer_phone||'—')+'</div>' +
-            '<div style="font-size:13px;color:#666;margin-top:2px;">行業：'+esc(l.buyer_industry||'—')+'</div>' +
-            '<div style="font-size:13px;margin-top:4px;">連結者：<b>'+esc(l.colinkery_name||l.referral_member_no||'—')+'</b>'+(l.holder_no?' <span style="font-size:12px;color:#888;">('+esc(l.holder_no)+')</span>':'')+'</div>' +
-            (l.assigned_supplier?'<div style="font-size:13px;color:#1D4ED8;margin-top:2px;">指派：'+esc(l.assigned_supplier)+'</div>':'') +
-            (l.note?'<div style="font-size:13px;color:#555;background:#F9FAFB;border-radius:6px;padding:5px 8px;margin-top:4px;">備註：'+esc(l.note)+'</div>':'') +
-            '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">' +
-              '<span class="badge '+statusBadge+'">'+(STATUS_MAP[l.status]||l.status)+'</span>' +
-              (l.commission_amount_cents?'<span class="badge '+commBadge+'">佣金 HK$'+Math.round(l.commission_amount_cents/100)+'　'+(COMM_MAP[l.commission_status]||'')+'</span>':'') +
-            '</div>' +
-            '<div style="font-size:11px;color:#aaa;margin-top:4px;">'+esc(l.created_at)+'</div>' +
-          '</div></div>' +
-          '<div class="row-btns"><button class="btn btn-b" onclick="editLead('+JSON.stringify(l)+')">✏️ 編輯</button></div>' +
-          '</div>';
-        }).join('');
-  } catch(e){ document.getElementById('leads-list').innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
-}
-
-function editLead(l){
-  document.getElementById('lm-lead-id').value = l.lead_id;
-  document.getElementById('lead-modal-title').textContent = '✏️ 編輯 Lead：'+(l.buyer_name||l.buyer_company||l.lead_id);
-  document.getElementById('lm-buyer-name').value = l.buyer_name||'';
-  document.getElementById('lm-buyer-company').value = l.buyer_company||'';
-  document.getElementById('lm-buyer-phone').value = l.buyer_phone||'';
-  document.getElementById('lm-buyer-email').value = l.buyer_email||'';
-  document.getElementById('lm-buyer-industry').value = l.buyer_industry||'';
-  document.getElementById('lm-colinkery').value = (l.colinkery_name||l.referral_member_no||'')+(l.holder_no?' ('+l.holder_no+')':'');
-  document.getElementById('lm-status').value = l.status||'pending';
-  document.getElementById('lm-supplier').value = l.assigned_supplier||'';
-  document.getElementById('lm-comm').value = l.commission_amount_cents ? Math.round(l.commission_amount_cents/100) : '';
-  document.getElementById('lm-comm-status').value = l.commission_status||'none';
-  document.getElementById('lm-note').value = l.note||'';
-  document.getElementById('lead-modal').classList.add('show');
-}
-function closeLeadModal(){ document.getElementById('lead-modal').classList.remove('show'); }
-async function saveLead(){
-  var leadId = document.getElementById('lm-lead-id').value;
-  var commVal = document.getElementById('lm-comm').value;
-  var body = {
-    status: document.getElementById('lm-status').value,
-    assigned_supplier: document.getElementById('lm-supplier').value.trim(),
-    commission_status: document.getElementById('lm-comm-status').value,
-    commission_amount_cents: commVal ? Math.round(parseFloat(commVal)*100) : 0,
-    note: document.getElementById('lm-note').value.trim()
-  };
-  try{
-    var res = await fetch('/api/admin/colinkery/leads/'+encodeURIComponent(leadId)+'/update',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    var d = await res.json();
-    if(!d.ok){ alert(d.error||'儲存失敗'); return; }
-    closeLeadModal();
-    loadLeads();
-  } catch(e){ alert('網絡錯誤'); }
-}
-
-// 點 modal 背景關閉
-document.getElementById('lead-modal').addEventListener('click',function(e){ if(e.target===this) closeLeadModal(); });
 
 // 自動載入
-loadPending();
-</script>
+loadClPending();
+<\/script>`
+}
+
+// ─── 將 CoLinkery 審批頁面注入現有 admin shell ──────────────────────────────
+app.get('/admin/colinkery', async (c) => {
+  const token = getSessionToken(c)
+  if (!await verifySession(c.env.DB, token)) return c.redirect('/membership/admin', 302)
+  return c.html(`<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CoLinkery 審批 — Admin</title>
+<style>
+*{box-sizing:border-box;}body{font-family:sans-serif;background:#F3F4F6;margin:0;padding:16px;}
+h1{font-size:20px;font-weight:700;margin-bottom:16px;}
+a{color:#1B5E20;text-decoration:none;}
+a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+<div><a href="/admin">← 返回 Admin</a></div>
+<h1>🤝 CoLinkery 管理</h1>
+${adminColinkerySectionHtml()}
 </body>
 </html>`)
-  res.headers.set('Cache-Control', 'no-store')
-  return res
 })
 
 export default app
