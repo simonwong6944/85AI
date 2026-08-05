@@ -16008,24 +16008,32 @@ app.get('/api/colinkery/ocr-test', requireColinkery(), async (c) => {
 app.post('/api/colinkery/cards/ocr', requireColinkery(), async (c) => {
   const db = c.env.DB
   const memberNo = c.get('clMemberNo') as string
+  let r2Key = ''
+  try {
   const form = await c.req.formData()
   const imgFile = form.get('image') as File | null
   if (!imgFile) return c.json({ ok: false, error: '請上傳名片圖片' }, 400)
 
   // 存入 R2
-  const r2Key = `b2b-cards/${memberNo}/${Date.now()}_${imgFile.name || 'card.jpg'}`
+  r2Key = `b2b-cards/${memberNo}/${Date.now()}_${imgFile.name || 'card.jpg'}`
+  const imgArrayBuffer = await imgFile.arrayBuffer()
   if (c.env.FILES) {
-    await c.env.FILES.put(r2Key, await imgFile.arrayBuffer(), { httpMetadata: { contentType: imgFile.type || 'image/jpeg' } })
+    await c.env.FILES.put(r2Key, imgArrayBuffer.slice(0), { httpMetadata: { contentType: imgFile.type || 'image/jpeg' } })
   }
 
   // OCR via OpenRouter — free model: nvidia/nemotron-nano-12b-v2-vl:free
   // Fallback: google/gemma-3-27b-it:free
   const apiKey = c.env.OPENROUTER_API_KEY
-  if (!apiKey) return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {} })
+  if (!apiKey) return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {}, debug: ['OPENROUTER_API_KEY not set'] })
 
-  const imgBytes = await imgFile.arrayBuffer()
-  // Resize large images to avoid token limits — cap at 1200px wide
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBytes)))
+  // Convert to base64 safely (btoa spread fails on large images in Workers — use chunked approach)
+  const uint8 = new Uint8Array(imgArrayBuffer)
+  let base64 = ''
+  const CHUNK = 8192
+  for (let i = 0; i < uint8.length; i += CHUNK) {
+    base64 += String.fromCharCode(...uint8.subarray(i, i + CHUNK))
+  }
+  base64 = btoa(base64)
   const mimeType = imgFile.type || 'image/jpeg'
   const dataUrl = `data:${mimeType};base64,${base64}`
 
@@ -16096,6 +16104,9 @@ Rules: use empty string "" for any missing field. Combine multiple phones if nee
   }
   // All models failed — return debug info so frontend can show useful error
   return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {}, debug: debugLog })
+  } catch(err: any) {
+    return c.json({ ok: true, r2_key: r2Key, ocr_failed: true, parsed: {}, debug: [`outer exception: ${err?.message || String(err)}`] })
+  }
 })
 
 // ─── 名片 CRUD ────────────────────────────────────────────────────────────────
@@ -16156,22 +16167,25 @@ app.post('/api/colinkery/handover', requireColinkery(), async (c) => {
 
   const member = await db.prepare(`SELECT name_zh FROM members WHERE member_no=?`).bind(memberNo).first<{ name_zh: string }>()
 
-  // 建立 b2b_lead
+  // 建立 b2b_lead (production schema: PK = 'id', not 'lead_id')
   const leadId = makeCsrpnToken(16)
   await db.prepare(`
-    INSERT INTO b2b_leads (lead_id, card_id, referral_member_no, colinkery_name, buyer_name, buyer_company, buyer_title, buyer_phone, buyer_email, buyer_industry, source)
+    INSERT INTO b2b_leads (id, card_id, referral_member_no, colinkery_name, buyer_name, buyer_company, buyer_title, buyer_phone, buyer_email, buyer_industry, source)
     VALUES (?,?,?,?,?,?,?,?,?,?,'card_handover')
   `).bind(leadId, card_id, memberNo, member?.name_zh || '', card.name_zh || '', card.company || '', card.title || '', card.phone || card.mobile || '', card.email || '', card.industry || '').run()
 
   // 生成 CSPRNG token（≥32 bytes，不可枚舉）
-  const token = makeCsrpnToken(40)
+  // production b2b_tokens schema: PK='id', token=separate column, lead_id=FK
+  const tokenId = makeCsrpnToken(16)
+  const tokenVal = makeCsrpnToken(40)
   const expiresAt = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 19)
-  await db.prepare(`INSERT INTO b2b_tokens (token, lead_id, referral_member_no, expires_at) VALUES (?,?,?,?)`).bind(token, leadId, memberNo, expiresAt).run()
+  await db.prepare(`INSERT INTO b2b_tokens (id, token, lead_id, referral_member_no, expires_at, active) VALUES (?,?,?,?,?,1)`).bind(tokenId, tokenVal, leadId, memberNo, expiresAt).run()
 
-  // Audit log
-  await db.prepare(`INSERT INTO b2b_audit_log (lead_id, action, actor) VALUES (?,?,?)`).bind(leadId, 'handover_created', memberNo).run()
+  // Audit log (production schema: PK='id' TEXT, entity_id, entity_type, payload, actor, action)
+  const auditId = makeCsrpnToken(16)
+  await db.prepare(`INSERT INTO b2b_audit_log (id, entity_type, entity_id, action, actor) VALUES (?,?,?,?,?)`).bind(auditId, 'b2b_lead', leadId, 'handover_created', memberNo).run()
 
-  const catalogUrl = `https://coeldery85.org/b2b?token=${token}`
+  const catalogUrl = `https://coeldery85.org/b2b?token=${tokenVal}`
   return c.json({ ok: true, lead_id: leadId, catalog_url: catalogUrl, buyer_name: card.name_zh || '', buyer_company: card.company || '' })
 })
 
@@ -16180,29 +16194,33 @@ app.get('/api/colinkery/stats', requireColinkery(), async (c) => {
   const db = c.env.DB
   const memberNo = c.get('clMemberNo') as string
 
-  const totals = await db.prepare(`
-    SELECT
-      COUNT(*) as total_leads,
-      SUM(CASE WHEN status='won' THEN 1 ELSE 0 END) as won_count,
-      SUM(CASE WHEN commission_status='paid' THEN commission_amount_cents ELSE 0 END) as paid_cents,
-      SUM(CASE WHEN commission_status='accrued' THEN commission_amount_cents ELSE 0 END) as accrued_cents
-    FROM b2b_leads WHERE referral_member_no=?
-  `).bind(memberNo).first<any>()
+  try {
+    const totals = await db.prepare(`
+      SELECT
+        COUNT(*) as total_leads,
+        SUM(CASE WHEN status='won' THEN 1 ELSE 0 END) as won_count,
+        SUM(CASE WHEN commission_status='paid' THEN commission_amount_cents ELSE 0 END) as paid_cents,
+        SUM(CASE WHEN commission_status='accrued' THEN commission_amount_cents ELSE 0 END) as accrued_cents
+      FROM b2b_leads WHERE referral_member_no=?
+    `).bind(memberNo).first<any>()
 
-  const recentWon = await db.prepare(`
-    SELECT lead_id, buyer_name, buyer_company, commission_amount_cents, commission_status, updated_at
-    FROM b2b_leads WHERE referral_member_no=? AND status='won'
-    ORDER BY updated_at DESC LIMIT 10
-  `).bind(memberNo).all()
+    const recentWon = await db.prepare(`
+      SELECT id as lead_id, buyer_name, buyer_company, commission_amount_cents, commission_status, updated_at
+      FROM b2b_leads WHERE referral_member_no=? AND status='won'
+      ORDER BY updated_at DESC LIMIT 10
+    `).bind(memberNo).all()
 
-  return c.json({
-    ok: true,
-    total_leads: totals?.total_leads || 0,
-    won_count: totals?.won_count || 0,
-    paid_cents: totals?.paid_cents || 0,
-    accrued_cents: totals?.accrued_cents || 0,
-    recent_won: recentWon.results
-  })
+    return c.json({
+      ok: true,
+      total_leads: totals?.total_leads || 0,
+      won_count: totals?.won_count || 0,
+      paid_cents: totals?.paid_cents || 0,
+      accrued_cents: totals?.accrued_cents || 0,
+      recent_won: recentWon.results
+    })
+  } catch (err: any) {
+    return c.json({ ok: false, error: err?.message || String(err) }, 500)
+  }
 })
 
 // ─── Admin CoLinkery：待審批 + 待發 OTP ───────────────────────────────────────
@@ -16381,6 +16399,7 @@ function colinkerypwaHtml(): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CoLinkery">
