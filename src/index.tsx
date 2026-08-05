@@ -16583,10 +16583,31 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
       <button class="btn-secondary" onclick="showPage('page-cards')" style="margin-bottom:10px;">📋 名片庫</button>
       <button class="btn-secondary" onclick="showPage('page-share')" style="margin-bottom:10px;">🔗 分享我的引薦連結</button>
     </div>
-    <!-- iOS PWA install hint -->
-    <div id="ios-install-hint" class="cl-card" style="display:none;margin:0 16px;background:var(--pale);border:1px solid #86EFAC;">
-      <p style="font-size:15px;color:var(--green);font-weight:600;margin-bottom:6px;">📲 加至主畫面，下次更快</p>
-      <p style="font-size:14px;color:var(--muted);">點擊 Safari 底部的 <strong>分享</strong> 按鈕，然後選「<strong>加至主畫面</strong>」，即可像 App 般使用。</p>
+    <!-- PWA install prompt (shown after login if not already installed) -->
+    <div id="pwa-install-card" style="display:none;margin:0 16px 16px;">
+      <div style="background:linear-gradient(135deg,#1a6b1a,#2d9e2d);border-radius:14px;padding:18px 16px;color:#fff;position:relative;">
+        <button onclick="document.getElementById('pwa-install-card').style.display='none';localStorage.setItem('cl_pwa_dismissed','1');"
+          style="position:absolute;top:10px;right:12px;background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;">✕</button>
+        <div style="font-size:22px;margin-bottom:8px;">📲 安裝 CoLinkery App</div>
+        <div style="font-size:15px;opacity:.9;margin-bottom:14px;line-height:1.5;">安裝後可離線使用，並從主畫面直接開啟，體驗更流暢！</div>
+        <!-- Android install button (shown when beforeinstallprompt fires) -->
+        <button id="pwa-install-android-btn" onclick="triggerInstall()" style="display:none;width:100%;background:#fff;color:#1a6b1a;border:none;border-radius:10px;padding:14px;font-size:17px;font-weight:900;cursor:pointer;margin-bottom:8px;">
+          ⬇️ 立即安裝到主畫面
+        </button>
+        <!-- iOS Safari instructions -->
+        <div id="pwa-install-ios" style="display:none;background:rgba(255,255,255,.15);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:8px;">iPhone / iPad 步驟：</div>
+          <div style="font-size:14px;line-height:1.8;">
+            1️⃣ 點擊 Safari 底部 <strong>分享</strong> 按鈕 <span style="font-size:18px;">⬆️</span><br>
+            2️⃣ 向下滾動，選「<strong>加入主畫面</strong>」<br>
+            3️⃣ 點「<strong>新增</strong>」完成
+          </div>
+        </div>
+        <!-- Fallback for other browsers -->
+        <div id="pwa-install-other" style="display:none;font-size:14px;opacity:.85;line-height:1.6;">
+          在瀏覽器選單中選擇「<strong>加至主畫面</strong>」或「<strong>安裝應用程式</strong>」即可。
+        </div>
+      </div>
     </div>
   </div>
 
@@ -16766,7 +16787,7 @@ function showPage(id){
   // Stop camera if leaving camera page
   if(id !== 'page-camera') stopCamera();
   // Auto-init pages
-  if(id==='page-camera') initCamera();
+  if(id==='page-camera') resetAndInitCamera();
   if(id==='page-cards') loadCards();
   if(id==='page-results') loadResults();
   if(id==='page-share') initSharePage();
@@ -16820,7 +16841,15 @@ function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.disp
   window.addEventListener('beforeinstallprompt', function(e){
     e.preventDefault();
     STATE.deferredPrompt = e;
-    document.getElementById('pwa-banner').style.display = 'flex';
+    // If user already logged in and card is waiting for prompt, show it now
+    if(STATE.showInstallCardWhenReady){
+      STATE.showInstallCardWhenReady = false;
+      var card = document.getElementById('pwa-install-card');
+      if(card && !localStorage.getItem('cl_pwa_dismissed')){
+        document.getElementById('pwa-install-android-btn').style.display = 'block';
+        card.style.display = 'block';
+      }
+    }
   });
 })();
 
@@ -16829,7 +16858,12 @@ function triggerInstall(){
     STATE.deferredPrompt.prompt();
     STATE.deferredPrompt.userChoice.then(function(r){
       STATE.deferredPrompt = null;
-      document.getElementById('pwa-banner').style.display = 'none';
+      // Hide install card after user responds
+      var card = document.getElementById('pwa-install-card');
+      if(card) card.style.display = 'none';
+      if(r.outcome === 'accepted'){
+        localStorage.setItem('cl_pwa_dismissed','1');
+      }
     });
   }
 }
@@ -16861,11 +16895,32 @@ function afterLogin(){
   if(!localStorage.getItem('cl_onboarded_'+STATE.memberNo)){
     startOnboarding();
   }
-  // iOS install hint
-  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  var isStandalone = window.navigator.standalone;
-  if(isIos && !isStandalone){
-    setTimeout(function(){ document.getElementById('ios-install-hint').style.display='block'; },2000);
+  // PWA install prompt — show after login if not dismissed and not already installed
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if(!localStorage.getItem('cl_pwa_dismissed') && !isStandalone){
+    setTimeout(function(){
+      var card = document.getElementById('pwa-install-card');
+      if(!card) return;
+      var ua = navigator.userAgent;
+      var isIos = /iphone|ipad|ipod/i.test(ua);
+      var isAndroid = /android/i.test(ua);
+      // Reset sub-sections
+      document.getElementById('pwa-install-ios').style.display = 'none';
+      document.getElementById('pwa-install-android-btn').style.display = 'none';
+      document.getElementById('pwa-install-other').style.display = 'none';
+      if(isIos){
+        document.getElementById('pwa-install-ios').style.display = 'block';
+      } else if(isAndroid && STATE.deferredPrompt){
+        document.getElementById('pwa-install-android-btn').style.display = 'block';
+      } else if(isAndroid){
+        // Android but beforeinstallprompt not yet fired — mark flag so it shows when prompt fires
+        STATE.showInstallCardWhenReady = true;
+        return; // wait for beforeinstallprompt
+      } else {
+        document.getElementById('pwa-install-other').style.display = 'block';
+      }
+      card.style.display = 'block';
+    }, 2000);
   }
 }
 
@@ -17015,6 +17070,22 @@ async function loadStats(){
 }
 
 // ── Camera ────────────────────────────────────────────────────────────────────
+// Reset camera page UI and (re)start camera stream
+function resetAndInitCamera(){
+  // Always show camera-area, hide card-form and ocr-loading
+  var camArea = document.getElementById('camera-area');
+  if(camArea) camArea.style.display='';
+  var cardForm = document.getElementById('card-form');
+  if(cardForm) cardForm.style.display='none';
+  var ocrLoad = document.getElementById('ocr-loading');
+  if(ocrLoad) ocrLoad.style.display='none';
+  // Show hint again
+  var hint = document.getElementById('camera-tap-hint');
+  if(hint){ hint.style.display='block'; hint.style.opacity='1'; }
+  // Restart stream if needed
+  if(!STATE.cameraStream) initCamera();
+}
+
 async function initCamera(){
   if(STATE.cameraStream) return;
   try{
