@@ -9070,10 +9070,9 @@ function qrModGetIdAndLabel(){
 // ── build registration URL ─────────────────────────────────────────────────────
 function qrModBuildUrl(sourceId){
   if(!sourceId) return '';
-  var target = (document.getElementById('qrmodTarget')||{}).value || 'primary';
   var base = window.location.origin;
-  var path = target==='family' ? '/register/family' : target==='both' ? '/register' : '/register/primary';
-  return base + path + '?source=' + encodeURIComponent(sourceId);
+  // Real route: /qr-register?source=xxx  (target selector kept for future use)
+  return base + '/qr-register?source=' + encodeURIComponent(sourceId);
 }
 
 // ── QR canvas render (uses qrcode-generator via CDN or fallback API) ──────────
@@ -9231,7 +9230,7 @@ function qrModLoadSources(){
         list.innerHTML = '<div style="color:#aaa;font-size:12px;text-align:center;padding:12px;">尚無 QR 來源</div>';
       } else {
         list.innerHTML = sources.map(function(s){
-          var url = window.location.origin + '/register/primary?source=' + encodeURIComponent(s.source_id);
+          var url = window.location.origin + '/qr-register?source=' + encodeURIComponent(s.source_id);
           return '<div class="qrmod-src-item'+(s.status==='inactive'?' inactive':'')+'">' +
             '<div class="qrmod-src-header">' +
               '<div class="qrmod-src-name">' + escHtml(s.display_name) + '</div>' +
@@ -9263,7 +9262,7 @@ function qrModLoadSources(){
         grid.innerHTML = '<p style="color:#888;font-size:14px;grid-column:1/-1;">尚無QR碼，請點「新增QR碼」</p>';
       } else {
         grid.innerHTML = sources.map(function(s){
-          var url = window.location.origin + '/register/primary?source=' + encodeURIComponent(s.source_id);
+          var url = window.location.origin + '/qr-register?source=' + encodeURIComponent(s.source_id);
           var qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(url);
           return '<div class="qrmod-src-item'+(s.status==='inactive'?' inactive':'')+'" style="border-radius:10px;border:1.5px solid #E5E7EB;">' +
             '<div class="qrmod-src-header">' +
