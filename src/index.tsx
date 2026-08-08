@@ -11,6 +11,10 @@ type Bindings = {
   CLOUDINARY_CLOUD_NAME?: string  // Cloudinary cloud name (e.g. ex2zrh2h)
   CLOUDINARY_API_KEY?: string     // Cloudinary API key
   CLOUDINARY_API_SECRET?: string  // Cloudinary API secret (for signed uploads)
+  WHATSAPP_VERIFY_TOKEN?: string  // WhatsApp webhook verify token (set in Meta Dashboard)
+  WHATSAPP_API_TOKEN?: string     // WhatsApp Cloud API token (for sending messages)
+  WHATSAPP_PHONE_ID?: string      // WhatsApp Cloud API phone number ID
+  APP_SECRET?: string             // App-level secret for signing login tokens
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -11704,6 +11708,67 @@ function switchUser() {
     });
   }
 
+  // ── WA Quick Register Token 自動登入 ──────────────────────────────────────
+  var urlParams = new URLSearchParams(window.location.search);
+  var waToken = urlParams.get('token');
+  var waSource = urlParams.get('source');
+  if (waToken && waSource === 'wa_quick_register') {
+    // Show loading state
+    var wrap = document.getElementById('mainWrap') || document.body;
+    var loadEl = document.createElement('div');
+    loadEl.id = 'tokenLoadingBanner';
+    loadEl.style.cssText = 'position:fixed;inset:0;background:linear-gradient(160deg,#1a6b1a,#388e3c);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    loadEl.innerHTML = '<div style="text-align:center;color:#fff;padding:40px"><div style="font-size:48px;margin-bottom:16px">🎉</div><div style="font-size:22px;font-weight:900;margin-bottom:8px">歡迎加入 CoEldery 85！</div><div style="font-size:15px;opacity:0.85">正在驗證你的會員身份...</div></div>';
+    document.body.appendChild(loadEl);
+
+    fetch('/api/wa-token/verify', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token: waToken })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      document.body.removeChild(loadEl);
+      // Clean URL (remove token params)
+      var cleanUrl = window.location.origin + '/app';
+      window.history.replaceState({}, '', cleanUrl);
+
+      if (d.ok && d.member) {
+        var m = d.member;
+        localStorage.setItem('ce85_member_no', m.member_no);
+        localStorage.setItem('ce85_wa_clicked', '1');
+        if (m.phone) localStorage.setItem('ce85_phone', m.phone);
+
+        // If profile incomplete → redirect to complete page
+        if (m.registration_method === 'whatsapp_qr' && m.registration_status === 'incomplete') {
+          try { sessionStorage.setItem('wa_member', JSON.stringify(m)); } catch(_){}
+          window.location.href = '/qr-register/complete';
+          return;
+        }
+        // Profile complete → show card normally
+        showCard(m.member_no, true);
+      } else {
+        // Token invalid / expired
+        var expiredBanner = document.createElement('div');
+        expiredBanner.style.cssText = 'background:#FEE2E2;border:1.5px solid #EF4444;border-radius:12px;padding:20px 24px;margin:20px;text-align:center;';
+        expiredBanner.innerHTML =
+          '<div style="font-size:36px;margin-bottom:8px">⏰</div>' +
+          '<div style="font-size:16px;font-weight:700;color:#B91C1C;margin-bottom:6px">' + (d.error||'登入連結已過期') + '</div>' +
+          '<div style="font-size:13px;color:#666;margin-bottom:16px">請重新掃描QR碼或前往會員登記頁面</div>' +
+          '<a href="/membership/join" style="background:#1a6b1a;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">重新登記</a>';
+        var lookupCard = document.querySelector('.lookup-card');
+        if (lookupCard) lookupCard.parentNode.insertBefore(expiredBanner, lookupCard);
+      }
+    })
+    .catch(function(){
+      if (document.getElementById('tokenLoadingBanner')) {
+        document.body.removeChild(loadEl);
+      }
+    });
+    return; // Don't run saved-member check while token is being verified
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   var saved = localStorage.getItem('ce85_member_no');
   if (saved) {
     var savedWaClicked = localStorage.getItem('ce85_wa_clicked') === '1';
@@ -18214,4 +18279,1123 @@ body{background:#F0EBD8;font-family:"Noto Sans TC","PingFang TC","Microsoft Jhen
 </html>`)
 })
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── WhatsApp QR Quick Registration System ────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Helper: generate a secure random hex token ───────────────────────────────
+async function generateToken(len = 32): Promise<string> {
+  const buf = new Uint8Array(len)
+  crypto.getRandomValues(buf)
+  return Array.from(buf).map(b => b.toString(16).padStart(2,'0')).join('')
+}
+
+// ── Helper: generate unique member_no (CE85-XXXXXX) ─────────────────────────
+async function genMemberNoQR(db: D1Database): Promise<string> {
+  for (let i = 0; i < 10; i++) {
+    const num = Math.floor(100000 + Math.random() * 900000)
+    const candidate = `CE85-${num}`
+    const existing = await db.prepare('SELECT id FROM members WHERE member_no = ?').bind(candidate).first()
+    if (!existing) return candidate
+  }
+  // fallback: use counter
+  const row = await db.prepare('UPDATE counter SET next_val = next_val + 1 WHERE id = 1 RETURNING next_val').first<{ next_val: number }>()
+  const n = (row?.next_val ?? 1).toString().padStart(6,'0')
+  return `CE85-${n}`
+}
+
+// ── Helper: Hong Kong districts list ────────────────────────────────────────
+const HK_DISTRICTS = ['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','葵青','荃灣','屯門','元朗','北區','大埔','沙田','西貢','離島']
+
+// ── GET /qr-register — Mini form page ────────────────────────────────────────
+app.get('/qr-register', (c) => {
+  const source = (c.req.query('source') || 'online_website').replace(/[^a-z0-9_\-]/gi, '').slice(0, 100)
+  return c.html(qrRegisterHtml(source))
+})
+
+function qrRegisterHtml(source: string) {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>快速加入 CoEldery 85</title>
+<meta name="theme-color" content="#1a6b1a">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:linear-gradient(160deg,#1a6b1a 0%,#388e3c 45%,#2e7d32 100%);min-height:100vh;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:#fff;border-radius:24px;padding:36px 28px 32px;max-width:420px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+.logo-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px;}
+.logo-badge{background:#1a6b1a;color:#fff;font-size:28px;font-weight:900;border-radius:12px;
+  padding:6px 14px;letter-spacing:1px;line-height:1.2;}
+.logo-text{font-size:18px;font-weight:700;color:#1a6b1a;}
+h1{font-size:22px;font-weight:900;color:#1a6b1a;text-align:center;margin:14px 0 4px;line-height:1.35;}
+.subtitle{font-size:14px;color:#666;text-align:center;margin-bottom:28px;line-height:1.5;}
+.field{margin-bottom:22px;}
+.field label{display:block;font-size:15px;font-weight:700;color:#222;margin-bottom:8px;}
+.field label span{color:#c62828;}
+.field input,.field select{width:100%;padding:14px 16px;font-size:18px;
+  border:2px solid #388e3c;border-radius:12px;font-family:inherit;color:#111;
+  background:#fff;outline:none;transition:border-color 0.2s;}
+.field input:focus,.field select:focus{border-color:#1a6b1a;box-shadow:0 0 0 3px rgba(56,142,60,0.15);}
+.field input::placeholder{color:#bbb;}
+.btn{width:100%;padding:16px;font-size:18px;font-weight:900;color:#fff;
+  background:linear-gradient(135deg,#1a6b1a,#388e3c);border:none;border-radius:14px;
+  cursor:pointer;letter-spacing:1px;margin-top:4px;transition:opacity 0.2s;
+  -webkit-tap-highlight-color:transparent;}
+.btn:active{opacity:0.85;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+.error-box{background:#FEE2E2;border:1.5px solid #EF4444;border-radius:10px;
+  padding:12px 16px;font-size:14px;color:#B91C1C;margin-bottom:18px;display:none;}
+.steps{background:#F0FDF4;border-radius:12px;padding:16px 18px;margin-top:22px;}
+.steps h3{font-size:13px;font-weight:700;color:#166534;margin-bottom:10px;letter-spacing:0.5px;}
+.step-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;}
+.step-row:last-child{margin-bottom:0;}
+.step-num{background:#1a6b1a;color:#fff;font-size:11px;font-weight:900;
+  border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-txt{font-size:13px;color:#166534;line-height:1.5;}
+.privacy{font-size:12px;color:#888;text-align:center;margin-top:16px;line-height:1.6;}
+.source-badge{display:inline-block;background:#E8F5E9;color:#2e7d32;font-size:11px;
+  font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:16px;letter-spacing:0.5px;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-row">
+    <div class="logo-badge">85</div>
+    <div class="logo-text">CoEldery<br>老有聯盟</div>
+  </div>
+  <h1>快速加入 CoEldery 85</h1>
+  <p class="subtitle">兩步完成登記，立即獲得數碼會員卡</p>
+
+  <div id="errorBox" class="error-box"></div>
+
+  <div class="field">
+    <label>姓名 <span>✽</span></label>
+    <input type="text" id="fieldName" placeholder="請輸入你的姓名" maxlength="50" autocomplete="name">
+  </div>
+  <div class="field">
+    <label>出生年份 <span>✽</span></label>
+    <input type="number" id="fieldYear" placeholder="例如：1960" min="1920" max="2011" inputmode="numeric">
+  </div>
+
+  <button class="btn" id="submitBtn" onclick="doSubmit()">
+    📱 快速登記（WhatsApp 確認）
+  </button>
+
+  <div class="steps">
+    <h3>📋 登記步驟</h3>
+    <div class="step-row"><div class="step-num">1</div><div class="step-txt">填寫以上資料後點擊「快速登記」</div></div>
+    <div class="step-row"><div class="step-num">2</div><div class="step-txt">WhatsApp 自動開啟，預填訊息已準備好</div></div>
+    <div class="step-row"><div class="step-num">3</div><div class="step-txt">點擊 WhatsApp 的「發送」按鈕</div></div>
+    <div class="step-row"><div class="step-num">4</div><div class="step-txt">系統即時確認，並發送你的數碼會員卡連結</div></div>
+  </div>
+
+  <p class="privacy">🔒 你的個人資料受香港個人資料（私隱）條例保護<br>僅用於 CoEldery 85 會員服務</p>
+</div>
+
+<script>
+var SOURCE = '${source.replace(/'/g,"\\'")}';
+
+function showError(msg){
+  var b=document.getElementById('errorBox');
+  b.textContent=msg; b.style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function hideError(){ document.getElementById('errorBox').style.display='none'; }
+
+function doSubmit(){
+  hideError();
+  var name = document.getElementById('fieldName').value.trim();
+  var yearStr = document.getElementById('fieldYear').value.trim();
+  var year = parseInt(yearStr, 10);
+
+  if (!name || name.length < 1 || name.length > 50){
+    showError('請輸入有效的姓名（1-50字）'); return;
+  }
+  if (!yearStr || isNaN(year) || year < 1920 || year > 2011){
+    showError('請輸入有效的出生年份（1920 - 2011）'); return;
+  }
+
+  var text = '姓名:' + name + '\\n年份:' + year + '\\nSource:' + SOURCE;
+  var url = 'https://wa.me/85254429749?text=' + encodeURIComponent(text);
+
+  // Show confirmation overlay
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 正在開啟 WhatsApp...';
+
+  setTimeout(function(){
+    window.location.href = url;
+    setTimeout(function(){
+      btn.disabled = false;
+      btn.textContent = '📱 快速登記（WhatsApp 確認）';
+    }, 3000);
+  }, 400);
+}
+
+// Allow Enter key to submit
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Enter') doSubmit();
+});
+</script>
+</body>
+</html>`
+}
+
+// ── GET /api/qr-sources — public list of active sources (for QR gen) ─────────
+app.get('/api/qr-sources', async (c) => {
+  const db = c.env.DB
+  try {
+    const rows = await db.prepare(
+      "SELECT source_id, display_name, event_date, location FROM qr_sources WHERE status='active' ORDER BY created_at DESC"
+    ).all<{ source_id: string; display_name: string; event_date: string; location: string }>()
+    return c.json({ ok: true, sources: rows.results || [] })
+  } catch (_) {
+    return c.json({ ok: true, sources: [] })
+  }
+})
+
+// ── POST /webhooks/whatsapp — Meta WhatsApp Cloud API webhook ────────────────
+// GET /webhooks/whatsapp — webhook verification challenge
+app.get('/webhooks/whatsapp', (c) => {
+  const mode      = c.req.query('hub.mode')
+  const token     = c.req.query('hub.verify_token')
+  const challenge = c.req.query('hub.challenge')
+  const verifyToken = c.env.WHATSAPP_VERIFY_TOKEN || 'coeldery85_wa_webhook_verify'
+  if (mode === 'subscribe' && token === verifyToken) {
+    return c.text(challenge || '', 200)
+  }
+  return c.text('Forbidden', 403)
+})
+
+app.post('/webhooks/whatsapp', async (c) => {
+  const db = c.env.DB
+  let body: any
+  try { body = await c.req.json() } catch (_) { return c.json({ ok: false }, 400) }
+
+  // Extract message from WhatsApp Cloud API payload
+  const entry   = body?.entry?.[0]
+  const changes = entry?.changes?.[0]
+  const value   = changes?.value
+  const msg     = value?.messages?.[0]
+
+  if (!msg || msg.type !== 'text') return c.json({ ok: true }) // ignore non-text
+
+  const fromNumber  = msg.from || ''          // e.g. "85298765432"
+  const messageId   = msg.id || ''
+  const msgText     = (msg.text?.body || '').trim()
+
+  // ── Parse message format: 姓名:NAME\n年份:YEAR\nSource:SOURCE ──────────────
+  let parsedName: string | null = null
+  let parsedYear: number | null = null
+  let parsedSource: string | null = null
+
+  const nameMatch   = msgText.match(/姓名[:：]\s*(.+)/u)
+  const yearMatch   = msgText.match(/年份[:：]\s*(\d{4})/u)
+  const sourceMatch = msgText.match(/Source[:：]\s*([^\s\n]+)/i)
+
+  if (nameMatch)   parsedName   = nameMatch[1].trim().slice(0, 100)
+  if (yearMatch)   parsedYear   = parseInt(yearMatch[1], 10)
+  if (sourceMatch) parsedSource = sourceMatch[1].trim().replace(/[^a-z0-9_\-]/gi,'').slice(0, 100)
+
+  // Insert webhook log
+  const logInsert = db.prepare(
+    `INSERT INTO whatsapp_webhook_logs
+      (message_id, from_number, message_content, parsed_name, parsed_year, parsed_source, validation_result, response_status)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', 'pending')`
+  ).bind(messageId, fromNumber, msgText, parsedName, parsedYear, parsedSource)
+
+  let logId: number | null = null
+  try {
+    const lr = await logInsert.run()
+    logId = lr.meta?.last_row_id ?? null
+  } catch (_) { /* log insert failure non-fatal */ }
+
+  async function updateLog(validationResult: string, membNo: string | null, responseStatus: string, errMsg: string | null) {
+    if (!logId) return
+    try {
+      await db.prepare(
+        `UPDATE whatsapp_webhook_logs SET validation_result=?, member_no=?, response_status=?, error_message=?, processed_at=datetime('now') WHERE id=?`
+      ).bind(validationResult, membNo, responseStatus, errMsg, logId).run()
+    } catch (_) { /* ignore */ }
+  }
+
+  // Helper: send WA reply via Cloud API
+  async function sendReply(toNum: string, text: string): Promise<boolean> {
+    const phoneId  = c.env.WHATSAPP_PHONE_ID
+    const apiToken = c.env.WHATSAPP_API_TOKEN
+    if (!phoneId || !apiToken) return false
+    try {
+      const resp = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to: toNum, type: 'text', text: { body: text } })
+      })
+      return resp.ok
+    } catch (_) { return false }
+  }
+
+  // ── Validation ────────────────────────────────────────────────────────────
+  const currentYear = new Date().getFullYear()
+
+  // Validate phone (HK 8-digit, prefixed with 852)
+  const hkPhone = fromNumber.startsWith('852') ? fromNumber.slice(3) : fromNumber
+  const phoneValid = /^\d{8}$/.test(hkPhone)
+
+  if (!parsedName || !parsedYear) {
+    await updateLog('format_error', null, 'sent', 'Missing name or year')
+    await sendReply(fromNumber,
+      '抱歉，格式不正確 🙏\n\n請重新輸入以下格式：\n姓名:[你的名字]\n年份:[出生年份]\n\n例如：\n姓名:李大文\n年份:1960')
+    return c.json({ ok: true })
+  }
+
+  if (parsedYear < 1920 || parsedYear > 2011) {
+    await updateLog('invalid_year', null, 'sent', `Year out of range: ${parsedYear}`)
+    await sendReply(fromNumber, `出生年份 ${parsedYear} 不在有效範圍內（1920-2011）\n請重新傳送正確的出生年份。`)
+    return c.json({ ok: true })
+  }
+
+  if (!phoneValid) {
+    await updateLog('invalid_phone', null, 'sent', `Invalid phone: ${fromNumber}`)
+    await sendReply(fromNumber, '系統無法識別你的電話號碼，請確保使用香港 WhatsApp 號碼登記。')
+    return c.json({ ok: true })
+  }
+
+  // ── Check duplicate ───────────────────────────────────────────────────────
+  let existing: { member_no: string } | null = null
+  try {
+    existing = await db.prepare('SELECT member_no FROM members WHERE phone = ? LIMIT 1').bind(hkPhone).first<{ member_no: string }>()
+  } catch (_) { /* ignore */ }
+
+  if (existing) {
+    const loginUrl = `https://coeldery85.com/app`
+    await updateLog('duplicate_phone', existing.member_no, 'sent', null)
+    await sendReply(fromNumber,
+      `你已是 CoEldery 85 會員！🎉\n\n會員號碼：${existing.member_no}\n\n📱 點擊此連結查看你的會員卡：\n${loginUrl}`)
+    return c.json({ ok: true })
+  }
+
+  // ── Create member ─────────────────────────────────────────────────────────
+  const age        = currentYear - parsedYear
+  const tier       = age >= 55 ? 'PRIMARY' : 'FAMILY'
+  const tierLabel  = tier === 'PRIMARY' ? '主卡（55+）' : '家庭卡'
+  const expiresAt  = `${currentYear + 2}-12-31`
+  const memberNo   = await genMemberNoQR(db)
+  const roadshowSrc = parsedSource || 'online_website'
+
+  try {
+    await db.prepare(
+      `INSERT INTO members
+        (member_no, tier, name_zh, phone, birth_year, roadshow, source, status,
+         registration_method, registration_status, roadshow_source, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'whatsapp_qr', 'ACTIVE',
+               'whatsapp_qr', 'incomplete', ?, ?)`
+    ).bind(memberNo, tier, parsedName, hkPhone, parsedYear, roadshowSrc, roadshowSrc, expiresAt).run()
+  } catch (dbErr: any) {
+    await updateLog('db_error', null, 'failed', String(dbErr))
+    await sendReply(fromNumber, '系統暫時出現問題，請稍後再試或WhatsApp我們：5442-9749 🙏')
+    return c.json({ ok: true })
+  }
+
+  // ── Generate one-time login token ─────────────────────────────────────────
+  let loginToken = ''
+  try {
+    loginToken = await generateToken(32)
+    const expiresTokenAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+      .toISOString().replace('T',' ').slice(0,19)
+    await db.prepare(
+      `INSERT INTO wa_login_tokens (token, member_no, phone, purpose, expires_at)
+       VALUES (?, ?, ?, 'app_login', ?)`
+    ).bind(loginToken, memberNo, hkPhone, expiresTokenAt).run()
+  } catch (_) { loginToken = '' }
+
+  const appLink = loginToken
+    ? `https://coeldery85.com/app?token=${loginToken}&source=wa_quick_register`
+    : `https://coeldery85.com/app`
+
+  // ── Send confirmation reply ───────────────────────────────────────────────
+  const confirmMsg =
+    `🎉 歡迎加入 CoEldery 85 老有聯盟！\n\n` +
+    `你的會員卡已準備就緒！\n\n` +
+    `會員號碼：${memberNo}\n` +
+    `姓名：${parsedName}\n` +
+    `會員類型：${tierLabel}\n` +
+    `出生年份：${parsedYear}\n\n` +
+    `📱 點擊此連結查看你的會員卡並完成登記：\n${appLink}\n\n` +
+    (loginToken ? `⏰ 此連結將在24小時後過期\n` : '') +
+    `🔒 只有你的 WhatsApp 號碼能存取此連結`
+
+  const sent = await sendReply(fromNumber, confirmMsg)
+  await updateLog('success', memberNo, sent ? 'sent' : 'failed', null)
+
+  return c.json({ ok: true })
+})
+
+// ── POST /api/wa-token/verify — validate token and return member ──────────────
+app.post('/api/wa-token/verify', async (c) => {
+  const db = c.env.DB
+  let body: { token?: string }
+  try { body = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效請求' }, 400) }
+
+  const token = (body.token || '').trim()
+  if (!token || token.length < 10) return c.json({ ok: false, error: '無效連結' })
+
+  // Look up token
+  let row: { id: number; member_no: string; phone: string; used: number; expires_at: string } | null = null
+  try {
+    row = await db.prepare(
+      'SELECT id, member_no, phone, used, expires_at FROM wa_login_tokens WHERE token = ? LIMIT 1'
+    ).bind(token).first<{ id: number; member_no: string; phone: string; used: number; expires_at: string }>()
+  } catch (_) { return c.json({ ok: false, error: '系統錯誤' }) }
+
+  if (!row) return c.json({ ok: false, error: '連結無效或已過期', expired: true })
+  if (row.used) return c.json({ ok: false, error: '此連結已被使用，請重新掃描QR碼登記', expired: true })
+
+  // Check expiry
+  const now = new Date()
+  const exp = new Date(row.expires_at.replace(' ', 'T') + 'Z')
+  if (now > exp) {
+    return c.json({ ok: false, error: '登入連結已過期（超過24小時），請重新掃描QR碼', expired: true })
+  }
+
+  // Mark token as used
+  try {
+    await db.prepare("UPDATE wa_login_tokens SET used=1, used_at=datetime('now') WHERE id=?").bind(row.id).run()
+  } catch (_) { /* non-fatal */ }
+
+  // Fetch member
+  let member: any = null
+  try {
+    member = await db.prepare(
+      `SELECT member_no, tier, name_zh, phone, gender, birth_year, district,
+              registration_method, registration_status, status, expires_at
+       FROM members WHERE member_no = ? LIMIT 1`
+    ).bind(row.member_no).first()
+  } catch (_) { return c.json({ ok: false, error: '無法讀取會員資料' }) }
+
+  if (!member) return c.json({ ok: false, error: '找不到會員資料' })
+  if (member.status !== 'ACTIVE') return c.json({ ok: false, error: '此會員帳戶已停用' })
+
+  return c.json({ ok: true, member })
+})
+
+// ── POST /api/member/complete-profile — fill in gender + district ────────────
+app.post('/api/member/complete-profile', async (c) => {
+  const db = c.env.DB
+  let body: { member_no?: string; gender?: string; district?: string }
+  try { body = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效請求' }, 400) }
+
+  const memberNo = (body.member_no || '').trim()
+  const gender   = (body.gender || '').trim()
+  const district = (body.district || '').trim()
+
+  if (!memberNo) return c.json({ ok: false, error: '缺少會員號碼' })
+  if (!gender)   return c.json({ ok: false, error: '請選擇性別' })
+  if (!district) return c.json({ ok: false, error: '請選擇居住地區' })
+
+  const validGenders = ['M','F','Other','Prefer not to say']
+  if (!validGenders.includes(gender)) return c.json({ ok: false, error: '無效性別選項' })
+  if (!HK_DISTRICTS.includes(district)) return c.json({ ok: false, error: '無效地區選項' })
+
+  try {
+    await db.prepare(
+      `UPDATE members SET gender=?, district=?, registration_status='complete', updated_at=datetime('now') WHERE member_no=?`
+    ).bind(gender, district, memberNo).run()
+  } catch (_) {
+    // updated_at column may not exist; try without it
+    try {
+      await db.prepare(
+        `UPDATE members SET gender=?, district=?, registration_status='complete' WHERE member_no=?`
+      ).bind(gender, district, memberNo).run()
+    } catch (e2: any) {
+      return c.json({ ok: false, error: '更新失敗' })
+    }
+  }
+
+  return c.json({ ok: true })
+})
+
+// ── GET /qr-register/complete — supplement info page (after token login) ─────
+app.get('/qr-register/complete', (c) => {
+  return c.html(qrCompleteHtml())
+})
+
+function qrCompleteHtml() {
+  const districtOptions = HK_DISTRICTS.map(d => `<option value="${d}">${d}</option>`).join('')
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>完成會員登記 — CoEldery 85</title>
+<meta name="theme-color" content="#1a6b1a">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:linear-gradient(160deg,#1a6b1a 0%,#388e3c 45%,#2e7d32 100%);min-height:100vh;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:#fff;border-radius:24px;padding:36px 28px 32px;max-width:420px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+h1{font-size:22px;font-weight:900;color:#1a6b1a;margin-bottom:6px;}
+.sub{font-size:14px;color:#666;margin-bottom:24px;line-height:1.5;}
+.info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:15px;}
+.info-row .lbl{color:#888;font-weight:600;}
+.info-row .val{font-weight:700;color:#111;}
+.check-icon{color:#22c55e;margin-right:4px;}
+.section{margin:22px 0 4px;font-size:16px;font-weight:700;color:#1a6b1a;}
+.field{margin-bottom:18px;}
+.field label{display:block;font-size:14px;font-weight:700;color:#222;margin-bottom:8px;}
+.field label span{color:#c62828;}
+.field select{width:100%;padding:13px 16px;font-size:16px;border:2px solid #388e3c;
+  border-radius:10px;font-family:inherit;color:#111;background:#fff;outline:none;}
+.btn{width:100%;padding:15px;font-size:17px;font-weight:900;color:#fff;
+  background:linear-gradient(135deg,#1a6b1a,#388e3c);border:none;border-radius:12px;
+  cursor:pointer;letter-spacing:1px;transition:opacity 0.2s;}
+.btn:active{opacity:0.85;}
+.error-box{background:#FEE2E2;border:1.5px solid #EF4444;border-radius:10px;
+  padding:12px 16px;font-size:14px;color:#B91C1C;margin-bottom:16px;display:none;}
+.success-box{display:none;text-align:center;padding:20px 0;}
+.success-box .big-check{font-size:64px;margin-bottom:12px;}
+.success-box h2{font-size:22px;font-weight:900;color:#1a6b1a;margin-bottom:8px;}
+.success-box p{font-size:15px;color:#555;margin-bottom:20px;line-height:1.6;}
+.go-app-btn{display:block;width:100%;padding:15px;font-size:17px;font-weight:900;
+  color:#fff;background:#1a6b1a;border:none;border-radius:12px;
+  text-decoration:none;text-align:center;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="card" id="mainCard">
+  <h1>🎉 完成你的會員資訊</h1>
+  <p class="sub">你已成功加入！請補充以下資訊以完成會員登記。</p>
+
+  <div id="memberInfo">
+    <!-- filled by JS -->
+  </div>
+
+  <p class="section">請補充以下資訊：</p>
+
+  <div id="errorBox" class="error-box"></div>
+
+  <div class="field">
+    <label>性別 <span>✽</span></label>
+    <select id="fieldGender">
+      <option value="">── 請選擇 ──</option>
+      <option value="M">男</option>
+      <option value="F">女</option>
+      <option value="Other">其他</option>
+      <option value="Prefer not to say">寧願不說</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>居住地區 <span>✽</span></label>
+    <select id="fieldDistrict">
+      <option value="">── 請選擇 ──</option>
+      ${districtOptions}
+    </select>
+  </div>
+
+  <button class="btn" id="submitBtn" onclick="doComplete()">保存並查看會員卡</button>
+</div>
+
+<div class="success-box" id="successBox">
+  <div class="big-check">✅</div>
+  <h2>會員登記完成！</h2>
+  <p>你的 CoEldery 85 會員資料已完整<br>立即進入老有卡 App 查看你的會員卡</p>
+  <a class="go-app-btn" id="goAppBtn" href="/app">📱 進入老有卡 App</a>
+</div>
+
+<script>
+var memberNo = '';
+var memberData = null;
+
+// Get member info from sessionStorage (set by /app after token login)
+try {
+  var stored = sessionStorage.getItem('wa_member');
+  if (stored) memberData = JSON.parse(stored);
+} catch(_) {}
+
+if (memberData) {
+  memberNo = memberData.member_no || '';
+  var currentYear = new Date().getFullYear();
+  var age = memberData.birth_year ? currentYear - memberData.birth_year : null;
+  var tierLabel = memberData.tier === 'PRIMARY' ? '主卡（55+）' : '家庭卡';
+  document.getElementById('memberInfo').innerHTML =
+    '<div class="info-row"><span class="lbl">姓名</span><span class="val"><span class="check-icon">✓</span>' + (memberData.name_zh||'') + '</span></div>' +
+    '<div class="info-row"><span class="lbl">出生年份</span><span class="val"><span class="check-icon">✓</span>' + (memberData.birth_year||'') + '</span></div>' +
+    '<div class="info-row"><span class="lbl">會員類型</span><span class="val"><span class="check-icon">✓</span>' + tierLabel + '</span></div>' +
+    '<div class="info-row"><span class="lbl">會員號碼</span><span class="val"><span class="check-icon">✓</span>' + memberNo + '</span></div>';
+}
+
+function showError(msg){ var b=document.getElementById('errorBox'); b.textContent=msg; b.style.display='block'; }
+function hideError(){ document.getElementById('errorBox').style.display='none'; }
+
+function doComplete(){
+  hideError();
+  var gender   = document.getElementById('fieldGender').value;
+  var district = document.getElementById('fieldDistrict').value;
+  if (!gender)   { showError('請選擇性別'); return; }
+  if (!district) { showError('請選擇居住地區'); return; }
+  if (!memberNo) { showError('找不到會員資料，請重新掃描QR碼'); return; }
+
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '⏳ 儲存中...';
+
+  fetch('/api/member/complete-profile', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ member_no: memberNo, gender: gender, district: district })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok){
+      document.getElementById('mainCard').style.display = 'none';
+      document.getElementById('successBox').style.display = 'block';
+      // Update stored member data
+      if (memberData){
+        memberData.gender = gender; memberData.district = district;
+        memberData.registration_status = 'complete';
+        try { sessionStorage.setItem('wa_member', JSON.stringify(memberData)); } catch(_){}
+      }
+    } else {
+      showError(d.error || '儲存失敗，請重試');
+      btn.disabled=false; btn.textContent='保存並查看會員卡';
+    }
+  })
+  .catch(function(){
+    showError('網絡錯誤，請重試');
+    btn.disabled=false; btn.textContent='保存並查看會員卡';
+  });
+}
+</script>
+</body>
+</html>`
+}
+
+// ── Admin: GET /api/admin/qr-sources — list all QR sources with stats ────────
+app.get('/api/admin/qr-sources', async (c) => {
+  const db = c.env.DB
+  // Verify admin password
+  const auth = c.req.header('x-admin-password') || c.req.query('pw') || ''
+  const adminPw = c.env.ADMIN_PASSWORD || ''
+  if (!adminPw || auth !== adminPw) return c.json({ ok: false, error: '未授權' }, 401)
+
+  try {
+    const sources = await db.prepare(
+      `SELECT qs.*, 
+        (SELECT COUNT(*) FROM members m WHERE m.roadshow_source = qs.source_id) as member_count
+       FROM qr_sources qs ORDER BY qs.created_at DESC`
+    ).all<any>()
+    return c.json({ ok: true, sources: sources.results || [] })
+  } catch (_) {
+    return c.json({ ok: true, sources: [] })
+  }
+})
+
+// ── Admin: POST /api/admin/qr-sources — create new QR source ─────────────────
+app.post('/api/admin/qr-sources', async (c) => {
+  const db = c.env.DB
+  const auth = c.req.header('x-admin-password') || ''
+  const adminPw = c.env.ADMIN_PASSWORD || ''
+  if (!adminPw || auth !== adminPw) return c.json({ ok: false, error: '未授權' }, 401)
+
+  let body: { source_id?: string; display_name?: string; event_date?: string; location?: string; notes?: string }
+  try { body = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效請求' }, 400) }
+
+  const sourceId   = (body.source_id || '').replace(/[^a-z0-9_\-]/gi,'').trim().toLowerCase()
+  const displayName = (body.display_name || '').trim()
+  if (!sourceId || !displayName) return c.json({ ok: false, error: '缺少 source_id 或 display_name' })
+
+  try {
+    await db.prepare(
+      `INSERT INTO qr_sources (source_id, display_name, event_date, location, notes)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(sourceId, displayName, body.event_date||null, body.location||null, body.notes||'').run()
+    return c.json({ ok: true })
+  } catch (e: any) {
+    if (String(e).includes('UNIQUE')) return c.json({ ok: false, error: '此 source_id 已存在' })
+    return c.json({ ok: false, error: '建立失敗' })
+  }
+})
+
+// ── Admin: PATCH /api/admin/qr-sources/:id — toggle status ───────────────────
+app.patch('/api/admin/qr-sources/:id', async (c) => {
+  const db = c.env.DB
+  const auth = c.req.header('x-admin-password') || ''
+  const adminPw = c.env.ADMIN_PASSWORD || ''
+  if (!adminPw || auth !== adminPw) return c.json({ ok: false, error: '未授權' }, 401)
+
+  const id = c.req.param('id')
+  let body: { status?: string }
+  try { body = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const status = body.status === 'inactive' ? 'inactive' : 'active'
+
+  try {
+    await db.prepare('UPDATE qr_sources SET status=? WHERE source_id=?').bind(status, id).run()
+    return c.json({ ok: true })
+  } catch (_) { return c.json({ ok: false, error: '更新失敗' }) }
+})
+
+// ── Admin: GET /api/admin/qr-sources/:id/stats — stats for one source ────────
+app.get('/api/admin/qr-sources/:id/stats', async (c) => {
+  const db = c.env.DB
+  const auth = c.req.header('x-admin-password') || c.req.query('pw') || ''
+  const adminPw = c.env.ADMIN_PASSWORD || ''
+  if (!adminPw || auth !== adminPw) return c.json({ ok: false, error: '未授權' }, 401)
+
+  const sourceId = c.req.param('id')
+  try {
+    const total = await db.prepare(
+      'SELECT COUNT(*) as cnt FROM members WHERE roadshow_source=?'
+    ).bind(sourceId).first<{ cnt: number }>()
+
+    const byGender = await db.prepare(
+      `SELECT gender, COUNT(*) as cnt FROM members WHERE roadshow_source=? GROUP BY gender`
+    ).bind(sourceId).all<{ gender: string; cnt: number }>()
+
+    const byTier = await db.prepare(
+      `SELECT tier, COUNT(*) as cnt FROM members WHERE roadshow_source=? GROUP BY tier`
+    ).bind(sourceId).all<{ tier: string; cnt: number }>()
+
+    const byDistrict = await db.prepare(
+      `SELECT district, COUNT(*) as cnt FROM members WHERE roadshow_source=? AND district != '' GROUP BY district ORDER BY cnt DESC LIMIT 10`
+    ).bind(sourceId).all<{ district: string; cnt: number }>()
+
+    const byStatus = await db.prepare(
+      `SELECT registration_status, COUNT(*) as cnt FROM members WHERE roadshow_source=? GROUP BY registration_status`
+    ).bind(sourceId).all<{ registration_status: string; cnt: number }>()
+
+    const avgYear = await db.prepare(
+      `SELECT AVG(birth_year) as avg_year, MIN(birth_year) as min_year, MAX(birth_year) as max_year
+       FROM members WHERE roadshow_source=? AND birth_year > 0`
+    ).bind(sourceId).first<{ avg_year: number; min_year: number; max_year: number }>()
+
+    return c.json({
+      ok: true,
+      total: total?.cnt || 0,
+      by_gender: byGender.results || [],
+      by_tier: byTier.results || [],
+      by_district: byDistrict.results || [],
+      by_status: byStatus.results || [],
+      avg_birth_year: avgYear?.avg_year ? Math.round(avgYear.avg_year) : null,
+      birth_year_range: { min: avgYear?.min_year, max: avgYear?.max_year }
+    })
+  } catch (_) { return c.json({ ok: false, error: '查詢失敗' }) }
+})
+
+// ── Admin: GET /api/admin/webhook-logs — paginated webhook logs ───────────────
+app.get('/api/admin/webhook-logs', async (c) => {
+  const db = c.env.DB
+  const auth = c.req.header('x-admin-password') || c.req.query('pw') || ''
+  const adminPw = c.env.ADMIN_PASSWORD || ''
+  if (!adminPw || auth !== adminPw) return c.json({ ok: false, error: '未授權' }, 401)
+
+  const page   = Math.max(1, parseInt(c.req.query('page') || '1'))
+  const limit  = 50
+  const offset = (page - 1) * limit
+  const status = c.req.query('status') || ''
+  const source = c.req.query('source') || ''
+
+  let where = '1=1'
+  const params: any[] = []
+  if (status) { where += ' AND validation_result=?'; params.push(status) }
+  if (source) { where += ' AND parsed_source=?'; params.push(source) }
+
+  try {
+    const rows = await db.prepare(
+      `SELECT * FROM whatsapp_webhook_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(...params, limit, offset).all<any>()
+    const countRow = await db.prepare(
+      `SELECT COUNT(*) as cnt FROM whatsapp_webhook_logs WHERE ${where}`
+    ).bind(...params).first<{ cnt: number }>()
+
+    return c.json({ ok: true, logs: rows.results || [], total: countRow?.cnt || 0, page, limit })
+  } catch (_) { return c.json({ ok: true, logs: [], total: 0, page, limit }) }
+})
+
+// ── GET /admin/qr — Admin QR Management Page ─────────────────────────────────
+app.get('/admin/qr', (c) => {
+  return c.html(adminQrHtml())
+})
+
+function adminQrHtml() {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR 碼管理 — CoEldery 85 Admin</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Noto Sans TC",sans-serif;background:#f5f5f5;color:#111;}
+.topbar{background:#1a6b1a;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}
+.topbar h1{font-size:18px;font-weight:900;}
+.topbar a{color:#fff;font-size:13px;opacity:0.8;text-decoration:none;}
+.main{max-width:1100px;margin:0 auto;padding:20px;}
+.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid #ddd;}
+.tab{padding:10px 20px;cursor:pointer;font-weight:700;font-size:14px;border:none;background:none;color:#666;border-bottom:3px solid transparent;margin-bottom:-2px;}
+.tab.active{color:#1a6b1a;border-bottom-color:#1a6b1a;}
+.panel{display:none;} .panel.active{display:block;}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:16px;}
+.card h2{font-size:16px;font-weight:900;color:#1a6b1a;margin-bottom:16px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+.qr-card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border-left:4px solid #1a6b1a;}
+.qr-card.inactive{border-left-color:#ccc;opacity:0.7;}
+.qr-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.qr-card-name{font-size:16px;font-weight:900;color:#111;}
+.qr-badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px;white-space:nowrap;}
+.badge-active{background:#D1FAE5;color:#065F46;}
+.badge-inactive{background:#F3F4F6;color:#6B7280;}
+.qr-meta{font-size:13px;color:#666;margin-bottom:12px;line-height:1.7;}
+.qr-meta span{margin-right:12px;}
+.qr-count{font-size:28px;font-weight:900;color:#1a6b1a;}
+.qr-count-label{font-size:12px;color:#888;}
+.btn-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.btn{padding:7px 14px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;}
+.btn-green{background:#1a6b1a;color:#fff;}
+.btn-blue{background:#1d4ed8;color:#fff;}
+.btn-gray{background:#e5e7eb;color:#374151;}
+.btn-red{background:#dc2626;color:#fff;}
+.btn-orange{background:#ea580c;color:#fff;}
+input,select,textarea{width:100%;padding:10px 12px;font-size:14px;border:1.5px solid #d1d5db;border-radius:8px;font-family:inherit;margin-bottom:10px;outline:none;}
+input:focus,select:focus{border-color:#1a6b1a;}
+.form-label{font-size:13px;font-weight:700;color:#374151;margin-bottom:4px;display:block;}
+.form-row{margin-bottom:12px;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px;}
+.stat-box{background:#f9fafb;border-radius:10px;padding:14px;text-align:center;}
+.stat-num{font-size:28px;font-weight:900;color:#1a6b1a;}
+.stat-lbl{font-size:12px;color:#6b7280;margin-top:2px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{background:#f9fafb;padding:10px 12px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e5e7eb;}
+td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top;}
+tr:hover td{background:#fafafa;}
+.status-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;}
+.s-success{background:#D1FAE5;color:#065F46;}
+.s-format_error,.s-db_error{background:#FEE2E2;color:#991B1B;}
+.s-invalid_year,.s-invalid_phone{background:#FEF3C7;color:#92400E;}
+.s-duplicate_phone{background:#DBEAFE;color:#1E40AF;}
+.s-pending{background:#F3F4F6;color:#6B7280;}
+.qr-code-img{border:2px solid #e5e7eb;border-radius:8px;display:block;}
+.copy-input{font-size:12px;font-family:monospace;background:#f9fafb;border-color:#e5e7eb;}
+.login-section{background:#FEF9C3;border:1.5px solid #FCD34D;border-radius:10px;padding:16px;margin-bottom:20px;}
+.login-section h3{font-size:14px;font-weight:900;color:#92400E;margin-bottom:8px;}
+.err{color:#dc2626;font-size:13px;margin-bottom:8px;}
+#loginSection{margin:80px auto;max-width:360px;background:#fff;border-radius:16px;padding:32px 28px;box-shadow:0 4px 20px rgba(0,0,0,0.12);}
+</style>
+</head>
+<body>
+
+<div id="loginSection">
+  <div style="text-align:center;margin-bottom:20px">
+    <div style="font-size:36px">🔐</div>
+    <h2 style="font-size:20px;font-weight:900;color:#1a6b1a;margin-top:8px">QR 管理系統</h2>
+    <p style="font-size:13px;color:#666;margin-top:4px">CoEldery 85 Admin</p>
+  </div>
+  <p id="loginErr" class="err" style="display:none"></p>
+  <input type="password" id="pwInput" placeholder="管理員密碼" onkeydown="if(event.key==='Enter')doLogin()">
+  <button class="btn btn-green" style="width:100%;padding:12px;font-size:15px" onclick="doLogin()">登入</button>
+</div>
+
+<div id="adminBody" style="display:none">
+<div class="topbar">
+  <h1>🔖 QR 碼管理系統</h1>
+  <div style="display:flex;gap:16px;align-items:center;">
+    <span id="topbarInfo" style="font-size:13px;opacity:0.85"></span>
+    <a href="/membership/admin">會員後台</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('qrcodes')">🔖 QR 碼管理</button>
+    <button class="tab" onclick="showTab('create')">➕ 新增 QR 碼</button>
+    <button class="tab" onclick="showTab('logs')">📋 Webhook 日誌</button>
+    <button class="tab" onclick="showTab('stats')">📊 統計分析</button>
+  </div>
+
+  <!-- QR Codes Panel -->
+  <div id="panel-qrcodes" class="panel active">
+    <div class="card">
+      <h2>🔖 所有 QR 碼</h2>
+      <div id="qrGrid" class="grid">
+        <p style="color:#888">載入中...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Panel -->
+  <div id="panel-create" class="panel">
+    <div class="card" style="max-width:500px">
+      <h2>➕ 新增 QR 碼 / Roadshow</h2>
+      <div class="form-row">
+        <label class="form-label">Source ID <span style="color:#dc2626">✽</span> <small style="color:#888">(英文、數字、底線，如：roadshow_tkl_sep2026)</small></label>
+        <input type="text" id="newSourceId" placeholder="roadshow_xxx_sep2026">
+      </div>
+      <div class="form-row">
+        <label class="form-label">顯示名稱 <span style="color:#dc2626">✽</span></label>
+        <input type="text" id="newDisplayName" placeholder="例如：旺角 Roadshow">
+      </div>
+      <div class="form-row">
+        <label class="form-label">活動日期</label>
+        <input type="date" id="newEventDate">
+      </div>
+      <div class="form-row">
+        <label class="form-label">地點</label>
+        <input type="text" id="newLocation" placeholder="例如：旺角朗豪坊廣場">
+      </div>
+      <div class="form-row">
+        <label class="form-label">備註</label>
+        <input type="text" id="newNotes" placeholder="（可選）">
+      </div>
+      <p id="createErr" class="err" style="display:none"></p>
+      <p id="createOk" style="color:#1a6b1a;font-size:13px;font-weight:700;display:none">✅ QR 碼已建立！</p>
+      <button class="btn btn-green" onclick="doCreate()" style="padding:11px 24px;font-size:15px">建立 QR 碼</button>
+    </div>
+  </div>
+
+  <!-- Logs Panel -->
+  <div id="panel-logs" class="panel">
+    <div class="card">
+      <h2>📋 WhatsApp Webhook 日誌</h2>
+      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+        <select id="logFilterStatus" onchange="loadLogs()" style="width:auto;margin:0">
+          <option value="">全部狀態</option>
+          <option value="success">成功</option>
+          <option value="format_error">格式錯誤</option>
+          <option value="invalid_year">年份無效</option>
+          <option value="duplicate_phone">重複電話</option>
+          <option value="db_error">系統錯誤</option>
+        </select>
+        <select id="logFilterSource" onchange="loadLogs()" style="width:auto;margin:0">
+          <option value="">全部來源</option>
+        </select>
+        <button class="btn btn-gray" onclick="loadLogs()">刷新</button>
+      </div>
+      <div id="logsTable"><p style="color:#888">載入中...</p></div>
+      <div id="logsPager" style="margin-top:12px;display:flex;gap:8px;align-items:center;"></div>
+    </div>
+  </div>
+
+  <!-- Stats Panel -->
+  <div id="panel-stats" class="panel">
+    <div class="card">
+      <h2>📊 快速登記統計</h2>
+      <div style="margin-bottom:16px">
+        <label class="form-label" style="display:inline;margin-right:8px">選擇 QR 來源：</label>
+        <select id="statsSourceSelect" onchange="loadStats()" style="width:auto;display:inline;margin:0">
+          <option value="">── 請選擇 ──</option>
+        </select>
+      </div>
+      <div id="statsContent"><p style="color:#888;font-size:14px">請選擇一個 QR 來源以查看統計</p></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// Simple QR code SVG generation (datamatrix-like using qr.js CDN)
+var ADMIN_PW = '';
+var logPage = 1;
+
+function doLogin(){
+  var pw = document.getElementById('pwInput').value.trim();
+  if (!pw){ document.getElementById('loginErr').textContent='請輸入密碼'; document.getElementById('loginErr').style.display='block'; return; }
+  fetch('/api/admin/qr-sources?pw='+encodeURIComponent(pw))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d.ok){
+      ADMIN_PW = pw;
+      document.getElementById('loginSection').style.display='none';
+      document.getElementById('adminBody').style.display='block';
+      loadAll();
+    } else {
+      document.getElementById('loginErr').textContent='密碼錯誤';
+      document.getElementById('loginErr').style.display='block';
+    }
+  });
+}
+
+function loadAll(){ loadQRCodes(); loadLogsSourceFilter(); }
+
+function showTab(tab){
+  document.querySelectorAll('.tab').forEach(function(t,i){ t.classList.toggle('active', ['qrcodes','create','logs','stats'][i]===tab); });
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById('panel-'+tab).classList.add('active');
+  if(tab==='logs') loadLogs();
+  if(tab==='stats') loadStatsSourceFilter();
+}
+
+function loadQRCodes(){
+  fetch('/api/admin/qr-sources?pw='+encodeURIComponent(ADMIN_PW))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var html='';
+    (d.sources||[]).forEach(function(s){
+      var url='https://coeldery85.com/qr-register?source='+encodeURIComponent(s.source_id);
+      var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(url);
+      html += '<div class="qr-card'+(s.status==='inactive'?' inactive':'')+'">' +
+        '<div class="qr-card-header">' +
+          '<div class="qr-card-name">'+s.display_name+'</div>' +
+          '<span class="qr-badge '+(s.status==='active'?'badge-active':'badge-inactive')+'">'+(s.status==='active'?'✅ 啟用':'⏸ 暫停')+'</span>' +
+        '</div>' +
+        '<div class="qr-meta">' +
+          (s.event_date?'<span>📅 '+s.event_date+'</span>':'')+
+          (s.location?'<span>📍 '+s.location+'</span>':'')+
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:16px;margin-bottom:10px">' +
+          '<img src="'+qrUrl+'" width="90" height="90" class="qr-code-img">' +
+          '<div><div class="qr-count">'+s.member_count+'</div><div class="qr-count-label">已登記會員</div></div>' +
+        '</div>' +
+        '<input class="copy-input" value="'+url+'" readonly onclick="this.select()">' +
+        '<div class="btn-row">' +
+          '<a class="btn btn-blue" href="'+qrUrl+'" target="_blank">🖼 下載QR</a>' +
+          '<button class="btn btn-green" onclick="copyLink(\''+url+'\')">📋 複製連結</button>' +
+          '<button class="btn btn-gray" onclick="viewStats(\''+s.source_id+'\')">📊 統計</button>' +
+          '<button class="btn '+(s.status==='active'?'btn-orange':'btn-green')+'" onclick="toggleStatus(\''+s.source_id+'\',\''+s.status+'\')">'+
+            (s.status==='active'?'⏸ 暫停':'▶ 啟用')+'</button>' +
+        '</div>' +
+      '</div>';
+    });
+    document.getElementById('qrGrid').innerHTML = html || '<p style="color:#888">尚無QR碼，請先新增</p>';
+  });
+}
+
+function copyLink(url){
+  navigator.clipboard.writeText(url).then(function(){alert('已複製連結！');}).catch(function(){});
+}
+
+function toggleStatus(sourceId, currentStatus){
+  var newStatus = currentStatus==='active'?'inactive':'active';
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId), {
+    method:'PATCH',
+    headers:{'Content-Type':'application/json','x-admin-password':ADMIN_PW},
+    body:JSON.stringify({status:newStatus})
+  }).then(function(){loadQRCodes();});
+}
+
+function doCreate(){
+  var sourceId = document.getElementById('newSourceId').value.trim().toLowerCase().replace(/[^a-z0-9_\\-]/g,'');
+  var displayName = document.getElementById('newDisplayName').value.trim();
+  var eventDate = document.getElementById('newEventDate').value;
+  var location = document.getElementById('newLocation').value.trim();
+  var notes = document.getElementById('newNotes').value.trim();
+  document.getElementById('createErr').style.display='none';
+  document.getElementById('createOk').style.display='none';
+  if(!sourceId||!displayName){ document.getElementById('createErr').textContent='請填寫 Source ID 和顯示名稱'; document.getElementById('createErr').style.display='block'; return; }
+  fetch('/api/admin/qr-sources',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-admin-password':ADMIN_PW},
+    body:JSON.stringify({source_id:sourceId,display_name:displayName,event_date:eventDate||null,location:location||null,notes:notes})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){ document.getElementById('createOk').style.display='block'; document.getElementById('newSourceId').value=''; document.getElementById('newDisplayName').value=''; loadQRCodes(); }
+    else { document.getElementById('createErr').textContent=d.error||'建立失敗'; document.getElementById('createErr').style.display='block'; }
+  });
+}
+
+function loadLogsSourceFilter(){
+  fetch('/api/qr-sources').then(function(r){return r.json();}).then(function(d){
+    var sel=document.getElementById('logFilterSource');
+    (d.sources||[]).forEach(function(s){ sel.innerHTML+='<option value="'+s.source_id+'">'+s.display_name+'</option>'; });
+  });
+}
+
+function loadLogs(){
+  var status=document.getElementById('logFilterStatus').value;
+  var source=document.getElementById('logFilterSource').value;
+  var url='/api/admin/webhook-logs?pw='+encodeURIComponent(ADMIN_PW)+'&page='+logPage;
+  if(status) url+='&status='+encodeURIComponent(status);
+  if(source) url+='&source='+encodeURIComponent(source);
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    var rows=(d.logs||[]);
+    var html='<table><thead><tr><th>時間</th><th>電話</th><th>姓名</th><th>年份</th><th>來源</th><th>狀態</th><th>會員號</th></tr></thead><tbody>';
+    rows.forEach(function(l){
+      var statusMap={'success':'成功','format_error':'格式錯誤','invalid_year':'年份無效','duplicate_phone':'重複電話','db_error':'系統錯誤','pending':'處理中','invalid_phone':'電話無效'};
+      html+='<tr>'+
+        '<td style="white-space:nowrap">'+((l.created_at||'').substring(0,16))+'</td>'+
+        '<td>'+maskPhone(l.from_number||'')+'</td>'+
+        '<td>'+(l.parsed_name||'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td>'+(l.parsed_year||'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td style="font-size:12px">'+(l.parsed_source||'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td><span class="status-badge s-'+(l.validation_result||'pending')+'">'+(statusMap[l.validation_result]||l.validation_result)+'</span></td>'+
+        '<td>'+(l.member_no||'<span style="color:#ccc">—</span>')+'</td>'+
+      '</tr>';
+    });
+    html+='</tbody></table>';
+    document.getElementById('logsTable').innerHTML=html;
+    document.getElementById('logsPager').innerHTML=
+      '<button class="btn btn-gray" onclick="logPage=Math.max(1,logPage-1);loadLogs()" '+(logPage<=1?'disabled':'')+'>上一頁</button>'+
+      '<span style="font-size:13px;color:#666">第 '+logPage+' 頁 · 共 '+(d.total||0)+' 條</span>'+
+      '<button class="btn btn-gray" onclick="logPage++;loadLogs()" '+((logPage*50>=(d.total||0))?'disabled':'')+'>下一頁</button>';
+  });
+}
+
+function maskPhone(p){ if(p.length>=8) return p.substring(0,4)+'****'+p.substring(p.length-2); return p; }
+
+function loadStatsSourceFilter(){
+  fetch('/api/qr-sources').then(function(r){return r.json();}).then(function(d){
+    var sel=document.getElementById('statsSourceSelect');
+    sel.innerHTML='<option value="">── 請選擇 ──</option>';
+    (d.sources||[]).forEach(function(s){ sel.innerHTML+='<option value="'+s.source_id+'">'+s.display_name+'</option>'; });
+  });
+}
+
+function viewStats(sourceId){
+  showTab('stats');
+  document.getElementById('statsSourceSelect').value=sourceId;
+  loadStats();
+}
+
+function loadStats(){
+  var sourceId=document.getElementById('statsSourceSelect').value;
+  if(!sourceId){ document.getElementById('statsContent').innerHTML='<p style="color:#888;font-size:14px">請選擇一個 QR 來源以查看統計</p>'; return; }
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId)+'/stats?pw='+encodeURIComponent(ADMIN_PW))
+  .then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ document.getElementById('statsContent').innerHTML='<p style="color:#dc2626">查詢失敗</p>'; return; }
+    var gMap={'M':'男','F':'女','Other':'其他','Prefer not to say':'不說','':'未填'};
+    var tMap={'PRIMARY':'主卡（55+）','FAMILY':'家庭卡'};
+    var sMap={'incomplete':'未完整','complete':'已完整'};
+    var currentYear=new Date().getFullYear();
+    var avgAge=d.avg_birth_year?currentYear-d.avg_birth_year:null;
+
+    var html='<div class="stat-grid">'+
+      '<div class="stat-box"><div class="stat-num">'+d.total+'</div><div class="stat-lbl">總登記人數</div></div>'+
+      (avgAge?'<div class="stat-box"><div class="stat-num">'+avgAge+'</div><div class="stat-lbl">平均年齡</div></div>':'')+
+    '</div>';
+
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:16px">';
+
+    html+='<div><h3 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">📊 會員類型</h3>';
+    (d.by_tier||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:14px"><span>'+(tMap[r.tier]||r.tier)+'</span><strong>'+r.cnt+'</strong></div>'; });
+    html+='</div>';
+
+    html+='<div><h3 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">⚧ 性別分佈</h3>';
+    (d.by_gender||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:14px"><span>'+(gMap[r.gender||'']||r.gender)+'</span><strong>'+r.cnt+'</strong></div>'; });
+    html+='</div>';
+
+    html+='<div><h3 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">✅ 完成率</h3>';
+    (d.by_status||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:14px"><span>'+(sMap[r.registration_status]||r.registration_status)+'</span><strong>'+r.cnt+'</strong></div>'; });
+    html+='</div>';
+
+    if((d.by_district||[]).length>0){
+      html+='<div><h3 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">🗺 地區分佈（Top 10）</h3>';
+      (d.by_district||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:14px"><span>'+(r.district||'未填')+'</span><strong>'+r.cnt+'</strong></div>'; });
+      html+='</div>';
+    }
+
+    html+='</div>';
+    document.getElementById('statsContent').innerHTML=html;
+  });
+}
+
+document.getElementById('pwInput').addEventListener('keydown',function(e){ if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 export default app
