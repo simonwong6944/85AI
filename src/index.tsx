@@ -11119,14 +11119,13 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 <body>
 
 <div class="topbar">
-  <!-- 左：漢堡選單 -->
+  <!-- 左：CoEldery 85 Logo -->
+  <img src="/static/logo-coeldery85-white.png" alt="CoEldery 85" class="topbar-logo">
+  <!-- 右：漢堡選單 -->
+  <div class="topbar-spacer"></div>
   <button class="menu-btn" onclick="openDrawer()" aria-label="選單">
     <span></span><span></span><span></span>
   </button>
-  <!-- 中：CoEldery 85 Logo -->
-  <div class="topbar-spacer"></div>
-  <img src="/static/logo-coeldery85-white.png" alt="CoEldery 85" class="topbar-logo">
-  <div class="topbar-spacer"></div>
 </div>
 
 <!-- ── 側邊抽屜選單 ── -->
@@ -11767,7 +11766,7 @@ function setupDrawerBtns(memberNo, clStatus, ckStatus){
       bCL.onclick=function(){ closeDrawer(); window.location.href='/coleadery/'+(phone?'?phone='+encodeURIComponent(phone):''); };
     } else if(clStatus==='PENDING'){
       if(clSub) clSub.textContent='⏳ 審核中（3-5 工作天）';
-      bCL.onclick=function(){ closeDrawer(); if(confirm('⏳ CoLeadery 申請審核中。如想重新申請請按確定。')){ window.location.href='/partner/apply?role=COLEADERY&member='+memberNo; } };
+      bCL.onclick=function(){ closeDrawer(); if(confirm('⏳ CoLeadery 申請審核中。如想重新申請請按確定。')){ window.location.href='/app/partner-apply?role=COLEADERY&member='+memberNo; } };
     } else {
       bCL.onclick=function(){ closeDrawer(); drawerOpenCoLeadery(); };
     }
@@ -11779,7 +11778,7 @@ function setupDrawerBtns(memberNo, clStatus, ckStatus){
       bCK.onclick=function(){ closeDrawer(); window.location.href='/colinkery/'+(phone?'?phone='+encodeURIComponent(phone):''); };
     } else if(ckStatus==='PENDING'){
       if(ckSub) ckSub.textContent='⏳ 審核中（3-5 工作天）';
-      bCK.onclick=function(){ closeDrawer(); if(confirm('⏳ CoLinkery 申請審核中。如想重新申請請按確定。')){ window.location.href='/partner/apply?role=COLINKERY&member='+memberNo; } };
+      bCK.onclick=function(){ closeDrawer(); if(confirm('⏳ CoLinkery 申請審核中。如想重新申請請按確定。')){ window.location.href='/app/partner-apply?role=COLINKERY&member='+memberNo; } };
     } else {
       bCK.onclick=function(){ closeDrawer(); drawerOpenCoLinkery(); };
     }
@@ -11787,11 +11786,11 @@ function setupDrawerBtns(memberNo, clStatus, ckStatus){
 }
 function drawerOpenCoLeadery(){
   var memberNo = window.MEMBER_NO||'';
-  window.location.href='/partner/apply?role=COLEADERY&member='+memberNo;
+  window.location.href='/app/partner-apply?role=COLEADERY&member='+memberNo;
 }
 function drawerOpenCoLinkery(){
   var memberNo = window.MEMBER_NO||'';
-  window.location.href='/partner/apply?role=COLINKERY&member='+memberNo;
+  window.location.href='/app/partner-apply?role=COLINKERY&member='+memberNo;
 }
 
 // ── 有用資訊 Modal ──
@@ -16742,7 +16741,12 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 
   <!-- ① 登入頁 -->
   <div class="page active" id="page-login">
-    <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:40px 20px 32px;color:#fff;text-align:center;">
+    <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:16px 20px 32px;color:#fff;text-align:center;">
+      <div style="text-align:left;margin-bottom:12px;">
+        <a href="/app" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:20px;padding:6px 14px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;">
+          ← 老有卡 App
+        </a>
+      </div>
       <div style="font-size:48px;margin-bottom:8px;">🤝</div>
       <div style="font-size:24px;font-weight:900;">CoLinkery</div>
       <div style="font-size:16px;opacity:.85;margin-top:4px;">老有聯盟 85 · 連結者工具</div>
@@ -16837,7 +16841,13 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 
   <!-- ⑤ Dashboard -->
   <div class="page" id="page-dashboard">
-    <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:20px 16px;color:#fff;">
+    <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:16px 16px 20px;color:#fff;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <a href="/app" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border:none;border-radius:20px;padding:6px 14px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;-webkit-tap-highlight-color:transparent;">
+          ← 老有卡 App
+        </a>
+        <div style="font-size:13px;opacity:.7;">CoLinkery</div>
+      </div>
       <div style="font-size:15px;opacity:.8;">歡迎回來</div>
       <div style="font-size:22px;font-weight:900;margin:4px 0;" id="dash-name">—</div>
       <div class="role-badge" style="margin-top:6px;">🤝 CoLinkery 連結者</div>
