@@ -952,12 +952,12 @@ async function loadMedical(){
   var r=await fetch(url); var d=await r.json(); if(!d.ok)return;
   document.getElementById('medicalCount').textContent='共 '+d.total+' 筆申請';
   window._medical=d.applications;
-  // Update thead to include card_no column
+  // Update thead to include card_no + card_image_url columns
   var thead=document.querySelector('#page-medical thead tr');
   if(thead && !document.getElementById('medThCardNo')){
     var th=document.createElement('th');
     th.id='medThCardNo';
-    th.textContent='卡號';
+    th.textContent='卡號 + 醫健卡圖片 URL';
     thead.insertBefore(th, thead.querySelector('th:last-child'));
   }
   document.getElementById('medicalTbody').innerHTML=d.applications.map(function(m,i){
@@ -966,10 +966,21 @@ async function loadMedical(){
     var cardNoDisplay=m.card_no
       ? '<span style="font-family:monospace;font-weight:700;color:#1B5E20;letter-spacing:2px;">'+m.card_no+'</span>'
       : '<span style="color:#aaa;font-size:11px;">未填</span>';
-    var cardNoInput='<div style="display:flex;gap:4px;align-items:center;margin-top:4px;">'
-      +'<input id="cardNoInput'+i+'" type="text" value="'+(m.card_no||'')+'" placeholder="例：CF 100 130" '
-      +'style="width:120px;padding:4px 6px;border:1px solid #90CAF9;border-radius:4px;font-size:12px;font-family:monospace;letter-spacing:1px;">'
-      +'<button class="act-btn" style="background:#1565C0;color:#fff;font-size:11px;" onclick="saveCardNo('+i+')">儲存卡號</button>'
+    // Cloudinary URL display: show link if exists
+    var imgUrlDisplay=m.card_image_url
+      ? '<div style="margin-top:3px;"><a href="'+m.card_image_url+'" target="_blank" style="color:#1565C0;font-size:11px;word-break:break-all;">🖼 查看圖片</a></div>'
+      : '<div style="color:#aaa;font-size:11px;margin-top:3px;">未上傳圖片</div>';
+    // Input section: card_no + card_image_url + save button
+    var cardNoInput='<div style="margin-top:6px;">'
+      +'<div style="display:flex;gap:4px;align-items:center;">'
+      +'<input id="cardNoInput'+i+'" type="text" value="'+(m.card_no||'')+'" placeholder="卡號 例：CF 100 130" '
+      +'style="width:130px;padding:4px 6px;border:1px solid #90CAF9;border-radius:4px;font-size:12px;font-family:monospace;letter-spacing:1px;">'
+      +'</div>'
+      +'<div style="display:flex;gap:4px;align-items:center;margin-top:4px;">'
+      +'<input id="cardImgInput'+i+'" type="url" value="'+(m.card_image_url||'')+'" placeholder="Cloudinary 圖片 URL (https://...)" '
+      +'style="width:200px;padding:4px 6px;border:1px solid #CE93D8;border-radius:4px;font-size:11px;">'
+      +'</div>'
+      +'<button class="act-btn" style="background:#1565C0;color:#fff;font-size:11px;margin-top:4px;" onclick="saveCardNo('+i+')">💾 儲存</button>'
       +'</div>';
     return '<tr>'
       +'<td style="font-size:11px;color:#aaa;">#'+m.id+'</td>'
@@ -980,7 +991,7 @@ async function loadMedical(){
       +'<td><a href="tel:+852'+m.phone+'">'+m.phone+'</a></td>'
       +'<td><span style="color:'+col+';font-weight:700;font-size:12px;">'+lbl+'</span></td>'
       +'<td style="font-size:11px;">'+(m.applied_at||'').slice(0,16).replace('T',' ')+'</td>'
-      +'<td>'+cardNoDisplay+cardNoInput+'</td>'
+      +'<td>'+cardNoDisplay+imgUrlDisplay+cardNoInput+'</td>'
       +'<td>'
       +(m.status==='PENDING'?'<button class="act-btn act-kyc" onclick="markMedSent('+i+')">標記已傳送</button>':'')
       +(m.status==='SENT'?'<button class="act-btn act-react" onclick="markMedIssued('+i+')">標記已發卡</button>':'')
@@ -992,17 +1003,19 @@ async function loadMedical(){
 async function saveCardNo(i){
   var m=window._medical[i];
   var input=document.getElementById('cardNoInput'+i);
+  var imgInput=document.getElementById('cardImgInput'+i);
   var cardNo=(input?input.value:'').trim();
+  var cardImageUrl=(imgInput?imgInput.value:'').trim();
   if(!cardNo){ alert('請輸入卡號'); return; }
-  var btn=input?input.nextElementSibling:null;
+  var btn=input?input.parentElement.parentElement.querySelector('button'):null;
   if(btn){ btn.disabled=true; btn.textContent='儲存中…'; }
   var r=await fetch('/api/admin/medical/'+m.id+'/card-no',{
     method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({card_no:cardNo})
+    body:JSON.stringify({card_no:cardNo, card_image_url:cardImageUrl})
   });
   var d=await r.json();
   if(d.ok){ loadMedical(); }
-  else { alert('儲存失敗：'+(d.error||'未知錯誤')); if(btn){btn.disabled=false;btn.textContent='儲存卡號';} }
+  else { alert('儲存失敗：'+(d.error||'未知錯誤')); if(btn){btn.disabled=false;btn.textContent='💾 儲存';} }
 }
 
 async function markMedSent(i){

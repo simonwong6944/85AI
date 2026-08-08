@@ -705,12 +705,12 @@ app.get('/api/admin/medical', async (c) => {
   const params: string[] = []
   if (status) { where += ' AND m.status = ?'; params.push(status) }
 
-  // Try with card_no column; fall back to without if column not yet migrated
+  // Try with card_no + card_image_url columns; fall back gracefully if not yet migrated
   let rows: any
   try {
     rows = await db.prepare(`
       SELECT m.id, m.member_no, m.name_zh_full, m.name_en_full, m.hkid_prefix,
-             m.phone, m.status, m.applied_at, m.sent_at, m.notes, m.card_no,
+             m.phone, m.status, m.applied_at, m.sent_at, m.notes, m.card_no, m.card_image_url,
              mb.name_zh as member_name_zh, mb.district
       FROM medical_card_applications m
       LEFT JOIN members mb ON mb.member_no = m.member_no
@@ -718,15 +718,27 @@ app.get('/api/admin/medical', async (c) => {
       ORDER BY m.applied_at DESC
     `).bind(...params).all()
   } catch (_) {
-    rows = await db.prepare(`
-      SELECT m.id, m.member_no, m.name_zh_full, m.name_en_full, m.hkid_prefix,
-             m.phone, m.status, m.applied_at, m.sent_at, m.notes, NULL AS card_no,
-             mb.name_zh as member_name_zh, mb.district
-      FROM medical_card_applications m
-      LEFT JOIN members mb ON mb.member_no = m.member_no
-      ${where}
-      ORDER BY m.applied_at DESC
-    `).bind(...params).all()
+    try {
+      rows = await db.prepare(`
+        SELECT m.id, m.member_no, m.name_zh_full, m.name_en_full, m.hkid_prefix,
+               m.phone, m.status, m.applied_at, m.sent_at, m.notes, m.card_no, NULL AS card_image_url,
+               mb.name_zh as member_name_zh, mb.district
+        FROM medical_card_applications m
+        LEFT JOIN members mb ON mb.member_no = m.member_no
+        ${where}
+        ORDER BY m.applied_at DESC
+      `).bind(...params).all()
+    } catch (_2) {
+      rows = await db.prepare(`
+        SELECT m.id, m.member_no, m.name_zh_full, m.name_en_full, m.hkid_prefix,
+               m.phone, m.status, m.applied_at, m.sent_at, m.notes, NULL AS card_no, NULL AS card_image_url,
+               mb.name_zh as member_name_zh, mb.district
+        FROM medical_card_applications m
+        LEFT JOIN members mb ON mb.member_no = m.member_no
+        ${where}
+        ORDER BY m.applied_at DESC
+      `).bind(...params).all()
+    }
   }
 
   if (exportCsv) {
@@ -768,24 +780,26 @@ app.patch('/api/admin/medical/:id', async (c) => {
   return c.json({ ok: true })
 })
 
-// ─── API: Admin — Save card_no for medical application ───────────────────────
+// ─── API: Admin — Save card_no + card_image_url for medical application ──────
 app.post('/api/admin/medical/:id/card-no', async (c) => {
   const id = c.req.param('id')
   const db = c.env.DB
-  const body = await c.req.json<{ card_no: string }>()
+  const body = await c.req.json<{ card_no: string; card_image_url?: string }>()
   const cardNo = (body.card_no || '').trim()
+  const cardImageUrl = (body.card_image_url || '').trim()
   if (!cardNo) return c.json({ ok: false, error: 'card_no 不能為空' }, 400)
-  // Auto-run migration if column not yet added
+  // Auto-run migration if columns not yet added
   try {
     await db.prepare(
-      'UPDATE medical_card_applications SET card_no = ?, status = ? WHERE id = ?'
-    ).bind(cardNo, 'ISSUED', id).run()
+      'UPDATE medical_card_applications SET card_no = ?, card_image_url = ?, status = ? WHERE id = ?'
+    ).bind(cardNo, cardImageUrl, 'ISSUED', id).run()
   } catch (_) {
-    // Column missing — add it first, then update
-    await db.prepare('ALTER TABLE medical_card_applications ADD COLUMN card_no TEXT').run()
+    // Columns missing — add them first, then update
+    try { await db.prepare('ALTER TABLE medical_card_applications ADD COLUMN card_no TEXT').run() } catch (_) {}
+    try { await db.prepare('ALTER TABLE medical_card_applications ADD COLUMN card_image_url TEXT DEFAULT \'\'').run() } catch (_) {}
     await db.prepare(
-      'UPDATE medical_card_applications SET card_no = ?, status = ? WHERE id = ?'
-    ).bind(cardNo, 'ISSUED', id).run()
+      'UPDATE medical_card_applications SET card_no = ?, card_image_url = ?, status = ? WHERE id = ?'
+    ).bind(cardNo, cardImageUrl, 'ISSUED', id).run()
   }
   return c.json({ ok: true })
 })
@@ -1795,18 +1809,24 @@ app.get('/membership/card/:no', async (c) => {
   const db = c.env.DB
   const row = await db.prepare('SELECT * FROM members WHERE member_no = ?').bind(no).first<any>()
   if (!row) return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>查無此會員</h2><p>${no}</p><a href="/membership/join">立即登記</a></body></html>`, 404)
-  // Check medical card application status + card_no (defensive: card_no column may not exist yet)
-  let medApp: { status: string; card_no: string | null } | null = null
+  // Check medical card application status + card_no + card_image_url (defensive: columns may not exist yet)
+  let medApp: { status: string; card_no: string | null; card_image_url: string | null } | null = null
   try {
     medApp = await db.prepare(
-      'SELECT status, card_no FROM medical_card_applications WHERE member_no = ? LIMIT 1'
-    ).bind(no).first<{ status: string; card_no: string | null }>()
+      'SELECT status, card_no, card_image_url FROM medical_card_applications WHERE member_no = ? LIMIT 1'
+    ).bind(no).first<{ status: string; card_no: string | null; card_image_url: string | null }>()
   } catch (_) {
-    medApp = await db.prepare(
-      'SELECT status, NULL AS card_no FROM medical_card_applications WHERE member_no = ? LIMIT 1'
-    ).bind(no).first<{ status: string; card_no: string | null }>()
+    try {
+      medApp = await db.prepare(
+        'SELECT status, card_no, NULL AS card_image_url FROM medical_card_applications WHERE member_no = ? LIMIT 1'
+      ).bind(no).first<{ status: string; card_no: string | null; card_image_url: string | null }>()
+    } catch (_2) {
+      medApp = await db.prepare(
+        'SELECT status, NULL AS card_no, NULL AS card_image_url FROM medical_card_applications WHERE member_no = ? LIMIT 1'
+      ).bind(no).first<{ status: string; card_no: string | null; card_image_url: string | null }>()
+    }
   }
-  return c.html(memberProfileHtml(row, medApp?.status ?? null, medApp?.card_no ?? null))
+  return c.html(memberProfileHtml(row, medApp?.status ?? null, medApp?.card_no ?? null, medApp?.card_image_url ?? null))
 })
 
 // ─── Future modules (placeholder) ────────────────────────────────────────────
@@ -6045,7 +6065,7 @@ function sopHtml() {
 }
 
 // ─── Member Profile HTML ──────────────────────────────────────────────────────
-function memberProfileHtml(m: any, medStatus: string | null = null, medCardNo: string | null = null) {
+function memberProfileHtml(m: any, medStatus: string | null = null, medCardNo: string | null = null, medCardImageUrl: string | null = null) {
   const isPrimary = m.tier === 'PRIMARY'
   const forestDeep = '#0d3e12', forest = '#2E7D32'
   const ferrari = '#C62828', ferrariDeep = '#8B0000'
@@ -6455,12 +6475,16 @@ body{background:#F0EBD8;min-height:100vh;font-size:20px;font-family:"Noto Sans T
       const surnamePart  = hasTwoParts ? nameParts[0] : ''
       const givenPart    = hasTwoParts ? nameParts.slice(1).join(' ') : ''
       return `
-    <!-- 兩個摺疊按鈕：一卡資料 / 查看醫生 -->
+    <!-- 按鈕列：卡資料 / 查看醫健卡圖片 / 查看醫生 -->
     <div style="display:flex;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
       <button onclick="toggleMedPanel('medCardPanel')" id="btnMedCard"
         style="flex:1;min-height:55px;padding:12px 10px;background:#1565C0;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;cursor:pointer;line-height:1.3;">
         💳 卡資料
       </button>
+      ${medCardImageUrl ? `<button onclick="window.open('${medCardImageUrl.replace(/'/g, '%27')}','_blank')" id="btnMedImage"
+        style="flex:1;min-height:55px;padding:12px 10px;background:#6A1B9A;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;cursor:pointer;line-height:1.3;">
+        🖼 查看醫健卡
+      </button>` : ''}
       <button onclick="toggleMedPanel('medDoctorPanel')" id="btnMedDoctor"
         style="flex:1;min-height:55px;padding:12px 10px;background:#2E7D32;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;cursor:pointer;line-height:1.3;">
         🩺 查看醫生
