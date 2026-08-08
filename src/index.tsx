@@ -11023,10 +11023,30 @@ function pwaAppHtml() {
 body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-size:20px;line-height:1.7;color:#111;}
 
 /* ── 頂部 ── */
-.topbar{background:var(--green-dark);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;}
-.topbar img{width:44px;height:44px;border-radius:8px;}
-.topbar .brand{font-size:22px;font-weight:900;letter-spacing:1px;}
-.topbar .sub{font-size:18px;opacity:0.8;margin-top:2px;}
+.topbar{background:var(--green-dark);color:#fff;padding:0 16px;display:flex;align-items:center;gap:10px;height:58px;position:sticky;top:0;z-index:100;}
+.topbar-logo{height:40px;width:auto;object-fit:contain;flex-shrink:0;}
+.topbar-spacer{flex:1;}
+/* Hamburger menu button (left) */
+.menu-btn{background:none;border:none;color:#fff;cursor:pointer;padding:8px;display:flex;flex-direction:column;justify-content:center;gap:5px;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+.menu-btn span{display:block;width:24px;height:2.5px;background:#fff;border-radius:2px;}
+/* Side drawer overlay */
+.drawer-overlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.45);}
+.drawer-overlay.open{display:block;}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:280px;max-width:85vw;background:#fff;z-index:9001;transform:translateX(-100%);transition:transform 0.28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(0,0,0,0.18);}
+.drawer.open{transform:translateX(0);}
+.drawer-header{background:var(--green-dark);color:#fff;padding:20px 18px 16px;display:flex;align-items:center;justify-content:space-between;}
+.drawer-header-title{font-size:18px;font-weight:900;letter-spacing:1px;}
+.drawer-close{background:none;border:none;color:#fff;font-size:26px;cursor:pointer;line-height:1;padding:2px 6px;}
+.drawer-body{flex:1;overflow-y:auto;padding:8px 0 20px;}
+.drawer-section-title{font-size:11px;font-weight:700;color:#9CA3AF;letter-spacing:2px;text-transform:uppercase;padding:16px 20px 6px;}
+.drawer-item{display:flex;align-items:center;gap:12px;padding:13px 20px;font-size:16px;font-weight:600;color:#111827;cursor:pointer;border:none;background:none;width:100%;text-align:left;-webkit-tap-highlight-color:transparent;}
+.drawer-item:active{background:#F3F4F6;}
+.drawer-item .di-icon{font-size:22px;width:28px;text-align:center;flex-shrink:0;}
+.drawer-item .di-sub{font-size:12px;color:#6B7280;font-weight:400;margin-top:2px;}
+.drawer-divider{height:1px;background:#E5E7EB;margin:8px 16px;}
+.drawer-sub-item{display:flex;align-items:center;gap:12px;padding:11px 20px 11px 52px;font-size:15px;font-weight:600;color:#374151;cursor:pointer;border:none;background:none;width:100%;text-align:left;-webkit-tap-highlight-color:transparent;}
+.drawer-sub-item:active{background:#F3F4F6;}
+.drawer-sub-item .di-icon{font-size:20px;width:24px;text-align:center;flex-shrink:0;}
 
 /* ── 主內容 ── */
 .wrap{max-width:480px;margin:0 auto;padding:28px 18px 80px;}
@@ -11099,15 +11119,51 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 <body>
 
 <div class="topbar">
-  <img src="/icon-192.png" alt="CoEldery 85">
-  <div>
-    <div class="brand">CoEldery 85</div>
-    <div class="sub">老有聯盟 85</div>
-  </div>
-  <button id="useful-links-btn" onclick="openUsefulLinksPanel()" style="margin-left:auto;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 10px;color:#fff;min-width:52px">
-    <span style="font-size:28px;line-height:1">&#x2139;&#xFE0F;</span>
-    <span style="font-size:12px;font-weight:600;margin-top:2px;white-space:nowrap">有用資訊</span>
+  <!-- 左：漢堡選單 -->
+  <button class="menu-btn" onclick="openDrawer()" aria-label="選單">
+    <span></span><span></span><span></span>
   </button>
+  <!-- 中：CoEldery 85 Logo -->
+  <div class="topbar-spacer"></div>
+  <img src="/static/logo-coeldery85-white.png" alt="CoEldery 85" class="topbar-logo">
+  <div class="topbar-spacer"></div>
+</div>
+
+<!-- ── 側邊抽屜選單 ── -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="sideDrawer">
+  <div class="drawer-header">
+    <div class="drawer-header-title">CoEldery 85 選單</div>
+    <button class="drawer-close" onclick="closeDrawer()">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <!-- CoEldery 85 合作計劃 -->
+    <div class="drawer-section-title">CoEldery 85 合作計劃</div>
+    <button class="drawer-sub-item" id="drawerBtnCoLeadery" onclick="closeDrawer();drawerOpenCoLeadery()">
+      <span class="di-icon">🌟</span>
+      <div>
+        <div>CoLeadery 領航者</div>
+        <div class="di-sub">分享項目淨利潤</div>
+      </div>
+    </button>
+    <button class="drawer-sub-item" id="drawerBtnCoLinkery" onclick="closeDrawer();drawerOpenCoLinkery()">
+      <span class="di-icon">🤝</span>
+      <div>
+        <div>CoLinkery 連結者</div>
+        <div class="di-sub">連接 B2B 商業客戶</div>
+      </div>
+    </button>
+    <div class="drawer-divider"></div>
+    <!-- 有用資訊 -->
+    <div class="drawer-section-title">資訊</div>
+    <button class="drawer-item" onclick="closeDrawer();openUsefulLinksPanel()">
+      <span class="di-icon">ℹ️</span>
+      <div>
+        <div>有用資訊</div>
+        <div class="di-sub">優惠、資源、連結</div>
+      </div>
+    </button>
+  </div>
 </div>
 
 <!-- ── Tab 面板：購物 ── -->
@@ -11545,29 +11601,10 @@ function showCard(memberNo, waClicked) {
       '</div>' +
       '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>' +
     '</div>';
-  // partner entry section — 用 data-member attribute 避免 onclick 引號衝突
-  var partnerEntryHtml =
-    '<div id="partnerEntrySection" style="margin:20px 0 0;padding:0 2px;">' +
-      '<div style="font-size:16px;font-weight:900;color:#8B0000;letter-spacing:1px;margin-bottom:10px;padding-left:2px;">\uD83C\uDF1F CoEldery 85 \u5408\u4f5c\u8a08\u5283</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">' +
-        '<button id="btnPartnerApply" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;border:none;border-radius:12px;padding:18px 10px;font-size:14px;font-weight:700;cursor:pointer;line-height:1.5;min-height:90px;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">' +
-          '<span style="font-size:32px;">\uD83C\uDF1F</span>' +
-          '<div style="font-size:15px;font-weight:800;">CoLeadery</div>' +
-          '<div style="font-size:11px;font-weight:400;opacity:0.9;">\u9818\u822a\u8005\uff5c\u5206\u4eab\u9805\u76ee\u6de8\u5229\u6f64</div>' +
-        '</button>' +
-        '<button id="btnCoLinkery" data-member="' + memberNo + '" style="background:linear-gradient(135deg,#1A237E,#283593);color:#fff;border:none;border-radius:12px;padding:18px 10px;font-size:14px;font-weight:700;cursor:pointer;line-height:1.5;min-height:90px;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">' +
-          '<span style="font-size:32px;">\uD83E\uDD1D</span>' +
-          '<div style="font-size:15px;font-weight:800;">CoLinkery</div>' +
-          '<div style="font-size:11px;font-weight:400;opacity:0.9;">\u9023\u7d50\u8005\uff5c\u9023\u63a5 B2B \u5546\u696d\u5ba2\u6236</div>' +
-        '</button>' +
-      '</div>' +
-      '<div style="text-align:center;margin-top:10px;">' +
-        '<a href="/impact" target="_blank" style="font-size:14px;color:#8B0000;text-decoration:none;font-weight:600;">\uD83D\uDCCA \u516c\u958b\u5f71\u97ff\u529b\u5831\u544a \u2192</a>' +
-      '</div>' +
-    '</div>';
-  wrap.innerHTML = iframeHtml + installHtml + partnerEntryHtml;
-  // 查詢此會員的角色申請狀態，動態調整按鈕行為
-  loadPartnerStatus(memberNo);
+  // partnerEntrySection removed — CoLeadery / CoLinkery moved to ☰ side drawer menu
+  wrap.innerHTML = iframeHtml + installHtml;
+  // Pre-load partner status for drawer buttons
+  loadDrawerPartnerStatus(memberNo);
   // 用戶已點過 WA 按鈕 → 立即展開安裝提示
   if (waClicked) {
     showInstallBanner();
@@ -11697,6 +11734,65 @@ function switchUser() {
       });
   }
 })();
+
+// ── 側邊抽屜選單 ──
+function openDrawer(){
+  document.getElementById('sideDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  // 載入合作計劃按鈕狀態（與原有 partnerEntry 邏輯一致）
+  var memberNo = window.MEMBER_NO || '';
+  if(memberNo){ loadDrawerPartnerStatus(memberNo); }
+}
+function closeDrawer(){
+  document.getElementById('sideDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+// 載入 CoLeadery / CoLinkery 狀態並更新 drawer 按鈕
+function loadDrawerPartnerStatus(memberNo){
+  fetch('/api/partner/my-status?member_no='+encodeURIComponent(memberNo))
+    .then(function(r){return r.json();})
+    .then(function(d){ setupDrawerBtns(memberNo, d.coleadery||null, d.colinkery||null); })
+    .catch(function(){ setupDrawerBtns(memberNo, null, null); });
+}
+function setupDrawerBtns(memberNo, clStatus, ckStatus){
+  var phone = localStorage.getItem('ce85_phone')||'';
+  var bCL = document.getElementById('drawerBtnCoLeadery');
+  var bCK = document.getElementById('drawerBtnCoLinkery');
+  if(bCL){
+    var clSub = bCL.querySelector('.di-sub');
+    if(clStatus==='APPROVED'){
+      if(clSub) clSub.textContent='領航者｜進入工具 →';
+      bCL.onclick=function(){ closeDrawer(); window.location.href='/coleadery/'+(phone?'?phone='+encodeURIComponent(phone):''); };
+    } else if(clStatus==='PENDING'){
+      if(clSub) clSub.textContent='⏳ 審核中（3-5 工作天）';
+      bCL.onclick=function(){ closeDrawer(); if(confirm('⏳ CoLeadery 申請審核中。如想重新申請請按確定。')){ window.location.href='/partner/apply?role=COLEADERY&member='+memberNo; } };
+    } else {
+      bCL.onclick=function(){ closeDrawer(); drawerOpenCoLeadery(); };
+    }
+  }
+  if(bCK){
+    var ckSub = bCK.querySelector('.di-sub');
+    if(ckStatus==='APPROVED'){
+      if(ckSub) ckSub.textContent='連結者｜進入工具 →';
+      bCK.onclick=function(){ closeDrawer(); window.location.href='/colinkery/'+(phone?'?phone='+encodeURIComponent(phone):''); };
+    } else if(ckStatus==='PENDING'){
+      if(ckSub) ckSub.textContent='⏳ 審核中（3-5 工作天）';
+      bCK.onclick=function(){ closeDrawer(); if(confirm('⏳ CoLinkery 申請審核中。如想重新申請請按確定。')){ window.location.href='/partner/apply?role=COLINKERY&member='+memberNo; } };
+    } else {
+      bCK.onclick=function(){ closeDrawer(); drawerOpenCoLinkery(); };
+    }
+  }
+}
+function drawerOpenCoLeadery(){
+  var memberNo = window.MEMBER_NO||'';
+  window.location.href='/partner/apply?role=COLEADERY&member='+memberNo;
+}
+function drawerOpenCoLinkery(){
+  var memberNo = window.MEMBER_NO||'';
+  window.location.href='/partner/apply?role=COLINKERY&member='+memberNo;
+}
 
 // ── 有用資訊 Modal ──
 function openUsefulLinksPanel(){
