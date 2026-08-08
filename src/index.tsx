@@ -8998,6 +8998,42 @@ var rsCache = {};
     <div id="qrStatsContent"><p style="color:#888;font-size:14px">請選擇一個 QR 來源以查看統計</p></div>
   </div>
 
+  <!-- ── Edit Modal ── -->
+  <div id="qrmodEditOverlay" onclick="if(event.target===this)qrModCloseEdit()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:28px 24px;width:90%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 style="font-size:16px;font-weight:700;color:#1B4332;margin:0;">✏️ 編輯 QR 來源</h3>
+        <button onclick="qrModCloseEdit()" style="background:none;border:none;font-size:20px;color:#6B7280;cursor:pointer;line-height:1;">✕</button>
+      </div>
+      <input type="hidden" id="qrmodEditId">
+      <div class="qrmod-field">
+        <label>Source ID <span style="font-size:11px;color:#9CA3AF;font-weight:400;text-transform:none;">(不可更改)</span></label>
+        <input id="qrmodEditSourceIdDisplay" type="text" disabled style="background:#F9FAFB;color:#6B7280;font-family:monospace;letter-spacing:1px;">
+      </div>
+      <div class="qrmod-field">
+        <label>顯示名稱 <span style="color:#dc2626">*</span></label>
+        <input id="qrmodEditName" type="text" placeholder="例：旺角 Roadshow">
+      </div>
+      <div class="qrmod-field">
+        <label>活動日期</label>
+        <input id="qrmodEditDate" type="date">
+      </div>
+      <div class="qrmod-field">
+        <label>地點</label>
+        <input id="qrmodEditLocation" type="text" placeholder="例：旺角朗豪坊廣場">
+      </div>
+      <div class="qrmod-field">
+        <label>備註</label>
+        <input id="qrmodEditNotes" type="text" placeholder="（選填）">
+      </div>
+      <div id="qrmodEditErr" style="color:#dc2626;font-size:12px;padding:8px 12px;background:#FEF2F2;border-radius:6px;display:none;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button onclick="qrModCloseEdit()" style="padding:9px 18px;background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;cursor:pointer;color:#374151;">取消</button>
+        <button onclick="qrModSaveEdit()" id="qrmodEditSaveBtn" style="padding:9px 18px;background:#1B4332;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">💾 儲存變更</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -9075,38 +9111,23 @@ function qrModBuildUrl(sourceId){
   return base + '/qr-register?source=' + encodeURIComponent(sourceId);
 }
 
-// ── QR canvas render (uses qrcode-generator via CDN or fallback API) ──────────
+// ── QR image render via reliable external API ─────────────────────────────────
 function qrModRenderCanvas(url, wrap){
   wrap.innerHTML = '';
-  // Try qrcode-generator lib first (loaded inline below)
-  try {
-    if(typeof qrcode === 'function'){
-      var qr = qrcode(0,'M');
-      qr.addData(url);
-      qr.make();
-      var canvas = document.createElement('canvas');
-      canvas.width = 200; canvas.height = 200;
-      var ctx = canvas.getContext('2d');
-      var mod = qr.getModuleCount();
-      var cell = Math.floor(196/mod);
-      var margin = Math.floor((200-mod*cell)/2);
-      ctx.fillStyle='#fff'; ctx.fillRect(0,0,200,200);
-      ctx.fillStyle='#000';
-      for(var row=0;row<mod;row++){
-        for(var col=0;col<mod;col++){
-          if(qr.isDark(row,col)) ctx.fillRect(margin+col*cell, margin+row*cell, cell, cell);
-        }
-      }
-      wrap.appendChild(canvas);
-      return;
-    }
-  } catch(e){}
-  // Fallback: external QR API img
   var img = document.createElement('img');
-  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(url);
+  // Use goqr.me API — reliable, no CORS issues, returns clean QR PNG
+  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=' + encodeURIComponent(url);
   img.width = 200; img.height = 200;
-  img.style.cssText = 'display:block;border-radius:4px;';
+  img.style.cssText = 'display:block;border-radius:6px;';
+  img.alt = 'QR Code';
+  // loading indicator
+  img.onload = function(){ wrap.style.background = 'transparent'; };
+  img.onerror = function(){
+    wrap.innerHTML = '<div style="color:#e53935;font-size:11px;text-align:center;padding:16px;">QR 生成失敗<br>請檢查網絡連線</div>';
+  };
   wrap.appendChild(img);
+  // Store reference for download
+  wrap._qrImg = img;
 }
 
 // ── update live preview ────────────────────────────────────────────────────────
@@ -9134,24 +9155,17 @@ function qrModUpdatePreview(){
   actionBtns.style.display = '';
 }
 
-// ── download PNG ───────────────────────────────────────────────────────────────
+// ── download PNG (high-res 600x600) ───────────────────────────────────────────
 function qrModDownload(){
-  var wrap = document.getElementById('qrmodCanvasWrap');
-  var canvas = wrap.querySelector('canvas');
-  if(canvas){
-    var a = document.createElement('a');
-    a.download = 'qr-'+(_qrModCurrentType)+'.png';
-    a.href = canvas.toDataURL('image/png');
-    a.click();
-    return;
-  }
-  // Fallback: download from API
-  if(_qrModCurrentUrl){
-    var a2 = document.createElement('a');
-    a2.href = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data='+encodeURIComponent(_qrModCurrentUrl);
-    a2.target = '_blank';
-    a2.click();
-  }
+  if(!_qrModCurrentUrl){ alert('請先填寫表單'); return; }
+  var info = qrModGetIdAndLabel();
+  var a = document.createElement('a');
+  a.href = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=20&format=png&data=' + encodeURIComponent(_qrModCurrentUrl);
+  a.download = 'qr-' + (info.sourceId || 'code') + '.png';
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // ── copy URL ───────────────────────────────────────────────────────────────────
@@ -9246,10 +9260,12 @@ function qrModLoadSources(){
             '</div>' +
             '<div class="qrmod-src-url">'+url+'</div>' +
             '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
-              '<button class="btn btn-secondary btn-sm" onclick="qrModCopyLink(&apos;'+escHtml(url)+'&apos;)"><i class="fas fa-copy"></i> 複製連結</button>' +
+              '<button class="btn btn-secondary btn-sm" onclick="qrModCopyLink(&apos;'+escHtml(url)+'&apos;)"><i class="fas fa-copy"></i> 複製</button>' +
               '<a class="btn btn-secondary btn-sm" href="'+url+'" target="_blank"><i class="fas fa-eye"></i> 預覽</a>' +
               '<button class="btn btn-secondary btn-sm" onclick="qrModViewStats(&apos;'+escHtml(s.source_id)+'&apos;)"><i class="fas fa-chart-bar"></i> 統計</button>' +
+              '<button class="btn btn-secondary btn-sm" onclick="qrModOpenEdit(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+escHtml(s.display_name)+'&apos;,&apos;'+(s.event_date||'')+'&apos;,&apos;'+escHtml(s.location||'')+'&apos;,&apos;'+escHtml(s.notes||'')+'&apos;)"><i class="fas fa-pen"></i> 編輯</button>' +
               '<button class="btn btn-sm '+(s.status==='active'?'btn-danger':'btn-primary')+'" onclick="qrModToggle(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+s.status+'&apos;)">'+(s.status==='active'?'⏸ 暫停':'▶ 啟用')+'</button>' +
+              '<button class="btn btn-sm" style="background:#FEF2F2;color:#DC2626;border:1px solid #FCA5A5;" onclick="qrModDelete(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+escHtml(s.display_name)+'&apos;,'+s.member_count+')"><i class="fas fa-trash"></i></button>' +
             '</div>' +
           '</div>';
         }).join('');
@@ -9284,7 +9300,9 @@ function qrModLoadSources(){
               '<button class="btn btn-secondary btn-sm" onclick="qrModCopyLink(&apos;'+escHtml(url)+'&apos;)"><i class="fas fa-copy"></i> 複製連結</button>' +
               '<a class="btn btn-secondary btn-sm" href="'+url+'" target="_blank"><i class="fas fa-eye"></i> 預覽</a>' +
               '<button class="btn btn-secondary btn-sm" onclick="qrModViewStats(&apos;'+escHtml(s.source_id)+'&apos;)"><i class="fas fa-chart-bar"></i> 統計</button>' +
+              '<button class="btn btn-secondary btn-sm" onclick="qrModOpenEdit(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+escHtml(s.display_name)+'&apos;,&apos;'+(s.event_date||'')+'&apos;,&apos;'+escHtml(s.location||'')+'&apos;,&apos;'+escHtml(s.notes||'')+'&apos;)"><i class="fas fa-pen"></i> 編輯</button>' +
               '<button class="btn btn-sm '+(s.status==='active'?'btn-danger':'btn-primary')+'" onclick="qrModToggle(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+s.status+'&apos;)">'+(s.status==='active'?'⏸ 暫停':'▶ 啟用')+'</button>' +
+              '<button class="btn btn-sm" style="background:#FEF2F2;color:#DC2626;border:1px solid #FCA5A5;" onclick="qrModDelete(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+escHtml(s.display_name)+'&apos;,'+s.member_count+')"><i class="fas fa-trash"></i> 刪除</button>' +
             '</div>' +
           '</div>';
         }).join('');
@@ -9312,6 +9330,76 @@ function qrModToggle(sourceId, currentStatus){
     credentials: 'include',
     body:JSON.stringify({status:newStatus})
   }).then(function(){ qrModLoadSources(); });
+}
+
+// ── Edit Modal ─────────────────────────────────────────────────────────────────
+function qrModOpenEdit(sourceId, displayName, eventDate, location, notes){
+  document.getElementById('qrmodEditId').value = sourceId;
+  document.getElementById('qrmodEditSourceIdDisplay').value = sourceId;
+  document.getElementById('qrmodEditName').value = displayName;
+  document.getElementById('qrmodEditDate').value = eventDate || '';
+  document.getElementById('qrmodEditLocation').value = location || '';
+  document.getElementById('qrmodEditNotes').value = notes || '';
+  document.getElementById('qrmodEditErr').style.display = 'none';
+  document.getElementById('qrmodEditSaveBtn').disabled = false;
+  document.getElementById('qrmodEditSaveBtn').textContent = '💾 儲存變更';
+  var overlay = document.getElementById('qrmodEditOverlay');
+  overlay.style.display = 'flex';
+}
+
+function qrModCloseEdit(){
+  document.getElementById('qrmodEditOverlay').style.display = 'none';
+}
+
+function qrModSaveEdit(){
+  var sourceId = document.getElementById('qrmodEditId').value;
+  var displayName = (document.getElementById('qrmodEditName').value||'').trim();
+  var eventDate = document.getElementById('qrmodEditDate').value || null;
+  var location = (document.getElementById('qrmodEditLocation').value||'').trim() || null;
+  var notes = (document.getElementById('qrmodEditNotes').value||'').trim() || null;
+  var errEl = document.getElementById('qrmodEditErr');
+  errEl.style.display = 'none';
+  if(!displayName){ errEl.textContent='請填寫顯示名稱'; errEl.style.display='block'; return; }
+  var btn = document.getElementById('qrmodEditSaveBtn');
+  btn.disabled = true; btn.textContent = '儲存中…';
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId),{
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    credentials: 'include',
+    body: JSON.stringify({display_name:displayName, event_date:eventDate, location:location, notes:notes})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false; btn.textContent = '💾 儲存變更';
+    if(d.ok){
+      qrModCloseEdit();
+      qrModLoadSources();
+    } else {
+      errEl.textContent = d.error || '更新失敗';
+      errEl.style.display = 'block';
+    }
+  }).catch(function(e){
+    btn.disabled = false; btn.textContent = '💾 儲存變更';
+    errEl.textContent = '網絡錯誤：'+String(e);
+    errEl.style.display = 'block';
+  });
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────────
+function qrModDelete(sourceId, displayName, memberCount){
+  if(memberCount > 0){
+    alert('❌ 無法刪除「'+displayName+'」\n\n此 QR 來源已有 '+memberCount+' 名會員登記。\n\n如不再使用，請改為「暫停」。');
+    return;
+  }
+  if(!confirm('確認刪除「'+displayName+'」（'+sourceId+'）？\n\n此操作不可撤銷。')){return;}
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId),{
+    method: 'DELETE',
+    credentials: 'include'
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d.ok){
+      qrModLoadSources();
+    } else {
+      alert('刪除失敗：'+(d.error||'未知錯誤'));
+    }
+  }).catch(function(e){ alert('網絡錯誤：'+String(e)); });
 }
 
 function qrModViewStats(sourceId){
@@ -19621,6 +19709,46 @@ app.patch('/api/admin/qr-sources/:id', async (c) => {
     await db.prepare('UPDATE qr_sources SET status=? WHERE source_id=?').bind(status, id).run()
     return c.json({ ok: true })
   } catch (_) { return c.json({ ok: false, error: '更新失敗' }) }
+})
+
+// ── Admin: PUT /api/admin/qr-sources/:id — edit QR source ────────────────────
+app.put('/api/admin/qr-sources/:id', async (c) => {
+  const db = c.env.DB
+  // Auth handled by /api/admin/* middleware (session cookie)
+
+  const id = c.req.param('id')
+  let body: { display_name?: string; event_date?: string; location?: string; notes?: string }
+  try { body = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效請求' }, 400) }
+
+  const displayName = (body.display_name || '').trim()
+  if (!displayName) return c.json({ ok: false, error: '缺少顯示名稱' })
+
+  try {
+    const result = await db.prepare(
+      `UPDATE qr_sources SET display_name=?, event_date=?, location=?, notes=? WHERE source_id=?`
+    ).bind(displayName, body.event_date||null, body.location||null, body.notes||null, id).run()
+    if ((result.meta?.changes ?? 0) === 0) return c.json({ ok: false, error: '找不到此 QR 來源' })
+    return c.json({ ok: true })
+  } catch (_) { return c.json({ ok: false, error: '更新失敗' }) }
+})
+
+// ── Admin: DELETE /api/admin/qr-sources/:id — delete QR source ───────────────
+app.delete('/api/admin/qr-sources/:id', async (c) => {
+  const db = c.env.DB
+  // Auth handled by /api/admin/* middleware (session cookie)
+
+  const id = c.req.param('id')
+  try {
+    // Check if any members registered via this source
+    const usage = await db.prepare(
+      'SELECT COUNT(*) as cnt FROM members WHERE roadshow_source=?'
+    ).bind(id).first<{ cnt: number }>()
+    if ((usage?.cnt ?? 0) > 0) {
+      return c.json({ ok: false, error: `此 QR 來源已有 ${usage?.cnt} 名會員登記，無法刪除。可改為「暫停」。` })
+    }
+    await db.prepare('DELETE FROM qr_sources WHERE source_id=?').bind(id).run()
+    return c.json({ ok: true })
+  } catch (_) { return c.json({ ok: false, error: '刪除失敗' }) }
 })
 
 // ── Admin: GET /api/admin/qr-sources/:id/stats — stats for one source ────────
