@@ -8739,6 +8739,7 @@ var rsCache = {};
 })();
 
 // ── QR 快速登記管理 Module ──────────────────────────────────────────────────
+</script>
 
 <div id="mod-qr" class="mod-page" style="display:none">
   <style>
@@ -8856,8 +8857,6 @@ var rsCache = {};
   </div>
 </div>
 
-</script>
-
 <script>
 // ═══════════════════════════════════════════════════════
 // QR Module JS
@@ -8908,10 +8907,10 @@ function qrLoadSources(){
         '<div class="qr-sc-url">'+url+'</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' +
           '<a class="btn btn-secondary btn-sm" href="'+qrImgUrl+'" target="_blank"><i class="fas fa-download"></i> 下載QR</a>' +
-          '<button class="btn btn-secondary btn-sm" onclick="qrCopy(\''+url+'\')"><i class="fas fa-copy"></i> 複製連結</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="qrCopy(&apos;'+url+'&apos;)"><i class="fas fa-copy"></i> 複製連結</button>' +
           '<a class="btn btn-secondary btn-sm" href="/qr-register?source='+encodeURIComponent(s.source_id)+'" target="_blank"><i class="fas fa-eye"></i> 預覽</a>' +
-          '<button class="btn btn-secondary btn-sm" onclick="qrViewStats(\''+escHtml(s.source_id)+'\')"><i class="fas fa-chart-bar"></i> 統計</button>' +
-          '<button class="btn btn-sm '+(s.status==='active'?'btn-danger':'btn-primary')+'" onclick="qrToggle(\''+escHtml(s.source_id)+'\',\''+s.status+'\')">'+(s.status==='active'?'⏸ 暫停':'▶ 啟用')+'</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="qrViewStats(&apos;'+escHtml(s.source_id)+'&apos;)"><i class="fas fa-chart-bar"></i> 統計</button>' +
+          '<button class="btn btn-sm '+(s.status==='active'?'btn-danger':'btn-primary')+'" onclick="qrToggle(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+s.status+'&apos;)">'+(s.status==='active'?'⏸ 暫停':'▶ 啟用')+'</button>' +
         '</div>' +
       '</div>';
     });
