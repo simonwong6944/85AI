@@ -7966,6 +7966,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="nav-item" onclick="switchMod('mod-colinkery-admin')">
         <i class="fas fa-handshake"></i> CoLinkery 申請
       </div>
+      <div class="nav-item" onclick="switchMod('mod-qr')">
+        <i class="fas fa-qrcode"></i> QR 快速登記
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doAdminLogout()">
@@ -8735,6 +8738,324 @@ var rsCache = {};
   });
 })();
 
+// ── QR 快速登記管理 Module ──────────────────────────────────────────────────
+</div><!-- end page-area before QR mod -->
+
+<div id="mod-qr" class="mod-page" style="display:none">
+  <style>
+    .qr-mod-tabs{display:flex;gap:0;border-bottom:2px solid #E5E7EB;margin-bottom:20px;}
+    .qr-mod-tab{padding:10px 20px;border:none;background:none;font-size:14px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;}
+    .qr-mod-tab.active{color:#1B4332;border-bottom-color:#1B4332;}
+    .qr-source-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+    .qr-source-card{background:#fff;border-radius:10px;border:1.5px solid #E5E7EB;padding:16px 18px;border-left:4px solid #1B4332;}
+    .qr-source-card.inactive{border-left-color:#D1D5DB;opacity:0.7;}
+    .qr-sc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+    .qr-sc-name{font-size:15px;font-weight:700;color:#111827;}
+    .qr-sc-meta{font-size:12px;color:#6B7280;line-height:1.8;margin-bottom:10px;}
+    .qr-sc-count{font-size:26px;font-weight:900;color:#1B4332;}
+    .qr-sc-count-lbl{font-size:11px;color:#6B7280;}
+    .qr-sc-url{font-size:11px;font-family:monospace;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:4px;padding:5px 8px;word-break:break-all;margin:8px 0;}
+    .qr-stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;}
+    .qr-stat-box{background:#fff;border-radius:8px;border:1px solid #E5E7EB;padding:12px;text-align:center;}
+    .qr-stat-num{font-size:24px;font-weight:900;color:#1B4332;}
+    .qr-stat-lbl{font-size:11px;color:#6B7280;margin-top:2px;}
+    .log-table{width:100%;border-collapse:collapse;font-size:13px;}
+    .log-table th{background:#F9FAFB;padding:9px 12px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #E5E7EB;}
+    .log-table td{padding:8px 12px;border-bottom:1px solid #F0F0F0;vertical-align:top;}
+    .log-table tr:hover td{background:#FAFAFA;}
+    .lbadge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;}
+    .lb-success{background:#D1FAE5;color:#065F46;}
+    .lb-format_error,.lb-db_error{background:#FEE2E2;color:#991B1B;}
+    .lb-invalid_year,.lb-invalid_phone{background:#FEF3C7;color:#92400E;}
+    .lb-duplicate_phone{background:#DBEAFE;color:#1E40AF;}
+    .lb-pending{background:#F3F4F6;color:#6B7280;}
+  </style>
+
+  <!-- Tab bar -->
+  <div class="qr-mod-tabs">
+    <button class="qr-mod-tab active" id="qrtab-sources" onclick="qrSwitchTab('sources',this)">🔖 QR 來源管理</button>
+    <button class="qr-mod-tab" id="qrtab-create" onclick="qrSwitchTab('create',this)">➕ 新增 QR 碼</button>
+    <button class="qr-mod-tab" id="qrtab-logs" onclick="qrSwitchTab('logs',this)">📋 Webhook 日誌</button>
+    <button class="qr-mod-tab" id="qrtab-stats" onclick="qrSwitchTab('stats',this)">📊 統計分析</button>
+  </div>
+
+  <!-- Sources panel -->
+  <div id="qrpanel-sources">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div>
+        <h3 style="font-size:15px;font-weight:700;color:#111827">QR 碼來源列表</h3>
+        <p style="font-size:12px;color:#6B7280;margin-top:2px">每個 QR 碼連結到一個 Roadshow 活動</p>
+      </div>
+      <button class="btn btn-primary" onclick="qrSwitchTab('create',document.getElementById('qrtab-create'))">
+        <i class="fas fa-plus"></i> 新增 QR 碼
+      </button>
+    </div>
+    <div id="qrSourceGrid" class="qr-source-grid"><p style="color:#888;font-size:14px">載入中...</p></div>
+  </div>
+
+  <!-- Create panel -->
+  <div id="qrpanel-create" style="display:none">
+    <div style="max-width:500px">
+      <h3 style="font-size:15px;font-weight:700;color:#111827;margin-bottom:16px">新增 QR 碼 / Roadshow</h3>
+      <div class="form-field">
+        <label>Source ID <span style="color:#dc2626">✽</span> <small style="color:#888">（英文、數字、底線，如：roadshow_tkl_sep2026）</small></label>
+        <input type="text" id="qrNewSourceId" placeholder="roadshow_xxx_sep2026">
+      </div>
+      <div class="form-field">
+        <label>顯示名稱 <span style="color:#dc2626">✽</span></label>
+        <input type="text" id="qrNewDisplayName" placeholder="例如：旺角 Roadshow">
+      </div>
+      <div class="form-field">
+        <label>活動日期</label>
+        <input type="date" id="qrNewEventDate">
+      </div>
+      <div class="form-field">
+        <label>地點</label>
+        <input type="text" id="qrNewLocation" placeholder="例如：旺角朗豪坊廣場">
+      </div>
+      <div class="form-field">
+        <label>備註</label>
+        <input type="text" id="qrNewNotes" placeholder="（可選）">
+      </div>
+      <p id="qrCreateErr" style="color:#dc2626;font-size:13px;margin-bottom:10px;display:none"></p>
+      <p id="qrCreateOk" style="color:#1B4332;font-size:13px;font-weight:700;margin-bottom:10px;display:none">✅ QR 碼已建立！</p>
+      <button class="btn btn-primary" onclick="qrDoCreate()"><i class="fas fa-plus"></i> 建立 QR 碼</button>
+    </div>
+  </div>
+
+  <!-- Logs panel -->
+  <div id="qrpanel-logs" style="display:none">
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+      <select id="qrLogStatus" onchange="qrLoadLogs()" style="padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px">
+        <option value="">全部狀態</option>
+        <option value="success">成功</option>
+        <option value="format_error">格式錯誤</option>
+        <option value="invalid_year">年份無效</option>
+        <option value="duplicate_phone">重複電話</option>
+        <option value="db_error">系統錯誤</option>
+      </select>
+      <select id="qrLogSource" onchange="qrLoadLogs()" style="padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px">
+        <option value="">全部來源</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="qrLoadLogs()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div style="overflow-x:auto">
+      <div id="qrLogsTable"><p style="color:#888;font-size:14px">載入中...</p></div>
+    </div>
+    <div id="qrLogsPager" style="margin-top:12px;display:flex;gap:8px;align-items:center"></div>
+  </div>
+
+  <!-- Stats panel -->
+  <div id="qrpanel-stats" style="display:none">
+    <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <label style="font-size:13px;font-weight:600;color:#374151">選擇 QR 來源：</label>
+      <select id="qrStatsSelect" onchange="qrLoadStats()" style="padding:7px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px">
+        <option value="">── 請選擇 ──</option>
+      </select>
+    </div>
+    <div id="qrStatsContent"><p style="color:#888;font-size:14px">請選擇一個 QR 來源以查看統計</p></div>
+  </div>
+</div>
+
+<div class="page-area" style="display:none"><!-- dummy reopen page-area for HTML structure -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+// QR Module JS
+// ═══════════════════════════════════════════════════════
+var _qrLogPage = 1;
+var _qrAdminPw = '';
+
+function qrGetPw(){ return _qrAdminPw || localStorage.getItem('ce85_admin_pw') || ''; }
+
+function qrLoadAll(){
+  _qrAdminPw = localStorage.getItem('ce85_admin_pw') || '';
+  qrLoadSources();
+  qrFillSourceSelects();
+}
+
+function qrSwitchTab(tab, btnEl){
+  ['sources','create','logs','stats'].forEach(function(t){
+    document.getElementById('qrpanel-'+t).style.display = t===tab?'block':'none';
+    var tb = document.getElementById('qrtab-'+t);
+    if(tb) tb.classList.toggle('active', t===tab);
+  });
+  if(tab==='logs') qrLoadLogs();
+  if(tab==='stats') qrFillSourceSelects();
+}
+
+function qrLoadSources(){
+  fetch('/api/admin/qr-sources?pw='+encodeURIComponent(qrGetPw()))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var html='';
+    (d.sources||[]).forEach(function(s){
+      var url='https://coeldery85.com/qr-register?source='+encodeURIComponent(s.source_id);
+      var qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=100x100&data='+encodeURIComponent(url);
+      html+='<div class="qr-source-card'+(s.status==='inactive'?' inactive':'')+'">' +
+        '<div class="qr-sc-header">' +
+          '<div class="qr-sc-name">'+escHtml(s.display_name)+'</div>' +
+          '<span class="status-badge '+(s.status==='active'?'status-active':'status-inactive')+'">'+(s.status==='active'?'啟用':'暫停')+'</span>' +
+        '</div>' +
+        '<div class="qr-sc-meta">' +
+          (s.event_date?'📅 '+s.event_date+'　':'')+
+          (s.location?'📍 '+escHtml(s.location)+'　':'') +
+          '<br><span style="font-family:monospace;font-size:11px;color:#9CA3AF">'+escHtml(s.source_id)+'</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">' +
+          '<img src="'+qrImgUrl+'" width="80" height="80" style="border:1.5px solid #E5E7EB;border-radius:6px">' +
+          '<div><div class="qr-sc-count">'+s.member_count+'</div><div class="qr-sc-count-lbl">已登記會員</div></div>' +
+        '</div>' +
+        '<div class="qr-sc-url">'+url+'</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' +
+          '<a class="btn btn-secondary btn-sm" href="'+qrImgUrl+'" target="_blank"><i class="fas fa-download"></i> 下載QR</a>' +
+          '<button class="btn btn-secondary btn-sm" onclick="qrCopy(\''+url+'\')"><i class="fas fa-copy"></i> 複製連結</button>' +
+          '<a class="btn btn-secondary btn-sm" href="/qr-register?source='+encodeURIComponent(s.source_id)+'" target="_blank"><i class="fas fa-eye"></i> 預覽</a>' +
+          '<button class="btn btn-secondary btn-sm" onclick="qrViewStats(\''+escHtml(s.source_id)+'\')"><i class="fas fa-chart-bar"></i> 統計</button>' +
+          '<button class="btn btn-sm '+(s.status==='active'?'btn-danger':'btn-primary')+'" onclick="qrToggle(\''+escHtml(s.source_id)+'\',\''+s.status+'\')">'+(s.status==='active'?'⏸ 暫停':'▶ 啟用')+'</button>' +
+        '</div>' +
+      '</div>';
+    });
+    document.getElementById('qrSourceGrid').innerHTML = html || '<p style="color:#888;font-size:14px">尚無QR碼，請點「新增QR碼」</p>';
+  });
+}
+
+function qrCopy(url){
+  navigator.clipboard.writeText(url).then(function(){ alert('已複製連結！'); }).catch(function(){ prompt('複製此連結：',url); });
+}
+
+function qrToggle(sourceId, currentStatus){
+  var newStatus = currentStatus==='active'?'inactive':'active';
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId),{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json','x-admin-password':qrGetPw()},
+    body:JSON.stringify({status:newStatus})
+  }).then(function(){ qrLoadSources(); });
+}
+
+function qrDoCreate(){
+  var sourceId = (document.getElementById('qrNewSourceId').value||'').trim().toLowerCase().replace(/[^a-z0-9_\-]/g,'');
+  var displayName = (document.getElementById('qrNewDisplayName').value||'').trim();
+  var eventDate = document.getElementById('qrNewEventDate').value;
+  var location = (document.getElementById('qrNewLocation').value||'').trim();
+  var notes = (document.getElementById('qrNewNotes').value||'').trim();
+  document.getElementById('qrCreateErr').style.display='none';
+  document.getElementById('qrCreateOk').style.display='none';
+  if(!sourceId||!displayName){
+    document.getElementById('qrCreateErr').textContent='請填寫 Source ID 和顯示名稱';
+    document.getElementById('qrCreateErr').style.display='block'; return;
+  }
+  fetch('/api/admin/qr-sources',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-admin-password':qrGetPw()},
+    body:JSON.stringify({source_id:sourceId,display_name:displayName,event_date:eventDate||null,location:location||null,notes:notes})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      document.getElementById('qrCreateOk').style.display='block';
+      document.getElementById('qrNewSourceId').value='';
+      document.getElementById('qrNewDisplayName').value='';
+      document.getElementById('qrNewEventDate').value='';
+      document.getElementById('qrNewLocation').value='';
+      document.getElementById('qrNewNotes').value='';
+      qrLoadSources();
+    } else {
+      document.getElementById('qrCreateErr').textContent=d.error||'建立失敗';
+      document.getElementById('qrCreateErr').style.display='block';
+    }
+  });
+}
+
+function qrFillSourceSelects(){
+  fetch('/api/qr-sources').then(function(r){return r.json();}).then(function(d){
+    var sels = [document.getElementById('qrLogSource'), document.getElementById('qrStatsSelect')];
+    sels.forEach(function(sel){
+      if(!sel) return;
+      var prev = sel.value;
+      var baseOpt = sel.id==='qrLogSource' ? '<option value="">全部來源</option>' : '<option value="">── 請選擇 ──</option>';
+      sel.innerHTML = baseOpt;
+      (d.sources||[]).forEach(function(s){ sel.innerHTML+='<option value="'+escHtml(s.source_id)+'">'+escHtml(s.display_name)+'</option>'; });
+      if(prev) sel.value = prev;
+    });
+  });
+}
+
+function qrLoadLogs(){
+  var status = document.getElementById('qrLogStatus').value;
+  var source = document.getElementById('qrLogSource').value;
+  var url='/api/admin/webhook-logs?pw='+encodeURIComponent(qrGetPw())+'&page='+_qrLogPage;
+  if(status) url+='&status='+encodeURIComponent(status);
+  if(source) url+='&source='+encodeURIComponent(source);
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    var rows = d.logs||[];
+    var statusMap={success:'成功',format_error:'格式錯誤',invalid_year:'年份無效',duplicate_phone:'重複電話',db_error:'系統錯誤',pending:'處理中',invalid_phone:'電話無效'};
+    var html='<table class="log-table"><thead><tr><th>時間</th><th>電話</th><th>姓名</th><th>年份</th><th>來源</th><th>狀態</th><th>會員號</th></tr></thead><tbody>';
+    rows.forEach(function(l){
+      html+='<tr>'+
+        '<td style="white-space:nowrap;font-size:12px">'+((l.created_at||'').substring(0,16))+'</td>'+
+        '<td>'+qrMaskPhone(l.from_number||'')+'</td>'+
+        '<td>'+(l.parsed_name?escHtml(l.parsed_name):'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td>'+(l.parsed_year||'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(l.parsed_source||'')+'">'+(l.parsed_source?escHtml(l.parsed_source):'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td><span class="lbadge lb-'+(l.validation_result||'pending')+'">'+(statusMap[l.validation_result]||l.validation_result||'處理中')+'</span></td>'+
+        '<td>'+(l.member_no?'<a href="/membership/card/'+escHtml(l.member_no)+'" target="_blank" style="color:#1B4332;font-weight:700">'+escHtml(l.member_no)+'</a>':'<span style="color:#ccc">—</span>')+'</td>'+
+      '</tr>';
+    });
+    html+='</tbody></table>';
+    document.getElementById('qrLogsTable').innerHTML = html;
+    document.getElementById('qrLogsPager').innerHTML =
+      '<button class="btn btn-secondary btn-sm" onclick="_qrLogPage=Math.max(1,_qrLogPage-1);qrLoadLogs()" '+(_qrLogPage<=1?'disabled':'')+'>上一頁</button>'+
+      '<span style="font-size:13px;color:#6B7280;padding:0 8px">第 '+_qrLogPage+' 頁 · 共 '+(d.total||0)+' 條</span>'+
+      '<button class="btn btn-secondary btn-sm" onclick="_qrLogPage++;qrLoadLogs()" '+((_qrLogPage*50>=(d.total||0))?'disabled':'')+'>下一頁</button>';
+  });
+}
+
+function qrMaskPhone(p){ if(p.length>=8) return p.substring(0,4)+'****'+p.substring(p.length-2); return p; }
+
+function qrViewStats(sourceId){
+  qrSwitchTab('stats', document.getElementById('qrtab-stats'));
+  document.getElementById('qrStatsSelect').value = sourceId;
+  qrLoadStats();
+}
+
+function qrLoadStats(){
+  var sourceId = document.getElementById('qrStatsSelect').value;
+  if(!sourceId){ document.getElementById('qrStatsContent').innerHTML='<p style="color:#888;font-size:14px">請選擇一個 QR 來源以查看統計</p>'; return; }
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId)+'/stats?pw='+encodeURIComponent(qrGetPw()))
+  .then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ document.getElementById('qrStatsContent').innerHTML='<p style="color:#dc2626">查詢失敗</p>'; return; }
+    var gMap={M:'男',F:'女',Other:'其他','Prefer not to say':'不說','':'未填'};
+    var tMap={PRIMARY:'主卡（55+）',FAMILY:'家庭卡'};
+    var sMap={incomplete:'未完整',complete:'已完整'};
+    var currentYear = new Date().getFullYear();
+    var avgAge = d.avg_birth_year ? currentYear - d.avg_birth_year : null;
+    var html = '<div class="qr-stat-grid">' +
+      '<div class="qr-stat-box"><div class="qr-stat-num">'+d.total+'</div><div class="qr-stat-lbl">總登記人數</div></div>' +
+      (avgAge?'<div class="qr-stat-box"><div class="qr-stat-num">'+avgAge+'</div><div class="qr-stat-lbl">平均年齡</div></div>':'') +
+      (d.birth_year_range&&d.birth_year_range.min?'<div class="qr-stat-box"><div class="qr-stat-num" style="font-size:16px">'+d.birth_year_range.min+' – '+d.birth_year_range.max+'</div><div class="qr-stat-lbl">出生年份範圍</div></div>':'') +
+    '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:4px">';
+    html += '<div><h4 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">📊 會員類型</h4>';
+    (d.by_tier||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:13px"><span>'+(tMap[r.tier]||r.tier)+'</span><strong>'+r.cnt+'</strong></div>'; });
+    html += '</div>';
+    html += '<div><h4 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">⚧ 性別分佈</h4>';
+    (d.by_gender||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:13px"><span>'+(gMap[r.gender||'']||r.gender||'未填')+'</span><strong>'+r.cnt+'</strong></div>'; });
+    html += '</div>';
+    html += '<div><h4 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">✅ 完成率</h4>';
+    (d.by_status||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:13px"><span>'+(sMap[r.registration_status]||r.registration_status)+'</span><strong>'+r.cnt+'</strong></div>'; });
+    html += '</div>';
+    if((d.by_district||[]).length>0){
+      html += '<div><h4 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">🗺 地區分佈 (Top 10)</h4>';
+      (d.by_district||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:13px"><span>'+(r.district||'未填')+'</span><strong>'+r.cnt+'</strong></div>'; });
+      html += '</div>';
+    }
+    html += '</div>';
+    document.getElementById('qrStatsContent').innerHTML = html;
+  });
+}
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+
 // ── Sidebar nav ──
 var _membershipFrameLoaded = false;
 function switchMod(id){
@@ -8742,7 +9063,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核','mod-qr':'🔖 QR 快速登記管理'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -8756,6 +9077,7 @@ function switchMod(id){
   if(id==='mod-coworkery') cwTab('cw-overview');
   if(id==='mod-revenue') { loadRevApps('PENDING'); loadRevStats(); }
   if(id==='mod-colinkery-admin') { loadCkAdminData(); }
+  if(id==='mod-qr') { qrLoadAll(); }
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
