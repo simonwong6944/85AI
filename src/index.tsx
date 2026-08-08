@@ -8739,7 +8739,6 @@ var rsCache = {};
 })();
 
 // ── QR 快速登記管理 Module ──────────────────────────────────────────────────
-</div><!-- end page-area before QR mod -->
 
 <div id="mod-qr" class="mod-page" style="display:none">
   <style>
@@ -8857,7 +8856,7 @@ var rsCache = {};
   </div>
 </div>
 
-<div class="page-area" style="display:none"><!-- dummy reopen page-area for HTML structure -->
+</script>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -9056,6 +9055,7 @@ function qrLoadStats(){
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 
+<script>
 // ── Sidebar nav ──
 var _membershipFrameLoaded = false;
 function switchMod(id){
