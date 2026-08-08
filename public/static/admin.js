@@ -957,31 +957,51 @@ async function loadMedical(){
   if(thead && !document.getElementById('medThCardNo')){
     var th=document.createElement('th');
     th.id='medThCardNo';
-    th.textContent='卡號 + 醫健卡圖片 URL';
+    th.textContent='卡號 + 醫健卡圖片';
     thead.insertBefore(th, thead.querySelector('th:last-child'));
   }
   document.getElementById('medicalTbody').innerHTML=d.applications.map(function(m,i){
     var col=medStatusColor[m.status]||'#888';
     var lbl=medStatusLabel[m.status]||m.status;
+
+    // Card number display
     var cardNoDisplay=m.card_no
       ? '<span style="font-family:monospace;font-weight:700;color:#1B5E20;letter-spacing:2px;">'+m.card_no+'</span>'
-      : '<span style="color:#aaa;font-size:11px;">未填</span>';
-    // Cloudinary URL display: show link if exists
-    var imgUrlDisplay=m.card_image_url
-      ? '<div style="margin-top:3px;"><a href="'+m.card_image_url+'" target="_blank" style="color:#1565C0;font-size:11px;word-break:break-all;">🖼 查看圖片</a></div>'
+      : '<span style="color:#aaa;font-size:11px;">未填卡號</span>';
+
+    // Image status display: thumbnail + link if URL exists
+    var imgDisplay=m.card_image_url
+      ? '<div style="margin-top:4px;display:flex;align-items:center;gap:6px;">'
+          +'<img src="'+m.card_image_url+'" style="height:36px;border-radius:3px;border:1px solid #CE93D8;cursor:pointer;" onclick="window.open(\''+m.card_image_url+'\',\'_blank\')" title="點擊查看原圖">'
+          +'<a href="'+m.card_image_url+'" target="_blank" style="color:#6A1B9A;font-size:11px;font-weight:700;">🖼 查看</a>'
+        +'</div>'
       : '<div style="color:#aaa;font-size:11px;margin-top:3px;">未上傳圖片</div>';
-    // Input section: card_no + card_image_url + save button
-    var cardNoInput='<div style="margin-top:6px;">'
-      +'<div style="display:flex;gap:4px;align-items:center;">'
+
+    // ── Input section ──
+    // Hidden file input (triggered by upload button)
+    var fileInput='<input type="file" id="cardFileInput'+i+'" accept="image/*" style="display:none;" onchange="uploadCardImage('+i+',this)">';
+
+    // Card number text input
+    var cardNoRow='<div style="display:flex;gap:4px;align-items:center;margin-top:6px;">'
       +'<input id="cardNoInput'+i+'" type="text" value="'+(m.card_no||'')+'" placeholder="卡號 例：CF 100 130" '
       +'style="width:130px;padding:4px 6px;border:1px solid #90CAF9;border-radius:4px;font-size:12px;font-family:monospace;letter-spacing:1px;">'
-      +'</div>'
-      +'<div style="display:flex;gap:4px;align-items:center;margin-top:4px;">'
-      +'<input id="cardImgInput'+i+'" type="url" value="'+(m.card_image_url||'')+'" placeholder="Cloudinary 圖片 URL (https://...)" '
-      +'style="width:200px;padding:4px 6px;border:1px solid #CE93D8;border-radius:4px;font-size:11px;">'
-      +'</div>'
-      +'<button class="act-btn" style="background:#1565C0;color:#fff;font-size:11px;margin-top:4px;" onclick="saveCardNo('+i+')">💾 儲存</button>'
       +'</div>';
+
+    // Upload button + URL input (URL is auto-filled after upload, but can also be pasted manually)
+    var imgRow='<div style="display:flex;gap:4px;align-items:center;margin-top:4px;flex-wrap:wrap;">'
+      +'<button class="act-btn" id="uploadBtn'+i+'" style="background:#6A1B9A;color:#fff;font-size:11px;white-space:nowrap;" onclick="document.getElementById(\'cardFileInput'+i+'\').click()">📤 上傳圖片</button>'
+      +'<span id="uploadStatus'+i+'" style="font-size:11px;color:#888;"></span>'
+      +'</div>'
+      +'<div style="margin-top:3px;">'
+      +'<input id="cardImgInput'+i+'" type="url" value="'+(m.card_image_url||'')+'" placeholder="或貼上 Cloudinary URL" '
+      +'style="width:100%;max-width:240px;padding:4px 6px;border:1px solid #CE93D8;border-radius:4px;font-size:11px;color:#6A1B9A;">'
+      +'</div>';
+
+    // Save button
+    var saveRow='<button class="act-btn" id="saveBtn'+i+'" style="background:#1565C0;color:#fff;font-size:11px;margin-top:5px;" onclick="saveCardNo('+i+')">💾 儲存卡號 + 圖片</button>';
+
+    var cardSection=fileInput+cardNoRow+imgRow+saveRow;
+
     return '<tr>'
       +'<td style="font-size:11px;color:#aaa;">#'+m.id+'</td>'
       +'<td><a href="/membership/card/'+m.member_no+'" target="_blank" style="color:var(--forest);font-weight:700;">'+m.member_no+'</a></td>'
@@ -991,7 +1011,7 @@ async function loadMedical(){
       +'<td><a href="tel:+852'+m.phone+'">'+m.phone+'</a></td>'
       +'<td><span style="color:'+col+';font-weight:700;font-size:12px;">'+lbl+'</span></td>'
       +'<td style="font-size:11px;">'+(m.applied_at||'').slice(0,16).replace('T',' ')+'</td>'
-      +'<td>'+cardNoDisplay+imgUrlDisplay+cardNoInput+'</td>'
+      +'<td style="min-width:200px;">'+cardNoDisplay+imgDisplay+cardSection+'</td>'
       +'<td>'
       +(m.status==='PENDING'?'<button class="act-btn act-kyc" onclick="markMedSent('+i+')">標記已傳送</button>':'')
       +(m.status==='SENT'?'<button class="act-btn act-react" onclick="markMedIssued('+i+')">標記已發卡</button>':'')
@@ -1000,34 +1020,91 @@ async function loadMedical(){
   }).join('');
 }
 
+// Upload image to Cloudinary via signed upload (API secret never exposed to browser)
+async function uploadCardImage(i, fileInput){
+  var file=fileInput.files[0];
+  if(!file) return;
+  var statusEl=document.getElementById('uploadStatus'+i);
+  var uploadBtn=document.getElementById('uploadBtn'+i);
+  var imgUrlInput=document.getElementById('cardImgInput'+i);
+
+  // Validate file type + size (max 10 MB)
+  if(!file.type.startsWith('image/')){ alert('請選擇圖片檔案 (PNG / JPEG)'); return; }
+  if(file.size > 10*1024*1024){ alert('檔案太大，請上傳 10MB 以下的圖片'); return; }
+
+  uploadBtn.disabled=true; uploadBtn.textContent='上傳中…';
+  if(statusEl) statusEl.textContent='⏳ 正在取得簽名…';
+
+  try {
+    // Step 1: Get signed upload params from backend (keeps API secret safe)
+    var signRes=await fetch('/api/admin/cloudinary-sign',{method:'POST',headers:{'Content-Type':'application/json'}});
+    var signData=await signRes.json();
+    if(!signData.ok) throw new Error(signData.error||'簽名失敗');
+
+    if(statusEl) statusEl.textContent='⏳ 正在上傳圖片…';
+
+    // Step 2: Upload directly to Cloudinary using the signed params
+    var formData=new FormData();
+    formData.append('file', file);
+    formData.append('api_key',   signData.api_key);
+    formData.append('timestamp', signData.timestamp);
+    formData.append('signature', signData.signature);
+    formData.append('folder',    signData.folder);
+
+    var uploadRes=await fetch(
+      'https://api.cloudinary.com/v1_1/'+signData.cloud_name+'/image/upload',
+      { method:'POST', body:formData }
+    );
+    var uploadData=await uploadRes.json();
+    if(!uploadData.secure_url) throw new Error(uploadData.error?.message||'上傳失敗');
+
+    // Step 3: Auto-fill the URL input field
+    if(imgUrlInput) imgUrlInput.value=uploadData.secure_url;
+    if(statusEl){ statusEl.textContent='✅ 上傳成功！'; statusEl.style.color='#2E7D32'; }
+    uploadBtn.disabled=false; uploadBtn.textContent='📤 重新上傳';
+
+    // Auto-save if card_no is already filled in
+    var cardNoInput=document.getElementById('cardNoInput'+i);
+    if(cardNoInput && cardNoInput.value.trim()){
+      if(statusEl) statusEl.textContent='✅ 上傳成功！正在自動儲存…';
+      await saveCardNo(i);
+    }
+  } catch(err){
+    if(statusEl){ statusEl.textContent='❌ '+err.message; statusEl.style.color='#C62828'; }
+    uploadBtn.disabled=false; uploadBtn.textContent='📤 上傳圖片';
+    console.error('Cloudinary upload error:', err);
+  }
+}
+
 async function saveCardNo(i){
   var m=window._medical[i];
   var input=document.getElementById('cardNoInput'+i);
   var imgInput=document.getElementById('cardImgInput'+i);
+  var saveBtn=document.getElementById('saveBtn'+i);
   var cardNo=(input?input.value:'').trim();
   var cardImageUrl=(imgInput?imgInput.value:'').trim();
   if(!cardNo){ alert('請輸入卡號'); return; }
-  var btn=input?input.parentElement.parentElement.querySelector('button'):null;
-  if(btn){ btn.disabled=true; btn.textContent='儲存中…'; }
+  if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='儲存中…'; }
   var r=await fetch('/api/admin/medical/'+m.id+'/card-no',{
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({card_no:cardNo, card_image_url:cardImageUrl})
   });
   var d=await r.json();
   if(d.ok){ loadMedical(); }
-  else { alert('儲存失敗：'+(d.error||'未知錯誤')); if(btn){btn.disabled=false;btn.textContent='💾 儲存';} }
+  else {
+    alert('儲存失敗：'+(d.error||'未知錯誤'));
+    if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='💾 儲存卡號 + 圖片'; }
+  }
 }
 
 async function markMedSent(i){
   var m=window._medical[i];
-
   var now=new Date().toISOString().slice(0,19).replace('T',' ');
   await fetch('/api/admin/medical/'+m.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'SENT',sent_at:now})});
   loadMedical();
 }
 async function markMedIssued(i){
   var m=window._medical[i];
-
   await fetch('/api/admin/medical/'+m.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'ISSUED'})});
   loadMedical();
 }

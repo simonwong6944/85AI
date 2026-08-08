@@ -8,6 +8,9 @@ type Bindings = {
   ADMIN_PASSWORD: string
   FILES?: R2Bucket        // CoWorkery 身份證 / 打卡 selfie；optional：本地無 bucket 時為 undefined
   OPENROUTER_API_KEY?: string  // CoLinkery OCR via OpenRouter
+  CLOUDINARY_CLOUD_NAME?: string  // Cloudinary cloud name (e.g. ex2zrh2h)
+  CLOUDINARY_API_KEY?: string     // Cloudinary API key
+  CLOUDINARY_API_SECRET?: string  // Cloudinary API secret (for signed uploads)
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -802,6 +805,44 @@ app.post('/api/admin/medical/:id/card-no', async (c) => {
     ).bind(cardNo, cardImageUrl, 'ISSUED', id).run()
   }
   return c.json({ ok: true })
+})
+
+// ─── API: Admin — Cloudinary signed upload signature ─────────────────────────
+// Returns a short-lived signature so the browser can upload directly to Cloudinary
+// without exposing the API Secret in frontend JS.
+// Flow: browser POST here → get {signature, timestamp, api_key, cloud_name, folder}
+//       → browser uploads directly to https://api.cloudinary.com/v1_1/{cloud}/image/upload
+//       → Cloudinary returns secure_url → browser saves it via /api/admin/medical/:id/card-no
+app.post('/api/admin/cloudinary-sign', async (c) => {
+  const cloudName   = c.env.CLOUDINARY_CLOUD_NAME
+  const apiKey      = c.env.CLOUDINARY_API_KEY
+  const apiSecret   = c.env.CLOUDINARY_API_SECRET
+  if (!cloudName || !apiKey || !apiSecret) {
+    return c.json({ ok: false, error: 'Cloudinary secrets not configured' }, 500)
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000)
+  const folder    = 'medical_cards'
+
+  // Build the string-to-sign: sorted params joined by & then + apiSecret
+  // Cloudinary signature = SHA-1( "folder=medical_cards&timestamp=<ts>" + apiSecret )
+  const strToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`
+
+  // SHA-1 using Web Crypto API (available in Cloudflare Workers)
+  const encoder = new TextEncoder()
+  const data = encoder.encode(strToSign)
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data)
+  const hashArray  = Array.from(new Uint8Array(hashBuffer))
+  const signature  = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+  return c.json({
+    ok: true,
+    signature,
+    timestamp,
+    api_key:    apiKey,
+    cloud_name: cloudName,
+    folder
+  })
 })
 
 // ─── API: Medical card application (re-apply from card page) ─────────────────
