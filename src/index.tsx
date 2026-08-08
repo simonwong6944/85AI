@@ -9231,12 +9231,33 @@ function qrModCreate(){
 
 // ── load sources list (mini version in create panel) ──────────────────────────
 function qrModLoadSources(){
+  var list = document.getElementById('qrmodSrcList');
+  var grid = document.getElementById('qrSourceGrid');
+  if(list) list.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:16px;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
+  if(grid) grid.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:24px;grid-column:1/-1;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
   fetch('/api/admin/qr-sources', { credentials: 'include' })
-  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if(r.status === 401){
+      var errHtml = '<div style="color:#e53935;font-size:13px;padding:12px;text-align:center;"><i class="fas fa-lock"></i> 未授權，請重新登入</div>';
+      if(list) list.innerHTML = errHtml;
+      if(grid) grid.innerHTML = '<p style="color:#e53935;font-size:14px;grid-column:1/-1;text-align:center;padding:24px;"><i class="fas fa-lock"></i> 未授權，請重新登入</p>';
+      return null;
+    }
+    return r.json();
+  })
   .then(function(d){
-    var list = document.getElementById('qrmodSrcList');
-    var grid = document.getElementById('qrSourceGrid');
+    if(!d) return;
+    var list2 = document.getElementById('qrmodSrcList');
+    var grid2 = document.getElementById('qrSourceGrid');
+    if(!d.ok){
+      var errMsg = d.error || '載入失敗';
+      if(list2) list2.innerHTML = '<div style="color:#e53935;font-size:13px;padding:12px;text-align:center;"><i class="fas fa-exclamation-circle"></i> '+escHtml(errMsg)+'</div>';
+      if(grid2) grid2.innerHTML = '<p style="color:#e53935;font-size:14px;grid-column:1/-1;text-align:center;padding:24px;">'+escHtml(errMsg)+'</p>';
+      return;
+    }
     var sources = d.sources || [];
+    // alias for block below
+    var list = list2, grid = grid2;
 
     // Mini list for create panel
     if(list){
@@ -9308,9 +9329,12 @@ function qrModLoadSources(){
         }).join('');
       }
     }
-  }).catch(function(){
+  }).catch(function(err){
+    console.error('qrModLoadSources error:', err);
     var list = document.getElementById('qrmodSrcList');
-    if(list) list.innerHTML = '<div style="color:#e53935;font-size:12px;padding:8px;">載入失敗，請確認已登入</div>';
+    var grid = document.getElementById('qrSourceGrid');
+    if(list) list.innerHTML = '<div style="color:#e53935;font-size:13px;padding:12px;text-align:center;"><i class="fas fa-exclamation-triangle"></i> 載入失敗，請確認已登入</div>';
+    if(grid) grid.innerHTML = '<p style="color:#e53935;font-size:14px;grid-column:1/-1;text-align:center;padding:24px;"><i class="fas fa-exclamation-triangle"></i> 載入失敗，請確認已登入</p>';
   });
 }
 
@@ -9386,10 +9410,10 @@ function qrModSaveEdit(){
 // ── Delete ─────────────────────────────────────────────────────────────────────
 function qrModDelete(sourceId, displayName, memberCount){
   if(memberCount > 0){
-    alert('❌ 無法刪除「'+displayName+'」\n\n此 QR 來源已有 '+memberCount+' 名會員登記。\n\n如不再使用，請改為「暫停」。');
+    alert('❌ 無法刪除「'+displayName+'」 - 此 QR 來源已有 '+memberCount+' 名會員登記。如不再使用，請改為「暫停」。');
     return;
   }
-  if(!confirm('確認刪除「'+displayName+'」（'+sourceId+'）？\n\n此操作不可撤銷。')){return;}
+  if(!confirm('確認刪除「'+displayName+'」（'+sourceId+'）？此操作不可撤銷！')){return;}
   fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId),{
     method: 'DELETE',
     credentials: 'include'
