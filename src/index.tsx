@@ -828,7 +828,7 @@ app.post('/api/admin/cloudinary-sign', async (c) => {
   // Allow caller to specify folder; default to 'medical_cards' for backward compat
   let reqBody2: any = {}
   try { reqBody2 = await c.req.json() } catch (_) { /* no body is fine */ }
-  const allowedFolders = ['medical_cards', 'app_contents']
+  const allowedFolders = ['medical_cards', 'app_contents', 'jobs']
   const folder = allowedFolders.includes(reqBody2?.folder) ? reqBody2.folder : 'medical_cards'
 
   const timestamp = Math.floor(Date.now() / 1000)
@@ -8288,7 +8288,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="modal" style="max-height:90vh;overflow-y:auto">
     <h3 id="job-modal-title"><i class="fas fa-briefcase" style="margin-right:8px;color:var(--brand)"></i>新增工作</h3>
     <input type="hidden" id="job-id">
-    <div class="form-field"><label>圖片 URL (4:3 比例)</label><input type="text" id="job-image-url" placeholder="https://..."></div>
+    <input type="hidden" id="job-image-url">
+    <div class="form-field">
+      <label>職位圖片（選填）</label>
+      <div id="jobImgDropZone"
+        ondragover="event.preventDefault();this.style.borderColor='var(--brand)';this.style.background='#f0fff0';"
+        ondragleave="this.style.borderColor='#D1D5DB';this.style.background='#F9FAFB';"
+        ondrop="jobImgHandleDrop(event)"
+        onclick="document.getElementById('jobImgFileInput').click()"
+        style="border:2px dashed #D1D5DB;border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:#F9FAFB;transition:all 0.2s;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+        <div id="jobImgPreviewWrap" style="display:none;width:100%;">
+          <img id="jobImgPreview" src="" alt="preview" style="max-width:100%;max-height:120px;object-fit:contain;border-radius:6px;display:block;margin:0 auto 6px;">
+          <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
+            <span id="jobImgPreviewName" style="font-size:11px;color:#555;"></span>
+            <button type="button" onclick="event.stopPropagation();jobImgClear()" style="font-size:11px;color:#DC2626;background:none;border:none;cursor:pointer;padding:0;">✕ 移除</button>
+          </div>
+        </div>
+        <div id="jobImgPlaceholder">
+          <div style="font-size:22px;margin-bottom:2px;">🖼️</div>
+          <div style="font-size:12px;color:#6B7280;">拖放或點擊上傳圖片</div>
+          <div style="font-size:11px;color:#9CA3AF;margin-top:1px;">建議 4:3 比例，JPG / PNG / WEBP</div>
+        </div>
+        <div id="jobImgUploadProgress" style="display:none;font-size:12px;color:var(--brand);">
+          <i class="fas fa-spinner fa-spin"></i> 上傳中…
+        </div>
+      </div>
+      <input id="jobImgFileInput" type="file" accept="image/*" style="display:none;" onchange="jobImgHandleFile(this.files[0])">
+    </div>
     <div class="form-field"><label>職位名稱 <span style="color:#EF4444">*</span></label><input type="text" id="job-title"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-field"><label>工作地點</label><input type="text" id="job-location" placeholder="例：旺角"></div>
@@ -9649,7 +9675,7 @@ function qrTestUpdatePreview(){
   var year   = (document.getElementById('qrTestYear')||{}).value||'...';
   var source = (document.getElementById('qrTestSource')||{}).value||'online_website';
   var pre = document.getElementById('qrTestMsgPreview');
-  if(pre) pre.textContent = '姓名:'+name+'\n年份:'+year+'\nSource:'+source;
+  if(pre) pre.textContent = '姓名:'+name+'\\n年份:'+year+'\\nSource:'+source;
 }
 
 function qrTestSubmit(){
@@ -10504,10 +10530,61 @@ function loadJobs(){
     }).join('');
   }).catch(function(e){console.error('loadJobs',e);});
 }
+// ── Job image upload helpers ─────────────────────────────────────────────────
+function jobImgClear(){
+  document.getElementById('job-image-url').value='';
+  document.getElementById('jobImgPreviewWrap').style.display='none';
+  document.getElementById('jobImgPlaceholder').style.display='';
+  document.getElementById('jobImgFileInput').value='';
+  var dz=document.getElementById('jobImgDropZone');
+  dz.style.borderColor='#D1D5DB'; dz.style.background='#F9FAFB';
+}
+function jobImgSetPreview(url,name){
+  document.getElementById('job-image-url').value=url;
+  document.getElementById('jobImgPreview').src=url;
+  document.getElementById('jobImgPreviewName').textContent=name||'';
+  document.getElementById('jobImgPreviewWrap').style.display='';
+  document.getElementById('jobImgPlaceholder').style.display='none';
+  var dz=document.getElementById('jobImgDropZone');
+  dz.style.borderColor='var(--brand)'; dz.style.background='#f0fff0';
+}
+function jobImgHandleDrop(e){
+  e.preventDefault();
+  var dz=document.getElementById('jobImgDropZone');
+  dz.style.borderColor='#D1D5DB'; dz.style.background='#F9FAFB';
+  var file=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(file) jobImgHandleFile(file);
+}
+function jobImgHandleFile(file){
+  if(!file||!file.type.startsWith('image/')){ alert('請選擇圖片檔案'); return; }
+  var progress=document.getElementById('jobImgUploadProgress');
+  var placeholder=document.getElementById('jobImgPlaceholder');
+  var previewWrap=document.getElementById('jobImgPreviewWrap');
+  progress.style.display=''; placeholder.style.display='none'; previewWrap.style.display='none';
+  fetch('/api/admin/cloudinary-sign',{
+    method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+    body:JSON.stringify({folder:'jobs'})
+  }).then(function(r){return r.json();}).then(function(sig){
+    if(!sig.ok){progress.style.display='none';placeholder.style.display='';alert('無法取得上傳簽名：'+(sig.error||'未知錯誤'));return;}
+    var fd=new FormData();
+    fd.append('file',file); fd.append('api_key',sig.api_key);
+    fd.append('timestamp',sig.timestamp); fd.append('signature',sig.signature);
+    fd.append('folder',sig.folder);
+    return fetch('https://api.cloudinary.com/v1_1/'+sig.cloud_name+'/image/upload',{
+      method:'POST',body:fd
+    }).then(function(r2){return r2.json();}).then(function(res){
+      progress.style.display='none';
+      if(res.secure_url){ jobImgSetPreview(res.secure_url,file.name); }
+      else{ placeholder.style.display=''; alert('上傳失敗：'+(res.error&&res.error.message||'未知錯誤')); }
+    });
+  }).catch(function(e){progress.style.display='none';placeholder.style.display='';alert('上傳錯誤：'+String(e));});
+}
+
 function openCreateJob(){
   document.getElementById('job-modal-title').innerHTML='<i class="fas fa-briefcase" style="margin-right:8px;color:var(--brand)"></i>新增工作';
   document.getElementById('job-id').value='';
-  ['job-image-url','job-title','job-location','job-type','job-company','job-salary','job-description','job-requirement'].forEach(function(f){document.getElementById(f).value='';});
+  ['job-title','job-location','job-type','job-company','job-salary','job-description','job-requirement'].forEach(function(f){document.getElementById(f).value='';});
+  jobImgClear();
   document.getElementById('job-sort-order').value='0';
   document.getElementById('job-status-field').style.display='none';
   document.getElementById('job-modal-err').style.display='none';
@@ -10519,7 +10596,7 @@ function openEditJob(id){
     if(!j){alert('讀取失敗');return;}
     document.getElementById('job-modal-title').innerHTML='<i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯工作';
     document.getElementById('job-id').value=j.id;
-    document.getElementById('job-image-url').value=j.image_url||'';
+    if(j.image_url){ jobImgSetPreview(j.image_url,''); } else { jobImgClear(); }
     document.getElementById('job-title').value=j.title||'';
     document.getElementById('job-location').value=j.location||'';
     document.getElementById('job-type').value=j.job_type||'';
@@ -10537,7 +10614,7 @@ function openEditJob(id){
 function submitJob(){
   var id=document.getElementById('job-id').value;
   var body={
-    image_url:document.getElementById('job-image-url').value.trim(),
+    image_url:document.getElementById('job-image-url').value.trim()||null,
     title:document.getElementById('job-title').value.trim(),
     location:document.getElementById('job-location').value.trim(),
     job_type:document.getElementById('job-type').value.trim(),
@@ -13029,8 +13106,8 @@ function loadAppContents(section) {
         cardsEl.innerHTML = items.map(function(item) {
           var dt = item.updated_at ? item.updated_at.slice(0,10) : '';
           var imgHtml = item.image_url
-            ? '<div style="margin:-0px -0px 0 -0px;border-radius:14px 14px 0 0;overflow:hidden;">' +
-                '<img src="' + escAppHtml(item.image_url) + '" alt="' + escAppHtml(item.title) + '" style="width:100%;max-height:220px;object-fit:cover;display:block;">' +
+            ? '<div style="border-radius:14px 14px 0 0;overflow:hidden;background:#f9f9f9;">' +
+                '<img src="' + escAppHtml(item.image_url) + '" alt="' + escAppHtml(item.title) + '" style="width:100%;height:auto;display:block;">' +
               '</div>'
             : '';
           var hasImg = !!item.image_url;
@@ -13260,7 +13337,7 @@ function loadJobList() {
       if (cards) {
         cards.innerHTML = d.jobs.map(function(j) {
           var imgHtml = j.image_url
-            ? '<div style="width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:12px 12px 0 0;background:#F3F4F6"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.display=String.fromCharCode(110,111,110,101)"></div>'
+            ? '<div style="width:100%;border-radius:12px 12px 0 0;overflow:hidden;background:#F3F4F6"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:auto;display:block;" loading="lazy" onerror="this.style.display=String.fromCharCode(110,111,110,101)"></div>'
             : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:18px">&#128247; \u6682\u7121\u5716\u7247</div>';
           var loc = j.location ? '<div style="font-size:18px;color:#374151;margin-top:4px">📍 ' + escHtml(j.location) + '</div>' : '';
           var type = j.job_type ? '<div style="display:inline-block;margin-top:8px;padding:4px 12px;background:#D1FAE5;color:#065F46;border-radius:20px;font-size:16px;font-weight:600">' + escHtml(j.job_type) + '</div>' : '';
@@ -13300,7 +13377,7 @@ function showJobDetail(jobId) {
       if (!d.ok) { content.innerHTML = '<div style="padding:40px;text-align:center;color:#DC2626;font-size:20px">載入失敗</div>'; return; }
       var j = d.job;
       var imgHtml = j.image_url
-        ? '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;overflow:hidden"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.style.display=String.fromCharCode(110,111,110,101)"></div>'
+        ? '<div style="width:100%;background:#F3F4F6;overflow:hidden"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:auto;display:block;" onerror="this.parentNode.style.display=String.fromCharCode(110,111,110,101)"></div>'
         : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:20px">&#128247; \u6682\u7121\u5716\u7247</div>';
       var rows = [
         j.company ? ['🏢 公司／機構', j.company] : null,
