@@ -825,11 +825,16 @@ app.post('/api/admin/cloudinary-sign', async (c) => {
     return c.json({ ok: false, error: 'Cloudinary secrets not configured' }, 500)
   }
 
+  // Allow caller to specify folder; default to 'medical_cards' for backward compat
+  let reqBody2: any = {}
+  try { reqBody2 = await c.req.json() } catch (_) { /* no body is fine */ }
+  const allowedFolders = ['medical_cards', 'app_contents']
+  const folder = allowedFolders.includes(reqBody2?.folder) ? reqBody2.folder : 'medical_cards'
+
   const timestamp = Math.floor(Date.now() / 1000)
-  const folder    = 'medical_cards'
 
   // Build the string-to-sign: sorted params joined by & then + apiSecret
-  // Cloudinary signature = SHA-1( "folder=medical_cards&timestamp=<ts>" + apiSecret )
+  // Cloudinary signature = SHA-1( "folder=<folder>&timestamp=<ts>" + apiSecret )
   const strToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`
 
   // SHA-1 using Web Crypto API (available in Cloudflare Workers)
@@ -1612,7 +1617,7 @@ app.get('/api/contents', async (c) => {
   let rows: any
   try {
     rows = await db.prepare(
-      `SELECT id, section, title, body, address, sort_order, created_at, updated_at
+      `SELECT id, section, title, body, address, sort_order, image_url, created_at, updated_at
        FROM app_contents WHERE section=? AND status='OPEN' ORDER BY sort_order ASC, id ASC`
     ).bind(section).all()
   } catch (_) {
@@ -1653,14 +1658,15 @@ app.post('/api/admin/contents', async (c) => {
   const address   = reqBody.address ? String(reqBody.address) : null
   const sortOrder = Number(reqBody.sort_order ?? 0)
   const status    = String(reqBody.status    || 'OPEN')
+  const imageUrl  = reqBody.image_url ? String(reqBody.image_url) : null
   if (!['shopping', 'news'].includes(section)) return c.json({ ok: false, error: '無效 section' }, 400)
   if (!title) return c.json({ ok: false, error: 'title 不能為空' }, 400)
   const now = new Date().toISOString()
   try {
     const r = await db.prepare(
-      `INSERT INTO app_contents (section, title, body, address, sort_order, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(section, title, bodyText, address, sortOrder, status, now, now).run()
+      `INSERT INTO app_contents (section, title, body, address, sort_order, status, image_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(section, title, bodyText, address, sortOrder, status, imageUrl, now, now).run()
     return c.json({ ok: true, id: r.meta.last_row_id })
   } catch (err: any) {
     return c.json({ ok: false, error: String(err?.message || err) }, 500)
@@ -1681,6 +1687,7 @@ app.put('/api/admin/contents/:id', async (c) => {
   if (rb.address    !== undefined) { fields.push('address=?');    vals.push(rb.address) }
   if (rb.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(rb.sort_order) }
   if (rb.status     !== undefined) { fields.push('status=?');     vals.push(rb.status) }
+  if (rb.image_url  !== undefined) { fields.push('image_url=?');  vals.push(rb.image_url || null) }
   if (!fields.length) return c.json({ ok: false, error: '無更新欄位' }, 400)
   fields.push('updated_at=?'); vals.push(new Date().toISOString())
   vals.push(id)
@@ -5575,6 +5582,7 @@ tr.inactive td{opacity:0.45;}
       <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:520px;max-height:90vh;overflow-y:auto;">
         <h3 id="cFormHeading" style="margin:0 0 18px;font-size:15px;font-weight:700;">＋ 新增內容</h3>
         <input type="hidden" id="cFormId">
+        <input type="hidden" id="cFormImageUrl">
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div>
             <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">類別 *</label>
@@ -5594,6 +5602,33 @@ tr.inactive td{opacity:0.45;}
           <div>
             <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">地址（選填，購物 Roadshow 用）</label>
             <input id="cFormAddress" type="text" maxlength="200" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;" placeholder="例：九龍灣德福廣場 L1 大堂">
+          </div>
+          <!-- ── 圖片上傳 (Cloudinary) ── -->
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">圖片（選填）</label>
+            <div id="cImgDropZone"
+              ondragover="event.preventDefault();this.style.borderColor='#228B22';this.style.background='#f0fff0';"
+              ondragleave="this.style.borderColor='#ccc';this.style.background='#fafafa';"
+              ondrop="cImgHandleDrop(event)"
+              onclick="document.getElementById('cImgFileInput').click()"
+              style="border:2px dashed #ccc;border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:#fafafa;transition:all 0.2s;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+              <div id="cImgPreviewWrap" style="display:none;">
+                <img id="cImgPreview" src="" alt="preview" style="max-width:100%;max-height:160px;border-radius:6px;display:block;margin:0 auto 8px;">
+                <div style="display:flex;gap:6px;justify-content:center;">
+                  <span id="cImgPreviewName" style="font-size:11px;color:#555;"></span>
+                  <button type="button" onclick="event.stopPropagation();cImgClear()" style="font-size:11px;color:#e53935;background:none;border:none;cursor:pointer;padding:0;">✕ 移除</button>
+                </div>
+              </div>
+              <div id="cImgPlaceholder">
+                <div style="font-size:28px;margin-bottom:4px;">🖼️</div>
+                <div style="font-size:13px;color:#888;">拖放圖片至此，或點擊選擇</div>
+                <div style="font-size:11px;color:#bbb;margin-top:2px;">JPG / PNG / WEBP，建議寬度 800px 以上</div>
+              </div>
+              <div id="cImgUploadProgress" style="display:none;font-size:12px;color:#228B22;">
+                <i class="fas fa-spinner fa-spin"></i> 上傳中…
+              </div>
+            </div>
+            <input id="cImgFileInput" type="file" accept="image/*" style="display:none;" onchange="cImgHandleFile(this.files[0])">
           </div>
           <div style="display:flex;gap:10px;">
             <div style="flex:1;">
@@ -5734,6 +5769,7 @@ function loadContents() {
             '<button onclick="deleteContent('+i+')" style="padding:5px 10px;background:#fff;border:1px solid #e53935;color:#e53935;border-radius:4px;font-size:12px;cursor:pointer;">刪除</button>' +
           '</div>' +
         '</div>' +
+        (item.image_url ? '<img src="'+escHtml(item.image_url)+'" alt="" style="width:100%;max-height:140px;object-fit:cover;border-radius:6px;margin-bottom:8px;">' : '') +
         '<div style="font-size:14px;font-weight:700;color:#222;margin-bottom:4px;">'+escHtml(item.title)+'</div>' +
         (item.address ? '<div style="font-size:12px;color:#555;margin-bottom:4px;">📍 '+escHtml(item.address)+'</div>' : '') +
         '<div style="font-size:12px;color:#444;white-space:pre-wrap;line-height:1.6;">'+escHtml(item.body)+'</div>' +
@@ -5746,6 +5782,74 @@ function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// ── Content form image helpers ────────────────────────────────────────────────
+function cImgClear() {
+  document.getElementById('cFormImageUrl').value = '';
+  document.getElementById('cImgPreviewWrap').style.display = 'none';
+  document.getElementById('cImgPlaceholder').style.display = '';
+  document.getElementById('cImgFileInput').value = '';
+  var dz = document.getElementById('cImgDropZone');
+  dz.style.borderColor = '#ccc';
+  dz.style.background = '#fafafa';
+}
+
+function cImgSetPreview(url, name) {
+  document.getElementById('cFormImageUrl').value = url;
+  document.getElementById('cImgPreview').src = url;
+  document.getElementById('cImgPreviewName').textContent = name || '';
+  document.getElementById('cImgPreviewWrap').style.display = '';
+  document.getElementById('cImgPlaceholder').style.display = 'none';
+  var dz = document.getElementById('cImgDropZone');
+  dz.style.borderColor = '#228B22';
+  dz.style.background = '#f0fff0';
+}
+
+function cImgHandleDrop(e) {
+  e.preventDefault();
+  var dz = document.getElementById('cImgDropZone');
+  dz.style.borderColor = '#ccc'; dz.style.background = '#fafafa';
+  var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (file) cImgHandleFile(file);
+}
+
+function cImgHandleFile(file) {
+  if (!file || !file.type.startsWith('image/')) { alert('請選擇圖片檔案'); return; }
+  var progress = document.getElementById('cImgUploadProgress');
+  var placeholder = document.getElementById('cImgPlaceholder');
+  var previewWrap = document.getElementById('cImgPreviewWrap');
+  progress.style.display = '';
+  placeholder.style.display = 'none';
+  previewWrap.style.display = 'none';
+  fetch('/api/admin/cloudinary-sign', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    credentials: 'include',
+    body: JSON.stringify({ folder: 'app_contents' })
+  }).then(function(r){ return r.json(); }).then(function(sig){
+    if (!sig.ok) { progress.style.display='none'; placeholder.style.display=''; alert('無法取得上傳簽名：'+(sig.error||'未知錯誤')); return; }
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('api_key', sig.api_key);
+    fd.append('timestamp', sig.timestamp);
+    fd.append('signature', sig.signature);
+    fd.append('folder', sig.folder);
+    return fetch('https://api.cloudinary.com/v1_1/'+sig.cloud_name+'/image/upload', {
+      method: 'POST', body: fd
+    }).then(function(r2){ return r2.json(); }).then(function(res){
+      progress.style.display = 'none';
+      if (res.secure_url) {
+        cImgSetPreview(res.secure_url, file.name);
+      } else {
+        placeholder.style.display = '';
+        alert('上傳失敗：'+(res.error&&res.error.message||'未知錯誤'));
+      }
+    });
+  }).catch(function(e){
+    progress.style.display='none'; placeholder.style.display='';
+    alert('上傳錯誤：'+String(e));
+  });
+}
+
 function openAddContent() {
   document.getElementById('cFormId').value = '';
   var heading = document.getElementById('cFormHeading'); if (heading) heading.textContent = '＋ 新增內容';
@@ -5754,6 +5858,7 @@ function openAddContent() {
   document.getElementById('cFormAddress').value = '';
   document.getElementById('cFormSort').value = '0';
   document.getElementById('cFormStatus').value = 'OPEN';
+  cImgClear();
   var wrap = document.getElementById('contentFormWrap');
   wrap.style.display = 'flex';
 }
@@ -5769,22 +5874,31 @@ function openEditContent(i) {
   document.getElementById('cFormAddress').value = item.address || '';
   document.getElementById('cFormSort').value = item.sort_order;
   document.getElementById('cFormStatus').value = item.status;
+  // Restore image if already set
+  if (item.image_url) {
+    cImgSetPreview(item.image_url, '');
+  } else {
+    cImgClear();
+  }
   document.getElementById('contentFormWrap').style.display = 'flex';
 }
 
 function closeContentForm() {
   document.getElementById('contentFormWrap').style.display = 'none';
+  cImgClear();
 }
 
 function saveContent() {
   var id = document.getElementById('cFormId').value;
+  var imageUrl = document.getElementById('cFormImageUrl').value.trim() || null;
   var payload = {
     section: document.getElementById('cFormSection').value,
     title: document.getElementById('cFormTitleInput').value.trim(),
     body: document.getElementById('cFormBody').value,
     address: document.getElementById('cFormAddress').value.trim() || null,
     sort_order: parseInt(document.getElementById('cFormSort').value) || 0,
-    status: document.getElementById('cFormStatus').value
+    status: document.getElementById('cFormStatus').value,
+    image_url: imageUrl
   };
   if (!payload.title) { alert('請填寫標題'); return; }
   var btn = document.getElementById('cFormSaveBtn');
@@ -12914,11 +13028,20 @@ function loadAppContents(section) {
       if (cardsEl) {
         cardsEl.innerHTML = items.map(function(item) {
           var dt = item.updated_at ? item.updated_at.slice(0,10) : '';
-          return '<div style="background:#fff;border-radius:14px;padding:22px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.08);border-left:5px solid #228B22;">' +
-            '<div style="font-size:24px;font-weight:900;color:#1a6b1a;margin-bottom:10px;line-height:1.3;">' + escAppHtml(item.title) + '</div>' +
-            (item.address ? '<div style="font-size:20px;color:#555;margin-bottom:10px;font-weight:600;">📍 地址：' + escAppHtml(item.address) + '</div>' : '') +
-            '<div style="font-size:20px;color:#333;white-space:pre-wrap;line-height:1.7;margin-bottom:' + (dt ? '12px' : '0') + ';">' + escAppHtml(item.body) + '</div>' +
-            (section === 'news' && dt ? '<div style="font-size:16px;color:#aaa;margin-top:8px;">📅 ' + dt + '</div>' : '') +
+          var imgHtml = item.image_url
+            ? '<div style="margin:-0px -0px 0 -0px;border-radius:14px 14px 0 0;overflow:hidden;">' +
+                '<img src="' + escAppHtml(item.image_url) + '" alt="' + escAppHtml(item.title) + '" style="width:100%;max-height:220px;object-fit:cover;display:block;">' +
+              '</div>'
+            : '';
+          var hasImg = !!item.image_url;
+          return '<div style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.08);border-left:5px solid #228B22;overflow:hidden;">' +
+            imgHtml +
+            '<div style="padding:22px 20px;">' +
+              '<div style="font-size:24px;font-weight:900;color:#1a6b1a;margin-bottom:10px;line-height:1.3;">' + escAppHtml(item.title) + '</div>' +
+              (item.address ? '<div style="font-size:20px;color:#555;margin-bottom:10px;font-weight:600;">📍 地址：' + escAppHtml(item.address) + '</div>' : '') +
+              '<div style="font-size:20px;color:#333;white-space:pre-wrap;line-height:1.7;margin-bottom:' + (dt ? '12px' : '0') + ';">' + escAppHtml(item.body) + '</div>' +
+              (section === 'news' && dt ? '<div style="font-size:16px;color:#aaa;margin-top:8px;">📅 ' + dt + '</div>' : '') +
+            '</div>' +
           '</div>';
         }).join('');
       }
