@@ -8806,6 +8806,7 @@ var rsCache = {};
     <button class="qrmod-tab" id="qrtab-sources" onclick="qrModTab('sources',this)">🔖 已有 QR 來源</button>
     <button class="qrmod-tab" id="qrtab-logs" onclick="qrModTab('logs',this)">📋 Webhook 日誌</button>
     <button class="qrmod-tab" id="qrtab-stats" onclick="qrModTab('stats',this)">📊 統計分析</button>
+    <button class="qrmod-tab" id="qrtab-test" onclick="qrModTab('test',this)" style="color:#b45309;">🧪 測試登記流程</button>
   </div>
 
   <!-- ── CREATE PANEL (left form + right live preview) ── -->
@@ -8998,6 +8999,71 @@ var rsCache = {};
     <div id="qrStatsContent"><p style="color:#888;font-size:14px">請選擇一個 QR 來源以查看統計</p></div>
   </div>
 
+  <!-- ── TEST PANEL ── -->
+  <div id="qrmodpanel-test" style="display:none">
+    <div style="background:#FFFBEB;border:1.5px solid #F59E0B;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:10px;">
+      <span style="font-size:20px;line-height:1.2;">🧪</span>
+      <div style="font-size:13px;color:#92400E;line-height:1.7;">
+        <strong>測試模式：</strong>此功能模擬 WhatsApp 用戶掃碼後發送訊息的完整流程，用於在 Meta API 審批前測試系統是否正常運作。<br>
+        測試完成後會建立真實的會員記錄，請記得在測試後手動刪除測試資料（或使用測試電話號碼）。
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+
+      <!-- Left: Test Form -->
+      <div style="background:#fff;border-radius:10px;border:1px solid #E5E7EB;padding:22px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <h3 style="font-size:15px;font-weight:700;color:#1B4332;margin:0 0 18px;">📱 模擬 WhatsApp 訊息</h3>
+
+        <div class="qrmod-field">
+          <label>WhatsApp 電話號碼（8位香港號碼）<span style="color:#dc2626">*</span></label>
+          <input id="qrTestPhone" type="text" placeholder="例：91234567" maxlength="8" style="font-size:16px;letter-spacing:2px;">
+          <div class="qrmod-hint">建議用測試號碼（如：99999999）避免影響真實用戶</div>
+        </div>
+
+        <div class="qrmod-field">
+          <label>姓名 <span style="color:#dc2626">*</span></label>
+          <input id="qrTestName" type="text" placeholder="例：測試用戶" maxlength="50">
+        </div>
+
+        <div class="qrmod-field">
+          <label>出生年份 <span style="color:#dc2626">*</span></label>
+          <input id="qrTestYear" type="number" placeholder="例：1960" min="1920" max="2011">
+        </div>
+
+        <div class="qrmod-field">
+          <label>QR 來源 (Source)</label>
+          <select id="qrTestSource" style="padding:9px 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px;width:100%;">
+            <option value="online_website">online_website（預設）</option>
+          </select>
+        </div>
+
+        <div style="background:#F0FDF4;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#166534;">
+          <strong>📨 模擬 WhatsApp 訊息內容：</strong>
+          <pre id="qrTestMsgPreview" style="margin:6px 0 0;font-family:monospace;white-space:pre-wrap;font-size:12px;color:#166534;background:none;border:none;padding:0;">姓名:...\n年份:...\nSource:...</pre>
+        </div>
+
+        <div id="qrTestErr" style="display:none;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:6px;padding:10px 14px;font-size:13px;color:#B91C1C;margin-bottom:12px;"></div>
+
+        <button id="qrTestBtn" onclick="qrTestSubmit()" style="width:100%;padding:13px;background:linear-gradient(135deg,#1B4332,#2D6A4F);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.5px;">
+          🚀 模擬發送 &amp; 測試登記流程
+        </button>
+      </div>
+
+      <!-- Right: Result -->
+      <div style="background:#fff;border-radius:10px;border:1px solid #E5E7EB;padding:22px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <h3 style="font-size:15px;font-weight:700;color:#1B4332;margin:0 0 18px;">📋 測試結果</h3>
+        <div id="qrTestResult">
+          <div style="text-align:center;padding:40px 20px;color:#9CA3AF;">
+            <div style="font-size:40px;margin-bottom:12px;">⏳</div>
+            <div style="font-size:13px;">點擊左方按鈕開始測試</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- ── Edit Modal ── -->
   <div id="qrmodEditOverlay" onclick="if(event.target===this)qrModCloseEdit()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:12px;padding:28px 24px;width:90%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
@@ -9046,13 +9112,14 @@ var _qrModCurrentUrl = '';
 
 // ── tab switching ──────────────────────────────────────────────────────────────
 function qrModTab(tab, btnEl){
-  ['create','sources','logs','stats'].forEach(function(t){
+  ['create','sources','logs','stats','test'].forEach(function(t){
     var panel = document.getElementById('qrmodpanel-'+t);
     if(panel) panel.style.display = t===tab?'block':'none';
     var tb = document.getElementById('qrtab-'+t);
     if(tb) tb.classList.toggle('active', t===tab);
   });
   if(tab==='sources'){ qrModLoadSources(); qrFillSourceSelects(); }
+  if(tab==='test'){ qrTestInit(); }
   if(tab==='logs'){ qrFillSourceSelects(); qrLoadLogs(); }
   if(tab==='stats'){ qrFillSourceSelects(); }
 }
@@ -9437,6 +9504,105 @@ function qrModViewStats(sourceId){
 function qrLoadAll(){
   qrModLoadSources();
   qrFillSourceSelects();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QR TEST PANEL
+// ══════════════════════════════════════════════════════════════════════════════
+function qrTestInit(){
+  // Populate source dropdown from API
+  fetch('/api/admin/qr-sources', { credentials:'include' })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var sel = document.getElementById('qrTestSource');
+    if(!sel) return;
+    sel.innerHTML = '<option value="online_website">online_website（預設）</option>';
+    (d.sources||[]).forEach(function(s){
+      sel.innerHTML += '<option value="'+escHtml(s.source_id)+'">'+escHtml(s.source_id)+' — '+escHtml(s.display_name)+'</option>';
+    });
+  }).catch(function(){});
+  // Live preview
+  ['qrTestPhone','qrTestName','qrTestYear','qrTestSource'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener('input', qrTestUpdatePreview);
+    if(el) el.addEventListener('change', qrTestUpdatePreview);
+  });
+  qrTestUpdatePreview();
+}
+
+function qrTestUpdatePreview(){
+  var name   = (document.getElementById('qrTestName')||{}).value||'...';
+  var year   = (document.getElementById('qrTestYear')||{}).value||'...';
+  var source = (document.getElementById('qrTestSource')||{}).value||'online_website';
+  var pre = document.getElementById('qrTestMsgPreview');
+  if(pre) pre.textContent = '姓名:'+name+'\n年份:'+year+'\nSource:'+source;
+}
+
+function qrTestSubmit(){
+  var phone  = ((document.getElementById('qrTestPhone')||{}).value||'').trim();
+  var name   = ((document.getElementById('qrTestName')||{}).value||'').trim();
+  var yearStr= ((document.getElementById('qrTestYear')||{}).value||'').trim();
+  var source = ((document.getElementById('qrTestSource')||{}).value||'online_website').trim();
+  var errEl  = document.getElementById('qrTestErr');
+
+  function showErr(msg){ errEl.textContent=msg; errEl.style.display='block'; }
+  errEl.style.display='none';
+
+  if(!/^\d{8}$/.test(phone)){ showErr('請輸入8位香港電話號碼'); return; }
+  if(!name || name.length<1){ showErr('請輸入姓名'); return; }
+  var year = parseInt(yearStr,10);
+  if(isNaN(year)||year<1920||year>2011){ showErr('請輸入有效出生年份（1920-2011）'); return; }
+
+  var btn = document.getElementById('qrTestBtn');
+  btn.disabled=true; btn.textContent='⏳ 測試中...';
+
+  var resultEl = document.getElementById('qrTestResult');
+  resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#6B7280;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><div style="margin-top:10px;font-size:13px;">正在模擬 WhatsApp 流程…</div></div>';
+
+  fetch('/api/admin/qr-test-webhook', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ phone: phone, name: name, year: year, source: source })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    btn.disabled=false; btn.textContent='🚀 模擬發送 & 測試登記流程';
+    if(d.ok){
+      var member = d.member;
+      var appUrl = d.app_link || '';
+      resultEl.innerHTML =
+        '<div style="text-align:center;margin-bottom:16px;">' +
+          '<div style="font-size:36px;margin-bottom:8px;">🎉</div>' +
+          '<div style="font-size:16px;font-weight:700;color:#065F46;">登記成功！</div>' +
+        '</div>' +
+        '<div style="background:#F0FDF4;border-radius:8px;border:1px solid #A7F3D0;padding:16px;font-size:13px;line-height:2;">' +
+          '<div><strong>會員號碼：</strong><span style="font-family:monospace;font-size:15px;font-weight:900;color:#1B4332;">'+escHtml(member.member_no)+'</span></div>' +
+          '<div><strong>姓名：</strong>'+escHtml(member.name_zh)+'</div>' +
+          '<div><strong>電話：</strong>'+escHtml(member.phone)+'</div>' +
+          '<div><strong>出生年份：</strong>'+escHtml(String(member.birth_year))+'</div>' +
+          '<div><strong>會員類型：</strong>'+(member.tier==='PRIMARY'?'主卡（55+）':'家庭卡')+'</div>' +
+          '<div><strong>來源渠道：</strong>'+escHtml(member.roadshow_source||'—')+'</div>' +
+        '</div>' +
+        (appUrl ? '<div style="margin-top:14px;background:#EFF6FF;border-radius:8px;padding:12px 14px;font-size:12px;color:#1E40AF;word-break:break-all;"><strong>📱 會員卡連結（24小時有效）：</strong><br><a href="'+escHtml(appUrl)+'" target="_blank" style="color:#2563EB;">'+escHtml(appUrl)+'</a></div>' : '') +
+        '<div style="margin-top:14px;padding:10px 14px;background:#FEF3C7;border-radius:6px;font-size:12px;color:#92400E;">' +
+          '⚠️ 這是測試記錄，請到<strong>會員系統</strong>搜尋「'+escHtml(name)+'」後刪除測試資料，或使用不真實的電話號碼測試。' +
+        '</div>';
+      // Refresh sources count
+      qrFillSourceSelects();
+    } else {
+      resultEl.innerHTML =
+        '<div style="text-align:center;padding:20px;">' +
+          '<div style="font-size:36px;margin-bottom:8px;">❌</div>' +
+          '<div style="font-size:14px;font-weight:700;color:#DC2626;margin-bottom:8px;">'+escHtml(d.error||'未知錯誤')+'</div>' +
+          (d.detail ? '<div style="font-size:12px;color:#6B7280;background:#F9FAFB;border-radius:6px;padding:8px 12px;text-align:left;">'+escHtml(d.detail)+'</div>' : '') +
+        '</div>';
+    }
+  })
+  .catch(function(e){
+    btn.disabled=false; btn.textContent='🚀 模擬發送 & 測試登記流程';
+    resultEl.innerHTML = '<div style="text-align:center;padding:20px;color:#DC2626;font-size:13px;">網絡錯誤：'+String(e)+'</div>';
+  });
 }
 
 // ── LEGACY COMPAT: qrSwitchTab → qrModTab (for any remaining old calls) ───────
@@ -19818,6 +19984,82 @@ app.get('/api/admin/qr-sources/:id/stats', async (c) => {
       birth_year_range: { min: avgYear?.min_year, max: avgYear?.max_year }
     })
   } catch (_) { return c.json({ ok: false, error: '查詢失敗' }) }
+})
+
+// ── Admin: POST /api/admin/qr-test-webhook — simulate WhatsApp message ────────
+app.post('/api/admin/qr-test-webhook', async (c) => {
+  const db = c.env.DB
+  // Auth handled by /api/admin/* middleware (session cookie)
+
+  let body: { phone?: string; name?: string; year?: number; source?: string }
+  try { body = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效請求' }, 400) }
+
+  const phone  = (body.phone || '').replace(/\D/g, '').slice(0, 8)
+  const name   = (body.name  || '').trim().slice(0, 100)
+  const year   = Number(body.year)
+  const source = (body.source || 'online_website').replace(/[^a-z0-9_\-]/gi, '').slice(0, 100)
+
+  if (!/^\d{8}$/.test(phone))           return c.json({ ok: false, error: '請輸入8位香港電話號碼' })
+  if (!name)                             return c.json({ ok: false, error: '缺少姓名' })
+  if (!year || year < 1920 || year > 2011) return c.json({ ok: false, error: '出生年份不在有效範圍（1920-2011）' })
+
+  // Check duplicate phone
+  const existing = await db.prepare('SELECT member_no FROM members WHERE phone=? LIMIT 1').bind(phone).first<{ member_no: string }>()
+  if (existing) {
+    return c.json({ ok: false, error: `此電話號碼 ${phone} 已登記為會員 ${existing.member_no}` })
+  }
+
+  // Create member (same logic as webhook)
+  const currentYear = new Date().getFullYear()
+  const age         = currentYear - year
+  const tier        = age >= 55 ? 'PRIMARY' : 'FAMILY'
+  const expiresAt   = `${currentYear + 2}-12-31`
+  const memberNo    = await genMemberNoQR(db)
+
+  try {
+    await db.prepare(
+      `INSERT INTO members
+        (member_no, tier, name_zh, phone, birth_year, roadshow, source, status,
+         registration_method, registration_status, roadshow_source, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'whatsapp_qr', 'ACTIVE',
+               'whatsapp_qr', 'incomplete', ?, ?)`
+    ).bind(memberNo, tier, name, phone, year, source, source, expiresAt).run()
+  } catch (e: any) {
+    return c.json({ ok: false, error: '建立會員失敗', detail: String(e) })
+  }
+
+  // Generate login token
+  let loginToken = ''
+  try {
+    loginToken = await generateToken(32)
+    const expiresTokenAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+      .toISOString().replace('T',' ').slice(0, 19)
+    await db.prepare(
+      `INSERT INTO wa_login_tokens (token, member_no, phone, purpose, expires_at)
+       VALUES (?, ?, ?, 'app_login', ?)`
+    ).bind(loginToken, memberNo, phone, expiresTokenAt).run()
+  } catch (_) { loginToken = '' }
+
+  const appLink = loginToken
+    ? `https://coeldery85.com/app?token=${loginToken}&source=wa_quick_register`
+    : `https://coeldery85.com/app`
+
+  // Write a test log entry
+  try {
+    await db.prepare(
+      `INSERT INTO whatsapp_webhook_logs
+        (message_id, from_number, message_content, parsed_name, parsed_year, parsed_source, validation_result, response_status, processed_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'success', 'test_mode', datetime('now'))`
+    ).bind('test_'+memberNo, '852'+phone, '姓名:'+name+'\n年份:'+year+'\nSource:'+source,
+            name, year, source).run()
+  } catch (_) { /* non-fatal */ }
+
+  return c.json({
+    ok: true,
+    member: { member_no: memberNo, tier, name_zh: name, phone, birth_year: year, roadshow_source: source },
+    app_link: appLink,
+    message: `會員 ${memberNo} 已成功建立，這是測試記錄，請測試完畢後手動刪除。`
+  })
 })
 
 // ── Admin: GET /api/admin/webhook-logs — paginated webhook logs ───────────────
