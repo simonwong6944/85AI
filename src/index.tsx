@@ -19591,18 +19591,19 @@ function doSubmit(){
   var text = '姓名:' + name + '\\n年份:' + year + '\\nSource:' + SOURCE;
   var url = 'https://wa.me/85254429749?text=' + encodeURIComponent(text);
 
-  // Show confirmation overlay
+  // Update button state (keep in sync context for iOS Safari)
   var btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.textContent = '⏳ 正在開啟 WhatsApp...';
 
+  // Must open URL synchronously within the user gesture for iOS Safari
+  window.location.href = url;
+
+  // Re-enable button after a delay (in case user returns)
   setTimeout(function(){
-    window.location.href = url;
-    setTimeout(function(){
-      btn.disabled = false;
-      btn.textContent = '📱 快速登記（WhatsApp 確認）';
-    }, 3000);
-  }, 400);
+    btn.disabled = false;
+    btn.textContent = '📱 快速登記（WhatsApp 確認）';
+  }, 3000);
 }
 
 // Allow Enter key to submit
