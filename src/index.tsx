@@ -14999,7 +14999,7 @@ function appBnfOpenMedCard(){
 }
 
 // MC Sample card image URL (hardcoded)
-var MC_SAMPLE_IMG='https://www.genspark.ai/api/files/s/5HqHigyU';
+var MC_SAMPLE_IMG='/static/mc-sample.png';
 
 function appBnfMedCardHeader(){
   // Simple compact header bar for issued/status/auth panels
@@ -15114,17 +15114,8 @@ function appBnfMedCardApplyHtml(d){
   // No blue header — start directly with sample card image
   parts.push('<div style="padding:0 0 100px;">');
 
-  // ── Sample card image ── use object-fit cover placeholder card design if image can't load
-  parts.push('<div style="width:100%;background:linear-gradient(135deg,#1565C0 0%,#0D47A1 60%,#01579B 100%);padding:28px 24px;box-sizing:border-box;position:relative;min-height:200px;display:flex;flex-direction:column;justify-content:center;">');
-  parts.push('<img src="'+escAppHtml(MC_SAMPLE_IMG)+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:0;" alt="醫健卡樣本" onerror="this.style.display=&apos;none&apos;">');
-  parts.push('<div style="position:relative;z-index:1;">');
-  parts.push('<div style="font-size:11px;color:rgba(255,255,255,0.75);letter-spacing:1px;margin-bottom:4px;">SAMPLE · 醫健卡樣本</div>');
-  parts.push('<div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:1px;margin-bottom:4px;">香港商貿慈善基金</div>');
-  parts.push('<div style="font-size:13px;color:rgba(255,255,255,0.85);margin-bottom:16px;">HMMP 醫療保障計劃</div>');
-  parts.push('<div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:8px;font-family:monospace;">XXXX-XXXX</div>');
-  parts.push('<div style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.7);">[申請人姓名]</div>');
-  parts.push('</div>');
-  parts.push('</div>');
+  // ── Sample card image (served from /static/mc-sample.png in the same deployment) ──
+  parts.push('<img src="'+escAppHtml(MC_SAMPLE_IMG)+'" style="width:100%;display:block;" alt="醫健卡樣本">');
 
   // ── NGO description ──
   parts.push('<div style="padding:16px 16px 0;">');
