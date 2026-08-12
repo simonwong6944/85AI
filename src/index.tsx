@@ -8602,6 +8602,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="nav-item" onclick="switchMod('mod-testing')">
         <i class="fas fa-flask"></i> 產品測試計劃
       </div>
+      <div class="nav-item" onclick="switchMod('mod-benefits')">
+        <i class="fas fa-gift"></i> 福利管理
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doAdminLogout()">
@@ -11060,6 +11063,346 @@ function tstSendWA(participantId, type){
 }
 </script>
 
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- mod-benefits: 福利管理面板 -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<div id="mod-benefits" class="mod-page" style="display:none">
+<style>
+.bnf-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.bnf-cat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.bnf-cat-tab{padding:6px 14px;border-radius:20px;border:2px solid #e0e0e0;background:#fff;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;}
+.bnf-cat-tab.active{background:#1B4332;color:#fff;border-color:#1B4332;}
+.bnf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+.bnf-card{background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);overflow:hidden;border:1px solid #f0f0f0;transition:box-shadow .2s;}
+.bnf-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.13);}
+.bnf-card-img{width:100%;height:160px;object-fit:cover;display:block;background:#f5f5f5;}
+.bnf-card-img-placeholder{width:100%;height:100px;background:linear-gradient(135deg,#e8f5e9,#c8e6c9);display:flex;align-items:center;justify-content:center;font-size:36px;}
+.bnf-card-body{padding:14px 16px;}
+.bnf-card-cat{font-size:11px;font-weight:700;color:#388E3C;background:#E8F5E9;padding:2px 8px;border-radius:10px;display:inline-block;margin-bottom:6px;}
+.bnf-card-title{font-size:15px;font-weight:800;color:#1a1a1a;margin-bottom:6px;line-height:1.3;}
+.bnf-card-desc{font-size:12px;color:#555;line-height:1.5;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.bnf-card-meta{font-size:11px;color:#888;margin-bottom:10px;}
+.bnf-card-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.bnf-badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
+.bnf-badge-active{background:#E8F5E9;color:#2E7D32;}
+.bnf-badge-inactive{background:#FFF3E0;color:#E65100;}
+.bnf-badge-expired{background:#f5f5f5;color:#9e9e9e;}
+.bnf-form-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.bnf-form-box{background:#fff;border-radius:16px;max-width:680px;width:100%;max-height:90vh;overflow-y:auto;padding:28px;}
+.bnf-form-title{font-size:18px;font-weight:800;color:#1B4332;margin-bottom:20px;}
+.bnf-field{margin-bottom:16px;}
+.bnf-label{font-size:12px;font-weight:700;color:#555;margin-bottom:5px;display:block;}
+.bnf-input,.bnf-select,.bnf-textarea{width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;font-family:inherit;}
+.bnf-textarea{min-height:80px;resize:vertical;}
+.bnf-input:focus,.bnf-select:focus,.bnf-textarea:focus{outline:none;border-color:#1B4332;}
+.bnf-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.bnf-extra-field{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.bnf-extra-field input{flex:1;padding:8px 10px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;}
+.bnf-add-field-btn{display:flex;align-items:center;gap:6px;color:#1B4332;font-size:13px;font-weight:700;cursor:pointer;border:2px dashed #a5d6a7;border-radius:8px;padding:8px 14px;background:#f1f8e9;margin-top:4px;}
+.bnf-upload-area{border:2px dashed #c8e6c9;border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:#f9fdf9;transition:border-color .2s;}
+.bnf-upload-area:hover{border-color:#1B4332;}
+.bnf-upload-preview{max-width:100%;max-height:200px;border-radius:8px;margin-top:10px;}
+.bnf-claims-table{width:100%;border-collapse:collapse;font-size:13px;}
+.bnf-claims-table th{background:#f5f5f5;padding:8px 12px;text-align:left;font-weight:700;color:#444;}
+.bnf-claims-table td{padding:8px 12px;border-bottom:1px solid #f0f0f0;}
+.bnf-stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+.bnf-stat-box{background:#fff;border-radius:10px;padding:14px 18px;box-shadow:0 1px 6px rgba(0,0,0,.07);min-width:100px;text-align:center;}
+.bnf-stat-num{font-size:26px;font-weight:900;color:#1B4332;}
+.bnf-stat-lbl{font-size:11px;color:#888;margin-top:2px;}
+</style>
+<div class="bnf-toolbar">
+  <button class="btn btn-primary" onclick="bnfOpenCreate()"><i class="fas fa-plus"></i> 新增福利</button>
+  <button class="btn btn-secondary" onclick="bnfShowClaims()"><i class="fas fa-chart-bar"></i> 申領記錄</button>
+  <button class="btn btn-secondary" onclick="bnfLoadAll()"><i class="fas fa-sync"></i> 刷新</button>
+</div>
+<div class="bnf-cat-tabs" id="bnfCatTabs">
+  <div class="bnf-cat-tab active" data-cat="0" onclick="bnfFilterCat(0,this)">📋 全部</div>
+</div>
+<div id="bnfLoading" style="text-align:center;padding:40px;color:#888;font-size:14px;">載入中…</div>
+<div id="bnfGrid" class="bnf-grid" style="display:none"></div>
+<div id="bnfEmpty" style="display:none;text-align:center;padding:40px;color:#aaa;">
+  <div style="font-size:40px;margin-bottom:10px;">🎁</div>
+  <div style="font-size:15px;">此分類暫無福利，點擊「新增福利」開始新增</div>
+</div>
+<div id="bnfClaimsPanel" style="display:none;margin-top:8px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div style="font-size:16px;font-weight:800;color:#1B4332;">📊 申領記錄總覽</div>
+    <button class="btn btn-sm btn-secondary" onclick="bnfHideClaims()">✕ 關閉</button>
+  </div>
+  <div id="bnfClaimsSummary"></div>
+</div>
+</div><!-- end mod-benefits -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// BENEFITS MODULE JS
+// ══════════════════════════════════════════════════════════════════════════════
+var _bnfCats=[];
+var _bnfCurrentCat=0;
+var _bnfBenefits=[];
+var _bnfEditingId=null;
+var _bnfExtraFields=[];
+
+function bnfLoadAll(){
+  fetch('/api/admin/benefit-categories',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      _bnfCats=d.categories||[];
+      var tabs=document.getElementById('bnfCatTabs');
+      if(!tabs) return;
+      tabs.innerHTML='<div class="bnf-cat-tab active" data-cat="0" onclick="bnfFilterCat(0,this)">📋 全部</div>';
+      _bnfCats.forEach(function(cat){
+        tabs.innerHTML+='<div class="bnf-cat-tab" data-cat="'+cat.id+'" onclick="bnfFilterCat('+cat.id+',this)">'+cat.icon+' '+cat.name+'</div>';
+      });
+    });
+  bnfFetchBenefits(0);
+}
+
+function bnfFetchBenefits(catId){
+  var loading=document.getElementById('bnfLoading'),grid=document.getElementById('bnfGrid'),empty=document.getElementById('bnfEmpty');
+  if(loading) loading.style.display='block';
+  if(grid) grid.style.display='none';
+  if(empty) empty.style.display='none';
+  var url='/api/admin/benefits'+(catId?'?category_id='+catId:'');
+  fetch(url,{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(loading) loading.style.display='none';
+      if(!d.ok){if(grid)grid.style.display='block';return;}
+      _bnfBenefits=d.benefits||[];
+      if(!_bnfBenefits.length){if(empty)empty.style.display='block';return;}
+      if(grid){grid.style.display='grid';grid.innerHTML=_bnfBenefits.map(function(b){return bnfCardHtml(b);}).join('');}
+    })
+    .catch(function(){if(loading)loading.style.display='none';if(empty)empty.style.display='block';});
+}
+
+function bnfFilterCat(catId,el){
+  _bnfCurrentCat=catId;
+  document.querySelectorAll('#bnfCatTabs .bnf-cat-tab').forEach(function(t){t.classList.remove('active');});
+  if(el) el.classList.add('active');
+  document.getElementById('bnfClaimsPanel').style.display='none';
+  bnfFetchBenefits(catId);
+}
+
+function bnfCardHtml(b){
+  var statusBadge=b.status==='active'?'<span class="bnf-badge bnf-badge-active">啟用</span>':
+    b.status==='inactive'?'<span class="bnf-badge bnf-badge-inactive">停用</span>':
+    '<span class="bnf-badge bnf-badge-expired">已過期</span>';
+  var imgHtml=b.image_url
+    ?'<img class="bnf-card-img" src="'+bnfEsc(b.image_url)+'" alt="'+bnfEsc(b.title)+'">'
+    :'<div class="bnf-card-img-placeholder">'+bnfEsc(b.category_icon||'🎁')+'</div>';
+  var dateHtml=(b.start_date||b.end_date)?'<div>📅 '+(b.start_date||'—')+' ~ '+(b.end_date||'長期')+'</div>':'';
+  return '<div class="bnf-card">'+imgHtml+
+    '<div class="bnf-card-body">'+
+      '<div><span class="bnf-card-cat">'+(b.category_icon||'')+' '+(b.category_name||'')+'</span> '+statusBadge+
+        ' <span style="font-size:11px;color:#888;margin-left:6px;">👥 '+b.claim_count+' 人領取</span></div>'+
+      '<div class="bnf-card-title">'+bnfEsc(b.title)+'</div>'+
+      '<div class="bnf-card-desc">'+bnfEsc(b.description)+'</div>'+
+      '<div class="bnf-card-meta">'+dateHtml+'</div>'+
+      '<div class="bnf-card-actions">'+
+        '<button class="btn btn-sm btn-primary" data-bid="'+b.id+'" onclick="bnfOpenEdit(this.dataset.bid)">✏️ 編輯</button>'+
+        '<button class="btn btn-sm btn-secondary" data-bid="'+b.id+'" data-btitle="'+bnfEsc(b.title)+'" onclick="bnfViewClaims(this.dataset.bid,this.dataset.btitle)">👥 申領</button>'+
+        '<button class="btn btn-sm btn-danger" data-bid="'+b.id+'" data-btitle="'+bnfEsc(b.title)+'" onclick="bnfDelete(this.dataset.bid,this.dataset.btitle)">🗑️</button>'+
+      '</div>'+
+    '</div></div>';
+}
+
+function bnfEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function bnfOpenCreate(){_bnfEditingId=null;_bnfExtraFields=[];bnfShowForm(null);}
+function bnfOpenEdit(id){
+  var b=_bnfBenefits.find(function(x){return x.id==id;});
+  if(!b){alert('找不到此福利');return;}
+  _bnfEditingId=id;_bnfExtraFields=[];
+  try{_bnfExtraFields=JSON.parse(b.extra_fields||'[]');}catch(e){}
+  bnfShowForm(b);
+}
+
+function bnfShowForm(b){
+  var old=document.getElementById('bnfFormOverlay');if(old)old.remove();
+  var catsOpts=_bnfCats.map(function(c){
+    return '<option value="'+c.id+'"'+(b&&b.category_id==c.id?' selected':'')+'>'+c.icon+' '+c.name+'</option>';
+  }).join('');
+  var extraHtml=_bnfExtraFields.map(function(f,i){
+    return '<div class="bnf-extra-field">'+
+      '<input placeholder="欄位名稱" value="'+bnfEsc(f.label||'')+'" oninput="bnfEFUpdate('+i+',this,0)">'+
+      '<input placeholder="內容" value="'+bnfEsc(f.value||'')+'" oninput="bnfEFUpdate('+i+',this,1)">'+
+      '<button onclick="bnfEFRemove('+i+')" style="border:none;background:#ffebee;color:#c62828;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;">✕</button>'+
+    '</div>';
+  }).join('');
+  var imgUrl=b&&b.image_url?b.image_url:'';
+  var html='<div id="bnfFormOverlay" class="bnf-form-overlay">'+
+    '<div class="bnf-form-box">'+
+      '<div class="bnf-form-title">'+(b?'✏️ 編輯福利':'➕ 新增福利')+'</div>'+
+      '<div class="bnf-row">'+
+        '<div class="bnf-field"><label class="bnf-label">分類 *</label>'+
+          '<select class="bnf-select" id="bnfFCat"><option value="">請選擇</option>'+catsOpts+'</select></div>'+
+        '<div class="bnf-field"><label class="bnf-label">狀態</label>'+
+          '<select class="bnf-select" id="bnfFStatus">'+
+            '<option value="active"'+((!b||b.status==='active')?' selected':'')+'>啟用</option>'+
+            '<option value="inactive"'+(b&&b.status==='inactive'?' selected':'')+'>停用</option>'+
+          '</select></div>'+
+      '</div>'+
+      '<div class="bnf-field"><label class="bnf-label">標題 *</label>'+
+        '<input class="bnf-input" id="bnfFTitle" placeholder="福利標題" value="'+bnfEsc(b?b.title:'')+'"></div>'+
+      '<div class="bnf-field"><label class="bnf-label">簡介</label>'+
+        '<textarea class="bnf-textarea" id="bnfFDesc" placeholder="簡短介紹">'+bnfEsc(b?b.description:'')+'</textarea></div>'+
+      '<div class="bnf-field"><label class="bnf-label">封面圖片</label>'+
+        '<div class="bnf-upload-area" onclick="document.getElementById(\'bnfFileInput\').click()">'+
+          '<div style="font-size:24px;margin-bottom:4px;">📷</div>'+
+          '<div id="bnfUploadTxt" style="font-size:13px;color:#666;">點擊上傳圖片（自動上傳至 Cloudinary）</div>'+
+          '<input type="file" id="bnfFileInput" accept="image/*" style="display:none" onchange="bnfUploadImage(this)">'+
+          (imgUrl?'<img class="bnf-upload-preview" id="bnfImgPreview" src="'+bnfEsc(imgUrl)+'">':'<img class="bnf-upload-preview" id="bnfImgPreview" style="display:none">')+
+        '</div>'+
+        '<input class="bnf-input" id="bnfFImg" placeholder="或直接輸入圖片 URL" value="'+bnfEsc(imgUrl)+'" style="margin-top:8px;" oninput="bnfPreviewUrl(this.value)">'+
+      '</div>'+
+      '<div class="bnf-row">'+
+        '<div class="bnf-field"><label class="bnf-label">開始日期</label>'+
+          '<input class="bnf-input" type="date" id="bnfFStart" value="'+bnfEsc(b&&b.start_date?b.start_date:'')+'"></div>'+
+        '<div class="bnf-field"><label class="bnf-label">結束日期</label>'+
+          '<input class="bnf-input" type="date" id="bnfFEnd" value="'+bnfEsc(b&&b.end_date?b.end_date:'')+'"></div>'+
+      '</div>'+
+      '<div class="bnf-field"><label class="bnf-label">福利內容詳情</label>'+
+        '<textarea class="bnf-textarea" id="bnfFContent" placeholder="詳細說明福利條款、如何使用等" style="min-height:100px;">'+bnfEsc(b?b.benefit_content:'')+'</textarea></div>'+
+      '<div class="bnf-row">'+
+        '<div class="bnf-field"><label class="bnf-label">每人領取上限（0=不限）</label>'+
+          '<input class="bnf-input" type="number" id="bnfFClaimLimit" min="0" value="'+(b?b.claim_limit:0)+'"></div>'+
+        '<div class="bnf-field"><label class="bnf-label">總名額上限（0=不限）</label>'+
+          '<input class="bnf-input" type="number" id="bnfFTotalQuota" min="0" value="'+(b?b.total_quota:0)+'"></div>'+
+      '</div>'+
+      '<div class="bnf-field"><label class="bnf-label">自訂欄位 <span style="font-weight:400;color:#999;">（可新增任意資訊欄位）</span></label>'+
+        '<div id="bnfExtraFieldsList">'+extraHtml+'</div>'+
+        '<div class="bnf-add-field-btn" onclick="bnfEFAdd()">＋ 新增欄位</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;">'+
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'bnfFormOverlay\').remove()">取消</button>'+
+        '<button class="btn btn-primary" onclick="bnfSave()">💾 儲存</button>'+
+      '</div>'+
+    '</div></div>';
+  document.getElementById('mod-benefits').insertAdjacentHTML('beforeend',html);
+}
+
+function bnfPreviewUrl(url){
+  var img=document.getElementById('bnfImgPreview');
+  if(!img) return;
+  if(url){img.src=url;img.style.display='block';}else{img.style.display='none';}
+}
+function bnfUploadImage(input){
+  var file=input.files[0];if(!file) return;
+  var fd=new FormData();fd.append('file',file);
+  var txt=document.getElementById('bnfUploadTxt');if(txt) txt.textContent='上傳中…';
+  fetch('/api/admin/benefits/upload-image',{method:'POST',credentials:'include',body:fd})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(txt) txt.textContent='點擊上傳圖片（自動上傳至 Cloudinary）';
+      if(d.ok&&d.url){document.getElementById('bnfFImg').value=d.url;bnfPreviewUrl(d.url);}
+      else alert(d.error||'上傳失敗');
+    })
+    .catch(function(){if(txt)txt.textContent='點擊上傳圖片';alert('上傳失敗');});
+}
+function bnfEFAdd(){_bnfExtraFields.push({label:'',value:''});bnfRenderEF();}
+function bnfEFRemove(i){_bnfExtraFields.splice(i,1);bnfRenderEF();}
+function bnfEFUpdate(i,inputEl,keyIdx){
+  if(!_bnfExtraFields[i]) return;
+  if(keyIdx===0) _bnfExtraFields[i].label=inputEl.value;
+  else _bnfExtraFields[i].value=inputEl.value;
+}
+function bnfRenderEF(){
+  var wrap=document.getElementById('bnfExtraFieldsList');if(!wrap) return;
+  wrap.innerHTML=_bnfExtraFields.map(function(f,i){
+    return '<div class="bnf-extra-field">'+
+      '<input placeholder="欄位名稱" value="'+bnfEsc(f.label||'')+'" oninput="bnfEFUpdate('+i+',this,0)">'+
+      '<input placeholder="內容" value="'+bnfEsc(f.value||'')+'" oninput="bnfEFUpdate('+i+',this,1)">'+
+      '<button onclick="bnfEFRemove('+i+')" style="border:none;background:#ffebee;color:#c62828;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;">✕</button>'+
+    '</div>';
+  }).join('');
+}
+function bnfSave(){
+  var cat=document.getElementById('bnfFCat').value;
+  var title=(document.getElementById('bnfFTitle').value||'').trim();
+  if(!cat||!title){alert('請填寫分類及標題');return;}
+  var payload={
+    category_id:parseInt(cat),title:title,
+    description:(document.getElementById('bnfFDesc').value||'').trim(),
+    image_url:(document.getElementById('bnfFImg').value||'').trim(),
+    start_date:document.getElementById('bnfFStart').value||'',
+    end_date:document.getElementById('bnfFEnd').value||'',
+    benefit_content:(document.getElementById('bnfFContent').value||'').trim(),
+    claim_limit:parseInt(document.getElementById('bnfFClaimLimit').value)||0,
+    total_quota:parseInt(document.getElementById('bnfFTotalQuota').value)||0,
+    extra_fields:JSON.stringify(_bnfExtraFields.filter(function(f){return f.label;})),
+    status:document.getElementById('bnfFStatus').value||'active',sort_order:0
+  };
+  var url=_bnfEditingId?'/api/admin/benefits/'+_bnfEditingId:'/api/admin/benefits';
+  var method=_bnfEditingId?'PUT':'POST';
+  fetch(url,{method:method,credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){var ov=document.getElementById('bnfFormOverlay');if(ov)ov.remove();bnfFetchBenefits(_bnfCurrentCat);}
+      else alert(d.error||'儲存失敗');
+    });
+}
+function bnfDelete(id,titleStr){
+  if(!confirm('確定刪除福利「'+titleStr+'」？此操作不可撤銷。')) return;
+  fetch('/api/admin/benefits/'+id,{method:'DELETE',credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.ok)bnfFetchBenefits(_bnfCurrentCat);else alert(d.error||'刪除失敗');});
+}
+function bnfShowClaims(){
+  var panel=document.getElementById('bnfClaimsPanel');panel.style.display='block';
+  document.getElementById('bnfClaimsSummary').innerHTML='<div style="text-align:center;padding:30px;color:#888;">載入中…</div>';
+  fetch('/api/admin/benefits/claims/summary',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok){document.getElementById('bnfClaimsSummary').innerHTML='<p style="color:red;">載入失敗</p>';return;}
+      var rows=d.summary||[];
+      if(!rows.length){document.getElementById('bnfClaimsSummary').innerHTML='<p style="color:#aaa;text-align:center;">暫無申領記錄</p>';return;}
+      var total=rows.reduce(function(s,r){return s+(r.claim_count||0);},0);
+      var html='<div class="bnf-stat-row"><div class="bnf-stat-box"><div class="bnf-stat-num">'+rows.length+'</div><div class="bnf-stat-lbl">福利項目</div></div>'+
+        '<div class="bnf-stat-box"><div class="bnf-stat-num">'+total+'</div><div class="bnf-stat-lbl">總申領次數</div></div></div>';
+      html+='<table class="bnf-claims-table"><thead><tr><th>分類</th><th>福利名稱</th><th>申領人次</th><th>最新申領</th><th>操作</th></tr></thead><tbody>';
+      rows.forEach(function(r){
+        html+='<tr><td>'+(r.icon||'')+(r.category_name||'')+'</td>'+
+          '<td style="font-weight:700;">'+bnfEsc(r.title)+'</td>'+
+          '<td><strong style="color:#1B4332;font-size:16px;">'+r.claim_count+'</strong></td>'+
+          '<td style="font-size:11px;color:#888;">'+(r.last_claimed_at?(r.last_claimed_at+'').slice(0,16):'—')+'</td>'+
+          '<td><button class="btn btn-sm btn-secondary" data-bid="'+r.benefit_id+'" data-btitle="'+bnfEsc(r.title)+'" onclick="bnfViewClaims(this.dataset.bid,this.dataset.btitle)">查看</button></td></tr>';
+      });
+      html+='</tbody></table>';
+      document.getElementById('bnfClaimsSummary').innerHTML=html;
+    });
+}
+function bnfHideClaims(){document.getElementById('bnfClaimsPanel').style.display='none';}
+function bnfViewClaims(id,titleStr){
+  var old=document.getElementById('bnfClaimsModal');if(old)old.remove();
+  var modal='<div id="bnfClaimsModal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;">'+
+    '<div style="background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'+
+        '<div style="font-size:16px;font-weight:800;color:#1B4332;">👥 申領記錄：'+bnfEsc(titleStr)+'</div>'+
+        '<button onclick="document.getElementById(\'bnfClaimsModal\').remove()" style="border:none;background:#f5f5f5;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;">✕</button>'+
+      '</div><div id="bnfClaimsDetail" style="text-align:center;padding:20px;color:#888;">載入中…</div>'+
+    '</div></div>';
+  document.getElementById('mod-benefits').insertAdjacentHTML('beforeend',modal);
+  fetch('/api/admin/benefits/'+id+'/claims',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var el=document.getElementById('bnfClaimsDetail');if(!el) return;
+      if(!d.ok){el.innerHTML='<p style="color:red;">載入失敗</p>';return;}
+      var claims=d.claims||[];
+      if(!claims.length){el.innerHTML='<p style="color:#aaa;">暫無申領記錄</p>';return;}
+      var tbl='<table class="bnf-claims-table"><thead><tr><th>#</th><th>會員號碼</th><th>姓名</th><th>申領時間</th></tr></thead><tbody>';
+      claims.forEach(function(c,i){
+        tbl+='<tr><td style="color:#888;">'+(i+1)+'</td>'+
+          '<td style="font-family:monospace;font-weight:700;">'+bnfEsc(c.member_no)+'</td>'+
+          '<td>'+bnfEsc(c.name_zh||'—')+'</td>'+
+          '<td style="font-size:11px;color:#888;">'+(c.claimed_at+'').slice(0,16)+'</td></tr>';
+      });
+      tbl+='</tbody></table>';
+      el.innerHTML='<div style="margin-bottom:10px;font-size:13px;color:#555;">共 <strong>'+claims.length+'</strong> 位會員申領</div>'+tbl;
+    });
+}
+</script>
+
 <script>
 // ── Sidebar nav ──
 var _membershipFrameLoaded = false;
@@ -11068,7 +11411,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核','mod-qr':'🔖 QR 快速登記管理','mod-testing':'🧪 產品測試計劃'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核','mod-qr':'🔖 QR 快速登記管理','mod-testing':'🧪 產品測試計劃','mod-benefits':'🎁 福利管理'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -11084,6 +11427,7 @@ function switchMod(id){
   if(id==='mod-colinkery-admin') { loadCkAdminData(); }
   if(id==='mod-qr') { qrLoadAll(); }
   if(id==='mod-testing') { testingLoadCampaigns(); }
+  if(id==='mod-benefits') { bnfLoadAll(); }
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
@@ -13558,15 +13902,28 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
   </div>
 </div>
 
-<!-- ── Tab 面板：購物 ── -->
-<div id="tabShop" style="display:none;padding:18px 16px 90px;">
-  <div style="font-size:26px;font-weight:900;color:#1a6b1a;margin-bottom:16px;letter-spacing:1px;">🛒 購物優惠</div>
-  <div id="shopLoadingMsg" style="text-align:center;padding:50px 20px;font-size:20px;color:#6B7280;">載入中…</div>
-  <div id="shopEmptyMsg" style="display:none;text-align:center;padding:50px 20px;">
-    <div style="font-size:52px;margin-bottom:14px;">🙏</div>
-    <div style="font-size:22px;font-weight:700;color:#555;">暫時未有內容，敬請期待 🙏</div>
+<!-- ── Tab 面板：福利 ── -->
+<div id="tabShop" style="display:none;padding:16px 14px 90px;">
+  <!-- Category filter tabs -->
+  <div id="appBnfCatTabs" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:14px;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+    <div style="flex-shrink:0;padding:6px 16px;border-radius:20px;background:#1B4332;color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-cid="0" onclick="appBnfFilterCat(0,this)">全部</div>
   </div>
-  <div id="shopCards" style="display:flex;flex-direction:column;gap:16px;"></div>
+  <!-- Benefits list -->
+  <div id="shopLoadingMsg" style="text-align:center;padding:50px 20px;font-size:18px;color:#6B7280;">載入中…</div>
+  <div id="shopEmptyMsg" style="display:none;text-align:center;padding:50px 20px;">
+    <div style="font-size:52px;margin-bottom:14px;">🎁</div>
+    <div style="font-size:20px;font-weight:700;color:#555;">暫時未有福利，敬請期待 🙏</div>
+  </div>
+  <div id="appBnfList" style="display:flex;flex-direction:column;gap:14px;"></div>
+</div>
+
+<!-- Benefits Detail Panel (full screen overlay in app) -->
+<div id="appBnfDetail" style="display:none;position:fixed;inset:0;background:#fff;z-index:800;overflow-y:auto;">
+  <div style="position:sticky;top:0;background:#fff;padding:14px 16px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:12px;z-index:1;">
+    <button onclick="appBnfCloseDetail()" style="background:#f5f5f5;border:none;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;">←</button>
+    <div style="font-size:17px;font-weight:800;color:#1B4332;">福利詳情</div>
+  </div>
+  <div id="appBnfDetailContent" style="padding:0 0 100px;"></div>
 </div>
 
 <!-- ── Tab 面板：消息 ── -->
@@ -13782,8 +14139,8 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 <!-- ── 底部 5-tab 導航列 ── -->
 <nav class="bottom-tab-bar" id="bottomTabBar">
   <button class="tab-btn" id="tabBtnShop" onclick="switchTab('shop')">
-    <span class="tab-icon">🛒</span>
-    <span class="tab-label">購物</span>
+    <span class="tab-icon">🎁</span>
+    <span class="tab-label">福利</span>
   </button>
   <button class="tab-btn" id="tabBtnNews" onclick="switchTab('news')">
     <span class="tab-icon">📢</span>
@@ -14621,52 +14978,220 @@ var _jobsLoaded = false;
 var _currentJobId = null;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── 購物 / 消息 内容 ──────────────────────────────────────────────────────────
+// ── 福利 Tab ──────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
-var _shopLoaded = false;
+var _appBnfCats = [];
+var _appBnfCurrentCat = 0;
+var _appBnfBenefits = [];
+
+function appBnfInit(){
+  // Load categories
+  fetch('/api/benefits/categories')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      _appBnfCats=d.categories||[];
+      var tabs=document.getElementById('appBnfCatTabs');
+      if(!tabs) return;
+      tabs.innerHTML='<div style="flex-shrink:0;padding:6px 16px;border-radius:20px;background:#1B4332;color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-cid="0" onclick="appBnfFilterCat(0,this)">全部</div>';
+      _appBnfCats.forEach(function(c){
+        tabs.innerHTML+='<div style="flex-shrink:0;padding:6px 16px;border-radius:20px;border:2px solid #e0e0e0;background:#fff;font-size:14px;font-weight:600;cursor:pointer;" data-cid="'+c.id+'" onclick="appBnfFilterCat('+c.id+',this)">'+escAppHtml(c.icon)+' '+escAppHtml(c.name)+'</div>';
+      });
+    });
+  appBnfLoad(0);
+}
+
+function appBnfFilterCat(catId, el){
+  _appBnfCurrentCat=catId;
+  var tabs=document.getElementById('appBnfCatTabs');
+  if(tabs) tabs.querySelectorAll('[data-cid]').forEach(function(t){
+    var active=t.dataset.cid==catId;
+    t.style.background=active?'#1B4332':'#fff';
+    t.style.color=active?'#fff':'#333';
+    t.style.border=active?'2px solid #1B4332':'2px solid #e0e0e0';
+  });
+  appBnfLoad(catId);
+}
+
+function appBnfLoad(catId){
+  var loading=document.getElementById('shopLoadingMsg'),empty=document.getElementById('shopEmptyMsg'),list=document.getElementById('appBnfList');
+  if(loading) loading.style.display='block';
+  if(empty) empty.style.display='none';
+  if(list) list.innerHTML='';
+  var url='/api/benefits'+(catId?'?category_id='+catId:'');
+  fetch(url)
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(loading) loading.style.display='none';
+      var items=d.benefits||[];
+      if(!items.length){if(empty)empty.style.display='block';return;}
+      _appBnfBenefits=items;
+      if(list) list.innerHTML=items.map(function(b){return appBnfCardHtml(b);}).join('');
+    })
+    .catch(function(){if(loading)loading.style.display='none';if(empty)empty.style.display='block';});
+}
+
+function appBnfCardHtml(b){
+  var imgHtml=b.image_url
+    ?'<div style="border-radius:14px 14px 0 0;overflow:hidden;height:180px;background:#f5f5f5;"><img src="'+escAppHtml(b.image_url)+'" style="width:100%;height:100%;object-fit:cover;display:block;"></div>'
+    :'<div style="border-radius:14px 14px 0 0;height:80px;background:linear-gradient(135deg,#e8f5e9,#c8e6c9);display:flex;align-items:center;justify-content:center;font-size:40px;">'+(b.category_icon||'🎁')+'</div>';
+  var dateHtml=(b.start_date||b.end_date)?'<div style="font-size:14px;color:#888;margin-top:4px;">📅 '+(b.start_date||'')+(b.start_date&&b.end_date?' ~ ':'')+(b.end_date||'長期')+'</div>':'';
+  return '<div onclick="appBnfOpenDetail('+b.id+')" style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.09);overflow:hidden;cursor:pointer;">'+
+    imgHtml+
+    '<div style="padding:14px 16px;">'+
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'+
+        '<span style="font-size:11px;font-weight:700;color:#388E3C;background:#E8F5E9;padding:2px 8px;border-radius:10px;">'+(b.category_icon||'')+' '+(b.category_name||'')+'</span>'+
+        (b.end_date&&b.end_date<new Date().toISOString().slice(0,10)?'<span style="font-size:11px;color:#9e9e9e;background:#f5f5f5;padding:2px 8px;border-radius:10px;">已過期</span>':'<span style="font-size:11px;color:#2E7D32;background:#E8F5E9;padding:2px 8px;border-radius:10px;">有效</span>')+
+      '</div>'+
+      '<div style="font-size:18px;font-weight:800;color:#1a1a1a;line-height:1.3;margin-bottom:6px;">'+escAppHtml(b.title)+'</div>'+
+      (b.description?'<div style="font-size:14px;color:#555;line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">'+escAppHtml(b.description)+'</div>':'')+
+      dateHtml+
+      '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">'+
+        '<span style="font-size:13px;color:#888;">👥 '+b.claim_count+' 人已領取</span>'+
+        '<span style="font-size:13px;font-weight:700;color:#1B4332;">查看詳情 ›</span>'+
+      '</div>'+
+    '</div></div>';
+}
+
+function appBnfOpenDetail(id){
+  var b=_appBnfBenefits.find(function(x){return x.id==id;});
+  if(!b) return;
+  var panel=document.getElementById('appBnfDetail');
+  var content=document.getElementById('appBnfDetailContent');
+  if(!panel||!content) return;
+
+  var imgHtml=b.image_url
+    ?'<img src="'+escAppHtml(b.image_url)+'" style="width:100%;max-height:280px;object-fit:cover;display:block;">'
+    :'<div style="height:120px;background:linear-gradient(135deg,#e8f5e9,#a5d6a7);display:flex;align-items:center;justify-content:center;font-size:60px;">'+(b.category_icon||'🎁')+'</div>';
+
+  var extraHtml='';
+  try{
+    var ef=JSON.parse(b.extra_fields||'[]');
+    if(ef.length){
+      extraHtml='<div style="background:#f9fdf9;border-radius:10px;padding:14px 16px;margin:16px 0;">';
+      ef.forEach(function(f){
+        if(f.label) extraHtml+='<div style="margin-bottom:8px;"><span style="font-size:13px;font-weight:700;color:#555;">'+escAppHtml(f.label)+'：</span><span style="font-size:14px;color:#222;">'+escAppHtml(f.value||'')+'</span></div>';
+      });
+      extraHtml+='</div>';
+    }
+  }catch(e){}
+
+  var claimBtn='<button id="appBnfClaimBtn" onclick="appBnfClaim('+b.id+')" style="width:100%;padding:16px;background:#1B4332;color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;margin-top:16px;">🎁 申請領取</button>';
+
+  content.innerHTML=
+    imgHtml+
+    '<div style="padding:18px 16px;">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'+
+        '<span style="font-size:13px;font-weight:700;color:#388E3C;background:#E8F5E9;padding:3px 10px;border-radius:12px;">'+(b.category_icon||'')+' '+(b.category_name||'')+'</span>'+
+        (b.claim_count>0?'<span style="font-size:13px;color:#888;">👥 '+b.claim_count+' 人已領取</span>':'')+
+      '</div>'+
+      '<div style="font-size:22px;font-weight:900;color:#1a1a1a;line-height:1.3;margin-bottom:10px;">'+escAppHtml(b.title)+'</div>'+
+      (b.description?'<div style="font-size:16px;color:#555;line-height:1.6;margin-bottom:12px;">'+escAppHtml(b.description)+'</div>':'')+
+      ((b.start_date||b.end_date)?'<div style="font-size:14px;color:#888;margin-bottom:12px;">📅 有效期：'+(b.start_date||'即日')+(b.end_date?' 至 '+b.end_date:' 長期有效')+'</div>':'')+
+      (b.benefit_content?'<div style="background:#f0f7f0;border-left:4px solid #1B4332;border-radius:0 10px 10px 0;padding:14px 16px;margin:14px 0;">'+
+        '<div style="font-size:13px;font-weight:700;color:#1B4332;margin-bottom:6px;">🎁 福利內容</div>'+
+        '<div style="font-size:15px;color:#333;white-space:pre-wrap;line-height:1.6;">'+escAppHtml(b.benefit_content)+'</div>'+
+      '</div>':'')+
+      extraHtml+
+      claimBtn+
+    '</div>';
+
+  panel.style.display='block';
+  // Check if already claimed
+  appBnfCheckClaimed(b.id);
+}
+
+function appBnfCheckClaimed(id){
+  fetch('/api/benefits/'+id+'/my-claim',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var btn=document.getElementById('appBnfClaimBtn');
+      if(!btn) return;
+      if(d.claimed){
+        btn.textContent='✅ 已領取';
+        btn.style.background='#4CAF50';
+        btn.style.cursor='default';
+        btn.onclick=null;
+        if(d.claimed_at) btn.insertAdjacentHTML('afterend','<div style="text-align:center;font-size:13px;color:#888;margin-top:6px;">領取時間：'+(d.claimed_at+'').slice(0,16)+'</div>');
+      }
+    });
+}
+
+function appBnfClaim(id){
+  var btn=document.getElementById('appBnfClaimBtn');
+  if(btn){btn.textContent='處理中…';btn.style.opacity='0.7';btn.onclick=null;}
+  fetch('/api/benefits/'+id+'/claim',{method:'POST',credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.code==='AUTH_REQUIRED'){
+        if(btn){btn.textContent='🎁 申請領取';btn.style.opacity='1';btn.onclick=function(){appBnfClaim(id);};}
+        alert('請先登入會員卡才可申領福利');
+        appBnfCloseDetail();
+        switchTab('card');
+        return;
+      }
+      if(d.ok||d.already_claimed){
+        if(btn){
+          btn.textContent=d.already_claimed?'✅ 已領取':'✅ 成功領取！';
+          btn.style.background='#4CAF50';btn.style.cursor='default';btn.onclick=null;
+        }
+        if(!d.already_claimed) alert('🎁 成功領取！');
+        // Refresh claim count
+        appBnfLoad(_appBnfCurrentCat);
+      } else {
+        if(btn){btn.textContent='🎁 申請領取';btn.style.opacity='1';btn.onclick=function(){appBnfClaim(id);};}
+        alert(d.error||'領取失敗，請稍後再試');
+      }
+    })
+    .catch(function(){
+      if(btn){btn.textContent='🎁 申請領取';btn.style.opacity='1';btn.onclick=function(){appBnfClaim(id);};}
+      alert('網絡錯誤，請稍後再試');
+    });
+}
+
+function appBnfCloseDetail(){
+  var panel=document.getElementById('appBnfDetail');
+  if(panel) panel.style.display='none';
+}
+
+// ── 消息 内容 ─────────────────────────────────────────────────────────────────
 var _newsLoaded = false;
 
 function loadAppContents(section) {
-  var prefix = section === 'shopping' ? 'shop' : 'news';
+  if(section==='shopping') { appBnfInit(); return; }
+  // News section
+  var prefix = 'news';
   var loadingEl = document.getElementById(prefix + 'LoadingMsg');
   var emptyEl   = document.getElementById(prefix + 'EmptyMsg');
   var cardsEl   = document.getElementById(prefix + 'Cards');
   if (loadingEl) loadingEl.style.display = 'block';
   if (emptyEl)   emptyEl.style.display   = 'none';
   if (cardsEl)   cardsEl.innerHTML       = '';
-  fetch('/api/contents?section=' + section)
+  fetch('/api/contents?section=news')
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (loadingEl) loadingEl.style.display = 'none';
       var items = (d.ok && d.items) ? d.items : [];
-      if (!items.length) {
-        if (emptyEl) emptyEl.style.display = 'block';
-        return;
-      }
+      if (!items.length) { if (emptyEl) emptyEl.style.display = 'block'; return; }
       if (cardsEl) {
         cardsEl.innerHTML = items.map(function(item) {
           var dt = item.updated_at ? item.updated_at.slice(0,10) : '';
           var imgHtml = item.image_url
-            ? '<div style="border-radius:14px 14px 0 0;overflow:hidden;background:#f9f9f9;">' +
-                '<img src="' + escAppHtml(item.image_url) + '" alt="' + escAppHtml(item.title) + '" style="width:100%;height:auto;display:block;">' +
-              '</div>'
+            ? '<div style="border-radius:14px 14px 0 0;overflow:hidden;background:#f9f9f9;"><img src="' + escAppHtml(item.image_url) + '" alt="' + escAppHtml(item.title) + '" style="width:100%;height:auto;display:block;"></div>'
             : '';
-          var hasImg = !!item.image_url;
           return '<div style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.08);border-left:5px solid #228B22;overflow:hidden;">' +
-            imgHtml +
-            '<div style="padding:22px 20px;">' +
+            imgHtml + '<div style="padding:22px 20px;">' +
               '<div style="font-size:24px;font-weight:900;color:#1a6b1a;margin-bottom:10px;line-height:1.3;">' + escAppHtml(item.title) + '</div>' +
               (item.address ? '<div style="font-size:20px;color:#555;margin-bottom:10px;font-weight:600;">📍 地址：' + escAppHtml(item.address) + '</div>' : '') +
               '<div style="font-size:20px;color:#333;white-space:pre-wrap;line-height:1.7;margin-bottom:' + (dt ? '12px' : '0') + ';">' + escAppHtml(item.body) + '</div>' +
-              (section === 'news' && dt ? '<div style="font-size:16px;color:#aaa;margin-top:8px;">📅 ' + dt + '</div>' : '') +
-            '</div>' +
-          '</div>';
+              (dt ? '<div style="font-size:16px;color:#aaa;margin-top:8px;">📅 ' + dt + '</div>' : '') +
+            '</div></div>';
         }).join('');
       }
     })
     .catch(function() {
       if (loadingEl) loadingEl.style.display = 'none';
-      if (emptyEl) { emptyEl.style.display = 'block'; }
+      if (emptyEl) emptyEl.style.display = 'block';
     });
 }
 
@@ -22646,6 +23171,240 @@ function submitForm(){
 </body>
 </html>`
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Benefits APIs ──────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/benefits/categories — public
+app.get('/api/benefits/categories', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const { results } = await db.prepare(
+    `SELECT id,name,icon,sort_order FROM benefit_categories WHERE is_active=1 ORDER BY sort_order`
+  ).all()
+  return c.json({ ok: true, categories: results })
+})
+
+// GET /api/benefits?category_id=&page= — public (member app)
+app.get('/api/benefits', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const catId = c.req.query('category_id') || ''
+  const page  = Math.max(1, parseInt(c.req.query('page') || '1'))
+  const limit = 20
+  const offset = (page - 1) * limit
+  const now = new Date().toISOString().slice(0, 10)
+  let sql = `SELECT b.id,b.category_id,b.title,b.description,b.image_url,
+               b.start_date,b.end_date,b.benefit_content,b.extra_fields,
+               b.claim_limit,b.total_quota,b.sort_order,
+               bc.name AS category_name, bc.icon AS category_icon,
+               (SELECT COUNT(*) FROM benefit_claims WHERE benefit_id=b.id) AS claim_count
+             FROM benefits b JOIN benefit_categories bc ON bc.id=b.category_id
+             WHERE b.status='active' AND (b.end_date IS NULL OR b.end_date >= '${now}')`
+  if (catId) sql += ` AND b.category_id=${parseInt(catId)}`
+  sql += ` ORDER BY b.sort_order DESC, b.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+  const { results } = await db.prepare(sql).all()
+  return c.json({ ok: true, benefits: results })
+})
+
+// GET /api/benefits/:id — public detail
+app.get('/api/benefits/:id', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const id = parseInt(c.req.param('id'))
+  const row = await db.prepare(
+    `SELECT b.*,bc.name AS category_name,bc.icon AS category_icon,
+       (SELECT COUNT(*) FROM benefit_claims WHERE benefit_id=b.id) AS claim_count
+     FROM benefits b JOIN benefit_categories bc ON bc.id=b.category_id
+     WHERE b.id=?`
+  ).bind(id).first()
+  if (!row) return c.json({ ok: false, error: '找不到福利' }, 404)
+  return c.json({ ok: true, benefit: row })
+})
+
+// POST /api/benefits/:id/claim — member claim (requires member auth via phone session)
+app.post('/api/benefits/:id/claim', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  // Get member from session cookie
+  const sessionId = getCookie(c, 'app_session') || ''
+  if (!sessionId) return c.json({ ok: false, error: '請先登入', code: 'AUTH_REQUIRED' }, 401)
+  const sess = await db.prepare(`SELECT member_no FROM app_sessions WHERE session_id=? AND expires_at>datetime('now')`).bind(sessionId).first() as any
+  if (!sess) return c.json({ ok: false, error: '登入已過期', code: 'AUTH_REQUIRED' }, 401)
+  const memberNo = sess.member_no as string
+
+  const benefitId = parseInt(c.req.param('id'))
+  // Check benefit exists and active
+  const benefit = await db.prepare(
+    `SELECT id,title,claim_limit,total_quota,status,end_date FROM benefits WHERE id=?`
+  ).bind(benefitId).first() as any
+  if (!benefit || benefit.status !== 'active') return c.json({ ok: false, error: '此福利不可領取' }, 400)
+  if (benefit.end_date && benefit.end_date < new Date().toISOString().slice(0, 10))
+    return c.json({ ok: false, error: '此福利已過期' }, 400)
+
+  // Check total quota
+  if (benefit.total_quota > 0) {
+    const total = await db.prepare(`SELECT COUNT(*) as cnt FROM benefit_claims WHERE benefit_id=?`).bind(benefitId).first() as any
+    if (total.cnt >= benefit.total_quota) return c.json({ ok: false, error: '此福利已額滿' }, 400)
+  }
+
+  // Check already claimed
+  const existing = await db.prepare(`SELECT id FROM benefit_claims WHERE benefit_id=? AND member_no=?`).bind(benefitId, memberNo).first()
+  if (existing) return c.json({ ok: false, error: '您已領取此福利', already_claimed: true }, 400)
+
+  // Insert claim
+  await db.prepare(`INSERT INTO benefit_claims (benefit_id,member_no) VALUES (?,?)`).bind(benefitId, memberNo).run()
+  return c.json({ ok: true, message: '成功領取！' })
+})
+
+// GET /api/benefits/:id/my-claim — check if current member claimed
+app.get('/api/benefits/:id/my-claim', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const sessionId = getCookie(c, 'app_session') || ''
+  if (!sessionId) return c.json({ ok: true, claimed: false })
+  const sess = await db.prepare(`SELECT member_no FROM app_sessions WHERE session_id=? AND expires_at>datetime('now')`).bind(sessionId).first() as any
+  if (!sess) return c.json({ ok: true, claimed: false })
+  const row = await db.prepare(`SELECT id,claimed_at FROM benefit_claims WHERE benefit_id=? AND member_no=?`).bind(parseInt(c.req.param('id')), sess.member_no).first()
+  return c.json({ ok: true, claimed: !!row, claimed_at: row ? (row as any).claimed_at : null })
+})
+
+// ── Admin Benefits APIs ──────────────────────────────────────────────────────
+
+// GET /api/admin/benefits — list all
+app.get('/api/admin/benefits', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  const catId = c.req.query('category_id') || ''
+  let sql = `SELECT b.*,bc.name AS category_name,bc.icon AS category_icon,
+               (SELECT COUNT(*) FROM benefit_claims WHERE benefit_id=b.id) AS claim_count
+             FROM benefits b JOIN benefit_categories bc ON bc.id=b.category_id`
+  if (catId) sql += ` WHERE b.category_id=${parseInt(catId)}`
+  sql += ` ORDER BY b.sort_order DESC, b.created_at DESC`
+  const { results } = await db.prepare(sql).all()
+  return c.json({ ok: true, benefits: results })
+})
+
+// POST /api/admin/benefits — create
+app.post('/api/admin/benefits', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  const body = await c.req.json() as any
+  const { category_id, title, description='', image_url='', start_date='', end_date='',
+          benefit_content='', claim_limit=0, total_quota=0, extra_fields='[]', status='active', sort_order=0 } = body
+  if (!title || !category_id) return c.json({ ok: false, error: '請填寫標題及分類' }, 400)
+  const r = await db.prepare(
+    `INSERT INTO benefits (category_id,title,description,image_url,start_date,end_date,benefit_content,claim_limit,total_quota,extra_fields,status,sort_order)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+  ).bind(category_id,title,description,image_url||null,start_date||null,end_date||null,benefit_content,claim_limit,total_quota,
+     typeof extra_fields==='string'?extra_fields:JSON.stringify(extra_fields),status,sort_order).run()
+  return c.json({ ok: true, id: r.meta.last_row_id })
+})
+
+// PUT /api/admin/benefits/:id — update
+app.put('/api/admin/benefits/:id', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  const id = parseInt(c.req.param('id'))
+  const body = await c.req.json() as any
+  const { category_id, title, description='', image_url, start_date, end_date,
+          benefit_content='', claim_limit=0, total_quota=0, extra_fields='[]', status='active', sort_order=0 } = body
+  if (!title || !category_id) return c.json({ ok: false, error: '請填寫標題及分類' }, 400)
+  await db.prepare(
+    `UPDATE benefits SET category_id=?,title=?,description=?,image_url=?,start_date=?,end_date=?,
+     benefit_content=?,claim_limit=?,total_quota=?,extra_fields=?,status=?,sort_order=?,updated_at=datetime('now')
+     WHERE id=?`
+  ).bind(category_id,title,description,image_url||null,start_date||null,end_date||null,benefit_content,
+     claim_limit,total_quota,typeof extra_fields==='string'?extra_fields:JSON.stringify(extra_fields),status,sort_order,id).run()
+  return c.json({ ok: true })
+})
+
+// DELETE /api/admin/benefits/:id
+app.delete('/api/admin/benefits/:id', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  await db.prepare(`DELETE FROM benefits WHERE id=?`).bind(parseInt(c.req.param('id'))).run()
+  return c.json({ ok: true })
+})
+
+// GET /api/admin/benefits/:id/claims — claim records with member info
+app.get('/api/admin/benefits/:id/claims', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  const { results } = await db.prepare(
+    `SELECT bc.id,bc.member_no,bc.claimed_at,bc.notes,
+       m.name_zh,m.phone
+     FROM benefit_claims bc LEFT JOIN members m ON m.member_no=bc.member_no
+     WHERE bc.benefit_id=? ORDER BY bc.claimed_at DESC`
+  ).bind(parseInt(c.req.param('id'))).all()
+  return c.json({ ok: true, claims: results })
+})
+
+// GET /api/admin/benefits/claims/summary — all claims summary
+app.get('/api/admin/benefits/claims/summary', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  const { results } = await db.prepare(
+    `SELECT b.id AS benefit_id,b.title,bc_cat.name AS category_name,bc_cat.icon,
+       COUNT(bc.id) AS claim_count,
+       MAX(bc.claimed_at) AS last_claimed_at
+     FROM benefits b
+     JOIN benefit_categories bc_cat ON bc_cat.id=b.category_id
+     LEFT JOIN benefit_claims bc ON bc.benefit_id=b.id
+     GROUP BY b.id ORDER BY claim_count DESC`
+  ).all()
+  return c.json({ ok: true, summary: results })
+})
+
+// POST /api/admin/benefits/upload-image — Cloudinary upload
+app.post('/api/admin/benefits/upload-image', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  const env = c.env as any
+  const cloudName = env.CLOUDINARY_CLOUD_NAME
+  const apiKey    = env.CLOUDINARY_API_KEY
+  const apiSecret = env.CLOUDINARY_API_SECRET
+  if (!cloudName || !apiKey || !apiSecret) return c.json({ ok: false, error: 'Cloudinary 未設定' }, 500)
+
+  const formData = await c.req.formData()
+  const file = formData.get('file') as File | null
+  if (!file) return c.json({ ok: false, error: '請選擇圖片' }, 400)
+
+  const ts = Math.floor(Date.now() / 1000)
+  const folder = 'benefits'
+  const paramsToSign = `folder=${folder}&timestamp=${ts}`
+  const encoder = new TextEncoder()
+  const keyData = encoder.encode(apiSecret)
+  const msgData = encoder.encode(paramsToSign)
+  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const sigBuffer = await crypto.subtle.sign('HMAC', cryptoKey, msgData)
+  const sigHex = Array.from(new Uint8Array(sigBuffer)).map(b => b.toString(16).padStart(2,'0')).join('')
+
+  // Actually use SHA-1 for Cloudinary (it requires SHA-1)
+  async function sha1(str: string): Promise<string> {
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(str))
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('')
+  }
+  const signature = await sha1(paramsToSign + apiSecret)
+
+  const cfForm = new FormData()
+  cfForm.append('file', file)
+  cfForm.append('folder', folder)
+  cfForm.append('timestamp', String(ts))
+  cfForm.append('api_key', apiKey)
+  cfForm.append('signature', signature)
+
+  const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST', body: cfForm
+  })
+  const result = await resp.json() as any
+  if (!resp.ok || !result.secure_url) return c.json({ ok: false, error: result.error?.message || '上傳失敗' }, 500)
+  return c.json({ ok: true, url: result.secure_url })
+})
+
+// GET /api/admin/benefit-categories — manage categories
+app.get('/api/admin/benefit-categories', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  const { results } = await db.prepare(`SELECT * FROM benefit_categories ORDER BY sort_order`).all()
+  return c.json({ ok: true, categories: results })
+})
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default app
