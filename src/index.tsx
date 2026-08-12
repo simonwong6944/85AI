@@ -15023,29 +15023,6 @@ function appBnfMedCardIssuedHtml(d){
 
   parts.push('</div>'); // end padding div
 
-  // Inline script for this panel's interactions
-  parts.push('<script>');
-  parts.push('function appMedTogglePanel(panelId){');
-  parts.push('  var panels=["medCardInfoPanel","medDoctorInfoPanel"];');
-  parts.push('  var btnMap={"medCardInfoPanel":"appBtnMedCard","medDoctorInfoPanel":"appBtnMedDoctor"};');
-  parts.push('  var activeCol={"medCardInfoPanel":"#1565C0","medDoctorInfoPanel":"#2E7D32"};');
-  parts.push('  panels.forEach(function(id){');
-  parts.push('    var el=document.getElementById(id);');
-  parts.push('    var btn=document.getElementById(btnMap[id]);');
-  parts.push('    var isTarget=(id===panelId);');
-  parts.push('    var isOpen=el&&el.style.display!=="none";');
-  parts.push('    if(isTarget){if(el)el.style.display=isOpen?"none":"block";if(btn)btn.style.background=isOpen?activeCol[id]:"#37474F";}');
-  parts.push('    else{if(el)el.style.display="none";if(btn)btn.style.background=activeCol[id];}');
-  parts.push('  });');
-  parts.push('}');
-  parts.push('function appMedCopy(txt,btnId,origLabel){');
-  parts.push('  navigator.clipboard.writeText(txt).then(function(){');
-  parts.push('    var b=document.getElementById(btnId);');
-  parts.push('    if(b){b.textContent="已複製 ✓";b.style.background="#2E7D32";setTimeout(function(){b.textContent=origLabel;b.style.background="#1565C0";},2000);}');
-  parts.push('  }).catch(function(){alert(txt);});');
-  parts.push('}');
-  parts.push('<\/script>');
-
   return parts.join('');
 }
 
@@ -15629,6 +15606,27 @@ function applyJob() {
       applyMsg.style.color = '#DC2626';
       applyMsg.textContent = '網絡錯誤，請稍後再試';
     });
+}
+
+// ── 醫健卡 panel 互動函數（appBnfMedCardIssuedHtml 用）──
+function appMedTogglePanel(panelId){
+  var panels=['medCardInfoPanel','medDoctorInfoPanel'];
+  var btnMap={'medCardInfoPanel':'appBtnMedCard','medDoctorInfoPanel':'appBtnMedDoctor'};
+  var activeCol={'medCardInfoPanel':'#1565C0','medDoctorInfoPanel':'#2E7D32'};
+  panels.forEach(function(id){
+    var el=document.getElementById(id);
+    var btn=document.getElementById(btnMap[id]);
+    var isTarget=(id===panelId);
+    var isOpen=el&&el.style.display!=='none';
+    if(isTarget){if(el)el.style.display=isOpen?'none':'block';if(btn)btn.style.background=isOpen?activeCol[id]:'#37474F';}
+    else{if(el)el.style.display='none';if(btn)btn.style.background=activeCol[id];}
+  });
+}
+function appMedCopy(txt,btnId,origLabel){
+  navigator.clipboard.writeText(txt).then(function(){
+    var b=document.getElementById(btnId);
+    if(b){b.textContent='已複製 ✓';b.style.background='#2E7D32';setTimeout(function(){b.textContent=origLabel;b.style.background='#1565C0';},2000);}
+  }).catch(function(){alert(txt);});
 }
 </script>
 </body>
