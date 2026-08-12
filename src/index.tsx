@@ -14905,15 +14905,26 @@ function appBnfOpenMedCard(){
   var panel=document.getElementById('appBnfDetail');
   var content=document.getElementById('appBnfDetailContent');
   if(!panel||!content) return;
+
+  // Get member_no from localStorage (same as the rest of the PWA app)
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+
+  if(!memberNo){
+    // Not logged in to the app — show prompt to go to 我的卡 tab
+    content.innerHTML=appBnfMedCardAuthHtml();
+    panel.style.display='block';
+    return;
+  }
+
   // Show panel with loading state immediately
   content.innerHTML='<div style="text-align:center;padding:60px 20px;color:#888;font-size:16px;">載入中…</div>';
   panel.style.display='block';
 
-  fetch('/api/member/medical-card',{credentials:'include'})
+  // Use the member_no-based API (no app_session cookie needed)
+  fetch('/api/members/'+encodeURIComponent(memberNo)+'/medical-status')
     .then(function(r){return r.json();})
     .then(function(d){
       if(!d.ok){
-        // Not logged in
         content.innerHTML=appBnfMedCardAuthHtml();
         return;
       }
@@ -14922,7 +14933,8 @@ function appBnfOpenMedCard(){
       } else if(d.status){
         content.innerHTML=appBnfMedCardStatusHtml(d);
       } else {
-        content.innerHTML=appBnfMedCardApplyHtml();
+        // No application yet — show apply form pre-filled with member name
+        content.innerHTML=appBnfMedCardApplyHtml(d);
       }
     })
     .catch(function(){
@@ -15037,22 +15049,25 @@ function appBnfMedCardIssuedHtml(d){
   return parts.join('');
 }
 
-function appBnfMedCardApplyHtml(){
+function appBnfMedCardApplyHtml(d){
+  // d may contain name_zh / name_en from member record for pre-fill
+  var preNameZh=(d&&d.name_zh)||'';
+  var preNameEn=(d&&d.name_en)||'';
   var parts=[];
   parts.push(appBnfMedCardHeader());
   parts.push('<div style="padding:20px 16px 100px;">');
   parts.push('<div style="font-size:16px;color:#546E7A;margin-bottom:18px;line-height:1.7;">由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>申請後職員將以 WhatsApp 聯絡辦理。</div>');
   parts.push('<div style="background:#fff;border-radius:12px;border:1.5px solid #e0e0e0;padding:20px;margin-bottom:20px;">');
   parts.push('<div style="font-size:15px;font-weight:700;color:#1B4332;margin-bottom:16px;">📝 填寫申請資料</div>');
-  // nameZh
+  // nameZh — pre-filled from member record
   parts.push('<div style="margin-bottom:14px;">');
   parts.push('<label style="font-size:14px;font-weight:700;color:#444;display:block;margin-bottom:6px;">中文全名 <span style="color:#C62828;">✽ 必填</span>（與身份證相同）</label>');
-  parts.push('<input id="appMfNameZh" type="text" placeholder="例：陳大文" style="width:100%;padding:12px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:inherit;">');
+  parts.push('<input id="appMfNameZh" type="text" placeholder="例：陳大文" value="'+escAppHtml(preNameZh)+'" style="width:100%;padding:12px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:inherit;">');
   parts.push('</div>');
-  // nameEn
+  // nameEn — pre-filled from member record
   parts.push('<div style="margin-bottom:14px;">');
   parts.push('<label style="font-size:14px;font-weight:700;color:#444;display:block;margin-bottom:6px;">英文全名 <span style="color:#C62828;">✽ 必填</span>（與身份證相同）</label>');
-  parts.push('<input id="appMfNameEn" type="text" placeholder="例：CHAN TAI MAN" style="width:100%;padding:12px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:inherit;text-transform:uppercase;">');
+  parts.push('<input id="appMfNameEn" type="text" placeholder="例：CHAN TAI MAN" value="'+escAppHtml(preNameEn)+'" style="width:100%;padding:12px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:inherit;text-transform:uppercase;">');
   parts.push('</div>');
   // hkid
   parts.push('<div style="margin-bottom:14px;">');
@@ -15091,8 +15106,10 @@ function appMedSubmit(){
   if(!consent){showErr('請同意私隱條款，授權 NGO 聯絡你');return;}
   var btn=document.getElementById('appMedSubmitBtn');
   if(btn){btn.textContent='提交中…';btn.style.opacity='0.7';btn.onclick=null;}
-  // Get member_no from existing MEMBER_NO global
-  fetch('/api/members/'+encodeURIComponent(MEMBER_NO)+'/medical',{
+  // Use localStorage member_no (same as rest of PWA app, no MEMBER_NO global needed)
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+  if(!memberNo){showErr('請先查閱你的會員卡再申請');if(btn){btn.textContent='提交申請';btn.style.opacity='1';btn.onclick=appMedSubmit;}return;}
+  fetch('/api/members/'+encodeURIComponent(memberNo)+'/medical',{
     method:'POST',credentials:'include',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({nameZh:nameZh.trim(),nameEn:nameEn.trim().toUpperCase(),hkid:hkid.trim().toUpperCase()})
@@ -23522,6 +23539,48 @@ app.get('/api/admin/benefit-categories', async (c) => {
   if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
   const { results } = await db.prepare(`SELECT * FROM benefit_categories ORDER BY sort_order`).all()
   return c.json({ ok: true, categories: results })
+})
+
+// GET /api/members/:no/medical-status — lookup by member_no (used by PWA app, no extra auth needed)
+// member_no is already known by the client from localStorage after they looked up their own card
+app.get('/api/members/:no/medical-status', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const memberNo = c.req.param('no')
+  if (!memberNo) return c.json({ ok: false, error: 'missing member_no' }, 400)
+
+  const member = await db.prepare(
+    `SELECT name_zh, name_en FROM members WHERE member_no=?`
+  ).bind(memberNo).first() as any
+  if (!member) return c.json({ ok: false, error: '找不到會員' }, 404)
+
+  let app_row: any = null
+  try {
+    app_row = await db.prepare(
+      `SELECT status, card_no, card_image_url FROM medical_card_applications WHERE member_no=? LIMIT 1`
+    ).bind(memberNo).first()
+  } catch (_) {
+    try {
+      app_row = await db.prepare(
+        `SELECT status, card_no, NULL AS card_image_url FROM medical_card_applications WHERE member_no=? LIMIT 1`
+      ).bind(memberNo).first()
+    } catch (__) {
+      try {
+        app_row = await db.prepare(
+          `SELECT status, NULL AS card_no, NULL AS card_image_url FROM medical_card_applications WHERE member_no=? LIMIT 1`
+        ).bind(memberNo).first()
+      } catch (___) {}
+    }
+  }
+
+  return c.json({
+    ok: true,
+    member_no: memberNo,
+    name_zh: member?.name_zh || '',
+    name_en: member?.name_en || '',
+    status:         app_row ? (app_row as any).status        : null,
+    card_no:        app_row ? (app_row as any).card_no       : null,
+    card_image_url: app_row ? (app_row as any).card_image_url : null,
+  })
 })
 
 // GET /api/member/medical-card — member's own medical card status (app_session auth)
