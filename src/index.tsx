@@ -11169,12 +11169,19 @@ function bnfFetchBenefits(catId){
     .then(function(r){return r.json();})
     .then(function(d){
       if(loading) loading.style.display='none';
-      if(!d.ok){if(grid)grid.style.display='block';return;}
+      if(!d.ok){
+        if(d.code==='AUTH_REQUIRED'||d.error==='Unauthorized'){
+          if(empty){empty.style.display='block';empty.textContent='請先登入管理後台';}
+        } else {
+          if(empty){empty.style.display='block';empty.textContent='載入失敗：'+(d.error||'未知錯誤');}
+        }
+        return;
+      }
       _bnfBenefits=d.benefits||[];
       if(!_bnfBenefits.length){if(empty)empty.style.display='block';return;}
       if(grid){grid.style.display='grid';grid.innerHTML=_bnfBenefits.map(function(b){return bnfCardHtml(b);}).join('');}
     })
-    .catch(function(){if(loading)loading.style.display='none';if(empty)empty.style.display='block';});
+    .catch(function(e){if(loading)loading.style.display='none';if(empty){empty.style.display='block';empty.textContent='網路錯誤，請重試';} });
 }
 
 function bnfFilterCat(catId,el){
@@ -11209,6 +11216,9 @@ function bnfCardHtml(b){
 }
 
 function bnfEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function bnfClickFileInput(){var el=document.getElementById('bnfFileInput');if(el)el.click();}
+function bnfCloseForm(){var el=document.getElementById('bnfFormOverlay');if(el)el.remove();}
+function bnfCloseClaimsModal(){var el=document.getElementById('bnfClaimsModal');if(el)el.remove();}
 function bnfOpenCreate(){_bnfEditingId=null;_bnfExtraFields=[];bnfShowForm(null);}
 function bnfOpenEdit(id){
   var b=_bnfBenefits.find(function(x){return x.id==id;});
@@ -11221,64 +11231,57 @@ function bnfOpenEdit(id){
 function bnfShowForm(b){
   var old=document.getElementById('bnfFormOverlay');if(old)old.remove();
   var catsOpts=_bnfCats.map(function(c){
-    return '<option value="'+c.id+'"'+(b&&b.category_id==c.id?' selected':'')+'>'+c.icon+' '+c.name+'</option>';
+    var sel=(b&&b.category_id==c.id)?' selected':'';
+    return '<option value="'+c.id+'"'+sel+'>'+c.icon+' '+c.name+'</option>';
   }).join('');
   var extraHtml=_bnfExtraFields.map(function(f,i){
-    return '<div class="bnf-extra-field">'+
-      '<input placeholder="欄位名稱" value="'+bnfEsc(f.label||'')+'" oninput="bnfEFUpdate('+i+',this,0)">'+
-      '<input placeholder="內容" value="'+bnfEsc(f.value||'')+'" oninput="bnfEFUpdate('+i+',this,1)">'+
-      '<button onclick="bnfEFRemove('+i+')" style="border:none;background:#ffebee;color:#c62828;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;">✕</button>'+
-    '</div>';
+    var parts=['<div class="bnf-extra-field">'];
+    parts.push('<input placeholder="欄位名稱" value="'+bnfEsc(f.label||'')+'" oninput="bnfEFUpdate('+i+',this,0)">');
+    parts.push('<input placeholder="內容" value="'+bnfEsc(f.value||'')+'" oninput="bnfEFUpdate('+i+',this,1)">');
+    parts.push('<button onclick="bnfEFRemove('+i+')" style="border:none;background:#ffebee;color:#c62828;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;">✕</button>');
+    parts.push('</div>');
+    return parts.join('');
   }).join('');
   var imgUrl=b&&b.image_url?b.image_url:'';
-  var html='<div id="bnfFormOverlay" class="bnf-form-overlay">'+
-    '<div class="bnf-form-box">'+
-      '<div class="bnf-form-title">'+(b?'✏️ 編輯福利':'➕ 新增福利')+'</div>'+
-      '<div class="bnf-row">'+
-        '<div class="bnf-field"><label class="bnf-label">分類 *</label>'+
-          '<select class="bnf-select" id="bnfFCat"><option value="">請選擇</option>'+catsOpts+'</select></div>'+
-        '<div class="bnf-field"><label class="bnf-label">狀態</label>'+
-          '<select class="bnf-select" id="bnfFStatus">'+
-            '<option value="active"'+((!b||b.status==='active')?' selected':'')+'>啟用</option>'+
-            '<option value="inactive"'+(b&&b.status==='inactive'?' selected':'')+'>停用</option>'+
-          '</select></div>'+
-      '</div>'+
-      '<div class="bnf-field"><label class="bnf-label">標題 *</label>'+
-        '<input class="bnf-input" id="bnfFTitle" placeholder="福利標題" value="'+bnfEsc(b?b.title:'')+'"></div>'+
-      '<div class="bnf-field"><label class="bnf-label">簡介</label>'+
-        '<textarea class="bnf-textarea" id="bnfFDesc" placeholder="簡短介紹">'+bnfEsc(b?b.description:'')+'</textarea></div>'+
-      '<div class="bnf-field"><label class="bnf-label">封面圖片</label>'+
-        '<div class="bnf-upload-area" onclick="document.getElementById(\'bnfFileInput\').click()">'+
-          '<div style="font-size:24px;margin-bottom:4px;">📷</div>'+
-          '<div id="bnfUploadTxt" style="font-size:13px;color:#666;">點擊上傳圖片（自動上傳至 Cloudinary）</div>'+
-          '<input type="file" id="bnfFileInput" accept="image/*" style="display:none" onchange="bnfUploadImage(this)">'+
-          (imgUrl?'<img class="bnf-upload-preview" id="bnfImgPreview" src="'+bnfEsc(imgUrl)+'">':'<img class="bnf-upload-preview" id="bnfImgPreview" style="display:none">')+
-        '</div>'+
-        '<input class="bnf-input" id="bnfFImg" placeholder="或直接輸入圖片 URL" value="'+bnfEsc(imgUrl)+'" style="margin-top:8px;" oninput="bnfPreviewUrl(this.value)">'+
-      '</div>'+
-      '<div class="bnf-row">'+
-        '<div class="bnf-field"><label class="bnf-label">開始日期</label>'+
-          '<input class="bnf-input" type="date" id="bnfFStart" value="'+bnfEsc(b&&b.start_date?b.start_date:'')+'"></div>'+
-        '<div class="bnf-field"><label class="bnf-label">結束日期</label>'+
-          '<input class="bnf-input" type="date" id="bnfFEnd" value="'+bnfEsc(b&&b.end_date?b.end_date:'')+'"></div>'+
-      '</div>'+
-      '<div class="bnf-field"><label class="bnf-label">福利內容詳情</label>'+
-        '<textarea class="bnf-textarea" id="bnfFContent" placeholder="詳細說明福利條款、如何使用等" style="min-height:100px;">'+bnfEsc(b?b.benefit_content:'')+'</textarea></div>'+
-      '<div class="bnf-row">'+
-        '<div class="bnf-field"><label class="bnf-label">每人領取上限（0=不限）</label>'+
-          '<input class="bnf-input" type="number" id="bnfFClaimLimit" min="0" value="'+(b?b.claim_limit:0)+'"></div>'+
-        '<div class="bnf-field"><label class="bnf-label">總名額上限（0=不限）</label>'+
-          '<input class="bnf-input" type="number" id="bnfFTotalQuota" min="0" value="'+(b?b.total_quota:0)+'"></div>'+
-      '</div>'+
-      '<div class="bnf-field"><label class="bnf-label">自訂欄位 <span style="font-weight:400;color:#999;">（可新增任意資訊欄位）</span></label>'+
-        '<div id="bnfExtraFieldsList">'+extraHtml+'</div>'+
-        '<div class="bnf-add-field-btn" onclick="bnfEFAdd()">＋ 新增欄位</div>'+
-      '</div>'+
-      '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;">'+
-        '<button class="btn btn-secondary" onclick="document.getElementById(\'bnfFormOverlay\').remove()">取消</button>'+
-        '<button class="btn btn-primary" onclick="bnfSave()">💾 儲存</button>'+
-      '</div>'+
-    '</div></div>';
+  var imgPreviewHtml=imgUrl?'<img class="bnf-upload-preview" id="bnfImgPreview" src="'+bnfEsc(imgUrl)+'">':'<img class="bnf-upload-preview" id="bnfImgPreview" style="display:none">';
+  var formTitle=b?'✏️ 編輯福利':'➕ 新增福利';
+  var selActive=(!b||b.status==='active')?' selected':'';
+  var selInactive=(b&&b.status==='inactive')?' selected':'';
+  var parts=[];
+  parts.push('<div id="bnfFormOverlay" class="bnf-form-overlay"><div class="bnf-form-box">');
+  parts.push('<div class="bnf-form-title">'+formTitle+'</div>');
+  parts.push('<div class="bnf-row">');
+  parts.push('<div class="bnf-field"><label class="bnf-label">分類 *</label><select class="bnf-select" id="bnfFCat"><option value="">請選擇</option>'+catsOpts+'</select></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">狀態</label><select class="bnf-select" id="bnfFStatus"><option value="active"'+selActive+'>啟用</option><option value="inactive"'+selInactive+'>停用</option></select></div>');
+  parts.push('</div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">標題 *</label><input class="bnf-input" id="bnfFTitle" placeholder="福利標題" value="'+bnfEsc(b?b.title:'')+'"></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">簡介</label><textarea class="bnf-textarea" id="bnfFDesc" placeholder="簡短介紹">'+bnfEsc(b?b.description:'')+'</textarea></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">封面圖片</label>');
+  parts.push('<div class="bnf-upload-area" onclick="bnfClickFileInput()">');
+  parts.push('<div style="font-size:24px;margin-bottom:4px;">📷</div>');
+  parts.push('<div id="bnfUploadTxt" style="font-size:13px;color:#666;">點擊上傳圖片（自動上傳至 Cloudinary）</div>');
+  parts.push('<input type="file" id="bnfFileInput" accept="image/*" style="display:none" onchange="bnfUploadImage(this)">');
+  parts.push(imgPreviewHtml);
+  parts.push('</div>');
+  parts.push('<input class="bnf-input" id="bnfFImg" placeholder="或直接輸入圖片 URL" value="'+bnfEsc(imgUrl)+'" style="margin-top:8px;" oninput="bnfPreviewUrl(this.value)">');
+  parts.push('</div>');
+  parts.push('<div class="bnf-row">');
+  parts.push('<div class="bnf-field"><label class="bnf-label">開始日期</label><input class="bnf-input" type="date" id="bnfFStart" value="'+bnfEsc(b&&b.start_date?b.start_date:'')+'"></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">結束日期</label><input class="bnf-input" type="date" id="bnfFEnd" value="'+bnfEsc(b&&b.end_date?b.end_date:'')+'"></div>');
+  parts.push('</div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">福利內容詳情</label><textarea class="bnf-textarea" id="bnfFContent" placeholder="詳細說明福利條款、如何使用等" style="min-height:100px;">'+bnfEsc(b?b.benefit_content:'')+'</textarea></div>');
+  parts.push('<div class="bnf-row">');
+  parts.push('<div class="bnf-field"><label class="bnf-label">每人領取上限（0=不限）</label><input class="bnf-input" type="number" id="bnfFClaimLimit" min="0" value="'+(b?b.claim_limit:0)+'"></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">總名額上限（0=不限）</label><input class="bnf-input" type="number" id="bnfFTotalQuota" min="0" value="'+(b?b.total_quota:0)+'"></div>');
+  parts.push('</div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">自訂欄位 <span style="font-weight:400;color:#999;">（可新增任意資訊欄位）</span></label>');
+  parts.push('<div id="bnfExtraFieldsList">'+extraHtml+'</div>');
+  parts.push('<div class="bnf-add-field-btn" onclick="bnfEFAdd()">＋ 新增欄位</div></div>');
+  parts.push('<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;">');
+  parts.push('<button class="btn btn-secondary" onclick="bnfCloseForm()">取消</button>');
+  parts.push('<button class="btn btn-primary" onclick="bnfSave()">💾 儲存</button>');
+  parts.push('</div></div></div>');
+  var html=parts.join('');
   document.getElementById('mod-benefits').insertAdjacentHTML('beforeend',html);
 }
 
@@ -11379,7 +11382,7 @@ function bnfViewClaims(id,titleStr){
     '<div style="background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'+
         '<div style="font-size:16px;font-weight:800;color:#1B4332;">👥 申領記錄：'+bnfEsc(titleStr)+'</div>'+
-        '<button onclick="document.getElementById(\'bnfClaimsModal\').remove()" style="border:none;background:#f5f5f5;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;">✕</button>'+
+        '<button onclick="bnfCloseClaimsModal()" style="border:none;background:#f5f5f5;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;">✕</button>'+
       '</div><div id="bnfClaimsDetail" style="text-align:center;padding:20px;color:#888;">載入中…</div>'+
     '</div></div>';
   document.getElementById('mod-benefits').insertAdjacentHTML('beforeend',modal);
