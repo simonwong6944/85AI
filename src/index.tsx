@@ -14854,19 +14854,31 @@ function appBnfFilterCat(catId, el){
 // 健康分類 ID (id=1 from migration 0030)
 var MED_CARD_CAT_ID = 1;
 
+// _appMedStatus: cached status for pin card badge ('PENDING','SENT','ISSUED','DECLINED',null)
+var _appMedStatus=null;
+
 function appBnfMedCardPinHtml(){
   // Hardcoded 醫健卡置頂卡片 — always shown in 全部(0) and 健康(1)
+  // Status badge: fetch async after render
+  var statusBadge='';
+  if(_appMedStatus==='PENDING'||_appMedStatus==='SENT'){
+    statusBadge='<span style="font-size:11px;color:#F57F17;background:#FFFDE7;border:1px solid #FFE082;padding:2px 10px;border-radius:10px;font-weight:700;">⏳ 審批中</span>';
+  } else if(_appMedStatus==='ISSUED'){
+    statusBadge='<span style="font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;">✅ 已啟用</span>';
+  } else if(_appMedStatus==='DECLINED'){
+    statusBadge='<span style="font-size:11px;color:#C62828;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;">❌ 未批准</span>';
+  }
   var parts=[];
-  parts.push('<div onclick="appBnfOpenMedCard()" style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.09);overflow:hidden;cursor:pointer;border:2px solid #1565C0;">');
+  parts.push('<div id="appMedPinCard" onclick="appBnfOpenMedCard()" style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.09);overflow:hidden;cursor:pointer;border:2px solid #1565C0;">');
   parts.push('<div style="height:90px;background:linear-gradient(135deg,#1565C0,#0D47A1);display:flex;align-items:center;justify-content:center;gap:14px;">');
   parts.push('<span style="font-size:44px;">🏥</span>');
   parts.push('<div style="color:#fff;"><div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">免費醫健卡</div><div style="font-size:13px;opacity:0.85;margin-top:2px;">HMMP 醫療保障計劃</div></div>');
   parts.push('</div>');
   parts.push('<div style="padding:14px 16px;">');
-  parts.push('<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">');
+  parts.push('<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">');
   parts.push('<span style="font-size:11px;font-weight:700;color:#1565C0;background:#E3F2FD;padding:2px 8px;border-radius:10px;">💊 健康</span>');
   parts.push('<span style="font-size:11px;color:#2E7D32;background:#E8F5E9;padding:2px 8px;border-radius:10px;">免費申請</span>');
-  parts.push('<span style="font-size:11px;color:#fff;background:#1565C0;padding:2px 8px;border-radius:10px;font-weight:700;">📌 置頂</span>');
+  parts.push(statusBadge);
   parts.push('</div>');
   parts.push('<div style="font-size:18px;font-weight:800;color:#1a1a1a;line-height:1.3;margin-bottom:6px;">香港商貿慈善基金醫健卡</div>');
   parts.push('<div style="font-size:14px;color:#555;line-height:1.5;margin-bottom:6px;">免費申請，享有網絡醫生診症服務。申請後 NGO 職員以 WhatsApp 聯絡辦理。</div>');
@@ -14874,6 +14886,40 @@ function appBnfMedCardPinHtml(){
   parts.push('<span style="font-size:13px;font-weight:700;color:#1565C0;">查看 / 申請 ›</span>');
   parts.push('</div></div></div>');
   return parts.join('');
+}
+
+// Fetch status badge async and update pin card after render
+function appMedFetchPinStatus(){
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+  if(!memberNo) return;
+  fetch('/api/members/'+encodeURIComponent(memberNo)+'/medical-status')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      _appMedStatus=d.status||null;
+      // Re-render pin card badge
+      var card=document.getElementById('appMedPinCard');
+      if(!card) return;
+      var badges=card.querySelectorAll('.appMedBadge');
+      // Remove existing status badge
+      badges.forEach(function(b){b.remove();});
+      var badgeRow=card.querySelector('[data-badge-row]');
+      if(badgeRow&&_appMedStatus){
+        var span=document.createElement('span');
+        span.className='appMedBadge';
+        if(_appMedStatus==='PENDING'||_appMedStatus==='SENT'){
+          span.style.cssText='font-size:11px;color:#F57F17;background:#FFFDE7;border:1px solid #FFE082;padding:2px 10px;border-radius:10px;font-weight:700;';
+          span.textContent='⏳ 審批中';
+        } else if(_appMedStatus==='ISSUED'){
+          span.style.cssText='font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;';
+          span.textContent='✅ 已啟用';
+        } else if(_appMedStatus==='DECLINED'){
+          span.style.cssText='font-size:11px;color:#C62828;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;';
+          span.textContent='❌ 未批准';
+        }
+        if(span.textContent) badgeRow.appendChild(span);
+      }
+    }).catch(function(){});
 }
 
 function appBnfLoad(catId){
@@ -14895,6 +14941,18 @@ function appBnfLoad(catId){
         var html=showMed?appBnfMedCardPinHtml():'';
         html+=items.map(function(b){return appBnfCardHtml(b);}).join('');
         list.innerHTML=html;
+        // Add data-badge-row attr to the badge row for async update
+        var card=document.getElementById('appMedPinCard');
+        if(card){
+          var rows=card.querySelectorAll('[style]');
+          rows.forEach(function(r){
+            if(r.style.display==='flex'&&r.getAttribute('style').indexOf('gap:6px')!==-1){
+              r.setAttribute('data-badge-row','1');
+            }
+          });
+        }
+        // Async fetch status badge
+        if(showMed) setTimeout(appMedFetchPinStatus,100);
       }
     })
     .catch(function(){if(loading)loading.style.display='none';if(empty)empty.style.display='block';});
@@ -14942,14 +15000,12 @@ function appBnfOpenMedCard(){
     });
 }
 
+// MC Sample card image URL (hardcoded)
+var MC_SAMPLE_IMG='https://www.genspark.ai/api/files/s/5HqHigyU';
+
 function appBnfMedCardHeader(){
-  var parts=[];
-  parts.push('<div style="background:linear-gradient(135deg,#1565C0,#0D47A1);padding:32px 20px 24px;text-align:center;">');
-  parts.push('<div style="font-size:52px;margin-bottom:8px;">🏥</div>');
-  parts.push('<div style="color:#fff;font-size:22px;font-weight:900;letter-spacing:0.5px;">免費醫健卡</div>');
-  parts.push('<div style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:4px;">香港商貿慈善基金 · HMMP 醫療保障計劃</div>');
-  parts.push('</div>');
-  return parts.join('');
+  // Simple compact header bar for issued/status/auth panels
+  return '<div style="background:linear-gradient(135deg,#1565C0,#0D47A1);padding:18px 20px 14px;display:flex;align-items:center;gap:12px;"><span style="font-size:28px;">🏥</span><div style="color:#fff;"><div style="font-size:16px;font-weight:900;">免費醫健卡</div><div style="font-size:12px;opacity:0.8;margin-top:1px;">香港商貿慈善基金 · HMMP</div></div></div>';
 }
 
 function appBnfMedCardAuthHtml(){
@@ -14985,86 +15041,97 @@ function appBnfMedCardStatusHtml(d){
 }
 
 function appBnfMedCardIssuedHtml(d){
+  // MC1.png layout: show card_image_url prominently at top, then green 查看醫生 button
+  // MC2.png: doctor panel shown inline after clicking 查看醫生
   var nameEnFull=(d.name_en||'').trim().toUpperCase();
   var nameParts=nameEnFull.split(/\s+/).filter(function(p){return p.length>0;});
   var hasTwoParts=nameParts.length>=2;
   var surnamePart=hasTwoParts?nameParts[0]:'';
   var givenPart=hasTwoParts?nameParts.slice(1).join(' '):'';
   var cardNo=d.card_no||'';
-  // Store copy values in hidden data elements; appMedCopyById reads them
-  // to avoid any single-quote in onclick attributes (Vite strips escape chars)
+  // Hidden data store for copy (avoids quote issues in onclick)
   var dataStore='<div id="appMedData" style="display:none;">'
     +'<span id="appMedData1">'+escAppHtml(cardNo)+'</span>'
     +'<span id="appMedData2">'+escAppHtml(surnamePart)+'</span>'
     +'<span id="appMedData3">'+escAppHtml(givenPart)+'</span>'
     +'<span id="appMedData4">'+escAppHtml(nameEnFull)+'</span>'
     +'</div>';
-  var cardImgBtn='';
-  if(d.card_image_url){
-    var safeUrl=encodeURI(d.card_image_url);
-    cardImgBtn='<button id="appBtnMedImg" data-url="'+escAppHtml(safeUrl)+'" onclick="appMedOpenImg(this)" style="flex:1;min-height:55px;padding:12px 10px;background:#6A1B9A;color:#fff;border:0;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;">🖼 查看醫健卡</button>';
-  }
+
   var parts=[];
   parts.push(appBnfMedCardHeader());
   parts.push(dataStore);
-  parts.push('<div style="padding:20px 16px 100px;">');
+  parts.push('<div style="padding:0 0 100px;">');
 
-  // Action buttons — use &apos; inside onclick so Vite won't break the string
-  parts.push('<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">');
-  parts.push('<button onclick="appMedTogglePanel(&apos;medCardInfoPanel&apos;)" id="appBtnMedCard" style="flex:1;min-height:55px;padding:12px 10px;background:#1565C0;color:#fff;border:0;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;">💳 卡資料</button>');
-  parts.push(cardImgBtn);
-  parts.push('<button onclick="appMedTogglePanel(&apos;medDoctorInfoPanel&apos;)" id="appBtnMedDoctor" style="flex:1;min-height:55px;padding:12px 10px;background:#2E7D32;color:#fff;border:0;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;">🩺 查看醫生</button>');
-  parts.push('</div>');
-
-  // Panel 1: card info
-  parts.push('<div id="medCardInfoPanel" style="display:none;margin-bottom:16px;">');
-  parts.push('<div style="font-size:15px;color:#546E7A;margin-bottom:12px;line-height:1.6;">你的醫健卡已透過 WhatsApp 發送給你，以下為你的卡號及登入資料。</div>');
-  parts.push('<div style="font-size:18px;font-weight:700;color:#1565C0;margin-bottom:10px;">你的醫健卡號碼</div>');
-  parts.push('<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">');
-  parts.push('<span id="appMedCardNoDisplay" style="font-size:28px;font-weight:900;color:#1B5E20;letter-spacing:3px;font-family:monospace;">'+escAppHtml(cardNo)+'</span>');
-  parts.push('<button onclick="appMedCopyById(1,this,&apos;複製卡號&apos;)" id="appCopyBtn1" style="padding:10px 18px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;min-height:44px;">複製卡號</button>');
-  parts.push('</div>');
-  parts.push('<div style="background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:8px;padding:16px 18px;">');
-  parts.push('<div style="font-size:17px;font-weight:700;color:#1B5E20;margin-bottom:12px;">🔐 HMMP 系統登入資料</div>');
-  parts.push('<ol style="padding-left:20px;font-size:17px;line-height:2;color:#1B5E20;margin:0;">');
-  parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">登入名稱：</span>你的醫健卡號碼<div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;"><span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#0D47A1;font-family:monospace;">'+escAppHtml(cardNo)+'</span><button onclick="appMedCopyById(1,this,&apos;複製&apos;)" id="appCopyBtn2" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></div></li>');
-  if(hasTwoParts){
-    parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">姓氏：</span>'+escAppHtml(surnamePart)+'<br><button onclick="appMedCopyById(2,this,&apos;複製&apos;)" id="appCopyBtn3" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></li>');
-    parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">名稱：</span>'+escAppHtml(givenPart)+'<br><button onclick="appMedCopyById(3,this,&apos;複製&apos;)" id="appCopyBtn4" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></li>');
+  // ── Card image ──
+  if(d.card_image_url){
+    parts.push('<div style="padding:16px 16px 0;">');
+    parts.push('<img src="'+escAppHtml(d.card_image_url)+'" style="width:100%;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:block;" alt="醫健卡">');
+    parts.push('</div>');
   } else {
-    parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">英文全名：</span>'+escAppHtml(nameEnFull)+'<br><button onclick="appMedCopyById(4,this,&apos;複製&apos;)" id="appCopyBtn3" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></li>');
+    // No image yet — show card no prominently
+    parts.push('<div style="padding:20px 16px 0;">');
+    parts.push('<div style="background:#E3F2FD;border-radius:10px;padding:18px;text-align:center;">');
+    parts.push('<div style="font-size:14px;color:#1565C0;font-weight:700;margin-bottom:8px;">你的醫健卡號碼</div>');
+    parts.push('<div style="font-size:32px;font-weight:900;color:#0D47A1;letter-spacing:4px;font-family:monospace;">'+escAppHtml(cardNo)+'</div>');
+    parts.push('<button onclick="appMedCopyById(1,this,&apos;複製卡號&apos;)" style="margin-top:12px;padding:10px 24px;background:#1565C0;color:#fff;border:0;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;">複製卡號</button>');
+    parts.push('</div></div>');
   }
-  parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">電郵地址：</span><span style="color:#78909C;">不用填</span></li>');
-  parts.push('<li><span style="font-weight:700;">按「登入」</span></li>');
-  parts.push('</ol></div></div>');
 
-  // Panel 2: doctor list
-  parts.push('<div id="medDoctorInfoPanel" style="display:none;margin-bottom:16px;">');
-  parts.push('<a href="https://www.hmmp.com.hk/DefaultDoctorList_cn.aspx" target="_blank" rel="noopener" style="display:block;width:100%;min-height:55px;padding:14px;background:#2E7D32;color:#fff;border:0;border-radius:8px;font-size:20px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;line-height:1.4;">🩺 開啟 HMMP 醫生名單</a>');
-  parts.push('<div style="margin-top:14px;font-size:15px;color:#546E7A;line-height:1.6;">點擊上方按鈕前往 HMMP 官網查看網絡醫生名單，<br>登入時使用「卡資料」內的登入資料。</div>');
+  // ── 查看醫生 green button ──
+  parts.push('<div style="padding:16px;">');
+  parts.push('<button onclick="appMedShowDoctorPanel()" id="appBtnMedDoctor" style="width:100%;min-height:58px;padding:14px;background:#2E7D32;color:#fff;border:0;border-radius:14px;font-size:20px;font-weight:900;cursor:pointer;letter-spacing:1px;">🩺 查看醫生</button>');
   parts.push('</div>');
+
+  // ── Doctor panel (MC2.png) — hidden by default ──
+  parts.push('<div id="appMedDoctorPanel" style="display:none;padding:0 16px 20px;">');
+  // Card login info
+  parts.push('<div style="background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:12px;padding:16px 18px;margin-bottom:16px;">');
+  parts.push('<div style="font-size:16px;font-weight:900;color:#1B5E20;margin-bottom:14px;">🔐 HMMP 系統登入資料</div>');
+  parts.push('<ol style="padding-left:20px;font-size:16px;line-height:2.2;color:#1B5E20;margin:0;">');
+  parts.push('<li><span style="font-weight:700;">登入名稱：</span>你的醫健卡號碼<div style="display:flex;align-items:center;gap:10px;margin:4px 0 8px;flex-wrap:wrap;"><span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#0D47A1;font-family:monospace;">'+escAppHtml(cardNo)+'</span><button onclick="appMedCopyById(1,this,&apos;複製&apos;)" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;">複製</button></div></li>');
+  if(hasTwoParts){
+    parts.push('<li><span style="font-weight:700;">姓氏：</span>'+escAppHtml(surnamePart)+'<div style="margin:4px 0 8px;"><button onclick="appMedCopyById(2,this,&apos;複製&apos;)" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;">複製</button></div></li>');
+    parts.push('<li><span style="font-weight:700;">名稱：</span>'+escAppHtml(givenPart)+'<div style="margin:4px 0 8px;"><button onclick="appMedCopyById(3,this,&apos;複製&apos;)" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;">複製</button></div></li>');
+  } else {
+    parts.push('<li><span style="font-weight:700;">英文全名：</span>'+escAppHtml(nameEnFull)+'<div style="margin:4px 0 8px;"><button onclick="appMedCopyById(4,this,&apos;複製&apos;)" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;">複製</button></div></li>');
+  }
+  parts.push('<li><span style="font-weight:700;">電郵地址：</span><span style="color:#78909C;">不用填</span></li>');
+  parts.push('<li><span style="font-weight:700;">按「登入」</span></li>');
+  parts.push('</ol></div>');
+  // Open doctor list link
+  parts.push('<a href="https://www.hmmp.com.hk/DefaultDoctorList_cn.aspx" target="_blank" rel="noopener" style="display:block;width:100%;min-height:55px;padding:14px;background:#1565C0;color:#fff;border:0;border-radius:12px;font-size:18px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;line-height:1.4;box-sizing:border-box;">🌐 開啟 HMMP 醫生名單網站</a>');
+  parts.push('<div style="margin-top:12px;font-size:14px;color:#546E7A;line-height:1.6;text-align:center;">前往 HMMP 官網，使用上方登入資料查看網絡醫生名單。</div>');
+  parts.push('</div>'); // end doctor panel
 
   parts.push('</div>'); // end padding div
-
   return parts.join('');
 }
 
 function appBnfMedCardApplyHtml(d){
+  // MC Apply layout: Sample card image on top, form below
   // d may contain name_zh / name_en from member record for pre-fill
   var preNameZh=(d&&d.name_zh)||'';
   var preNameEn=(d&&d.name_en)||'';
   var parts=[];
-  parts.push(appBnfMedCardHeader());
-  parts.push('<div style="padding:20px 16px 100px;">');
-  parts.push('<div style="font-size:16px;color:#546E7A;margin-bottom:18px;line-height:1.7;">由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>申請後職員將以 WhatsApp 聯絡辦理。</div>');
-  parts.push('<div style="background:#fff;border-radius:12px;border:1.5px solid #e0e0e0;padding:20px;margin-bottom:20px;">');
-  parts.push('<div style="font-size:15px;font-weight:700;color:#1B4332;margin-bottom:16px;">📝 填寫申請資料</div>');
-  // nameZh — pre-filled from member record
+  // No blue header — start directly with sample card image
+  parts.push('<div style="padding:0 0 100px;">');
+
+  // ── Sample card image (hardcoded MC Sample.png) ──
+  parts.push('<img src="'+escAppHtml(MC_SAMPLE_IMG)+'" style="width:100%;display:block;" alt="醫健卡樣本">');
+
+  // ── NGO description ──
+  parts.push('<div style="padding:16px 16px 0;">');
+  parts.push('<div style="font-size:15px;color:#546E7A;margin-bottom:16px;line-height:1.7;">由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>申請後職員將以 WhatsApp 聯絡辦理。</div>');
+
+  // ── Form card ──
+  parts.push('<div style="background:#fff;border-radius:12px;border:1.5px solid #e0e0e0;padding:20px;margin-bottom:16px;">');
+  parts.push('<div style="font-size:16px;font-weight:900;color:#1B4332;margin-bottom:16px;">📝 填寫申請資料</div>');
+  // nameZh
   parts.push('<div style="margin-bottom:14px;">');
   parts.push('<label style="font-size:14px;font-weight:700;color:#444;display:block;margin-bottom:6px;">中文全名 <span style="color:#C62828;">✽ 必填</span>（與身份證相同）</label>');
   parts.push('<input id="appMfNameZh" type="text" placeholder="例：陳大文" value="'+escAppHtml(preNameZh)+'" style="width:100%;padding:12px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:inherit;">');
   parts.push('</div>');
-  // nameEn — pre-filled from member record
+  // nameEn
   parts.push('<div style="margin-bottom:14px;">');
   parts.push('<label style="font-size:14px;font-weight:700;color:#444;display:block;margin-bottom:6px;">英文全名 <span style="color:#C62828;">✽ 必填</span>（與身份證相同）</label>');
   parts.push('<input id="appMfNameEn" type="text" placeholder="例：CHAN TAI MAN" value="'+escAppHtml(preNameEn)+'" style="width:100%;padding:12px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:inherit;text-transform:uppercase;">');
@@ -15084,11 +15151,13 @@ function appBnfMedCardApplyHtml(d){
   // submit
   parts.push('<button id="appMedSubmitBtn" onclick="appMedSubmit()" style="width:100%;padding:16px;background:#1565C0;color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;">提交申請</button>');
   parts.push('</div>');
+
   // disclaimer
-  parts.push('<div style="background:#FFF8E1;border-radius:10px;padding:14px 16px;font-size:13px;color:#5D4037;line-height:1.7;">');
+  parts.push('<div style="background:#FFF8E1;border-radius:10px;padding:14px 16px;font-size:13px;color:#5D4037;line-height:1.7;margin-bottom:16px;">');
   parts.push('⚕️ 醫健卡資料必須與<strong>香港身份證完全一致</strong>，請確保中英文姓名及身份證號碼頭4位正確無誤。');
   parts.push('</div>');
-  parts.push('</div>');
+  parts.push('</div>'); // end padding
+  parts.push('</div>'); // end outer
   return parts.join('');
 }
 
@@ -15662,6 +15731,18 @@ function appMedCopyById(n,btn,origLabel){
 function appMedOpenImg(btn){
   var url=btn&&btn.getAttribute('data-url');
   if(url) window.open(url,'_blank');
+}
+// Toggle 查看醫生 doctor panel (MC2.png)
+function appMedShowDoctorPanel(){
+  var panel=document.getElementById('appMedDoctorPanel');
+  var btn=document.getElementById('appBtnMedDoctor');
+  if(!panel) return;
+  var isOpen=panel.style.display!=='none';
+  panel.style.display=isOpen?'none':'block';
+  if(btn){
+    btn.style.background=isOpen?'#2E7D32':'#1B5E20';
+    btn.textContent=isOpen?'🩺 查看醫生':'🩺 收起醫生資料';
+  }
 }
 </script>
 </body>
