@@ -10576,7 +10576,7 @@ function testingLoadCampaigns(){
           tstStatusBadge(c.status)+
         '</div>'+
         '<div class="tst-stats-row">'+
-          '<div class="tst-stat-item"><div class="tst-stat-num">+'+(c.total_participants||0)+'</div><div class="tst-stat-lbl">參與者</div></div>'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.total_participants||0)+'</div><div class="tst-stat-lbl">參與者</div></div>'+
           '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.submitted_count||0)+'</div><div class="tst-stat-lbl">已提交</div></div>'+
           '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.qr_count||0)+'</div><div class="tst-stat-lbl">QR 碼</div></div>'+
           '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.testing_duration_days||14)+'天</div><div class="tst-stat-lbl">測試期</div></div>'+
@@ -10587,7 +10587,7 @@ function testingLoadCampaigns(){
           (c.status==='draft'?'<button class="tst-btn tst-btn-orange tst-btn-sm" onclick="tstSubmitReview('+c.id+')">📤 提交審核</button>':'')+
           (c.status==='pending_review'?'<button class="tst-btn tst-btn-green tst-btn-sm" onclick="tstApprove('+c.id+')">✅ 批准</button><button class="tst-btn tst-btn-danger tst-btn-sm" onclick="tstReject('+c.id+')">❌ 拒絕</button>':'')+
           (c.status==='approved'?'<button class="tst-btn tst-btn-green tst-btn-sm" onclick="tstPublish('+c.id+')">🚀 發佈上線</button>':'')+
-          (c.status==='draft'?'<button class="tst-btn tst-btn-danger tst-btn-sm" onclick="tstDeleteCampaign('+c.id+',\''+tstEsc(c.campaign_name)+'\')"><i class="fas fa-trash"></i></button>':'')+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-danger tst-btn-sm" onclick="tstDeleteCampaign('+c.id+',this.dataset.name)" data-name="'+tstEsc(c.campaign_name)+'"><i class="fas fa-trash"></i></button>':'')+
         '</div>'+
       '</div>';
     });
@@ -10723,7 +10723,8 @@ function tstPublish(id){
   });
 }
 
-function tstDeleteCampaign(id, name){
+function tstDeleteCampaign(id, nameOrEl){
+  var name = (nameOrEl && typeof nameOrEl === 'object') ? (nameOrEl.dataset&&nameOrEl.dataset.name)||'' : (nameOrEl||'');
   if(!confirm('確定刪除計劃「'+name+'」？此操作不可撤銷。')) return;
   fetch('/api/admin/testing/campaigns/'+id,{
     method:'DELETE',credentials:'include'
@@ -10777,7 +10778,7 @@ function tstLoadDetailData(id, tab){
           '<div class="tst-section-title">品牌填表連結</div>'+
           '<div style="display:flex;align-items:center;gap:8px;">'+
             '<input style="flex:1;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:monospace;background:#f9fafb;" readonly value="'+tstEsc(brandLink)+'">'+
-            (c.brand_form_token?'<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="navigator.clipboard.writeText(\''+tstEsc(brandLink)+'\').then(function(){alert(\'已複製！\')})">📋</button>':'')+
+            (c.brand_form_token?'<button class="tst-btn tst-btn-secondary tst-btn-sm" data-url="'+tstEsc(brandLink)+'" onclick="navigator.clipboard.writeText(this.dataset.url).then(function(){alert(&apos;已複製！&apos;)})">📋</button>':'')+
           '</div>'+
           '<div style="font-size:11px;color:#6b7280;margin-top:4px;">品牌可使用此連結填寫詳細資料</div>'+
         '</div>'+
@@ -10825,7 +10826,7 @@ function tstLoadDetailData(id, tab){
             '<div class="tst-q-num">'+(i+1)+'</div>'+
             '<div class="tst-q-body">'+
               '<div class="tst-q-title">'+tstEsc(q.title)+(q.is_required?'  <span style="color:#ef4444;font-size:11px;">必填</span>':'')+'</div>'+
-              '<div class="tst-q-type">+'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+'</div>'+
+              '<div class="tst-q-type">'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+'</div>'+
               optsHtml+
             '</div>'+
             '<div style="display:flex;gap:6px;">'+
@@ -10861,9 +10862,9 @@ function tstLoadDetailData(id, tab){
             '<td>'+tstEsc(q.label||'—')+'</td>'+
             '<td><span class="tst-qr-code">'+tstEsc(q.tracking_code)+'</span></td>'+
             '<td>'+tstEsc(String(q.scanned_count||0))+'</td>'+
-            '<td>+'+(q.status==='active'?'<span style="color:#166534;font-weight:700;">✅ 啟用</span>':'<span style="color:#9ca3af;">停用</span>')+'</td>'+
+            '<td>'+(q.status==='active'?'<span style="color:#166534;font-weight:700;">✅ 啟用</span>':'<span style="color:#9ca3af;">停用</span>')+'</td>'+
             '<td><a href="'+tstEsc(scanUrl)+'" target="_blank" style="font-size:11px;color:#7c3aed;word-break:break-all;">'+tstEsc(scanUrl)+'</a>'+
-              ' <button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="navigator.clipboard.writeText(\''+tstEsc(scanUrl)+'\').then(function(){alert(\'已複製！\')})">📋</button>'+
+              ' <button class="tst-btn tst-btn-secondary tst-btn-sm" data-url="'+tstEsc(scanUrl)+'" onclick="navigator.clipboard.writeText(this.dataset.url).then(function(){alert(&apos;已複製！&apos;)})">📋</button>'+
             '</td>'+
           '</tr>';
         });
@@ -10895,9 +10896,9 @@ function tstLoadDetailData(id, tab){
             '<td><span style="color:'+statusColor+';font-weight:700;">'+tstEsc(statusLabel)+'</span></td>'+
             '<td style="font-size:12px;color:#6b7280;">'+tstEsc((p.registered_at||'').slice(0,16))+'</td>'+
             '<td>'+
-              '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstSendWA('+p.id+',\'welcome\')">歡迎</button> '+
-              '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstSendWA('+p.id+',\'reminder1\')">提醒1</button> '+
-              '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstSendWA('+p.id+',\'complete\')">完成</button>'+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" data-pid="'+p.id+'" data-mt="welcome" onclick="tstSendWA(this.dataset.pid,this.dataset.mt)">歡迎</button> '+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" data-pid="'+p.id+'" data-mt="reminder1" onclick="tstSendWA(this.dataset.pid,this.dataset.mt)">提醒1</button> '+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" data-pid="'+p.id+'" data-mt="complete" onclick="tstSendWA(this.dataset.pid,this.dataset.mt)">完成</button>'+
             '</td>'+
           '</tr>';
         });
@@ -10932,7 +10933,7 @@ function tstLoadDetailData(id, tab){
       qs.forEach(function(q){
         html+='<div class="tst-card">'+
           '<div class="tst-section-title">'+tstEsc(q.title)+'</div>'+
-          '<div style="font-size:12px;color:#7c3aed;margin-bottom:10px;">+'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+' ／ 回答人數：+'+(q.response_count||0)+'</div>';
+          '<div style="font-size:12px;color:#7c3aed;margin-bottom:10px;">'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+' ／ 回答人數：'+(q.response_count||0)+'</div>';
         if(q.question_type==='rating' && q.avg_rating){
           var stars=Math.round(q.avg_rating);
           html+='<div style="font-size:28px;margin-bottom:6px;">'+'★'.repeat(stars)+'☆'.repeat(5-stars)+'</div>'+
@@ -10981,6 +10982,7 @@ function tstAddQR(cid){
 }
 
 // ── Add Question modal ───────────────────────────────────────────────────────
+function tstCloseQModal(){ var m=document.getElementById('tstQModal'); if(m) m.remove(); }
 function tstOpenAddQuestion(cid){
   var html='<div class="tst-modal-overlay" id="tstQModal" onclick="if(event.target===this)this.remove()">'+
     '<div class="tst-modal">'+
@@ -10997,7 +10999,7 @@ function tstOpenAddQuestion(cid){
         '<input class="tst-input" id="tstQTitle" placeholder="例：您對產品的整體評分？"></div>'+
       '<div id="tstQOptsWrap"></div>'+
       '<div class="tst-modal-footer">'+
-        '<button class="tst-btn tst-btn-secondary" onclick="document.getElementById(\'tstQModal\').remove()">取消</button>'+
+        '<button class="tst-btn tst-btn-secondary" onclick="tstCloseQModal()">取消</button>'+
         '<button class="tst-btn tst-btn-primary" onclick="tstSaveQuestion('+cid+')">新增</button>'+
       '</div>'+
     '</div>'+
@@ -11010,7 +11012,7 @@ function tstQTypeChange(){
   var wrap=document.getElementById('tstQOptsWrap');
   if(type==='single_choice'||type==='multi_choice'){
     wrap.innerHTML='<div class="tst-form-field"><label class="tst-form-label">選項（每行一個）</label>'+
-      '<textarea class="tst-input tst-textarea" id="tstQOpts" placeholder="選項 1\n選項 2\n選項 3" rows="4"></textarea></div>';
+      '<textarea class="tst-input tst-textarea" id="tstQOpts" placeholder="選項 1&#10;選項 2&#10;選項 3" rows="4"></textarea></div>';
   } else {
     wrap.innerHTML='';
   }
@@ -11022,7 +11024,7 @@ function tstSaveQuestion(cid){
   if(!title){alert('請輸入題目內容');return;}
   var options=[];
   if((type==='single_choice'||type==='multi_choice') && document.getElementById('tstQOpts')){
-    options=document.getElementById('tstQOpts').value.split('\n').map(function(s){return s.trim();}).filter(function(s){return s;});
+    options=document.getElementById('tstQOpts').value.split(String.fromCharCode(10)).map(function(s){return s.trim();}).filter(function(s){return s;});
   }
   fetch('/api/admin/testing/campaigns/'+cid+'/questions',{
     method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
@@ -14385,7 +14387,7 @@ function testingLoadMyCampaigns(){
         '<div style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:3px;">'+escHtml(c.product_name)+'</div>'+
         '<div style="font-size:14px;color:#6b7280;margin-bottom:8px;">'+escHtml(c.brand_name)+'</div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;">'+
-          '<span style="font-size:14px;font-weight:700;color:'+statusColor+';">+'+(TST_P_STATUS[c.status]||c.status)+'</span>'+
+          '<span style="font-size:14px;font-weight:700;color:'+statusColor+';">'+(TST_P_STATUS[c.status]||c.status)+'</span>'+
           (canSurvey?'<button onclick="testingOpenSurvey('+c.campaign_id+')" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer;">填寫問卷</button>':'')+
         '</div>'+
         (c.survey_deadline?'<div style="font-size:12px;color:#9ca3af;margin-top:6px;">問卷截止：'+escHtml(c.survey_deadline)+'</div>':'')+
