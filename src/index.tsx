@@ -10576,7 +10576,7 @@ function testingLoadCampaigns(){
           tstStatusBadge(c.status)+
         '</div>'+
         '<div class="tst-stats-row">'+
-          '<div class="tst-stat-item"><div class="tst-stat-num">'+（c.total_participants||0)+'</div><div class="tst-stat-lbl">參與者</div></div>'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">+'+(c.total_participants||0)+'</div><div class="tst-stat-lbl">參與者</div></div>'+
           '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.submitted_count||0)+'</div><div class="tst-stat-lbl">已提交</div></div>'+
           '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.qr_count||0)+'</div><div class="tst-stat-lbl">QR 碼</div></div>'+
           '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.testing_duration_days||14)+'天</div><div class="tst-stat-lbl">測試期</div></div>'+
@@ -10825,7 +10825,7 @@ function tstLoadDetailData(id, tab){
             '<div class="tst-q-num">'+(i+1)+'</div>'+
             '<div class="tst-q-body">'+
               '<div class="tst-q-title">'+tstEsc(q.title)+(q.is_required?'  <span style="color:#ef4444;font-size:11px;">必填</span>':'')+'</div>'+
-              '<div class="tst-q-type">'+（TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+'</div>'+
+              '<div class="tst-q-type">+'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+'</div>'+
               optsHtml+
             '</div>'+
             '<div style="display:flex;gap:6px;">'+
@@ -10861,7 +10861,7 @@ function tstLoadDetailData(id, tab){
             '<td>'+tstEsc(q.label||'—')+'</td>'+
             '<td><span class="tst-qr-code">'+tstEsc(q.tracking_code)+'</span></td>'+
             '<td>'+tstEsc(String(q.scanned_count||0))+'</td>'+
-            '<td>'+（q.status==='active'?'<span style="color:#166534;font-weight:700;">✅ 啟用</span>':'<span style="color:#9ca3af;">停用</span>')+'</td>'+
+            '<td>+'+(q.status==='active'?'<span style="color:#166534;font-weight:700;">✅ 啟用</span>':'<span style="color:#9ca3af;">停用</span>')+'</td>'+
             '<td><a href="'+tstEsc(scanUrl)+'" target="_blank" style="font-size:11px;color:#7c3aed;word-break:break-all;">'+tstEsc(scanUrl)+'</a>'+
               ' <button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="navigator.clipboard.writeText(\''+tstEsc(scanUrl)+'\').then(function(){alert(\'已複製！\')})">📋</button>'+
             '</td>'+
@@ -10932,7 +10932,7 @@ function tstLoadDetailData(id, tab){
       qs.forEach(function(q){
         html+='<div class="tst-card">'+
           '<div class="tst-section-title">'+tstEsc(q.title)+'</div>'+
-          '<div style="font-size:12px;color:#7c3aed;margin-bottom:10px;">'+（TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+' ／ 回答人數：'+（q.response_count||0)+'</div>';
+          '<div style="font-size:12px;color:#7c3aed;margin-bottom:10px;">+'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+' ／ 回答人數：+'+(q.response_count||0)+'</div>';
         if(q.question_type==='rating' && q.avg_rating){
           var stars=Math.round(q.avg_rating);
           html+='<div style="font-size:28px;margin-bottom:6px;">'+'★'.repeat(stars)+'☆'.repeat(5-stars)+'</div>'+
@@ -14385,7 +14385,7 @@ function testingLoadMyCampaigns(){
         '<div style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:3px;">'+escHtml(c.product_name)+'</div>'+
         '<div style="font-size:14px;color:#6b7280;margin-bottom:8px;">'+escHtml(c.brand_name)+'</div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;">'+
-          '<span style="font-size:14px;font-weight:700;color:'+statusColor+';">'+（TST_P_STATUS[c.status]||c.status)+'</span>'+
+          '<span style="font-size:14px;font-weight:700;color:'+statusColor+';">+'+(TST_P_STATUS[c.status]||c.status)+'</span>'+
           (canSurvey?'<button onclick="testingOpenSurvey('+c.campaign_id+')" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer;">填寫問卷</button>':'')+
         '</div>'+
         (c.survey_deadline?'<div style="font-size:12px;color:#9ca3af;margin-top:6px;">問卷截止：'+escHtml(c.survey_deadline)+'</div>':'')+
@@ -14497,8 +14497,8 @@ function testingOpenSurvey(campaignId){
         html+='</div><div id="rating-val-'+q.id+'" style="display:none;"></div>';
       } else if(q.question_type==='yes_no'){
         html+='<div style="display:flex;gap:10px;" id="yn-'+q.id+'">'+
-          '<button onclick="tstSetYN('+q.id+',\'是\')" data-val="是" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">是</button>'+
-          '<button onclick="tstSetYN('+q.id+',\'否\')" data-val="否" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">否</button>'+
+          '<button onclick="tstSetYN('+q.id+',this)" data-val="\u662f" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">\u662f</button>'+
+          '<button onclick="tstSetYN('+q.id+',this)" data-val="\u5426" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">\u5426</button>'+
         '</div>';
       } else if(q.question_type==='single_choice'||q.question_type==='multi_choice'){
         var opts=[];
@@ -14533,11 +14533,13 @@ function tstSetRating(qid, val){
   if(hidden){ hidden.setAttribute('data-value',String(val)); }
 }
 
-function tstSetYN(qid, val){
+function tstSetYN(qid, clickedBtn){
+  var val=clickedBtn.getAttribute('data-val');
   var wrap=document.getElementById('yn-'+qid);
   if(!wrap)return;
   wrap.querySelectorAll('button').forEach(function(btn){
     var isThis=btn.getAttribute('data-val')===val;
+    btn.setAttribute('data-active', isThis?'1':'0');
     btn.style.borderColor=isThis?'#7c3aed':'#e5e7eb';
     btn.style.background=isThis?'#ede9fe':'#fff';
     btn.style.color=isThis?'#5b21b6':'#374151';
@@ -14576,9 +14578,8 @@ function testingSubmitSurvey(campaignId){
     } else if(qtype==='yes_no'){
       var wrap=document.getElementById('yn-'+qid);
       if(wrap){
-        wrap.querySelectorAll('button').forEach(function(btn){
-          if(btn.style.borderColor==='rgb(124, 58, 237)') answer=btn.getAttribute('data-val');
-        });
+        var activeYN=wrap.querySelector('button[data-active="1"]');
+        if(activeYN) answer=activeYN.getAttribute('data-val')||'';
       }
     } else if(qtype==='single_choice'||qtype==='multi_choice'){
       var wrap2=document.getElementById('choice-'+qid);
