@@ -14859,14 +14859,18 @@ var _appMedStatus=null;
 
 function appBnfMedCardPinHtml(){
   // Hardcoded 醫健卡置頂卡片 — always shown in 全部(0) and 健康(1)
-  // Status badge: fetch async after render
-  var statusBadge='';
+  // Right-side badge: null→免費申請(green), PENDING/SENT→審批中(orange), ISSUED→已啟用(green), DECLINED→未批准(red)
+  // Badge is rendered server-side from cached _appMedStatus, then replaced async by appMedFetchPinStatus()
+  var rightBadge='';
   if(_appMedStatus==='PENDING'||_appMedStatus==='SENT'){
-    statusBadge='<span style="font-size:11px;color:#F57F17;background:#FFFDE7;border:1px solid #FFE082;padding:2px 10px;border-radius:10px;font-weight:700;">⏳ 審批中</span>';
+    rightBadge='<span class="appMedBadge" style="font-size:11px;color:#F57F17;background:#FFFDE7;border:1px solid #FFE082;padding:2px 10px;border-radius:10px;font-weight:700;">⏳ 審批中</span>';
   } else if(_appMedStatus==='ISSUED'){
-    statusBadge='<span style="font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;">✅ 已啟用</span>';
+    rightBadge='<span class="appMedBadge" style="font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;">✅ 已啟用</span>';
   } else if(_appMedStatus==='DECLINED'){
-    statusBadge='<span style="font-size:11px;color:#C62828;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;">❌ 未批准</span>';
+    rightBadge='<span class="appMedBadge" style="font-size:11px;color:#C62828;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;">❌ 未批准</span>';
+  } else {
+    // No status (not applied yet) — show green 免費申請 on right
+    rightBadge='<span class="appMedBadge" style="font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;">免費申請</span>';
   }
   var parts=[];
   parts.push('<div id="appMedPinCard" onclick="appBnfOpenMedCard()" style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.09);overflow:hidden;cursor:pointer;border:2px solid #1565C0;">');
@@ -14875,13 +14879,13 @@ function appBnfMedCardPinHtml(){
   parts.push('<div style="color:#fff;"><div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">免費醫健卡</div><div style="font-size:13px;opacity:0.85;margin-top:2px;">HMMP 醫療保障計劃</div></div>');
   parts.push('</div>');
   parts.push('<div style="padding:14px 16px;">');
-  parts.push('<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">');
+  // Badge row: 💊健康 tag on left, right-side status badge floated right
+  parts.push('<div data-badge-row="1" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">');
   parts.push('<span style="font-size:11px;font-weight:700;color:#1565C0;background:#E3F2FD;padding:2px 8px;border-radius:10px;">💊 健康</span>');
-  parts.push('<span style="font-size:11px;color:#2E7D32;background:#E8F5E9;padding:2px 8px;border-radius:10px;">免費申請</span>');
-  parts.push(statusBadge);
+  parts.push(rightBadge);
   parts.push('</div>');
   parts.push('<div style="font-size:18px;font-weight:800;color:#1a1a1a;line-height:1.3;margin-bottom:6px;">香港商貿慈善基金醫健卡</div>');
-  parts.push('<div style="font-size:14px;color:#555;line-height:1.5;margin-bottom:6px;">免費申請，享有網絡醫生診症服務。申請後 NGO 職員以 WhatsApp 聯絡辦理。</div>');
+  parts.push('<div style="font-size:14px;color:#555;line-height:1.5;margin-bottom:6px;">免費申請：專享網絡醫療優惠服務</div>');
   parts.push('<div style="margin-top:10px;display:flex;align-items:center;justify-content:flex-end;">');
   parts.push('<span style="font-size:13px;font-weight:700;color:#1565C0;">查看 / 申請 ›</span>');
   parts.push('</div></div></div>');
@@ -14897,28 +14901,31 @@ function appMedFetchPinStatus(){
     .then(function(d){
       if(!d.ok) return;
       _appMedStatus=d.status||null;
-      // Re-render pin card badge
+      // Re-render pin card badge — replace the single .appMedBadge span in [data-badge-row]
       var card=document.getElementById('appMedPinCard');
       if(!card) return;
-      var badges=card.querySelectorAll('.appMedBadge');
-      // Remove existing status badge
-      badges.forEach(function(b){b.remove();});
       var badgeRow=card.querySelector('[data-badge-row]');
-      if(badgeRow&&_appMedStatus){
-        var span=document.createElement('span');
-        span.className='appMedBadge';
-        if(_appMedStatus==='PENDING'||_appMedStatus==='SENT'){
-          span.style.cssText='font-size:11px;color:#F57F17;background:#FFFDE7;border:1px solid #FFE082;padding:2px 10px;border-radius:10px;font-weight:700;';
-          span.textContent='⏳ 審批中';
-        } else if(_appMedStatus==='ISSUED'){
-          span.style.cssText='font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;';
-          span.textContent='✅ 已啟用';
-        } else if(_appMedStatus==='DECLINED'){
-          span.style.cssText='font-size:11px;color:#C62828;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;';
-          span.textContent='❌ 未批准';
-        }
-        if(span.textContent) badgeRow.appendChild(span);
+      if(!badgeRow) return;
+      // Remove ALL existing .appMedBadge elements (prevents duplicates on repeated fetch)
+      badgeRow.querySelectorAll('.appMedBadge').forEach(function(b){b.remove();});
+      // Build new badge based on status
+      var span=document.createElement('span');
+      span.className='appMedBadge';
+      if(_appMedStatus==='PENDING'||_appMedStatus==='SENT'){
+        span.style.cssText='font-size:11px;color:#F57F17;background:#FFFDE7;border:1px solid #FFE082;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='⏳ 審批中';
+      } else if(_appMedStatus==='ISSUED'){
+        span.style.cssText='font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='✅ 已啟用';
+      } else if(_appMedStatus==='DECLINED'){
+        span.style.cssText='font-size:11px;color:#C62828;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='❌ 未批准';
+      } else {
+        // No application — keep showing 免費申請
+        span.style.cssText='font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='免費申請';
       }
+      badgeRow.appendChild(span);
     }).catch(function(){});
 }
 
@@ -14941,17 +14948,8 @@ function appBnfLoad(catId){
         var html=showMed?appBnfMedCardPinHtml():'';
         html+=items.map(function(b){return appBnfCardHtml(b);}).join('');
         list.innerHTML=html;
-        // Add data-badge-row attr to the badge row for async update
-        var card=document.getElementById('appMedPinCard');
-        if(card){
-          var rows=card.querySelectorAll('[style]');
-          rows.forEach(function(r){
-            if(r.style.display==='flex'&&r.getAttribute('style').indexOf('gap:6px')!==-1){
-              r.setAttribute('data-badge-row','1');
-            }
-          });
-        }
-        // Async fetch status badge
+        // data-badge-row is now baked into appBnfMedCardPinHtml() HTML directly
+        // Async fetch status badge (replaces the initially-rendered badge)
         if(showMed) setTimeout(appMedFetchPinStatus,100);
       }
     })
@@ -15116,8 +15114,17 @@ function appBnfMedCardApplyHtml(d){
   // No blue header — start directly with sample card image
   parts.push('<div style="padding:0 0 100px;">');
 
-  // ── Sample card image (hardcoded MC Sample.png) ──
-  parts.push('<img src="'+escAppHtml(MC_SAMPLE_IMG)+'" style="width:100%;display:block;" alt="醫健卡樣本">');
+  // ── Sample card image ── use object-fit cover placeholder card design if image can't load
+  parts.push('<div style="width:100%;background:linear-gradient(135deg,#1565C0 0%,#0D47A1 60%,#01579B 100%);padding:28px 24px;box-sizing:border-box;position:relative;min-height:200px;display:flex;flex-direction:column;justify-content:center;">');
+  parts.push('<img src="'+escAppHtml(MC_SAMPLE_IMG)+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:0;" alt="醫健卡樣本" onerror="this.style.display=&apos;none&apos;">');
+  parts.push('<div style="position:relative;z-index:1;">');
+  parts.push('<div style="font-size:11px;color:rgba(255,255,255,0.75);letter-spacing:1px;margin-bottom:4px;">SAMPLE · 醫健卡樣本</div>');
+  parts.push('<div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:1px;margin-bottom:4px;">香港商貿慈善基金</div>');
+  parts.push('<div style="font-size:13px;color:rgba(255,255,255,0.85);margin-bottom:16px;">HMMP 醫療保障計劃</div>');
+  parts.push('<div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:8px;font-family:monospace;">XXXX-XXXX</div>');
+  parts.push('<div style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.7);">[申請人姓名]</div>');
+  parts.push('</div>');
+  parts.push('</div>');
 
   // ── NGO description ──
   parts.push('<div style="padding:16px 16px 0;">');
