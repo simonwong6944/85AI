@@ -1708,6 +1708,521 @@ app.delete('/api/admin/contents/:id', async (c) => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ─── Product Testing Survey System APIs ──────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Helper: generate random tracking code ─────────────────────────────────────
+function genTestingCode(prefix: string = 'TEST'): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let s = ''
+  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)]
+  return `${prefix}-${s}`
+}
+
+// ── Helper: generate brand form token ─────────────────────────────────────────
+async function genBrandToken(): Promise<string> {
+  const arr = new Uint8Array(24)
+  crypto.getRandomValues(arr)
+  return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('')
+}
+
+// ── Public: GET /api/testing/scan/:code — user scans QR, get campaign info ────
+app.get('/api/testing/scan/:code', async (c) => {
+  const code = c.req.param('code').toUpperCase()
+  const db = c.env.DB
+  const qr = await db.prepare(
+    `SELECT tq.*, tc.campaign_name, tc.brand_name, tc.brand_logo_url, tc.brand_description,
+            tc.product_name, tc.product_image_url, tc.testing_duration_days, tc.survey_deadline,
+            tc.status as campaign_status
+     FROM testing_qr_codes tq
+     JOIN testing_campaigns tc ON tq.campaign_id = tc.id
+     WHERE tq.tracking_code=? AND tq.status='active'`
+  ).bind(code).first<any>()
+  if (!qr) return c.json({ ok: false, error: 'QR 碼無效或已停用' }, 404)
+  if (qr.campaign_status !== 'live') return c.json({ ok: false, error: '此測試計劃暫未開放' }, 400)
+  // Increment scan count
+  await db.prepare('UPDATE testing_qr_codes SET scanned_count=scanned_count+1 WHERE id=?').bind(qr.id).run()
+  return c.json({ ok: true, qr_code_id: qr.id, campaign_id: qr.campaign_id,
+    campaign_name: qr.campaign_name, brand_name: qr.brand_name,
+    brand_logo_url: qr.brand_logo_url, brand_description: qr.brand_description,
+    product_name: qr.product_name, product_image_url: qr.product_image_url,
+    testing_duration_days: qr.testing_duration_days, survey_deadline: qr.survey_deadline })
+})
+
+// ── Public: POST /api/testing/join — member joins campaign (claims sample) ────
+app.post('/api/testing/join', async (c) => {
+  const db = c.env.DB
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const { member_no, qr_code_id, campaign_id } = body
+  if (!member_no || !campaign_id) return c.json({ ok: false, error: '缺少必要參數' }, 400)
+  // Verify member exists
+  const member = await db.prepare('SELECT member_no, name FROM members WHERE member_no=? LIMIT 1')
+    .bind(member_no).first<any>()
+  if (!member) return c.json({ ok: false, error: '會員不存在，請先登記' }, 404)
+  // Verify campaign is live
+  const camp = await db.prepare('SELECT id, campaign_name, testing_duration_days, survey_deadline FROM testing_campaigns WHERE id=? AND status="live" LIMIT 1')
+    .bind(campaign_id).first<any>()
+  if (!camp) return c.json({ ok: false, error: '測試計劃不存在或未開放' }, 404)
+  // Check already joined
+  const existing = await db.prepare('SELECT id, status FROM testing_participants WHERE campaign_id=? AND member_no=? LIMIT 1')
+    .bind(campaign_id, member_no).first<any>()
+  if (existing) {
+    return c.json({ ok: true, already_joined: true, participant_id: existing.id, status: existing.status,
+      member_name: member.name, campaign_name: camp.campaign_name })
+  }
+  // Calculate deadline
+  const deadline = camp.survey_deadline || (() => {
+    const d = new Date(); d.setDate(d.getDate() + camp.testing_duration_days); return d.toISOString().slice(0,10)
+  })()
+  const now = new Date().toISOString()
+  const result = await db.prepare(
+    `INSERT INTO testing_participants (campaign_id, qr_code_id, member_no, status, registered_at, sample_claimed_at)
+     VALUES (?, ?, ?, 'sample_claimed', ?, ?)`
+  ).bind(campaign_id, qr_code_id || null, member_no, now, now).run()
+  return c.json({ ok: true, already_joined: false, participant_id: result.meta.last_row_id,
+    member_name: member.name, campaign_name: camp.campaign_name, survey_deadline: deadline })
+})
+
+// ── Public: GET /api/testing/my-campaigns/:member_no — list joined campaigns ──
+app.get('/api/testing/my-campaigns/:member_no', async (c) => {
+  const db = c.env.DB
+  const memberNo = c.req.param('member_no')
+  const rows = await db.prepare(
+    `SELECT tp.id as participant_id, tp.status, tp.registered_at, tp.sample_claimed_at,
+            tp.survey_submitted_at, tc.id as campaign_id, tc.campaign_name, tc.brand_name,
+            tc.brand_logo_url, tc.product_name, tc.product_image_url, tc.survey_deadline,
+            tr.reward_name, tr.reward_description, tr.reward_type, tr.reward_value
+     FROM testing_participants tp
+     JOIN testing_campaigns tc ON tp.campaign_id = tc.id
+     LEFT JOIN testing_rewards tr ON tr.campaign_id = tc.id
+     WHERE tp.member_no=? ORDER BY tp.registered_at DESC`
+  ).bind(memberNo).all<any>()
+  return c.json({ ok: true, campaigns: rows.results || [] })
+})
+
+// ── Public: GET /api/testing/survey/:campaign_id — get survey questions ────────
+app.get('/api/testing/survey/:campaign_id', async (c) => {
+  const db = c.env.DB
+  const cid = c.req.param('campaign_id')
+  const camp = await db.prepare(
+    'SELECT id, campaign_name, brand_name, brand_logo_url, brand_description, product_name, media_content FROM testing_campaigns WHERE id=? AND status IN ("live","completed") LIMIT 1'
+  ).bind(cid).first<any>()
+  if (!camp) return c.json({ ok: false, error: '問卷不存在' }, 404)
+  const qs = await db.prepare(
+    'SELECT id, question_order, question_type, title, description, image_url, is_required, options, min_value, max_value FROM testing_questions WHERE campaign_id=? ORDER BY question_order ASC'
+  ).bind(cid).all<any>()
+  let mediaContent: any[] = []
+  try { mediaContent = JSON.parse(camp.media_content || '[]') } catch {}
+  return c.json({ ok: true, campaign: {
+    id: camp.id, campaign_name: camp.campaign_name, brand_name: camp.brand_name,
+    brand_logo_url: camp.brand_logo_url, brand_description: camp.brand_description,
+    product_name: camp.product_name, media_content: mediaContent
+  }, questions: (qs.results || []).map((q:any) => ({
+    ...q, options: (() => { try { return JSON.parse(q.options) } catch { return [] } })()
+  })) })
+})
+
+// ── Public: POST /api/testing/survey/submit — submit survey answers ────────────
+app.post('/api/testing/survey/submit', async (c) => {
+  const db = c.env.DB
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const { participant_id, campaign_id, responses, time_spent_seconds } = body
+  if (!participant_id || !campaign_id || !Array.isArray(responses)) {
+    return c.json({ ok: false, error: '缺少必要參數' }, 400)
+  }
+  const participant = await db.prepare('SELECT id, status, member_no FROM testing_participants WHERE id=? AND campaign_id=? LIMIT 1')
+    .bind(participant_id, campaign_id).first<any>()
+  if (!participant) return c.json({ ok: false, error: '找不到參與記錄' }, 404)
+  if (participant.status === 'survey_submitted') return c.json({ ok: false, error: '問卷已提交' }, 400)
+  const now = new Date().toISOString()
+  // Insert responses
+  for (const r of responses) {
+    if (!r.question_id) continue
+    await db.prepare(
+      `INSERT OR REPLACE INTO testing_responses (participant_id, campaign_id, question_id, answer, submitted_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(participant_id, campaign_id, r.question_id, String(r.answer ?? ''), now).run()
+  }
+  await db.prepare(
+    `UPDATE testing_participants SET status='survey_submitted', survey_submitted_at=?, time_to_complete_seconds=? WHERE id=?`
+  ).bind(now, time_spent_seconds || null, participant_id).run()
+  // Get reward info
+  const reward = await db.prepare('SELECT reward_name, reward_description, reward_value, reward_type FROM testing_rewards WHERE campaign_id=? LIMIT 1')
+    .bind(campaign_id).first<any>()
+  return c.json({ ok: true, reward })
+})
+
+// ── Admin: GET /api/admin/testing/campaigns — list all campaigns ────────────────
+app.get('/api/admin/testing/campaigns', async (c) => {
+  const db = c.env.DB
+  const rows = await db.prepare(
+    `SELECT tc.*, 
+      (SELECT COUNT(*) FROM testing_participants WHERE campaign_id=tc.id) as participant_count,
+      (SELECT COUNT(*) FROM testing_participants WHERE campaign_id=tc.id AND status='survey_submitted') as submitted_count,
+      (SELECT COUNT(*) FROM testing_qr_codes WHERE campaign_id=tc.id) as qr_count
+     FROM testing_campaigns tc ORDER BY tc.created_at DESC`
+  ).all<any>()
+  return c.json({ ok: true, campaigns: rows.results || [] })
+})
+
+// ── Admin: POST /api/admin/testing/campaigns — create campaign ─────────────────
+app.post('/api/admin/testing/campaigns', async (c) => {
+  const db = c.env.DB
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  if (!body.campaign_name?.trim()) return c.json({ ok: false, error: '請填寫計劃名稱' }, 400)
+  if (!body.product_name?.trim()) return c.json({ ok: false, error: '請填寫產品名稱' }, 400)
+  const now = new Date().toISOString()
+  const token = await genBrandToken()
+  const tokenExpiry = new Date(Date.now() + 30*24*60*60*1000).toISOString()
+  const r = await db.prepare(
+    `INSERT INTO testing_campaigns
+      (campaign_name, description, brand_name, brand_logo_url, brand_description,
+       brand_story_image_url, brand_website_url, product_name, product_image_url,
+       testing_duration_days, survey_deadline, reminder1_day, reminder2_days_before,
+       media_content, wa_template_welcome, wa_template_reminder1, wa_template_reminder2,
+       wa_template_complete, brand_form_token, brand_form_expires_at, status, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?)`
+  ).bind(
+    body.campaign_name.trim(), body.description || '', body.brand_name || '', body.brand_logo_url || null,
+    body.brand_description || '', body.brand_story_image_url || null, body.brand_website_url || null,
+    body.product_name.trim(), body.product_image_url || null,
+    body.testing_duration_days || 14, body.survey_deadline || null,
+    body.reminder1_day || 7, body.reminder2_days_before || 3,
+    body.media_content || '[]',
+    body.wa_template_welcome || '', body.wa_template_reminder1 || '',
+    body.wa_template_reminder2 || '', body.wa_template_complete || '',
+    token, tokenExpiry, now, now
+  ).run()
+  return c.json({ ok: true, id: r.meta.last_row_id, brand_form_token: token, brand_form_expires_at: tokenExpiry })
+})
+
+// ── Admin: PUT /api/admin/testing/campaigns/:id — update campaign ──────────────
+app.put('/api/admin/testing/campaigns/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const allowed = ['campaign_name','description','brand_name','brand_logo_url','brand_description',
+    'brand_story_image_url','brand_website_url','product_name','product_image_url',
+    'testing_duration_days','survey_deadline','reminder1_day','reminder2_days_before',
+    'media_content','wa_template_welcome','wa_template_reminder1','wa_template_reminder2',
+    'wa_template_complete','status','review_comments']
+  const fields: string[] = []; const vals: any[] = []
+  for (const k of allowed) {
+    if (body[k] !== undefined) { fields.push(`${k}=?`); vals.push(body[k]) }
+  }
+  if (!fields.length) return c.json({ ok: false, error: '無更新欄位' }, 400)
+  fields.push('updated_at=?'); vals.push(new Date().toISOString()); vals.push(id)
+  await db.prepare(`UPDATE testing_campaigns SET ${fields.join(',')} WHERE id=?`).bind(...vals).run()
+  return c.json({ ok: true })
+})
+
+// ── Admin: DELETE /api/admin/testing/campaigns/:id ─────────────────────────────
+app.delete('/api/admin/testing/campaigns/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const camp = await db.prepare('SELECT status FROM testing_campaigns WHERE id=? LIMIT 1').bind(id).first<any>()
+  if (!camp) return c.json({ ok: false, error: '計劃不存在' }, 404)
+  if (camp.status === 'live') return c.json({ ok: false, error: '進行中的計劃不可刪除，請先改為 archived' }, 400)
+  await db.prepare('DELETE FROM testing_campaigns WHERE id=?').bind(id).run()
+  return c.json({ ok: true })
+})
+
+// ── Admin: POST /api/admin/testing/campaigns/:id/approve — approve/reject ──────
+app.post('/api/admin/testing/campaigns/:id/approve', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const action = body.action // 'approve' | 'request_changes' | 'reject'
+  const statusMap: Record<string,string> = { approve:'approved', request_changes:'pending_review', reject:'archived' }
+  if (!statusMap[action]) return c.json({ ok: false, error: '無效操作' }, 400)
+  const now = new Date().toISOString()
+  await db.prepare('UPDATE testing_campaigns SET status=?, review_comments=?, reviewed_at=?, updated_at=? WHERE id=?')
+    .bind(statusMap[action], body.comments || null, now, now, id).run()
+  return c.json({ ok: true, new_status: statusMap[action] })
+})
+
+// ── Admin: POST /api/admin/testing/campaigns/:id/publish — set live ───────────
+app.post('/api/admin/testing/campaigns/:id/publish', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const camp = await db.prepare('SELECT status FROM testing_campaigns WHERE id=? LIMIT 1').bind(id).first<any>()
+  if (!camp) return c.json({ ok: false, error: '計劃不存在' }, 404)
+  if (!['approved','draft'].includes(camp.status)) return c.json({ ok: false, error: '只有已審批或草稿計劃可發佈' }, 400)
+  const now = new Date().toISOString()
+  await db.prepare('UPDATE testing_campaigns SET status="live", updated_at=? WHERE id=?').bind(now, id).run()
+  return c.json({ ok: true })
+})
+
+// ── Admin: GET /api/admin/testing/campaigns/:id — get single campaign detail ───
+app.get('/api/admin/testing/campaigns/:id', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const camp = await db.prepare('SELECT * FROM testing_campaigns WHERE id=? LIMIT 1').bind(id).first<any>()
+  if (!camp) return c.json({ ok: false, error: '計劃不存在' }, 404)
+  const questions = await db.prepare('SELECT * FROM testing_questions WHERE campaign_id=? ORDER BY question_order').bind(id).all<any>()
+  const reward = await db.prepare('SELECT * FROM testing_rewards WHERE campaign_id=? LIMIT 1').bind(id).first<any>()
+  const qrCodes = await db.prepare('SELECT * FROM testing_qr_codes WHERE campaign_id=? ORDER BY id').bind(id).all<any>()
+  return c.json({ ok: true, campaign: camp,
+    questions: (questions.results || []).map((q:any) => ({ ...q, options: (() => { try { return JSON.parse(q.options) } catch { return [] } })() })),
+    reward: reward || null,
+    qr_codes: qrCodes.results || [] })
+})
+
+// ── Admin: GET /api/admin/testing/campaigns/:id/report — analytics ────────────
+app.get('/api/admin/testing/campaigns/:id/report', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const camp = await db.prepare('SELECT campaign_name, brand_name, product_name FROM testing_campaigns WHERE id=? LIMIT 1').bind(id).first<any>()
+  if (!camp) return c.json({ ok: false, error: '計劃不存在' }, 404)
+  // Funnel counts
+  const funnel = await db.prepare(
+    `SELECT status, COUNT(*) as cnt FROM testing_participants WHERE campaign_id=? GROUP BY status`
+  ).bind(id).all<any>()
+  const funnelMap: Record<string,number> = {}
+  for (const row of (funnel.results||[])) funnelMap[row.status] = row.cnt
+  const total = Object.values(funnelMap).reduce((a,b)=>a+b,0)
+  const submitted = funnelMap['survey_submitted'] || 0
+  // Per-question response stats
+  const qs = await db.prepare('SELECT id, title, question_type, min_value, max_value FROM testing_questions WHERE campaign_id=? ORDER BY question_order').bind(id).all<any>()
+  const questionStats = await Promise.all((qs.results||[]).map(async (q:any) => {
+    const answers = await db.prepare('SELECT answer FROM testing_responses WHERE campaign_id=? AND question_id=?').bind(id, q.id).all<any>()
+    const vals = (answers.results||[]).map((r:any) => r.answer)
+    let stat: any = { question_id: q.id, title: q.title, type: q.question_type, response_count: vals.length }
+    if (q.question_type === 'rating') {
+      const nums = vals.map(Number).filter(n => !isNaN(n))
+      stat.average = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2) : null
+      stat.distribution = {}
+      for (let i = q.min_value; i <= q.max_value; i++) stat.distribution[i] = nums.filter(n=>n===i).length
+    } else if (['single_choice','multi_choice','yes_no'].includes(q.question_type)) {
+      const counts: Record<string,number> = {}
+      vals.forEach(v => { (v||'').split(',').forEach((s:string) => { s=s.trim(); if(s) counts[s]=(counts[s]||0)+1 }) })
+      stat.option_counts = counts
+    } else {
+      stat.sample_answers = vals.slice(0, 20)
+    }
+    return stat
+  }))
+  // QR scan stats
+  const qrStats = await db.prepare('SELECT label, tracking_code, scanned_count FROM testing_qr_codes WHERE campaign_id=? ORDER BY scanned_count DESC').bind(id).all<any>()
+  return c.json({ ok: true,
+    campaign: camp,
+    funnel: { total_registered: total, sample_claimed: (funnelMap['sample_claimed']||0)+(funnelMap['survey_started']||0)+(funnelMap['survey_submitted']||0)+(funnelMap['reward_sent']||0), survey_submitted: submitted, conversion_rate: total ? ((submitted/total)*100).toFixed(1)+'%' : '0%', by_status: funnelMap },
+    question_stats: questionStats,
+    qr_stats: qrStats.results || [] })
+})
+
+// ── Admin: GET /api/admin/testing/campaigns/:id/participants — list ────────────
+app.get('/api/admin/testing/campaigns/:id/participants', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const rows = await db.prepare(
+    `SELECT tp.*, m.name as member_name, m.phone as member_phone,
+            tq.label as qr_label, tq.tracking_code
+     FROM testing_participants tp
+     JOIN members m ON tp.member_no = m.member_no
+     LEFT JOIN testing_qr_codes tq ON tp.qr_code_id = tq.id
+     WHERE tp.campaign_id=? ORDER BY tp.registered_at DESC`
+  ).bind(id).all<any>()
+  return c.json({ ok: true, participants: rows.results || [] })
+})
+
+// ── Admin: POST /api/admin/testing/campaigns/:id/qr-codes — generate QR code ──
+app.post('/api/admin/testing/campaigns/:id/qr-codes', async (c) => {
+  const db = c.env.DB
+  const campId = c.req.param('id')
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const label = (body.label || '').trim() || '未命名'
+  const trackingCode = genTestingCode('PT')
+  const now = new Date().toISOString()
+  const r = await db.prepare(
+    'INSERT INTO testing_qr_codes (campaign_id, label, tracking_code, status, created_at) VALUES (?,?,?,"active",?)'
+  ).bind(campId, label, trackingCode, now).run()
+  // Build the QR URL (points to /testing/scan page)
+  const surveyUrl = `https://coeldery85.com/testing/scan/${trackingCode}`
+  return c.json({ ok: true, id: r.meta.last_row_id, tracking_code: trackingCode, survey_url: surveyUrl, label })
+})
+
+// ── Admin: GET/POST/PUT /api/admin/testing/campaigns/:id/questions ─────────────
+app.get('/api/admin/testing/campaigns/:id/questions', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const rows = await db.prepare('SELECT * FROM testing_questions WHERE campaign_id=? ORDER BY question_order').bind(id).all<any>()
+  return c.json({ ok: true, questions: (rows.results||[]).map((q:any) => ({ ...q, options: (() => { try { return JSON.parse(q.options) } catch { return [] } })() })) })
+})
+
+app.post('/api/admin/testing/campaigns/:id/questions', async (c) => {
+  const db = c.env.DB
+  const campId = c.req.param('id')
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  if (!body.title?.trim()) return c.json({ ok: false, error: '請填寫題目' }, 400)
+  const maxOrder = await db.prepare('SELECT COALESCE(MAX(question_order),0) as m FROM testing_questions WHERE campaign_id=?').bind(campId).first<any>()
+  const order = (maxOrder?.m || 0) + 1
+  const r = await db.prepare(
+    `INSERT INTO testing_questions (campaign_id, question_order, question_type, title, description, image_url, is_required, options, min_value, max_value, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+  ).bind(campId, order, body.question_type||'rating', body.title.trim(), body.description||'',
+    body.image_url||null, body.is_required!==false?1:0,
+    JSON.stringify(body.options||[]), body.min_value||1, body.max_value||5, new Date().toISOString()).run()
+  return c.json({ ok: true, id: r.meta.last_row_id })
+})
+
+app.put('/api/admin/testing/questions/:qid', async (c) => {
+  const db = c.env.DB
+  const qid = c.req.param('qid')
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const allowed = ['question_order','question_type','title','description','image_url','is_required','options','min_value','max_value']
+  const fields: string[] = []; const vals: any[] = []
+  for (const k of allowed) {
+    if (body[k] !== undefined) {
+      fields.push(`${k}=?`)
+      vals.push(k === 'options' ? JSON.stringify(body[k]) : body[k])
+    }
+  }
+  if (!fields.length) return c.json({ ok: false, error: '無更新欄位' }, 400)
+  vals.push(qid)
+  await db.prepare(`UPDATE testing_questions SET ${fields.join(',')} WHERE id=?`).bind(...vals).run()
+  return c.json({ ok: true })
+})
+
+app.delete('/api/admin/testing/questions/:qid', async (c) => {
+  const db = c.env.DB
+  await db.prepare('DELETE FROM testing_questions WHERE id=?').bind(c.req.param('qid')).run()
+  return c.json({ ok: true })
+})
+
+// ── Admin: GET/POST/PUT /api/admin/testing/campaigns/:id/reward ───────────────
+app.get('/api/admin/testing/campaigns/:id/reward', async (c) => {
+  const db = c.env.DB
+  const r = await db.prepare('SELECT * FROM testing_rewards WHERE campaign_id=? LIMIT 1').bind(c.req.param('id')).first<any>()
+  return c.json({ ok: true, reward: r || null })
+})
+
+app.post('/api/admin/testing/campaigns/:id/reward', async (c) => {
+  const db = c.env.DB
+  const campId = c.req.param('id')
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const existing = await db.prepare('SELECT id FROM testing_rewards WHERE campaign_id=? LIMIT 1').bind(campId).first<any>()
+  const now = new Date().toISOString()
+  if (existing) {
+    await db.prepare('UPDATE testing_rewards SET reward_name=?, reward_description=?, reward_type=?, reward_value=?, quantity_available=?, delivery_notes=? WHERE campaign_id=?')
+      .bind(body.reward_name||'', body.reward_description||'', body.reward_type||'product', body.reward_value||'', body.quantity_available||0, body.delivery_notes||'', campId).run()
+  } else {
+    await db.prepare('INSERT INTO testing_rewards (campaign_id, reward_name, reward_description, reward_type, reward_value, quantity_available, delivery_notes, created_at) VALUES (?,?,?,?,?,?,?,?)')
+      .bind(campId, body.reward_name||'', body.reward_description||'', body.reward_type||'product', body.reward_value||'', body.quantity_available||0, body.delivery_notes||'', now).run()
+  }
+  return c.json({ ok: true })
+})
+
+// ── Admin: POST /api/admin/testing/send-whatsapp — manual WA send ─────────────
+app.post('/api/admin/testing/send-whatsapp', async (c) => {
+  const db = c.env.DB
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const { participant_id, message_type } = body
+  // Get participant + member + campaign info
+  const info = await db.prepare(
+    `SELECT tp.*, m.name as member_name, m.phone, tc.campaign_name, tc.product_name,
+            tc.wa_template_welcome, tc.wa_template_reminder1, tc.wa_template_reminder2, tc.wa_template_complete,
+            tc.testing_duration_days, tc.survey_deadline
+     FROM testing_participants tp
+     JOIN members m ON tp.member_no = m.member_no
+     JOIN testing_campaigns tc ON tp.campaign_id = tc.id
+     WHERE tp.id=? LIMIT 1`
+  ).bind(participant_id).first<any>()
+  if (!info) return c.json({ ok: false, error: '找不到參與記錄' }, 404)
+  // Select template
+  const templateMap: Record<string,string> = {
+    welcome: info.wa_template_welcome, reminder1: info.wa_template_reminder1,
+    reminder2: info.wa_template_reminder2, complete: info.wa_template_complete
+  }
+  let template = templateMap[message_type] || ''
+  if (!template) return c.json({ ok: false, error: '此計劃未設定此類型訊息模板' }, 400)
+  // Replace placeholders
+  const deadline = info.survey_deadline || (() => { const d=new Date(info.registered_at||Date.now()); d.setDate(d.getDate()+info.testing_duration_days); return d.toISOString().slice(0,10) })()
+  const surveyLink = `https://coeldery85.com/app` // members go to /app → testing tab
+  template = template.replace(/\{user_name\}/g, info.member_name||'').replace(/\{product_name\}/g, info.product_name||'').replace(/\{campaign_name\}/g, info.campaign_name||'').replace(/\{survey_deadline\}/g, deadline).replace(/\{survey_link\}/g, surveyLink)
+  // Build WA link (manual send for now — admin copies link or API)
+  const phone = (info.phone||'').replace(/\D/g,'')
+  const waUrl = phone ? `https://wa.me/852${phone}?text=${encodeURIComponent(template)}` : null
+  // Record send time
+  const nowStr = new Date().toISOString()
+  const colMap: Record<string,string> = { welcome:'wa_welcome_sent_at', reminder1:'wa_reminder1_sent_at', reminder2:'wa_reminder2_sent_at', complete:'wa_complete_sent_at' }
+  if (colMap[message_type]) {
+    await db.prepare(`UPDATE testing_participants SET ${colMap[message_type]}=? WHERE id=?`).bind(nowStr, participant_id).run()
+  }
+  return c.json({ ok: true, wa_url: waUrl, message: template, phone })
+})
+
+// ── Brand form: GET /api/testing/brand-form/:token — get campaign for brand ────
+app.get('/api/testing/brand-form/:token', async (c) => {
+  const db = c.env.DB
+  const token = c.req.param('token')
+  const camp = await db.prepare(
+    'SELECT id, campaign_name, brand_form_expires_at, status FROM testing_campaigns WHERE brand_form_token=? LIMIT 1'
+  ).bind(token).first<any>()
+  if (!camp) return c.json({ ok: false, error: '表單連結無效' }, 404)
+  if (new Date(camp.brand_form_expires_at) < new Date()) return c.json({ ok: false, error: '表單連結已過期' }, 400)
+  if (!['draft','pending_review'].includes(camp.status)) return c.json({ ok: false, error: '此計劃已不接受提交' }, 400)
+  return c.json({ ok: true, campaign_id: camp.id, campaign_name: camp.campaign_name })
+})
+
+// ── Brand form: POST /api/testing/brand-form/:token/submit — brand submits ─────
+app.post('/api/testing/brand-form/:token/submit', async (c) => {
+  const db = c.env.DB
+  const token = c.req.param('token')
+  let body: any
+  try { body = await c.req.json() } catch { return c.json({ ok: false, error: '無效請求' }, 400) }
+  const camp = await db.prepare('SELECT id, brand_form_expires_at, status FROM testing_campaigns WHERE brand_form_token=? LIMIT 1').bind(token).first<any>()
+  if (!camp) return c.json({ ok: false, error: '表單連結無效' }, 404)
+  if (new Date(camp.brand_form_expires_at) < new Date()) return c.json({ ok: false, error: '表單連結已過期' }, 400)
+  const now = new Date().toISOString()
+  // Update campaign brand info
+  await db.prepare(
+    `UPDATE testing_campaigns SET brand_name=?, brand_logo_url=?, brand_description=?, brand_story_image_url=?,
+     brand_website_url=?, media_content=?, wa_template_welcome=?, wa_template_reminder1=?,
+     wa_template_reminder2=?, wa_template_complete=?, status='pending_review', brand_submitted_at=?, updated_at=? WHERE id=?`
+  ).bind(body.brand_name||'', body.brand_logo_url||null, body.brand_description||'', body.brand_story_image_url||null,
+    body.brand_website_url||null, JSON.stringify(body.media_content||[]),
+    body.wa_template_welcome||'', body.wa_template_reminder1||'',
+    body.wa_template_reminder2||'', body.wa_template_complete||'',
+    now, now, camp.id).run()
+  // Upsert reward
+  if (body.reward) {
+    const existing = await db.prepare('SELECT id FROM testing_rewards WHERE campaign_id=? LIMIT 1').bind(camp.id).first<any>()
+    if (existing) {
+      await db.prepare('UPDATE testing_rewards SET reward_name=?, reward_description=?, reward_type=?, reward_value=?, quantity_available=?, delivery_notes=? WHERE campaign_id=?')
+        .bind(body.reward.reward_name||'', body.reward.reward_description||'', body.reward.reward_type||'product', body.reward.reward_value||'', body.reward.quantity_available||0, body.reward.delivery_notes||'', camp.id).run()
+    } else {
+      await db.prepare('INSERT INTO testing_rewards (campaign_id, reward_name, reward_description, reward_type, reward_value, quantity_available, delivery_notes, created_at) VALUES (?,?,?,?,?,?,?,?)')
+        .bind(camp.id, body.reward.reward_name||'', body.reward.reward_description||'', body.reward.reward_type||'product', body.reward.reward_value||'', body.reward.quantity_available||0, body.reward.delivery_notes||'', now).run()
+    }
+  }
+  return c.json({ ok: true, campaign_id: camp.id })
+})
+
+// ── Public: GET /testing/scan/:code — redirect page (browser entry point) ──────
+app.get('/testing/scan/:code', (c) => {
+  const code = c.req.param('code')
+  // Redirect to /app with testing context — member identifies themselves there
+  return c.redirect(`/app?testing=${encodeURIComponent(code)}`)
+})
+
+// ── Brand form page: GET /brand-form — standalone brand submission page ─────────
+app.get('/brand-form', (c) => {
+  const token = c.req.query('token') || ''
+  return c.html(brandFormHtml(token))
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ─── Feedback (心聲) APIs ────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -8084,6 +8599,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="nav-item" onclick="switchMod('mod-qr')">
         <i class="fas fa-qrcode"></i> QR 快速登記
       </div>
+      <div class="nav-item" onclick="switchMod('mod-testing')">
+        <i class="fas fa-flask"></i> 產品測試計劃
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doAdminLogout()">
@@ -9841,6 +10359,705 @@ function qrLoadStats(){
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- mod-testing: 產品測試計劃 管理面板 -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<div id="mod-testing" class="mod-page" style="display:none">
+<style>
+.tst-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+.tst-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s;}
+.tst-btn:disabled{opacity:.5;cursor:not-allowed;}
+.tst-btn-primary{background:#7c3aed;color:#fff;}
+.tst-btn-secondary{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;}
+.tst-btn-sm{padding:5px 10px;font-size:12px;border-radius:6px;}
+.tst-btn-danger{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;}
+.tst-btn-green{background:#f0fdf4;color:#166534;border:1px solid #86efac;}
+.tst-btn-orange{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;}
+.tst-tabs{display:flex;gap:4px;background:#f3f4f6;border-radius:10px;padding:4px;margin-bottom:20px;overflow-x:auto;}
+.tst-tab{flex:none;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;white-space:nowrap;border:none;background:transparent;}
+.tst-tab.active{background:#fff;color:#7c3aed;box-shadow:0 1px 4px rgba(0,0,0,0.1);}
+.tst-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+.tst-campaign-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.tst-campaign-title{font-size:15px;font-weight:800;color:#1f2937;margin-bottom:3px;}
+.tst-campaign-sub{font-size:13px;color:#6b7280;}
+.tst-status-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+.tst-status-draft{background:#f3f4f6;color:#374151;}
+.tst-status-pending_review{background:#fef3c7;color:#92400e;}
+.tst-status-approved{background:#dbeafe;color:#1e40af;}
+.tst-status-live{background:#d1fae5;color:#065f46;}
+.tst-status-completed{background:#ede9fe;color:#5b21b6;}
+.tst-status-archived{background:#f3f4f6;color:#9ca3af;}
+.tst-stats-row{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;}
+.tst-stat-item{text-align:center;background:#f9fafb;border-radius:8px;padding:8px 14px;}
+.tst-stat-num{font-size:20px;font-weight:900;color:#7c3aed;}
+.tst-stat-lbl{font-size:11px;color:#6b7280;margin-top:1px;}
+.tst-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
+.tst-panel{display:none;}
+.tst-panel.active{display:block;}
+.tst-detail-hd{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.tst-back-btn{background:#f3f4f6;border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#374151;}
+.tst-section{margin-bottom:20px;}
+.tst-section-title{font-size:13px;font-weight:800;color:#5b21b6;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #ede9fe;}
+.tst-field{margin-bottom:12px;}
+.tst-label{font-size:12px;font-weight:700;color:#6b7280;margin-bottom:4px;}
+.tst-value{font-size:14px;color:#111;}
+.tst-form-field{margin-bottom:14px;}
+.tst-form-label{display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:5px;}
+.tst-input{width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;background:#fafafa;}
+.tst-input:focus{border-color:#7c3aed;outline:none;background:#fff;}
+.tst-textarea{resize:vertical;min-height:70px;line-height:1.6;}
+.tst-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;}
+.tst-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.tst-table{width:100%;border-collapse:collapse;font-size:13px;}
+.tst-table th{background:#f9fafb;padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:#6b7280;border-bottom:1px solid #e5e7eb;}
+.tst-table td{padding:10px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle;}
+.tst-table tr:last-child td{border-bottom:none;}
+.tst-qr-code{font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:12px;}
+.tst-q-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;}
+.tst-q-num{background:#7c3aed;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;}
+.tst-q-body{flex:1;}
+.tst-q-title{font-size:14px;font-weight:700;color:#1f2937;margin-bottom:3px;}
+.tst-q-type{font-size:11px;color:#7c3aed;font-weight:600;}
+.tst-funnel{display:flex;flex-direction:column;gap:8px;}
+.tst-funnel-row{display:flex;align-items:center;gap:12px;}
+.tst-funnel-bar-wrap{flex:1;background:#f3f4f6;border-radius:6px;height:24px;overflow:hidden;}
+.tst-funnel-bar{height:100%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:6px;transition:width .5s;}
+.tst-funnel-lbl{font-size:12px;color:#374151;width:100px;text-align:right;}
+.tst-funnel-num{font-size:13px;font-weight:800;color:#7c3aed;width:30px;}
+.tst-review-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:13px;color:#92400e;line-height:1.6;}
+.tst-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.tst-modal{background:#fff;border-radius:16px;padding:28px 24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+.tst-modal-title{font-size:18px;font-weight:800;color:#1f2937;margin-bottom:18px;}
+.tst-modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
+</style>
+
+<!-- ── Panel: Campaign List ── -->
+<div id="tst-panel-list" class="tst-panel active">
+  <div class="tst-topbar">
+    <div style="font-size:15px;font-weight:800;color:#1f2937;">所有測試計劃</div>
+    <button class="tst-btn tst-btn-primary" onclick="tstOpenCreate()"><i class="fas fa-plus"></i> 新增計劃</button>
+  </div>
+  <div id="tstCampaignList">
+    <div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>
+  </div>
+</div>
+
+<!-- ── Panel: Campaign Detail ── -->
+<div id="tst-panel-detail" class="tst-panel">
+  <div class="tst-detail-hd">
+    <button class="tst-back-btn" onclick="tstShowList()">← 返回列表</button>
+    <div id="tstDetailTitle" style="font-size:16px;font-weight:800;color:#1f2937;flex:1;"></div>
+    <div id="tstDetailBadge"></div>
+  </div>
+  <div class="tst-tabs" id="tstDetailTabs">
+    <button class="tst-tab active" onclick="tstDetailTab('overview',this)">📋 概覽</button>
+    <button class="tst-tab" onclick="tstDetailTab('questions',this)">❓ 問卷題目</button>
+    <button class="tst-tab" onclick="tstDetailTab('qrcodes',this)">🔖 QR 碼</button>
+    <button class="tst-tab" onclick="tstDetailTab('participants',this)">👥 參與者</button>
+    <button class="tst-tab" onclick="tstDetailTab('report',this)">📊 報告</button>
+  </div>
+  <div id="tstDetailContent">
+    <div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>
+  </div>
+</div>
+
+<!-- ── Panel: Create/Edit Campaign ── -->
+<div id="tst-panel-form" class="tst-panel">
+  <div class="tst-detail-hd">
+    <button class="tst-back-btn" onclick="tstShowList()">← 返回列表</button>
+    <div id="tstFormTitle" style="font-size:16px;font-weight:800;color:#1f2937;flex:1;"></div>
+  </div>
+  <div id="tstFormMsg" style="display:none;padding:12px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:14px;"></div>
+  <div class="tst-card">
+    <div class="tst-section-title">基本資料</div>
+    <div class="tst-form-field">
+      <label class="tst-form-label">計劃名稱 <span style="color:#ef4444">*</span></label>
+      <input class="tst-input" id="tstFName" placeholder="例：XX 品牌護膚品測試計劃 2025">
+    </div>
+    <div class="tst-form-grid">
+      <div class="tst-form-field">
+        <label class="tst-form-label">品牌名稱 <span style="color:#ef4444">*</span></label>
+        <input class="tst-input" id="tstFBrand" placeholder="例：XX 護膚">
+      </div>
+      <div class="tst-form-field">
+        <label class="tst-form-label">產品名稱 <span style="color:#ef4444">*</span></label>
+        <input class="tst-input" id="tstFProduct" placeholder="例：深層保濕面霜">
+      </div>
+    </div>
+    <div class="tst-form-field">
+      <label class="tst-form-label">品牌標誌 URL</label>
+      <input class="tst-input" id="tstFLogo" placeholder="https://…">
+    </div>
+    <div class="tst-form-field">
+      <label class="tst-form-label">品牌描述</label>
+      <textarea class="tst-input tst-textarea" id="tstFDesc" rows="3" placeholder="品牌簡介…"></textarea>
+    </div>
+    <div class="tst-form-grid">
+      <div class="tst-form-field">
+        <label class="tst-form-label">測試天數</label>
+        <select class="tst-input tst-select" id="tstFDuration">
+          <option value="7">7 天</option>
+          <option value="14" selected>14 天</option>
+          <option value="21">21 天</option>
+          <option value="28">28 天</option>
+        </select>
+      </div>
+      <div class="tst-form-field">
+        <label class="tst-form-label">問卷截止日期</label>
+        <input class="tst-input" id="tstFDeadline" placeholder="YYYY-MM-DD">
+      </div>
+    </div>
+    <div class="tst-form-field">
+      <label class="tst-form-label">生成品牌填表連結</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="tst-input" id="tstFBrandToken" readonly style="flex:1;background:#f9fafb;font-size:12px;font-family:monospace;">
+        <button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstCopyBrandLink()" style="white-space:nowrap;">📋 複製</button>
+      </div>
+      <div style="font-size:11px;color:#6b7280;margin-top:4px;">儲存計劃後自動生成，有效期 30 天</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+    <button class="tst-btn tst-btn-secondary" onclick="tstShowList()">取消</button>
+    <button class="tst-btn tst-btn-primary" id="tstFormSaveBtn" onclick="tstSaveCampaign()"><i class="fas fa-save"></i> 儲存</button>
+  </div>
+</div>
+</div><!-- end mod-testing -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// TESTING MODULE JS
+// ══════════════════════════════════════════════════════════════════════════════
+var tstCurrentId = null;
+var tstCurrentData = null;
+
+var TST_STATUS_LABELS = {
+  draft:'草稿', pending_review:'待審核', approved:'已批准', live:'進行中', completed:'已完成', archived:'已封存'
+};
+var TST_Q_TYPE_LABELS = {
+  rating:'評分', yes_no:'是/否', single_choice:'單選', multi_choice:'多選', text:'文字'
+};
+var TST_PARTICIPANT_STATUS = {
+  registered:'已登記', sample_claimed:'已取樣品',
+  survey_started:'填寫中', survey_submitted:'已提交', reward_sent:'已發獎勵'
+};
+
+function tstEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function tstPanel(id){
+  document.querySelectorAll('#mod-testing .tst-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById(id).classList.add('active');
+}
+
+function tstShowList(){ tstPanel('tst-panel-list'); testingLoadCampaigns(); }
+
+function tstStatusBadge(status){
+  return '<span class="tst-status-badge tst-status-'+tstEsc(status)+'">'+(TST_STATUS_LABELS[status]||status)+'</span>';
+}
+
+// ── Load campaign list ──────────────────────────────────────────────────────
+function testingLoadCampaigns(){
+  var el = document.getElementById('tstCampaignList');
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>';
+  fetch('/api/admin/testing/campaigns',{credentials:'include'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok||!(d.campaigns||[]).length){
+      el.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;">尚未有測試計劃。點擊「新增計劃」開始。</div>';
+      return;
+    }
+    var html='';
+    d.campaigns.forEach(function(c){
+      html+='<div class="tst-card">'+
+        '<div class="tst-campaign-hd">'+
+          '<div style="flex:1;">'+
+            '<div class="tst-campaign-title">'+tstEsc(c.campaign_name)+'</div>'+
+            '<div class="tst-campaign-sub">'+tstEsc(c.brand_name)+' ／ '+tstEsc(c.product_name)+'</div>'+
+          '</div>'+
+          tstStatusBadge(c.status)+
+        '</div>'+
+        '<div class="tst-stats-row">'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">'+（c.total_participants||0)+'</div><div class="tst-stat-lbl">參與者</div></div>'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.submitted_count||0)+'</div><div class="tst-stat-lbl">已提交</div></div>'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.qr_count||0)+'</div><div class="tst-stat-lbl">QR 碼</div></div>'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.testing_duration_days||14)+'天</div><div class="tst-stat-lbl">測試期</div></div>'+
+        '</div>'+
+        '<div class="tst-actions">'+
+          '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstViewDetail('+c.id+')"><i class="fas fa-eye"></i> 查看</button>'+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstOpenEdit('+c.id+')"><i class="fas fa-edit"></i> 編輯</button>':'')+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-orange tst-btn-sm" onclick="tstSubmitReview('+c.id+')">📤 提交審核</button>':'')+
+          (c.status==='pending_review'?'<button class="tst-btn tst-btn-green tst-btn-sm" onclick="tstApprove('+c.id+')">✅ 批准</button><button class="tst-btn tst-btn-danger tst-btn-sm" onclick="tstReject('+c.id+')">❌ 拒絕</button>':'')+
+          (c.status==='approved'?'<button class="tst-btn tst-btn-green tst-btn-sm" onclick="tstPublish('+c.id+')">🚀 發佈上線</button>':'')+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-danger tst-btn-sm" onclick="tstDeleteCampaign('+c.id+',\''+tstEsc(c.campaign_name)+'\')"><i class="fas fa-trash"></i></button>':'')+
+        '</div>'+
+      '</div>';
+    });
+    el.innerHTML=html;
+  }).catch(function(){ el.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444;">載入失敗</div>'; });
+}
+
+// ── Create / Edit ───────────────────────────────────────────────────────────
+function tstOpenCreate(){
+  tstCurrentId=null; tstCurrentData=null;
+  document.getElementById('tstFormTitle').textContent='新增測試計劃';
+  ['tstFName','tstFBrand','tstFProduct','tstFLogo','tstFDesc','tstFDeadline','tstFBrandToken'].forEach(function(id){
+    document.getElementById(id).value='';
+  });
+  document.getElementById('tstFDuration').value='14';
+  document.getElementById('tstFormMsg').style.display='none';
+  tstPanel('tst-panel-form');
+}
+
+function tstOpenEdit(id){
+  fetch('/api/admin/testing/campaigns/'+id,{credentials:'include'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok){alert('載入失敗');return;}
+    var c=d.campaign;
+    tstCurrentId=id; tstCurrentData=d;
+    document.getElementById('tstFormTitle').textContent='編輯計劃：'+c.campaign_name;
+    document.getElementById('tstFName').value=c.campaign_name||'';
+    document.getElementById('tstFBrand').value=c.brand_name||'';
+    document.getElementById('tstFProduct').value=c.product_name||'';
+    document.getElementById('tstFLogo').value=c.brand_logo_url||'';
+    document.getElementById('tstFDesc').value=c.brand_description||'';
+    document.getElementById('tstFDuration').value=String(c.testing_duration_days||14);
+    document.getElementById('tstFDeadline').value=c.survey_deadline||'';
+    if(c.brand_form_token){
+      document.getElementById('tstFBrandToken').value=location.origin+'/brand-form?token='+c.brand_form_token;
+    }
+    document.getElementById('tstFormMsg').style.display='none';
+    tstPanel('tst-panel-form');
+  });
+}
+
+function tstSaveCampaign(){
+  var name=document.getElementById('tstFName').value.trim();
+  var brand=document.getElementById('tstFBrand').value.trim();
+  var product=document.getElementById('tstFProduct').value.trim();
+  if(!name||!brand||!product){
+    tstShowFormMsg('請填寫計劃名稱、品牌名稱及產品名稱','#fef2f2','#991b1b');return;
+  }
+  var payload={
+    campaign_name:name, brand_name:brand, product_name:product,
+    brand_logo_url:document.getElementById('tstFLogo').value.trim()||null,
+    brand_description:document.getElementById('tstFDesc').value.trim(),
+    testing_duration_days:parseInt(document.getElementById('tstFDuration').value)||14,
+    survey_deadline:document.getElementById('tstFDeadline').value.trim()||null
+  };
+  var btn=document.getElementById('tstFormSaveBtn');
+  btn.disabled=true; btn.textContent='儲存中…';
+  var url=tstCurrentId?'/api/admin/testing/campaigns/'+tstCurrentId:'/api/admin/testing/campaigns';
+  var method=tstCurrentId?'PUT':'POST';
+  fetch(url,{method:method,credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> 儲存';
+    if(d.ok){
+      var cid=d.id||(d.campaign&&d.campaign.id)||tstCurrentId;
+      if(d.brand_form_token){
+        document.getElementById('tstFBrandToken').value=location.origin+'/brand-form?token='+d.brand_form_token;
+      }
+      tstShowFormMsg('儲存成功！','#f0fdf4','#166534');
+      if(!tstCurrentId && cid){ tstCurrentId=cid; }
+    } else {
+      tstShowFormMsg(d.error||'儲存失敗','#fef2f2','#991b1b');
+    }
+  }).catch(function(){
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> 儲存';
+    tstShowFormMsg('網絡錯誤，請重試','#fef2f2','#991b1b');
+  });
+}
+
+function tstShowFormMsg(text, bg, color){
+  var el=document.getElementById('tstFormMsg');
+  el.textContent=text; el.style.background=bg; el.style.color=color;
+  el.style.border='1px solid '+color; el.style.display='block';
+}
+
+function tstCopyBrandLink(){
+  var val=document.getElementById('tstFBrandToken').value;
+  if(!val){alert('請先儲存計劃以生成連結');return;}
+  navigator.clipboard.writeText(val).then(function(){alert('連結已複製！');}).catch(function(){
+    prompt('請手動複製連結：',val);
+  });
+}
+
+// ── Status actions ──────────────────────────────────────────────────────────
+function tstSubmitReview(id){
+  if(!confirm('確定提交此計劃供審核？')) return;
+  fetch('/api/admin/testing/campaigns/'+id+'/approve',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'submit_review'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'操作失敗');
+  });
+}
+
+function tstApprove(id){
+  if(!confirm('確定批准此計劃？')) return;
+  fetch('/api/admin/testing/campaigns/'+id+'/approve',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'approve'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'操作失敗');
+  });
+}
+
+function tstReject(id){
+  var comments=prompt('請輸入拒絕原因（選填）：','');
+  if(comments===null) return;
+  fetch('/api/admin/testing/campaigns/'+id+'/approve',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'reject',comments:comments})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'操作失敗');
+  });
+}
+
+function tstPublish(id){
+  if(!confirm('確定發佈此計劃上線？發佈後參與者可掃描 QR 碼加入。')) return;
+  fetch('/api/admin/testing/campaigns/'+id+'/publish',{
+    method:'POST',credentials:'include'
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'操作失敗');
+  });
+}
+
+function tstDeleteCampaign(id, name){
+  if(!confirm('確定刪除計劃「'+name+'」？此操作不可撤銷。')) return;
+  fetch('/api/admin/testing/campaigns/'+id,{
+    method:'DELETE',credentials:'include'
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'刪除失敗');
+  });
+}
+
+// ── Detail view ─────────────────────────────────────────────────────────────
+function tstViewDetail(id){
+  tstCurrentId=id;
+  tstPanel('tst-panel-detail');
+  document.getElementById('tstDetailContent').innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>';
+  tstLoadDetailData(id,'overview');
+}
+
+function tstDetailTab(tab, btn){
+  document.querySelectorAll('#tstDetailTabs .tst-tab').forEach(function(t){t.classList.remove('active');});
+  btn.classList.add('active');
+  tstLoadDetailData(tstCurrentId, tab);
+}
+
+function tstLoadDetailData(id, tab){
+  var el=document.getElementById('tstDetailContent');
+  el.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>';
+
+  if(tab==='overview'){
+    fetch('/api/admin/testing/campaigns/'+id,{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';return;}
+      var c=d.campaign;
+      tstCurrentData=d;
+      document.getElementById('tstDetailTitle').textContent=c.campaign_name;
+      document.getElementById('tstDetailBadge').innerHTML=tstStatusBadge(c.status);
+      var brandLink=c.brand_form_token?(location.origin+'/brand-form?token='+c.brand_form_token):'（尚未生成）';
+      var reviewHtml=c.review_comments?'<div class="tst-review-box">📝 審核備注：'+tstEsc(c.review_comments)+'</div>':'';
+      var html=''+
+        reviewHtml+
+        '<div class="tst-card">'+
+          '<div class="tst-section-title">基本資料</div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'+
+            '<div><div class="tst-label">品牌名稱</div><div class="tst-value">'+tstEsc(c.brand_name)+'</div></div>'+
+            '<div><div class="tst-label">產品名稱</div><div class="tst-value">'+tstEsc(c.product_name)+'</div></div>'+
+            '<div><div class="tst-label">測試天數</div><div class="tst-value">'+tstEsc(String(c.testing_duration_days||14))+' 天</div></div>'+
+            '<div><div class="tst-label">問卷截止</div><div class="tst-value">'+tstEsc(c.survey_deadline||'—')+'</div></div>'+
+          '</div>'+
+          (c.brand_description?'<div style="margin-top:10px;"><div class="tst-label">品牌描述</div><div class="tst-value" style="white-space:pre-wrap">'+tstEsc(c.brand_description)+'</div></div>':'')+
+        '</div>'+
+        '<div class="tst-card">'+
+          '<div class="tst-section-title">品牌填表連結</div>'+
+          '<div style="display:flex;align-items:center;gap:8px;">'+
+            '<input style="flex:1;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:monospace;background:#f9fafb;" readonly value="'+tstEsc(brandLink)+'">'+
+            (c.brand_form_token?'<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="navigator.clipboard.writeText(\''+tstEsc(brandLink)+'\').then(function(){alert(\'已複製！\')})">📋</button>':'')+
+          '</div>'+
+          '<div style="font-size:11px;color:#6b7280;margin-top:4px;">品牌可使用此連結填寫詳細資料</div>'+
+        '</div>'+
+        '<div class="tst-card">'+
+          '<div class="tst-section-title">WhatsApp 範本</div>'+
+          ['welcome','reminder1','reminder2','complete'].map(function(k){
+            var labels={welcome:'歡迎訊息',reminder1:'第一次提醒',reminder2:'第二次提醒',complete:'完成感謝'};
+            var val=c['wa_template_'+k]||'';
+            return val?'<div style="margin-bottom:10px;"><div class="tst-label">'+labels[k]+'</div><div style="background:#f9fafb;border-radius:6px;padding:10px;font-size:13px;white-space:pre-wrap;color:#374151">'+tstEsc(val)+'</div></div>':'';
+          }).join('')+
+        '</div>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">'+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-secondary" onclick="tstOpenEdit('+id+')"><i class="fas fa-edit"></i> 編輯</button>':'')+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-orange" onclick="tstSubmitReview('+id+')">📤 提交審核</button>':'')+
+          (c.status==='pending_review'?'<button class="tst-btn tst-btn-green" onclick="tstApprove('+id+')">✅ 批准</button><button class="tst-btn tst-btn-danger" onclick="tstReject('+id+')">❌ 拒絕</button>':'')+
+          (c.status==='approved'?'<button class="tst-btn tst-btn-primary" onclick="tstPublish('+id+')">🚀 發佈上線</button>':'')+
+        '</div>';
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+
+  else if(tab==='questions'){
+    fetch('/api/admin/testing/campaigns/'+id,{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var questions=d.questions||[];
+      var html='<div class="tst-card">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'+
+          '<div class="tst-section-title" style="margin:0">問卷題目（共 '+questions.length+' 題）</div>'+
+          '<button class="tst-btn tst-btn-primary tst-btn-sm" onclick="tstOpenAddQuestion('+id+')">＋ 新增題目</button>'+
+        '</div>';
+      if(!questions.length){
+        html+='<div style="text-align:center;padding:24px;color:#9ca3af;">尚未有題目</div>';
+      } else {
+        questions.sort(function(a,b){return a.question_order-b.question_order;});
+        questions.forEach(function(q,i){
+          var optsHtml='';
+          if(q.options){
+            try{
+              var opts=JSON.parse(q.options);
+              if(opts.length) optsHtml='<div style="margin-top:6px;font-size:12px;color:#6b7280;">選項：'+opts.map(function(o){return tstEsc(o);}).join(' ／ ')+'</div>';
+            }catch(e){}
+          }
+          html+='<div class="tst-q-card">'+
+            '<div class="tst-q-num">'+(i+1)+'</div>'+
+            '<div class="tst-q-body">'+
+              '<div class="tst-q-title">'+tstEsc(q.title)+(q.is_required?'  <span style="color:#ef4444;font-size:11px;">必填</span>':'')+'</div>'+
+              '<div class="tst-q-type">'+（TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+'</div>'+
+              optsHtml+
+            '</div>'+
+            '<div style="display:flex;gap:6px;">'+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstDeleteQuestion('+q.id+','+id+')"><i class="fas fa-trash" style="color:#ef4444"></i></button>'+
+            '</div>'+
+          '</div>';
+        });
+      }
+      html+='</div>';
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+
+  else if(tab==='qrcodes'){
+    fetch('/api/admin/testing/campaigns/'+id,{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var qrs=d.qr_codes||[];
+      var html='<div class="tst-card">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'+
+          '<div class="tst-section-title" style="margin:0">QR 碼（共 '+qrs.length+' 個）</div>'+
+          '<button class="tst-btn tst-btn-primary tst-btn-sm" onclick="tstAddQR('+id+')">＋ 新增 QR 碼</button>'+
+        '</div>'+
+        '<table class="tst-table">'+
+          '<thead><tr><th>標籤</th><th>追蹤碼</th><th>掃描次數</th><th>狀態</th><th>掃描連結</th></tr></thead>'+
+          '<tbody>';
+      if(!qrs.length){
+        html+='<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:20px;">尚未有 QR 碼</td></tr>';
+      } else {
+        qrs.forEach(function(q){
+          var scanUrl=location.origin+'/testing/scan/'+q.tracking_code;
+          html+='<tr>'+
+            '<td>'+tstEsc(q.label||'—')+'</td>'+
+            '<td><span class="tst-qr-code">'+tstEsc(q.tracking_code)+'</span></td>'+
+            '<td>'+tstEsc(String(q.scanned_count||0))+'</td>'+
+            '<td>'+（q.status==='active'?'<span style="color:#166534;font-weight:700;">✅ 啟用</span>':'<span style="color:#9ca3af;">停用</span>')+'</td>'+
+            '<td><a href="'+tstEsc(scanUrl)+'" target="_blank" style="font-size:11px;color:#7c3aed;word-break:break-all;">'+tstEsc(scanUrl)+'</a>'+
+              ' <button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="navigator.clipboard.writeText(\''+tstEsc(scanUrl)+'\').then(function(){alert(\'已複製！\')})">📋</button>'+
+            '</td>'+
+          '</tr>';
+        });
+      }
+      html+='</tbody></table></div>';
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+
+  else if(tab==='participants'){
+    fetch('/api/admin/testing/campaigns/'+id+'/participants',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var ps=d.participants||[];
+      var html='<div class="tst-card">'+
+        '<div class="tst-section-title">參與者列表（'+ps.length+' 人）</div>'+
+        '<table class="tst-table">'+
+          '<thead><tr><th>會員編號</th><th>姓名</th><th>狀態</th><th>登記時間</th><th>WA 操作</th></tr></thead>'+
+          '<tbody>';
+      if(!ps.length){
+        html+='<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:20px;">尚未有參與者</td></tr>';
+      } else {
+        ps.forEach(function(p){
+          var statusLabel=TST_PARTICIPANT_STATUS[p.status]||p.status;
+          var statusColor={'registered':'#374151','sample_claimed':'#c2410c','survey_started':'#1e40af','survey_submitted':'#166534','reward_sent':'#5b21b6'}[p.status]||'#374151';
+          html+='<tr>'+
+            '<td><span class="tst-qr-code">'+tstEsc(p.member_no)+'</span></td>'+
+            '<td>'+tstEsc(p.member_name||'—')+'</td>'+
+            '<td><span style="color:'+statusColor+';font-weight:700;">'+tstEsc(statusLabel)+'</span></td>'+
+            '<td style="font-size:12px;color:#6b7280;">'+tstEsc((p.registered_at||'').slice(0,16))+'</td>'+
+            '<td>'+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstSendWA('+p.id+',\'welcome\')">歡迎</button> '+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstSendWA('+p.id+',\'reminder1\')">提醒1</button> '+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstSendWA('+p.id+',\'complete\')">完成</button>'+
+            '</td>'+
+          '</tr>';
+        });
+      }
+      html+='</tbody></table></div>';
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+
+  else if(tab==='report'){
+    fetch('/api/admin/testing/campaigns/'+id+'/report',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';return;}
+      var r=d.report;
+      var funnel=r.funnel||{};
+      var total=funnel.registered||0;
+      function pct(n){ return total>0?Math.round(n/total*100):0; }
+      var html='<div class="tst-card">'+
+        '<div class="tst-section-title">參與漏斗</div>'+
+        '<div class="tst-funnel">'+
+          tstFunnelRow('已登記',funnel.registered||0,pct(funnel.registered||0))+
+          tstFunnelRow('已取樣品',funnel.sample_claimed||0,pct(funnel.sample_claimed||0))+
+          tstFunnelRow('填寫中',funnel.survey_started||0,pct(funnel.survey_started||0))+
+          tstFunnelRow('已提交',funnel.survey_submitted||0,pct(funnel.survey_submitted||0))+
+          tstFunnelRow('已發獎勵',funnel.reward_sent||0,pct(funnel.reward_sent||0))+
+        '</div>'+
+        (r.avg_completion_minutes?'<div style="margin-top:12px;font-size:13px;color:#6b7280;">平均完成時間：<strong>'+Math.round(r.avg_completion_minutes)+' 分鐘</strong></div>':'')+
+      '</div>';
+      // Per-question stats
+      var qs=r.question_stats||[];
+      qs.forEach(function(q){
+        html+='<div class="tst-card">'+
+          '<div class="tst-section-title">'+tstEsc(q.title)+'</div>'+
+          '<div style="font-size:12px;color:#7c3aed;margin-bottom:10px;">'+（TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+' ／ 回答人數：'+（q.response_count||0)+'</div>';
+        if(q.question_type==='rating' && q.avg_rating){
+          var stars=Math.round(q.avg_rating);
+          html+='<div style="font-size:28px;margin-bottom:6px;">'+'★'.repeat(stars)+'☆'.repeat(5-stars)+'</div>'+
+            '<div style="font-size:20px;font-weight:900;color:#7c3aed;">'+parseFloat(q.avg_rating).toFixed(1)+' / 5</div>';
+        } else if(q.options_breakdown){
+          html+='<div>';
+          (q.options_breakdown||[]).forEach(function(opt){
+            html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+              '<div style="width:120px;font-size:13px;color:#374151;">'+tstEsc(opt.answer)+'</div>'+
+              '<div style="flex:1;background:#f3f4f6;border-radius:4px;height:16px;overflow:hidden;">'+
+                '<div style="height:100%;background:#7c3aed;width:'+opt.pct+'%;border-radius:4px;"></div>'+
+              '</div>'+
+              '<div style="font-size:13px;font-weight:700;color:#7c3aed;width:40px;">'+opt.count+'</div>'+
+            '</div>';
+          });
+          html+='</div>';
+        } else if(q.question_type==='text'){
+          html+='<div style="font-size:12px;color:#6b7280;">（文字回答，請查看個別參與者資料）</div>';
+        }
+        html+='</div>';
+      });
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+}
+
+function tstFunnelRow(label, num, pct){
+  return '<div class="tst-funnel-row">'+
+    '<div class="tst-funnel-lbl">'+tstEsc(label)+'</div>'+
+    '<div class="tst-funnel-bar-wrap"><div class="tst-funnel-bar" style="width:'+pct+'%"></div></div>'+
+    '<div class="tst-funnel-num">'+num+'</div>'+
+  '</div>';
+}
+
+// ── Add QR Code ─────────────────────────────────────────────────────────────
+function tstAddQR(cid){
+  var label=prompt('請輸入此 QR 碼的標籤（例：Exhibition A / 門市 B）：','');
+  if(label===null) return;
+  fetch('/api/admin/testing/campaigns/'+cid+'/qr-codes',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({label:label})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){ tstLoadDetailData(cid,'qrcodes'); }
+    else alert(d.error||'生成失敗');
+  });
+}
+
+// ── Add Question modal ───────────────────────────────────────────────────────
+function tstOpenAddQuestion(cid){
+  var html='<div class="tst-modal-overlay" id="tstQModal" onclick="if(event.target===this)this.remove()">'+
+    '<div class="tst-modal">'+
+      '<div class="tst-modal-title">新增問卷題目</div>'+
+      '<div class="tst-form-field"><label class="tst-form-label">題型</label>'+
+        '<select class="tst-input tst-select" id="tstQType" onchange="tstQTypeChange()">'+
+          '<option value="rating">評分（1-5 星）</option>'+
+          '<option value="yes_no">是 / 否</option>'+
+          '<option value="single_choice">單選題</option>'+
+          '<option value="multi_choice">多選題</option>'+
+          '<option value="text">文字回答</option>'+
+        '</select></div>'+
+      '<div class="tst-form-field"><label class="tst-form-label">題目內容 <span style="color:#ef4444">*</span></label>'+
+        '<input class="tst-input" id="tstQTitle" placeholder="例：您對產品的整體評分？"></div>'+
+      '<div id="tstQOptsWrap"></div>'+
+      '<div class="tst-modal-footer">'+
+        '<button class="tst-btn tst-btn-secondary" onclick="document.getElementById(\'tstQModal\').remove()">取消</button>'+
+        '<button class="tst-btn tst-btn-primary" onclick="tstSaveQuestion('+cid+')">新增</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function tstQTypeChange(){
+  var type=document.getElementById('tstQType').value;
+  var wrap=document.getElementById('tstQOptsWrap');
+  if(type==='single_choice'||type==='multi_choice'){
+    wrap.innerHTML='<div class="tst-form-field"><label class="tst-form-label">選項（每行一個）</label>'+
+      '<textarea class="tst-input tst-textarea" id="tstQOpts" placeholder="選項 1\n選項 2\n選項 3" rows="4"></textarea></div>';
+  } else {
+    wrap.innerHTML='';
+  }
+}
+
+function tstSaveQuestion(cid){
+  var type=document.getElementById('tstQType').value;
+  var title=document.getElementById('tstQTitle').value.trim();
+  if(!title){alert('請輸入題目內容');return;}
+  var options=[];
+  if((type==='single_choice'||type==='multi_choice') && document.getElementById('tstQOpts')){
+    options=document.getElementById('tstQOpts').value.split('\n').map(function(s){return s.trim();}).filter(function(s){return s;});
+  }
+  fetch('/api/admin/testing/campaigns/'+cid+'/questions',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_type:type,title:title,options:options,is_required:1})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      var m=document.getElementById('tstQModal'); if(m) m.remove();
+      tstLoadDetailData(cid,'questions');
+    } else alert(d.error||'新增失敗');
+  });
+}
+
+function tstDeleteQuestion(qid, cid){
+  if(!confirm('確定刪除此題目？')) return;
+  fetch('/api/admin/testing/questions/'+qid,{method:'DELETE',credentials:'include'})
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.ok) tstLoadDetailData(cid,'questions'); else alert(d.error||'刪除失敗');
+  });
+}
+
+// ── Send WA ─────────────────────────────────────────────────────────────────
+function tstSendWA(participantId, type){
+  fetch('/api/admin/testing/send-whatsapp',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({participant_id:participantId,message_type:type})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok && d.wa_url){
+      window.open(d.wa_url,'_blank');
+    } else {
+      alert(d.error||'無法生成 WhatsApp 連結');
+    }
+  });
+}
+</script>
+
 <script>
 // ── Sidebar nav ──
 var _membershipFrameLoaded = false;
@@ -9849,7 +11066,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核','mod-qr':'🔖 QR 快速登記管理'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核','mod-qr':'🔖 QR 快速登記管理','mod-testing':'🧪 產品測試計劃'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -9864,6 +11081,7 @@ function switchMod(id){
   if(id==='mod-revenue') { loadRevApps('PENDING'); loadRevStats(); }
   if(id==='mod-colinkery-admin') { loadCkAdminData(); }
   if(id==='mod-qr') { qrLoadAll(); }
+  if(id==='mod-testing') { testingLoadCampaigns(); }
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
@@ -12325,6 +13543,16 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
         <div class="di-sub">優惠、資源、連結</div>
       </div>
     </button>
+    <div class="drawer-divider"></div>
+    <!-- 產品測試 -->
+    <div class="drawer-section-title">會員專屬活動</div>
+    <button class="drawer-item" onclick="closeDrawer();openTestingPanel()">
+      <span class="di-icon">🧪</span>
+      <div>
+        <div>產品測試計劃</div>
+        <div class="di-sub">試用新品，分享意見</div>
+      </div>
+    </button>
   </div>
 </div>
 
@@ -12524,6 +13752,28 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
       <button onclick="closeUsefulLinksPanel()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#6B7280;padding:4px 8px;line-height:1">&times;</button>
     </div>
     <div id="ul-panel-list" style="overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch"></div>
+  </div>
+</div>
+
+<!-- ── 產品測試計劃 面板 ── -->
+<div id="testing-panel" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.5);flex-direction:column;align-items:center;justify-content:flex-end">
+  <div style="background:#f9fafb;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:0 0 env(safe-area-inset-bottom,16px);max-height:92vh;display:flex;flex-direction:column">
+    <div style="background:#7c3aed;color:#fff;border-radius:20px 20px 0 0;padding:16px 20px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="font-size:20px;font-weight:900;">🧪 產品測試計劃</div>
+      <button onclick="closeTestingPanel()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#fff;padding:4px 8px;line-height:1">&times;</button>
+    </div>
+    <div style="overflow-y:auto;padding:14px 16px 16px;-webkit-overflow-scrolling:touch;flex:1;">
+      <!-- Main view: my campaigns -->
+      <div id="tst-panel-main">
+        <div id="tst-join-confirm" style="display:none;margin-bottom:14px;"></div>
+        <div style="font-size:14px;font-weight:800;color:#5b21b6;margin-bottom:10px;">📋 我的測試計劃</div>
+        <div id="tst-my-list">
+          <div style="text-align:center;padding:24px;color:#9ca3af;font-size:16px;">載入中…</div>
+        </div>
+      </div>
+      <!-- Survey view -->
+      <div id="tst-panel-survey" style="display:none;"></div>
+    </div>
   </div>
 </div>
 
@@ -12771,6 +14021,12 @@ function showCard(memberNo, waClicked) {
   if (waClicked) {
     showInstallBanner();
   }
+  // 處理產品測試 QR 掃描
+  if(window._pendingTestingCode){
+    var tc = window._pendingTestingCode;
+    window._pendingTestingCode = null;
+    setTimeout(function(){ testingHandleQRScan(tc); }, 400);
+  }
 }
 
 // 查詢申請狀態並動態調整按鈕
@@ -12867,8 +14123,17 @@ function switchUser() {
     });
   }
 
-  // ── WA Quick Register Token 自動登入 ──────────────────────────────────────
+  // ── 產品測試 QR 掃描參數 ──────────────────────────────────────────────────
   var urlParams = new URLSearchParams(window.location.search);
+  var testingCode = urlParams.get('testing');
+  if(testingCode){
+    // Clean URL
+    window.history.replaceState({},'',window.location.origin+'/app');
+    // After member check, will call testingHandleQRScan
+    window._pendingTestingCode = testingCode;
+  }
+
+  // ── WA Quick Register Token 自動登入 ──────────────────────────────────────
   var waToken = urlParams.get('token');
   var waSource = urlParams.get('source');
   if (waToken && waSource === 'wa_quick_register') {
@@ -13073,6 +14338,279 @@ function closeUsefulLinksPanel(){
 }
 function escHtml(s){
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── 產品測試計劃 ─────────────────────────────────────────────────────────────
+var _testingPanel = null;
+var _testingContext = null; // set when arriving via QR scan
+
+function openTestingPanel(){
+  var panel = document.getElementById('testing-panel');
+  if(!panel) return;
+  panel.style.display='flex';
+  testingPanelShowMain();
+}
+function closeTestingPanel(){
+  var panel = document.getElementById('testing-panel');
+  if(panel) panel.style.display='none';
+}
+
+function testingPanelShowMain(){
+  var el = document.getElementById('tst-panel-main');
+  var el2 = document.getElementById('tst-panel-survey');
+  if(el) el.style.display='block';
+  if(el2) el2.style.display='none';
+  testingLoadMyCampaigns();
+}
+
+function testingLoadMyCampaigns(){
+  var memberNo = window.MEMBER_NO||'';
+  var el = document.getElementById('tst-my-list');
+  if(!el) return;
+  if(!memberNo){ el.innerHTML='<div style="text-align:center;padding:24px;color:#9ca3af;font-size:16px;">請先登入查看您的測試計劃。</div>'; return; }
+  el.innerHTML='<div style="text-align:center;padding:24px;color:#9ca3af;font-size:16px;">載入中…</div>';
+  fetch('/api/testing/my-campaigns/'+encodeURIComponent(memberNo))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok||(d.campaigns||[]).length===0){
+      el.innerHTML='<div style="text-align:center;padding:24px;color:#9ca3af;font-size:16px;">您尚未參與任何產品測試計劃。<br>請掃描活動 QR 碼加入！</div>';
+      return;
+    }
+    var TST_P_STATUS={registered:'已登記',sample_claimed:'已取樣品',survey_started:'填寫中',survey_submitted:'已提交問卷',reward_sent:'已收獎勵'};
+    var html=d.campaigns.map(function(c){
+      var statusColor={registered:'#374151',sample_claimed:'#c2410c',survey_started:'#1e40af',survey_submitted:'#166534',reward_sent:'#5b21b6'}[c.status]||'#374151';
+      var canSurvey=c.campaign_status==='live' && (c.status==='sample_claimed'||c.status==='survey_started');
+      return '<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);margin-bottom:12px;border:1.5px solid #ede9fe;">'+
+        (c.brand_logo_url?'<img src="'+escHtml(c.brand_logo_url)+'" alt="" style="height:36px;object-fit:contain;margin-bottom:10px;">':'')+
+        '<div style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:3px;">'+escHtml(c.product_name)+'</div>'+
+        '<div style="font-size:14px;color:#6b7280;margin-bottom:8px;">'+escHtml(c.brand_name)+'</div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;">'+
+          '<span style="font-size:14px;font-weight:700;color:'+statusColor+';">'+（TST_P_STATUS[c.status]||c.status)+'</span>'+
+          (canSurvey?'<button onclick="testingOpenSurvey('+c.campaign_id+')" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer;">填寫問卷</button>':'')+
+        '</div>'+
+        (c.survey_deadline?'<div style="font-size:12px;color:#9ca3af;margin-top:6px;">問卷截止：'+escHtml(c.survey_deadline)+'</div>':'')+
+      '</div>';
+    }).join('');
+    el.innerHTML=html;
+  }).catch(function(){
+    el.innerHTML='<div style="text-align:center;padding:24px;color:#ef4444;font-size:16px;">載入失敗</div>';
+  });
+}
+
+// Called when QR scan brings user to /app?testing=CODE
+function testingHandleQRScan(code){
+  _testingContext = code;
+  var memberNo = window.MEMBER_NO||'';
+  if(!memberNo){ openTestingPanel(); return; }
+  // Show join confirmation
+  fetch('/api/testing/scan/'+encodeURIComponent(code))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok){ openTestingPanel(); return; }
+    var c=d.campaign;
+    _testingContext = {code:code, campaign:c};
+    openTestingPanel();
+    testingShowJoinConfirm(c);
+  }).catch(function(){ openTestingPanel(); });
+}
+
+function testingShowJoinConfirm(campaign){
+  var el = document.getElementById('tst-join-confirm');
+  var el2 = document.getElementById('tst-my-list');
+  if(!el||!el2) return;
+  el2.style.display='none';
+  el.style.display='block';
+  el.innerHTML='<div style="background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:2px solid #7c3aed;text-align:center;">'+
+    '<div style="font-size:40px;margin-bottom:10px;">🧪</div>'+
+    (campaign.brand_logo_url?'<img src="'+escHtml(campaign.brand_logo_url)+'" alt="" style="height:40px;object-fit:contain;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto;">':'')+
+    '<div style="font-size:20px;font-weight:900;color:#1f2937;margin-bottom:4px;">'+escHtml(campaign.product_name)+'</div>'+
+    '<div style="font-size:15px;color:#6b7280;margin-bottom:12px;">由 '+escHtml(campaign.brand_name)+' 提供</div>'+
+    (campaign.brand_description?'<div style="font-size:14px;color:#374151;text-align:left;background:#f9fafb;border-radius:8px;padding:12px;margin-bottom:14px;line-height:1.7;">'+escHtml(campaign.brand_description)+'</div>':'')+
+    '<div style="font-size:14px;color:#6b7280;margin-bottom:16px;">測試期：'+tstEsc(String(campaign.testing_duration_days||14))+' 天</div>'+
+    '<button onclick="testingJoinCampaign()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:14px;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:10px;">✅ 確認加入並領取樣品</button>'+
+    '<button onclick="testingCancelJoin()" style="width:100%;background:#f3f4f6;color:#374151;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;">取消</button>'+
+  '</div>';
+}
+
+function testingCancelJoin(){
+  var el=document.getElementById('tst-join-confirm');
+  var el2=document.getElementById('tst-my-list');
+  if(el) el.style.display='none';
+  if(el2) el2.style.display='block';
+  _testingContext=null;
+}
+
+function testingJoinCampaign(){
+  var memberNo=window.MEMBER_NO||'';
+  if(!memberNo){alert('請先登入');return;}
+  var code=(_testingContext&&_testingContext.code)||_testingContext;
+  if(!code){alert('無效的活動碼');return;}
+  fetch('/api/testing/join',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tracking_code:code,member_no:memberNo})
+  }).then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('tst-join-confirm');
+    if(el) el.style.display='none';
+    var el2=document.getElementById('tst-my-list');
+    if(el2) el2.style.display='block';
+    if(d.ok){
+      alert('🎉 成功加入！請向工作人員領取產品樣品，使用後填寫問卷。');
+      testingLoadMyCampaigns();
+    } else {
+      alert(d.error||'加入失敗，請重試');
+    }
+    _testingContext=null;
+  }).catch(function(){alert('網絡錯誤，請重試');});
+}
+
+function testingOpenSurvey(campaignId){
+  var memberNo=window.MEMBER_NO||'';
+  if(!memberNo){alert('請先登入');return;}
+  var panelMain=document.getElementById('tst-panel-main');
+  var panelSurvey=document.getElementById('tst-panel-survey');
+  if(panelMain) panelMain.style.display='none';
+  if(panelSurvey){
+    panelSurvey.style.display='block';
+    panelSurvey.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;font-size:16px;">載入問卷中…</div>';
+  }
+  fetch('/api/testing/survey/'+campaignId+'?member_no='+encodeURIComponent(memberNo))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok||!(d.questions||[]).length){
+      panelSurvey.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444;font-size:16px;">'+(d.error||'無法載入問卷')+'</div>'+
+        '<button onclick="testingPanelShowMain()" style="display:block;margin:0 auto;background:#f3f4f6;border:none;border-radius:8px;padding:10px 20px;font-size:15px;font-weight:600;cursor:pointer;">返回</button>';
+      return;
+    }
+    var qs=d.questions;
+    var html='<div style="background:#7c3aed;color:#fff;padding:16px 18px;border-radius:12px;margin-bottom:18px;">'+
+      '<div style="font-size:11px;opacity:.8;margin-bottom:4px;">產品試用問卷</div>'+
+      '<div style="font-size:18px;font-weight:800;">'+escHtml(d.product_name||'')+'</div>'+
+      '</div>';
+    qs.forEach(function(q,i){
+      html+='<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08);" data-qid="'+q.id+'" data-qtype="'+q.question_type+'">'+
+        '<div style="font-size:15px;font-weight:800;color:#1f2937;margin-bottom:10px;">'+(i+1)+'. '+escHtml(q.title)+(q.is_required?'  <span style="color:#ef4444;font-size:12px;">必填</span>':'')+'</div>';
+      if(q.question_type==='rating'){
+        html+='<div style="display:flex;gap:8px;justify-content:center;margin:8px 0;" id="stars-'+q.id+'">';
+        for(var s=1;s<=5;s++){
+          html+='<button onclick="tstSetRating('+q.id+','+s+')" data-star="'+s+'" style="font-size:32px;background:none;border:none;cursor:pointer;color:#d1d5db;transition:color .15s;">★</button>';
+        }
+        html+='</div><div id="rating-val-'+q.id+'" style="display:none;"></div>';
+      } else if(q.question_type==='yes_no'){
+        html+='<div style="display:flex;gap:10px;" id="yn-'+q.id+'">'+
+          '<button onclick="tstSetYN('+q.id+',\'是\')" data-val="是" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">是</button>'+
+          '<button onclick="tstSetYN('+q.id+',\'否\')" data-val="否" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">否</button>'+
+        '</div>';
+      } else if(q.question_type==='single_choice'||q.question_type==='multi_choice'){
+        var opts=[];
+        try{ opts=JSON.parse(q.options||'[]'); }catch(e){}
+        html+='<div id="choice-'+q.id+'" data-multi="'+(q.question_type==='multi_choice'?'1':'0')+'">';
+        opts.forEach(function(opt){
+          html+='<button onclick="tstToggleChoice('+q.id+',this)" data-val="'+escHtml(opt)+'" style="display:block;width:100%;text-align:left;padding:11px 14px;margin-bottom:6px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;background:#fff;color:#374151;">'+escHtml(opt)+'</button>';
+        });
+        html+='</div>';
+      } else if(q.question_type==='text'){
+        html+='<textarea id="text-'+q.id+'" rows="3" placeholder="請輸入您的回答…" style="width:100%;padding:11px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical;"></textarea>';
+      }
+      html+='</div>';
+    });
+    html+='<button onclick="testingSubmitSurvey('+campaignId+')" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;margin-top:8px;">📤 提交問卷</button>'+
+      '<button onclick="testingPanelShowMain()" style="display:block;width:100%;margin-top:10px;background:transparent;border:none;color:#9ca3af;font-size:14px;cursor:pointer;">← 返回</button>';
+    panelSurvey.innerHTML=html;
+  }).catch(function(){
+    panelSurvey.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444;font-size:16px;">載入失敗</div>'+
+      '<button onclick="testingPanelShowMain()" style="display:block;margin:0 auto;background:#f3f4f6;border:none;border-radius:8px;padding:10px 20px;font-size:15px;font-weight:600;cursor:pointer;">返回</button>';
+  });
+}
+
+function tstSetRating(qid, val){
+  var wrap=document.getElementById('stars-'+qid);
+  if(!wrap)return;
+  wrap.querySelectorAll('button').forEach(function(btn){
+    var s=parseInt(btn.getAttribute('data-star'));
+    btn.style.color=s<=val?'#f59e0b':'#d1d5db';
+  });
+  var hidden=document.getElementById('rating-val-'+qid);
+  if(hidden){ hidden.setAttribute('data-value',String(val)); }
+}
+
+function tstSetYN(qid, val){
+  var wrap=document.getElementById('yn-'+qid);
+  if(!wrap)return;
+  wrap.querySelectorAll('button').forEach(function(btn){
+    var isThis=btn.getAttribute('data-val')===val;
+    btn.style.borderColor=isThis?'#7c3aed':'#e5e7eb';
+    btn.style.background=isThis?'#ede9fe':'#fff';
+    btn.style.color=isThis?'#5b21b6':'#374151';
+  });
+}
+
+function tstToggleChoice(qid, btn){
+  var wrap=document.getElementById('choice-'+qid);
+  if(!wrap)return;
+  var isMulti=wrap.getAttribute('data-multi')==='1';
+  if(!isMulti){
+    wrap.querySelectorAll('button').forEach(function(b){
+      b.style.borderColor='#e5e7eb';b.style.background='#fff';b.style.color='#374151';
+    });
+  }
+  var isActive=btn.getAttribute('data-active')==='1';
+  btn.setAttribute('data-active',isActive?'0':'1');
+  btn.style.borderColor=isActive?'#e5e7eb':'#7c3aed';
+  btn.style.background=isActive?'#fff':'#ede9fe';
+  btn.style.color=isActive?'#374151':'#5b21b6';
+}
+
+function testingSubmitSurvey(campaignId){
+  var memberNo=window.MEMBER_NO||'';
+  if(!memberNo){alert('請先登入');return;}
+  var qs=document.querySelectorAll('#tst-panel-survey [data-qid]');
+  var answers=[];
+  var valid=true;
+  qs.forEach(function(card){
+    var qid=parseInt(card.getAttribute('data-qid'));
+    var qtype=card.getAttribute('data-qtype');
+    var answer='';
+    if(qtype==='rating'){
+      var hidden=document.getElementById('rating-val-'+qid);
+      answer=hidden?String(hidden.getAttribute('data-value')||''):'';
+    } else if(qtype==='yes_no'){
+      var wrap=document.getElementById('yn-'+qid);
+      if(wrap){
+        wrap.querySelectorAll('button').forEach(function(btn){
+          if(btn.style.borderColor==='rgb(124, 58, 237)') answer=btn.getAttribute('data-val');
+        });
+      }
+    } else if(qtype==='single_choice'||qtype==='multi_choice'){
+      var wrap2=document.getElementById('choice-'+qid);
+      if(wrap2){
+        var selected=[];
+        wrap2.querySelectorAll('button[data-active="1"]').forEach(function(btn){selected.push(btn.getAttribute('data-val'));});
+        answer=selected.join(',');
+      }
+    } else if(qtype==='text'){
+      var ta=document.getElementById('text-'+qid);
+      answer=ta?ta.value.trim():'';
+    }
+    if(!answer&&card.querySelector('.必填')){valid=false;}
+    answers.push({question_id:qid,answer:answer});
+  });
+  if(!valid){alert('請完成所有必填題目');return;}
+  fetch('/api/testing/survey/submit',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({campaign_id:campaignId,member_no:memberNo,answers:answers})
+  }).then(function(r){return r.json();}).then(function(d){
+    var panelSurvey=document.getElementById('tst-panel-survey');
+    if(d.ok){
+      panelSurvey.innerHTML='<div style="text-align:center;padding:40px;">'+
+        '<div style="font-size:56px;margin-bottom:16px;">🎉</div>'+
+        '<div style="font-size:22px;font-weight:900;color:#166534;margin-bottom:10px;">問卷提交成功！</div>'+
+        '<div style="font-size:16px;color:#374151;line-height:1.7;">感謝您完成產品試用問卷！<br>我們將盡快安排您的獎勵。</div>'+
+        '<button onclick="testingPanelShowMain()" style="margin-top:24px;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:16px;font-weight:700;cursor:pointer;">返回</button>'+
+      '</div>';
+    } else {
+      alert(d.error||'提交失敗，請重試');
+    }
+  }).catch(function(){alert('網絡錯誤，請重試');});
 }
 
 // ── 工作市場 ──
@@ -20666,6 +22204,441 @@ function loadStats(){
 }
 
 document.getElementById('pwInput').addEventListener('keydown',function(e){ if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>`
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── brandFormHtml — standalone brand submission page ────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+function brandFormHtml(token: string) {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>產品測試 — 品牌資料提交</title>
+<meta name="theme-color" content="#7c3aed">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:linear-gradient(160deg,#4c1d95 0%,#7c3aed 50%,#5b21b6 100%);
+  min-height:100vh;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  padding:24px 16px 48px;}
+.wrap{max-width:700px;margin:0 auto;}
+.brand-header{text-align:center;color:#fff;margin-bottom:28px;}
+.brand-header h1{font-size:26px;font-weight:900;margin-bottom:6px;}
+.brand-header p{font-size:14px;opacity:0.85;line-height:1.6;}
+.card{background:#fff;border-radius:20px;padding:28px 24px;margin-bottom:20px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.18);}
+.card h2{font-size:16px;font-weight:800;color:#5b21b6;margin-bottom:18px;
+  padding-bottom:10px;border-bottom:2px solid #ede9fe;display:flex;align-items:center;gap:8px;}
+.field{margin-bottom:16px;}
+label{display:block;font-size:13px;font-weight:700;color:#374151;margin-bottom:5px;}
+input[type=text],input[type=url],textarea,select{
+  width:100%;padding:10px 13px;border:1.5px solid #d1d5db;border-radius:10px;
+  font-size:14px;font-family:inherit;color:#111;background:#fafafa;transition:border 0.2s;}
+input[type=text]:focus,input[type=url]:focus,textarea:focus{
+  border-color:#7c3aed;outline:none;background:#fff;}
+textarea{resize:vertical;min-height:80px;line-height:1.6;}
+.hint{font-size:12px;color:#6b7280;margin-top:4px;}
+.required{color:#ef4444;}
+.section-title{font-size:13px;font-weight:700;color:#374151;margin:14px 0 8px;
+  border-left:3px solid #7c3aed;padding-left:8px;}
+.wa-tip{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 12px;
+  font-size:12px;color:#166534;line-height:1.6;margin-bottom:12px;}
+.media-add-btn{background:#ede9fe;color:#5b21b6;border:none;border-radius:8px;
+  padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;margin-top:6px;}
+.media-item{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;
+  margin-bottom:8px;position:relative;}
+.media-item input{margin-bottom:6px;}
+.media-remove{position:absolute;top:10px;right:10px;background:none;border:none;
+  color:#ef4444;cursor:pointer;font-size:18px;line-height:1;}
+.q-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:10px;}
+.q-card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.q-card-hd span{font-size:13px;font-weight:700;color:#374151;}
+.q-remove{background:none;border:none;color:#ef4444;cursor:pointer;font-size:20px;}
+.add-q-btn{background:#ede9fe;color:#5b21b6;border:none;border-radius:8px;padding:8px 14px;
+  font-size:13px;font-weight:600;cursor:pointer;width:100%;margin-top:4px;}
+.reward-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.submit-btn{width:100%;padding:16px;background:linear-gradient(135deg,#7c3aed,#4c1d95);
+  color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;
+  cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 16px rgba(124,58,237,0.4);
+  margin-top:8px;transition:opacity 0.2s;}
+.submit-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.msg{padding:14px 16px;border-radius:10px;font-size:14px;font-weight:600;
+  margin-bottom:16px;display:none;}
+.msg.ok{background:#f0fdf4;color:#166534;border:1px solid #86efac;}
+.msg.err{background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;}
+.token-err{background:#fef2f2;border:1px solid #fca5a5;border-radius:14px;padding:32px 24px;
+  text-align:center;color:#991b1b;}
+.token-err h2{font-size:20px;font-weight:800;margin-bottom:8px;}
+.token-err p{font-size:14px;color:#7f1d1d;line-height:1.6;}
+.options-wrap{margin-top:6px;}
+.opt-item{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.opt-item input{flex:1;}
+.opt-item button{background:none;border:none;color:#ef4444;cursor:pointer;font-size:18px;}
+.add-opt-btn{background:#f3f4f6;border:none;border-radius:6px;padding:5px 10px;
+  font-size:12px;color:#374151;cursor:pointer;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand-header">
+    <div style="font-size:38px;margin-bottom:10px;">🧪</div>
+    <h1>產品測試計劃<br>品牌資料提交</h1>
+    <p>請填寫品牌及產品資料，提交後將交由 CoEldery 85 審核。</p>
+  </div>
+
+  <div id="tokenErrWrap" style="display:none;">
+    <div class="token-err">
+      <div style="font-size:40px;margin-bottom:12px;">⛔</div>
+      <h2>連結無效或已過期</h2>
+      <p>此品牌提交連結無效或已過期（有效期 30 天）。<br>請聯絡 CoEldery 85 管理員重新獲取連結。</p>
+    </div>
+  </div>
+
+  <div id="successWrap" style="display:none;">
+    <div class="card" style="text-align:center;padding:40px 24px;">
+      <div style="font-size:52px;margin-bottom:16px;">🎉</div>
+      <h2 style="font-size:22px;font-weight:900;color:#166534;margin-bottom:8px;border:none;">提交成功！</h2>
+      <p style="color:#374151;font-size:15px;line-height:1.7;">感謝您提交品牌及產品資料。<br>我們將在審核後通知您結果，通常需要 2-3 個工作天。</p>
+    </div>
+  </div>
+
+  <div id="mainForm">
+    <div id="msgBox" class="msg"></div>
+
+    <!-- 品牌基本資料 -->
+    <div class="card">
+      <h2>🏢 品牌基本資料</h2>
+      <div class="field">
+        <label>品牌名稱 <span class="required">*</span></label>
+        <input type="text" id="fBrandName" placeholder="例：XX 護膚品牌">
+      </div>
+      <div class="field">
+        <label>品牌標誌 URL（Cloudinary 或直接連結）</label>
+        <input type="url" id="fBrandLogo" placeholder="https://...">
+        <div class="hint">建議尺寸：正方形，最小 200×200px</div>
+      </div>
+      <div class="field">
+        <label>品牌描述 <span class="required">*</span></label>
+        <textarea id="fBrandDesc" rows="3" placeholder="簡短介紹品牌背景、理念、目標客群等…"></textarea>
+      </div>
+    </div>
+
+    <!-- 測試產品 -->
+    <div class="card">
+      <h2>🛍 測試產品資料</h2>
+      <div class="field">
+        <label>產品名稱 <span class="required">*</span></label>
+        <input type="text" id="fProductName" placeholder="例：XX 深層保濕面霜">
+      </div>
+      <div class="field">
+        <label>產品圖片 / 媒體內容</label>
+        <div class="hint" style="margin-bottom:8px;">可新增多張圖片或影片連結（支援 Cloudinary / YouTube / 直接圖片 URL）</div>
+        <div id="mediaList"></div>
+        <button class="media-add-btn" onclick="addMediaItem()">＋ 新增圖片/影片</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>測試週數 <span class="required">*</span></label>
+          <select id="fDuration">
+            <option value="7">1 週（7 天）</option>
+            <option value="14" selected>2 週（14 天）</option>
+            <option value="21">3 週（21 天）</option>
+            <option value="28">4 週（28 天）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>問卷截止日期 <span class="required">*</span></label>
+          <input type="text" id="fSurveyDeadline" placeholder="例：2025-09-30">
+        </div>
+      </div>
+    </div>
+
+    <!-- WhatsApp 訊息範本 -->
+    <div class="card">
+      <h2>💬 WhatsApp 訊息範本</h2>
+      <div class="wa-tip">
+        💡 以下訊息將由 CoEldery 85 以 WhatsApp 發送給測試參與者。可使用變數：<br>
+        <strong>{{member_name}}</strong> 會員姓名 ／ <strong>{{product_name}}</strong> 產品名稱 ／ <strong>{{brand_name}}</strong> 品牌名稱 ／ <strong>{{survey_link}}</strong> 問卷連結
+      </div>
+      <div class="field">
+        <label>歡迎訊息（領取樣品後發送）</label>
+        <textarea id="fWaWelcome" rows="4" placeholder="例：您好 {{member_name}}！感謝您參與 {{brand_name}} 的 {{product_name}} 試用計劃。請於測試期間記錄您的使用感受，測試完成後請填寫問卷：{{survey_link}}"></textarea>
+      </div>
+      <div class="field">
+        <label>第一次提醒（測試中期）</label>
+        <textarea id="fWaReminder1" rows="3" placeholder="例：您好 {{member_name}}！提醒您記得繼續使用 {{product_name}} 並記錄感受。問卷連結：{{survey_link}}"></textarea>
+      </div>
+      <div class="field">
+        <label>第二次提醒（截止前）</label>
+        <textarea id="fWaReminder2" rows="3" placeholder="例：{{member_name}} 您好！{{product_name}} 的問卷即將截止，請盡快填寫：{{survey_link}}"></textarea>
+      </div>
+      <div class="field">
+        <label>完成感謝訊息</label>
+        <textarea id="fWaComplete" rows="3" placeholder="例：感謝 {{member_name}} 完成 {{product_name}} 試用問卷！您的意見對我們非常寶貴。感謝參與！"></textarea>
+      </div>
+    </div>
+
+    <!-- 問卷題目 -->
+    <div class="card">
+      <h2>📋 問卷題目</h2>
+      <div id="questionList"></div>
+      <button class="add-q-btn" onclick="addQuestion()">＋ 新增題目</button>
+    </div>
+
+    <!-- 獎勵設定 -->
+    <div class="card">
+      <h2>🎁 完成獎勵設定</h2>
+      <div class="field">
+        <label>獎勵名稱 <span class="required">*</span></label>
+        <input type="text" id="fRewardName" placeholder="例：精美禮品一份">
+      </div>
+      <div class="field">
+        <label>獎勵描述</label>
+        <textarea id="fRewardDesc" rows="2" placeholder="例：完成問卷後可領取 XX 品牌護膚品禮盒一套"></textarea>
+      </div>
+      <div class="reward-row">
+        <div class="field">
+          <label>獎勵類型</label>
+          <select id="fRewardType">
+            <option value="product">實物產品</option>
+            <option value="coupon">優惠券</option>
+            <option value="cash">現金</option>
+            <option value="points">積分</option>
+            <option value="other">其他</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>獎勵數量</label>
+          <input type="text" id="fRewardQty" placeholder="例：50">
+        </div>
+      </div>
+      <div class="field">
+        <label>配送備注</label>
+        <textarea id="fRewardNotes" rows="2" placeholder="例：獎品將於活動結束後 14 日內寄出"></textarea>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" onclick="submitForm()">提交品牌資料</button>
+  </div>
+</div>
+
+<script>
+var TOKEN = ${JSON.stringify(token)};
+var qCount = 0;
+var mediaCount = 0;
+
+// Validate token on load
+window.addEventListener('load', function(){
+  if(!TOKEN){
+    document.getElementById('tokenErrWrap').style.display='block';
+    document.getElementById('mainForm').style.display='none';
+    return;
+  }
+  fetch('/api/testing/brand-form/'+TOKEN)
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok){
+        document.getElementById('tokenErrWrap').style.display='block';
+        document.getElementById('mainForm').style.display='none';
+      } else {
+        // Pre-fill if data exists
+        if(d.campaign){
+          var c=d.campaign;
+          if(c.brand_name) document.getElementById('fBrandName').value=c.brand_name;
+          if(c.brand_logo_url) document.getElementById('fBrandLogo').value=c.brand_logo_url;
+          if(c.brand_description) document.getElementById('fBrandDesc').value=c.brand_description;
+          if(c.product_name) document.getElementById('fProductName').value=c.product_name;
+          if(c.testing_duration_days) document.getElementById('fDuration').value=String(c.testing_duration_days);
+          if(c.survey_deadline) document.getElementById('fSurveyDeadline').value=c.survey_deadline;
+          if(c.wa_template_welcome) document.getElementById('fWaWelcome').value=c.wa_template_welcome;
+          if(c.wa_template_reminder1) document.getElementById('fWaReminder1').value=c.wa_template_reminder1;
+          if(c.wa_template_reminder2) document.getElementById('fWaReminder2').value=c.wa_template_reminder2;
+          if(c.wa_template_complete) document.getElementById('fWaComplete').value=c.wa_template_complete;
+          if(c.reward_name) document.getElementById('fRewardName').value=c.reward_name;
+          if(c.reward_description) document.getElementById('fRewardDesc').value=c.reward_description;
+          if(c.reward_type) document.getElementById('fRewardType').value=c.reward_type;
+          if(c.quantity_available) document.getElementById('fRewardQty').value=String(c.quantity_available);
+          if(c.delivery_notes) document.getElementById('fRewardNotes').value=c.delivery_notes;
+          // Pre-fill media
+          if(c.media_content){
+            try{
+              var mc=JSON.parse(c.media_content);
+              mc.forEach(function(m){ addMediaItemWithValue(m.url||'', m.caption||''); });
+            }catch(e){}
+          }
+          // Pre-fill questions
+          if(c.questions){
+            c.questions.forEach(function(q){ addQuestionWithValue(q); });
+          }
+        }
+      }
+    })
+    .catch(function(){
+      document.getElementById('tokenErrWrap').style.display='block';
+      document.getElementById('mainForm').style.display='none';
+    });
+});
+
+function showMsg(text, type){
+  var el=document.getElementById('msgBox');
+  el.textContent=text; el.className='msg '+(type||'err');
+  el.style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function addMediaItem(){ addMediaItemWithValue('',''); }
+function addMediaItemWithValue(url, caption){
+  mediaCount++;
+  var id='media'+mediaCount;
+  var div=document.createElement('div');
+  div.className='media-item'; div.id=id;
+  div.innerHTML='<input type="url" placeholder="圖片或影片 URL（https://…）" value="'+escHtml(url)+'" style="margin-bottom:6px;">'+
+    '<input type="text" placeholder="說明文字（選填）" value="'+escHtml(caption)+'">'+
+    '<button class="media-remove" onclick="document.getElementById(\''+id+'\').remove()">✕</button>';
+  document.getElementById('mediaList').appendChild(div);
+}
+
+function addQuestion(){ addQuestionWithValue(null); }
+function addQuestionWithValue(q){
+  qCount++;
+  var id='q'+qCount;
+  var type=(q&&q.question_type)||'rating';
+  var title=(q&&q.title)||'';
+  var div=document.createElement('div');
+  div.className='q-card'; div.id=id;
+  div.innerHTML='<div class="q-card-hd"><span>題目 #'+qCount+'</span>'+
+    '<button class="q-remove" onclick="document.getElementById(\''+id+'\').remove()">✕</button></div>'+
+    '<div class="field"><label>題型</label>'+
+    '<select class="qtype-sel" onchange="updateQType(\''+id+'\',this.value)">'+
+    '<option value="rating"'+(type==='rating'?' selected':'')+'>評分（1-5 星）</option>'+
+    '<option value="yes_no"'+(type==='yes_no'?' selected':'')+'>是 / 否</option>'+
+    '<option value="single_choice"'+(type==='single_choice'?' selected':'')+'>單選題</option>'+
+    '<option value="multi_choice"'+(type==='multi_choice'?' selected':'')+'>多選題</option>'+
+    '<option value="text"'+(type==='text'?' selected':'')+'>文字回答</option>'+
+    '</select></div>'+
+    '<div class="field"><label>題目內容 <span class="required">*</span></label>'+
+    '<input type="text" class="qtitle-inp" value="'+escHtml(title)+'" placeholder="例：您對產品的整體評分？"></div>'+
+    '<div class="qopts-wrap"></div>';
+  document.getElementById('questionList').appendChild(div);
+  updateQType(id, type, q);
+}
+
+function updateQType(qid, type, prefill){
+  var wrap=document.querySelector('#'+qid+' .qopts-wrap');
+  if(type==='single_choice'||type==='multi_choice'){
+    var opts=(prefill&&prefill.options)?prefill.options:[];
+    if(!opts.length) opts=['',''];
+    var html='<div class="options-wrap" id="opts'+qid+'">';
+    opts.forEach(function(o,i){
+      html+='<div class="opt-item"><input type="text" placeholder="選項 '+(i+1)+'" value="'+escHtml(o)+'">'+
+        '<button onclick="this.parentElement.remove()">✕</button></div>';
+    });
+    html+='</div><button class="add-opt-btn" onclick="addOpt(\'opts'+qid+'\')">＋ 新增選項</button>';
+    wrap.innerHTML=html;
+  } else {
+    wrap.innerHTML='';
+  }
+}
+
+function addOpt(wrapId){
+  var wrap=document.getElementById(wrapId);
+  var cnt=wrap.querySelectorAll('.opt-item').length+1;
+  var div=document.createElement('div'); div.className='opt-item';
+  div.innerHTML='<input type="text" placeholder="選項 '+cnt+'"><button onclick="this.parentElement.remove()">✕</button>';
+  wrap.appendChild(div);
+}
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function collectMedia(){
+  var items=document.querySelectorAll('#mediaList .media-item');
+  var result=[];
+  items.forEach(function(item){
+    var inputs=item.querySelectorAll('input');
+    var url=inputs[0]?inputs[0].value.trim():'';
+    var caption=inputs[1]?inputs[1].value.trim():'';
+    if(url) result.push({url:url,caption:caption});
+  });
+  return result;
+}
+
+function collectQuestions(){
+  var cards=document.querySelectorAll('#questionList .q-card');
+  var result=[];
+  var order=0;
+  cards.forEach(function(card){
+    var type=card.querySelector('.qtype-sel').value;
+    var title=card.querySelector('.qtitle-inp').value.trim();
+    if(!title) return;
+    order++;
+    var q={question_type:type,title:title,question_order:order,is_required:1,options:[],min_value:1,max_value:5};
+    if(type==='single_choice'||type==='multi_choice'){
+      card.querySelectorAll('.opt-item input').forEach(function(inp){
+        var v=inp.value.trim(); if(v) q.options.push(v);
+      });
+    }
+    result.push(q);
+  });
+  return result;
+}
+
+function submitForm(){
+  var btn=document.getElementById('submitBtn');
+  var brandName=document.getElementById('fBrandName').value.trim();
+  var brandDesc=document.getElementById('fBrandDesc').value.trim();
+  var productName=document.getElementById('fProductName').value.trim();
+  var deadline=document.getElementById('fSurveyDeadline').value.trim();
+  var rewardName=document.getElementById('fRewardName').value.trim();
+  if(!brandName||!brandDesc||!productName||!deadline||!rewardName){
+    showMsg('請填寫所有必填欄位（品牌名稱、描述、產品名稱、截止日期、獎勵名稱）','err');
+    return;
+  }
+  var payload={
+    brand_name:brandName,
+    brand_logo_url:document.getElementById('fBrandLogo').value.trim()||null,
+    brand_description:brandDesc,
+    product_name:productName,
+    testing_duration_days:parseInt(document.getElementById('fDuration').value)||14,
+    survey_deadline:deadline,
+    wa_template_welcome:document.getElementById('fWaWelcome').value.trim(),
+    wa_template_reminder1:document.getElementById('fWaReminder1').value.trim(),
+    wa_template_reminder2:document.getElementById('fWaReminder2').value.trim(),
+    wa_template_complete:document.getElementById('fWaComplete').value.trim(),
+    media_content:collectMedia(),
+    questions:collectQuestions(),
+    reward:{
+      reward_name:rewardName,
+      reward_description:document.getElementById('fRewardDesc').value.trim(),
+      reward_type:document.getElementById('fRewardType').value,
+      quantity_available:parseInt(document.getElementById('fRewardQty').value)||0,
+      delivery_notes:document.getElementById('fRewardNotes').value.trim()
+    }
+  };
+  btn.disabled=true; btn.textContent='提交中…';
+  fetch('/api/testing/brand-form/'+TOKEN+'/submit',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d.ok){
+      document.getElementById('mainForm').style.display='none';
+      document.getElementById('successWrap').style.display='block';
+      window.scrollTo({top:0,behavior:'smooth'});
+    } else {
+      showMsg(d.error||'提交失敗，請重試','err');
+      btn.disabled=false; btn.textContent='提交品牌資料';
+    }
+  })
+  .catch(function(){
+    showMsg('網絡錯誤，請重試','err');
+    btn.disabled=false; btn.textContent='提交品牌資料';
+  });
+}
 </script>
 </body>
 </html>`
