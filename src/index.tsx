@@ -14947,7 +14947,7 @@ function appBnfMedCardAuthHtml(){
   parts.push('<div style="font-size:40px;margin-bottom:16px;">🔒</div>');
   parts.push('<div style="font-size:18px;font-weight:700;color:#333;margin-bottom:10px;">請先登入會員卡</div>');
   parts.push('<div style="font-size:15px;color:#666;line-height:1.6;margin-bottom:24px;">登入後即可查看醫健卡狀態或提交申請。</div>');
-  parts.push('<button onclick="appBnfCloseDetail();switchTab(\'card\')" style="width:100%;padding:16px;background:#1565C0;color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;">前往登入</button>');
+  parts.push('<button onclick="appBnfCloseDetail();switchTab(&apos;card&apos;)" style="width:100%;padding:16px;background:#1565C0;color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;">前往登入</button>');
   parts.push('</div>');
   return parts.join('');
 }
@@ -14979,18 +14979,29 @@ function appBnfMedCardIssuedHtml(d){
   var surnamePart=hasTwoParts?nameParts[0]:'';
   var givenPart=hasTwoParts?nameParts.slice(1).join(' '):'';
   var cardNo=d.card_no||'';
-
+  // Store copy values in hidden data elements; appMedCopyById reads them
+  // to avoid any single-quote in onclick attributes (Vite strips escape chars)
+  var dataStore='<div id="appMedData" style="display:none;">'
+    +'<span id="appMedData1">'+escAppHtml(cardNo)+'</span>'
+    +'<span id="appMedData2">'+escAppHtml(surnamePart)+'</span>'
+    +'<span id="appMedData3">'+escAppHtml(givenPart)+'</span>'
+    +'<span id="appMedData4">'+escAppHtml(nameEnFull)+'</span>'
+    +'</div>';
+  var cardImgBtn='';
+  if(d.card_image_url){
+    var safeUrl=encodeURI(d.card_image_url);
+    cardImgBtn='<button id="appBtnMedImg" data-url="'+escAppHtml(safeUrl)+'" onclick="appMedOpenImg(this)" style="flex:1;min-height:55px;padding:12px 10px;background:#6A1B9A;color:#fff;border:0;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;">🖼 查看醫健卡</button>';
+  }
   var parts=[];
   parts.push(appBnfMedCardHeader());
+  parts.push(dataStore);
   parts.push('<div style="padding:20px 16px 100px;">');
 
-  // Action buttons
+  // Action buttons — use &apos; inside onclick so Vite won't break the string
   parts.push('<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">');
-  parts.push('<button onclick="appMedTogglePanel(\'medCardInfoPanel\')" id="appBtnMedCard" style="flex:1;min-height:55px;padding:12px 10px;background:#1565C0;color:#fff;border:0;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;">💳 卡資料</button>');
-  if(d.card_image_url){
-    parts.push('<button onclick="window.open(\''+d.card_image_url.replace(/'/g,'%27')+'\',\'_blank\')" style="flex:1;min-height:55px;padding:12px 10px;background:#6A1B9A;color:#fff;border:0;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;">🖼 查看醫健卡</button>');
-  }
-  parts.push('<button onclick="appMedTogglePanel(\'medDoctorInfoPanel\')" id="appBtnMedDoctor" style="flex:1;min-height:55px;padding:12px 10px;background:#2E7D32;color:#fff;border:0;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;">🩺 查看醫生</button>');
+  parts.push('<button onclick="appMedTogglePanel(&apos;medCardInfoPanel&apos;)" id="appBtnMedCard" style="flex:1;min-height:55px;padding:12px 10px;background:#1565C0;color:#fff;border:0;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;">💳 卡資料</button>');
+  parts.push(cardImgBtn);
+  parts.push('<button onclick="appMedTogglePanel(&apos;medDoctorInfoPanel&apos;)" id="appBtnMedDoctor" style="flex:1;min-height:55px;padding:12px 10px;background:#2E7D32;color:#fff;border:0;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;">🩺 查看醫生</button>');
   parts.push('</div>');
 
   // Panel 1: card info
@@ -14999,17 +15010,17 @@ function appBnfMedCardIssuedHtml(d){
   parts.push('<div style="font-size:18px;font-weight:700;color:#1565C0;margin-bottom:10px;">你的醫健卡號碼</div>');
   parts.push('<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">');
   parts.push('<span id="appMedCardNoDisplay" style="font-size:28px;font-weight:900;color:#1B5E20;letter-spacing:3px;font-family:monospace;">'+escAppHtml(cardNo)+'</span>');
-  parts.push('<button onclick="appMedCopy(\''+escAppHtml(cardNo)+'\',\'appCopyBtn1\',\'複製卡號\')" id="appCopyBtn1" style="padding:10px 18px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;min-height:44px;">複製卡號</button>');
+  parts.push('<button onclick="appMedCopyById(1,this,&apos;複製卡號&apos;)" id="appCopyBtn1" style="padding:10px 18px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;min-height:44px;">複製卡號</button>');
   parts.push('</div>');
   parts.push('<div style="background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:8px;padding:16px 18px;">');
   parts.push('<div style="font-size:17px;font-weight:700;color:#1B5E20;margin-bottom:12px;">🔐 HMMP 系統登入資料</div>');
   parts.push('<ol style="padding-left:20px;font-size:17px;line-height:2;color:#1B5E20;margin:0;">');
-  parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">登入名稱：</span>你的醫健卡號碼<div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;"><span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#0D47A1;font-family:monospace;">'+escAppHtml(cardNo)+'</span><button onclick="appMedCopy(\''+escAppHtml(cardNo)+'\',\'appCopyBtn2\',\'複製\')" id="appCopyBtn2" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></div></li>');
+  parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">登入名稱：</span>你的醫健卡號碼<div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;"><span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#0D47A1;font-family:monospace;">'+escAppHtml(cardNo)+'</span><button onclick="appMedCopyById(1,this,&apos;複製&apos;)" id="appCopyBtn2" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></div></li>');
   if(hasTwoParts){
-    parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">姓氏：</span>'+escAppHtml(surnamePart)+'<br><button onclick="appMedCopy(\''+escAppHtml(surnamePart)+'\',\'appCopyBtn3\',\'複製\')" id="appCopyBtn3" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></li>');
-    parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">名稱：</span>'+escAppHtml(givenPart)+'<br><button onclick="appMedCopy(\''+escAppHtml(givenPart)+'\',\'appCopyBtn4\',\'複製\')" id="appCopyBtn4" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></li>');
+    parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">姓氏：</span>'+escAppHtml(surnamePart)+'<br><button onclick="appMedCopyById(2,this,&apos;複製&apos;)" id="appCopyBtn3" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></li>');
+    parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">名稱：</span>'+escAppHtml(givenPart)+'<br><button onclick="appMedCopyById(3,this,&apos;複製&apos;)" id="appCopyBtn4" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></li>');
   } else {
-    parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">英文全名：</span>'+escAppHtml(nameEnFull)+'<br><button onclick="appMedCopy(\''+escAppHtml(nameEnFull)+'\',\'appCopyBtn3\',\'複製\')" id="appCopyBtn3" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></li>');
+    parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">英文全名：</span>'+escAppHtml(nameEnFull)+'<br><button onclick="appMedCopyById(4,this,&apos;複製&apos;)" id="appCopyBtn3" style="margin-top:4px;padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">複製</button></li>');
   }
   parts.push('<li style="margin-bottom:10px;"><span style="font-weight:700;">電郵地址：</span><span style="color:#78909C;">不用填</span></li>');
   parts.push('<li><span style="font-weight:700;">按「登入」</span></li>');
@@ -15622,11 +15633,18 @@ function appMedTogglePanel(panelId){
     else{if(el)el.style.display='none';if(btn)btn.style.background=activeCol[id];}
   });
 }
-function appMedCopy(txt,btnId,origLabel){
+// Copy value stored in hidden #appMedData{n} span; btn is the clicked element
+function appMedCopyById(n,btn,origLabel){
+  var src=document.getElementById('appMedData'+n);
+  var txt=src?src.textContent:'';
   navigator.clipboard.writeText(txt).then(function(){
-    var b=document.getElementById(btnId);
-    if(b){b.textContent='已複製 ✓';b.style.background='#2E7D32';setTimeout(function(){b.textContent=origLabel;b.style.background='#1565C0';},2000);}
+    if(btn){btn.textContent='已複製 ✓';btn.style.background='#2E7D32';setTimeout(function(){btn.textContent=origLabel;btn.style.background='#1565C0';},2000);}
   }).catch(function(){alert(txt);});
+}
+// Open card image url stored in data-url attr
+function appMedOpenImg(btn){
+  var url=btn&&btn.getAttribute('data-url');
+  if(url) window.open(url,'_blank');
 }
 </script>
 </body>
