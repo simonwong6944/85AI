@@ -1757,7 +1757,7 @@ app.post('/api/testing/join', async (c) => {
   const { member_no, qr_code_id, campaign_id } = body
   if (!member_no || !campaign_id) return c.json({ ok: false, error: '缺少必要參數' }, 400)
   // Verify member exists
-  const member = await db.prepare('SELECT member_no, name FROM members WHERE member_no=? LIMIT 1')
+  const member = await db.prepare('SELECT member_no, name_zh FROM members WHERE member_no=? LIMIT 1')
     .bind(member_no).first<any>()
   if (!member) return c.json({ ok: false, error: '會員不存在，請先登記' }, 404)
   // Verify campaign is live
@@ -1769,7 +1769,7 @@ app.post('/api/testing/join', async (c) => {
     .bind(campaign_id, member_no).first<any>()
   if (existing) {
     return c.json({ ok: true, already_joined: true, participant_id: existing.id, status: existing.status,
-      member_name: member.name, campaign_name: camp.campaign_name })
+      member_name: member.name_zh, campaign_name: camp.campaign_name })
   }
   // Calculate deadline
   const deadline = camp.survey_deadline || (() => {
@@ -1781,7 +1781,7 @@ app.post('/api/testing/join', async (c) => {
      VALUES (?, ?, ?, 'sample_claimed', ?, ?)`
   ).bind(campaign_id, qr_code_id || null, member_no, now, now).run()
   return c.json({ ok: true, already_joined: false, participant_id: result.meta.last_row_id,
-    member_name: member.name, campaign_name: camp.campaign_name, survey_deadline: deadline })
+    member_name: member.name_zh, campaign_name: camp.campaign_name, survey_deadline: deadline })
 })
 
 // ── Public: GET /api/testing/my-campaigns/:member_no — list joined campaigns ──
