@@ -24140,9 +24140,9 @@ app.get('/api/hmvod/settings', async (c) => {
 // PUT /api/admin/hmvod/settings — update WA number (admin only)
 app.put('/api/admin/hmvod/settings', async (c) => {
   const db = (c.env as any).DB as D1Database
-  const sessionId = getCookie(c, 'admin_session') || ''
+  const sessionId = getSessionToken(c) || ''
   if (!sessionId) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
-  const sess = await db.prepare(`SELECT id FROM admin_sessions WHERE session_id=? AND expires_at>datetime('now')`).bind(sessionId).first()
+  const sess = await db.prepare(`SELECT id FROM admin_sessions WHERE token=? AND expires_at>datetime('now')`).bind(sessionId).first()
   if (!sess) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
   const { wa_number } = await c.req.json() as any
   if (!wa_number) return c.json({ ok: false, error: 'missing wa_number' }, 400)
@@ -24186,9 +24186,9 @@ app.get('/api/hmvod/check', async (c) => {
 // GET /api/admin/hmvod/applications — list all (admin)
 app.get('/api/admin/hmvod/applications', async (c) => {
   const db = (c.env as any).DB as D1Database
-  const sessionId = getCookie(c, 'admin_session') || ''
+  const sessionId = getSessionToken(c) || ''
   if (!sessionId) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
-  const sess = await db.prepare(`SELECT id FROM admin_sessions WHERE session_id=? AND expires_at>datetime('now')`).bind(sessionId).first()
+  const sess = await db.prepare(`SELECT id FROM admin_sessions WHERE token=? AND expires_at>datetime('now')`).bind(sessionId).first()
   if (!sess) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
   const rows = await db.prepare(
     `SELECT id,member_no,name_zh,name_en,phone,status,notes,created_at,updated_at
@@ -24200,9 +24200,9 @@ app.get('/api/admin/hmvod/applications', async (c) => {
 // PUT /api/admin/hmvod/applications/:id — update status/notes (admin)
 app.put('/api/admin/hmvod/applications/:id', async (c) => {
   const db = (c.env as any).DB as D1Database
-  const sessionId = getCookie(c, 'admin_session') || ''
+  const sessionId = getSessionToken(c) || ''
   if (!sessionId) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
-  const sess = await db.prepare(`SELECT id FROM admin_sessions WHERE session_id=? AND expires_at>datetime('now')`).bind(sessionId).first()
+  const sess = await db.prepare(`SELECT id FROM admin_sessions WHERE token=? AND expires_at>datetime('now')`).bind(sessionId).first()
   if (!sess) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
   const id = c.req.param('id')
   let body: any = {}
