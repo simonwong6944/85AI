@@ -11462,9 +11462,10 @@ function hmvodExportExcel(){
   var csvContent='\uFEFF'+[headers].concat(rows).map(function(r){
     return r.map(function(cell){
       var s=String(cell).replace(/"/g,'""');
-      return (s.indexOf(',')!==-1||s.indexOf('"')!==-1||s.indexOf('\n')!==-1)?'"'+s+'"':s;
+      var nl=String.fromCharCode(10);
+      return (s.indexOf(',')!==-1||s.indexOf('"')!==-1||s.indexOf(nl)!==-1)?'"'+s+'"':s;
     }).join(',');
-  }).join('\r\n');
+  }).join(String.fromCharCode(13,10));
   var blob=new Blob([csvContent],{type:'text/csv;charset=utf-8;'});
   var url=URL.createObjectURL(blob);
   var a=document.createElement('a');
