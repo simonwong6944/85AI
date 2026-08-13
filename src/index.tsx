@@ -1802,6 +1802,22 @@ app.get('/api/testing/my-campaigns/:member_no', async (c) => {
   return c.json({ ok: true, campaigns: rows.results || [] })
 })
 
+// ── Public: GET /api/testing/available/:member_no — live campaigns + join status ──
+app.get('/api/testing/available/:member_no', async (c) => {
+  const db = c.env.DB
+  const memberNo = c.req.param('member_no')
+  const camps = await db.prepare(
+    `SELECT tc.id, tc.campaign_name, tc.brand_name, tc.brand_logo_url, tc.brand_description,
+            tc.product_name, tc.product_image_url, tc.testing_duration_days, tc.survey_deadline,
+            tp.id as participant_id, tp.status as participant_status
+     FROM testing_campaigns tc
+     LEFT JOIN testing_participants tp ON tp.campaign_id=tc.id AND tp.member_no=?
+     WHERE tc.status='live'
+     ORDER BY tc.created_at DESC`
+  ).bind(memberNo).all<any>()
+  return c.json({ ok: true, campaigns: camps.results || [] })
+})
+
 // ── Public: GET /api/testing/survey/:campaign_id — get survey questions ────────
 app.get('/api/testing/survey/:campaign_id', async (c) => {
   const db = c.env.DB
@@ -14178,12 +14194,23 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
       <button onclick="closeTestingPanel()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#fff;padding:4px 8px;line-height:1">&times;</button>
     </div>
     <div style="overflow-y:auto;padding:14px 16px 16px;-webkit-overflow-scrolling:touch;flex:1;">
-      <!-- Main view: my campaigns -->
+      <!-- Main view -->
       <div id="tst-panel-main">
+        <!-- Join confirm (shown when arriving via QR) -->
         <div id="tst-join-confirm" style="display:none;margin-bottom:14px;"></div>
-        <div style="font-size:14px;font-weight:800;color:#5b21b6;margin-bottom:10px;">📋 我的測試計劃</div>
-        <div id="tst-my-list">
-          <div style="text-align:center;padding:24px;color:#9ca3af;font-size:16px;">載入中…</div>
+        <!-- Available campaigns to join -->
+        <div id="tst-available-section" style="margin-bottom:16px;">
+          <div style="font-size:14px;font-weight:800;color:#5b21b6;margin-bottom:10px;">🎯 可參加的試用計劃</div>
+          <div id="tst-available-list">
+            <div style="text-align:center;padding:20px;color:#9ca3af;font-size:15px;">載入中…</div>
+          </div>
+        </div>
+        <!-- My joined campaigns -->
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#5b21b6;margin-bottom:10px;">📋 我的測試計劃</div>
+          <div id="tst-my-list">
+            <div style="text-align:center;padding:20px;color:#9ca3af;font-size:15px;">載入中…</div>
+          </div>
         </div>
       </div>
       <!-- Survey view -->
@@ -14802,7 +14829,41 @@ function testingPanelShowMain(){
   var el2 = document.getElementById('tst-panel-survey');
   if(el) el.style.display='block';
   if(el2) el2.style.display='none';
+  var memberNo = window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
+  testingLoadAvailable(memberNo);
   testingLoadMyCampaigns();
+}
+
+function testingLoadAvailable(memberNo){
+  var el = document.getElementById('tst-available-list');
+  var sec = document.getElementById('tst-available-section');
+  if(!el) return;
+  if(!memberNo){
+    if(sec) sec.style.display='none';
+    return;
+  }
+  fetch('/api/testing/available/'+encodeURIComponent(memberNo))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var camps=d.campaigns||[];
+    // Only show campaigns not yet joined
+    var notJoined=camps.filter(function(c){ return !c.participant_id; });
+    if(notJoined.length===0){
+      if(sec) sec.style.display='none';
+      return;
+    }
+    if(sec) sec.style.display='block';
+    el.innerHTML=notJoined.map(function(c){
+      return '<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:12px;border:2px solid #ddd6fe;">'+
+        '<div style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:2px;">'+escHtml(c.product_name)+'</div>'+
+        '<div style="font-size:14px;color:#6b7280;margin-bottom:10px;">由 '+escHtml(c.brand_name)+' 提供</div>'+
+        (c.brand_description?'<div style="font-size:13px;color:#374151;background:#f5f3ff;border-radius:8px;padding:10px;margin-bottom:10px;line-height:1.6;">'+escHtml(c.brand_description)+'</div>':'')+
+        '<button onclick="testingDirectJoin('+c.id+',\''+escHtml(c.product_name)+'\')" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;">✅ 加入試用並填問卷</button>'+
+      '</div>';
+    }).join('');
+  }).catch(function(){
+    if(sec) sec.style.display='none';
+  });
 }
 
 function testingLoadMyCampaigns(){
@@ -14895,6 +14956,28 @@ function testingHandleQRScan(code){
       testingShowJoinConfirm(camp);
     });
   }).catch(function(){ openTestingPanel(); });
+}
+
+// Direct join from available list (no QR needed)
+function testingDirectJoin(campaignId, productName){
+  var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
+  if(!memberNo){alert('請先登入會員');return;}
+  var btn=event&&event.target;
+  if(btn){btn.disabled=true;btn.textContent='處理中…';}
+  fetch('/api/testing/join',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({campaign_id:campaignId,member_no:memberNo})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      testingOpenSurvey(campaignId, d.participant_id);
+    } else {
+      if(btn){btn.disabled=false;btn.textContent='✅ 加入試用並填問卷';}
+      alert(d.error||'加入失敗，請重試');
+    }
+  }).catch(function(){
+    if(btn){btn.disabled=false;btn.textContent='✅ 加入試用並填問卷';}
+    alert('網絡錯誤，請重試');
+  });
 }
 
 function testingShowJoinConfirm(campaign){
