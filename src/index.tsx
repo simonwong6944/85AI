@@ -14858,7 +14858,7 @@ function testingLoadAvailable(memberNo){
         '<div style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:2px;">'+escHtml(c.product_name)+'</div>'+
         '<div style="font-size:14px;color:#6b7280;margin-bottom:10px;">由 '+escHtml(c.brand_name)+' 提供</div>'+
         (c.brand_description?'<div style="font-size:13px;color:#374151;background:#f5f3ff;border-radius:8px;padding:10px;margin-bottom:10px;line-height:1.6;">'+escHtml(c.brand_description)+'</div>':'')+
-        '<button onclick="testingDirectJoin('+c.id+',\''+escHtml(c.product_name)+'\')" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;">✅ 加入試用並填問卷</button>'+
+        '<button onclick="testingDirectJoin('+c.id+')" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;">✅ 加入試用並填問卷</button>'+
       '</div>';
     }).join('');
   }).catch(function(){
@@ -14959,7 +14959,7 @@ function testingHandleQRScan(code){
 }
 
 // Direct join from available list (no QR needed)
-function testingDirectJoin(campaignId, productName){
+function testingDirectJoin(campaignId){
   var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
   if(!memberNo){alert('請先登入會員');return;}
   var btn=event&&event.target;
