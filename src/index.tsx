@@ -14784,7 +14784,7 @@ function testingPanelShowMain(){
 }
 
 function testingLoadMyCampaigns(){
-  var memberNo = window.MEMBER_NO||'';
+  var memberNo = window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
   var el = document.getElementById('tst-my-list');
   if(!el) return;
   if(!memberNo){ el.innerHTML='<div style="text-align:center;padding:24px;color:#9ca3af;font-size:16px;">請先登入查看您的測試計劃。</div>'; return; }
@@ -14884,7 +14884,7 @@ function testingCancelJoin(){
 }
 
 function testingJoinCampaign(){
-  var memberNo=window.MEMBER_NO||'';
+  var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
   if(!memberNo){alert('請先登入');return;}
   var code=(_testingContext&&_testingContext.code)||_testingContext;
   if(!code){alert('無效的活動碼');return;}
