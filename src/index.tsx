@@ -14825,19 +14825,32 @@ function testingHandleQRScan(code){
   var lb=document.getElementById('testingLoginBanner');
   if(lb && lb.parentNode) lb.parentNode.removeChild(lb);
   if(!memberNo){ openTestingPanel(); return; }
-  // Fetch campaign info
+  // Fetch campaign info — API returns flat fields (campaign_id, campaign_name, etc.), not nested .campaign
   fetch('/api/testing/scan/'+encodeURIComponent(code))
   .then(function(r){return r.json();})
   .then(function(d){
     if(!d.ok){ openTestingPanel(); return; }
-    var camp=d.campaign;
+    // Build a campaign object from the flat API response
+    var camp={
+      id: d.campaign_id,
+      campaign_id: d.campaign_id,
+      campaign_name: d.campaign_name,
+      brand_name: d.brand_name,
+      brand_logo_url: d.brand_logo_url,
+      brand_description: d.brand_description,
+      product_name: d.product_name,
+      product_image_url: d.product_image_url,
+      testing_duration_days: d.testing_duration_days,
+      survey_deadline: d.survey_deadline,
+      qr_code_id: d.qr_code_id
+    };
     _testingContext = {code:code, campaign:camp};
     // Check if already joined — if so go straight to survey
     fetch('/api/testing/my-campaigns/'+encodeURIComponent(memberNo))
     .then(function(r2){return r2.json();})
     .then(function(d2){
       openTestingPanel();
-      var already=(d2.campaigns||[]).find(function(c){ return String(c.campaign_id)===String(camp.id||camp.campaign_id); });
+      var already=(d2.campaigns||[]).find(function(c){ return String(c.campaign_id)===String(camp.id); });
       if(already){
         if(already.survey_submitted_at){
           // Already submitted — show list
@@ -14886,21 +14899,22 @@ function testingCancelJoin(){
 function testingJoinCampaign(){
   var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
   if(!memberNo){alert('請先登入');return;}
-  var code=(_testingContext&&_testingContext.code)||_testingContext;
-  if(!code){alert('無效的活動碼');return;}
+  var camp=_testingContext&&_testingContext.campaign;
+  var campId=camp&&camp.id;
+  var qrCodeId=camp&&camp.qr_code_id;
+  if(!campId){alert('無效的活動碼');return;}
   fetch('/api/testing/join',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({tracking_code:code,member_no:memberNo})
+    body:JSON.stringify({campaign_id:campId, qr_code_id:qrCodeId||null, member_no:memberNo})
   }).then(function(r){return r.json();}).then(function(d){
     var el=document.getElementById('tst-join-confirm');
     if(el) el.style.display='none';
     var el2=document.getElementById('tst-my-list');
     if(el2) el2.style.display='block';
     if(d.ok){
-      // 加入成功 — 直接跳去填問卷
-      var jCampId=(_testingContext&&_testingContext.campaign&&_testingContext.campaign.id)||(_testingContext&&_testingContext.campaign&&_testingContext.campaign.campaign_id);
-      if(jCampId && d.participant_id){
-        testingOpenSurvey(jCampId, d.participant_id);
+      // 加入成功（或已加入）— 直接跳去填問卷
+      if(campId && d.participant_id){
+        testingOpenSurvey(campId, d.participant_id);
       } else {
         testingLoadMyCampaigns();
       }
