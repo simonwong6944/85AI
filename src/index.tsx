@@ -1792,6 +1792,7 @@ app.get('/api/testing/my-campaigns/:member_no', async (c) => {
     `SELECT tp.id as participant_id, tp.status, tp.registered_at, tp.sample_claimed_at,
             tp.survey_submitted_at, tc.id as campaign_id, tc.campaign_name, tc.brand_name,
             tc.brand_logo_url, tc.product_name, tc.product_image_url, tc.survey_deadline,
+            tc.status as campaign_status,
             tr.reward_name, tr.reward_description, tr.reward_type, tr.reward_value
      FROM testing_participants tp
      JOIN testing_campaigns tc ON tp.campaign_id = tc.id
@@ -13936,11 +13937,11 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
     <div class="drawer-divider"></div>
     <!-- 產品測試 -->
     <div class="drawer-section-title">會員專屬活動</div>
-    <button class="drawer-item" onclick="closeDrawer();openTestingPanel()">
+    <button class="drawer-item" onclick="closeDrawer();openTestingPanel()" style="border:2px solid #ede9fe;border-radius:12px;background:linear-gradient(135deg,#faf5ff,#f5f3ff);">
       <span class="di-icon">🧪</span>
       <div>
-        <div>產品測試計劃</div>
-        <div class="di-sub">試用新品，分享意見</div>
+        <div style="font-weight:800;color:#6d28d9;">產品測試計劃</div>
+        <div class="di-sub">試用新品 → 填問卷 → 贏獎勵</div>
       </div>
     </button>
   </div>
@@ -14028,6 +14029,17 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
         <p>你而家係用 WhatsApp / FB 入面嘅瀏覽器，<strong>唔支援安裝到主畫面</strong>。</p>
         <p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>
         <button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>
+      </div>
+      <!-- 產品測試問卷快捷入口 -->
+      <div id="testingShortcut" style="margin:14px 0 4px;display:none;">
+        <button onclick="openTestingPanel()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:12px;padding:14px 18px;font-size:16px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:12px;box-shadow:0 3px 12px rgba(124,58,237,0.35);">
+          <span style="font-size:26px;">🧪</span>
+          <div style="text-align:left;flex:1;">
+            <div>產品測試計劃</div>
+            <div style="font-size:13px;font-weight:500;opacity:0.85;margin-top:2px;">查看我的試用 / 填寫問卷</div>
+          </div>
+          <span style="font-size:20px;">›</span>
+        </button>
       </div>
       <!-- 換人 -->
       <div class="switch-wrap">
@@ -14414,6 +14426,16 @@ function showCard(memberNo, waClicked) {
         '<p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>' +
         '<button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>' +
       '</div>' +
+      '<div id="testingShortcut" style="margin:14px 0 4px;">' +
+        '<button onclick="openTestingPanel()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:12px;padding:14px 18px;font-size:16px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:12px;box-shadow:0 3px 12px rgba(124,58,237,0.35);">' +
+          '<span style="font-size:26px;">🧪</span>' +
+          '<div style="text-align:left;flex:1;">' +
+            '<div>產品測試計劃</div>' +
+            '<div style="font-size:13px;font-weight:500;opacity:0.85;margin-top:2px;">查看我的試用 / 填寫問卷</div>' +
+          '</div>' +
+          '<span style="font-size:20px;">›</span>' +
+        '</button>' +
+      '</div>' +
       '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>' +
     '</div>';
   // partnerEntrySection removed — CoLeadery / CoLinkery moved to ☰ side drawer menu
@@ -14799,16 +14821,21 @@ function testingLoadMyCampaigns(){
     var TST_P_STATUS={registered:'已登記',sample_claimed:'已取樣品',survey_started:'填寫中',survey_submitted:'已提交問卷',reward_sent:'已收獎勵'};
     var html=d.campaigns.map(function(c){
       var statusColor={registered:'#374151',sample_claimed:'#c2410c',survey_started:'#1e40af',survey_submitted:'#166534',reward_sent:'#5b21b6'}[c.status]||'#374151';
-      var canSurvey=c.campaign_status==='live' && (c.status==='sample_claimed'||c.status==='survey_started');
-      return '<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);margin-bottom:12px;border:1.5px solid #ede9fe;">'+
+      // canSurvey: campaign must be live AND participant status allows survey
+      var campLive=(c.campaign_status==='live'||!c.campaign_status);
+      var canSurvey=campLive && (c.status==='sample_claimed'||c.status==='survey_started'||c.status==='registered');
+      var done=(c.status==='survey_submitted'||c.status==='reward_sent');
+      var borderCol=canSurvey?'#7c3aed':done?'#bbf7d0':'#ede9fe';
+      return '<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);margin-bottom:12px;border:2px solid '+borderCol+';">'+
         (c.brand_logo_url?'<img src="'+escHtml(c.brand_logo_url)+'" alt="" style="height:36px;object-fit:contain;margin-bottom:10px;">':'')+
         '<div style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:3px;">'+escHtml(c.product_name)+'</div>'+
         '<div style="font-size:14px;color:#6b7280;margin-bottom:8px;">'+escHtml(c.brand_name)+'</div>'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:'+(canSurvey?'10':'0')+'px;">'+
           '<span style="font-size:14px;font-weight:700;color:'+statusColor+';">'+(TST_P_STATUS[c.status]||c.status)+'</span>'+
-          (canSurvey?'<button onclick="testingOpenSurvey('+c.campaign_id+')" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer;">填寫問卷</button>':'')+
+          (done?'<span style="font-size:13px;color:#166534;background:#dcfce7;border-radius:6px;padding:3px 9px;font-weight:700;">✅ 已完成</span>':'')+
         '</div>'+
-        (c.survey_deadline?'<div style="font-size:12px;color:#9ca3af;margin-top:6px;">問卷截止：'+escHtml(c.survey_deadline)+'</div>':'')+
+        (canSurvey?'<button onclick="testingOpenSurvey('+c.campaign_id+','+c.participant_id+')" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:10px;padding:13px;font-size:16px;font-weight:800;cursor:pointer;letter-spacing:0.5px;">📝 立即填寫問卷</button>':'')+
+        (c.survey_deadline&&!done?'<div style="font-size:12px;color:#9ca3af;margin-top:8px;text-align:center;">問卷截止：'+escHtml(c.survey_deadline)+'</div>':'')+
       '</div>';
     }).join('');
     el.innerHTML=html;
