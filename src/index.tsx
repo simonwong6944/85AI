@@ -15643,7 +15643,7 @@ function appHmvodDetailHtml(alreadyApplied){
   var parts=[];
   // Header
   parts.push('<div style="background:linear-gradient(135deg,#B71C1C,#D32F2F);padding:18px 20px 14px;display:flex;align-items:center;gap:12px;">');
-  parts.push('<span style="font-size:28px;">🎬</span><div style="color:#fff;"><div style="font-size:16px;font-weight:900;">HMVod 免費1年影視串流會籍</div><div style="font-size:12px;opacity:0.8;margin-top:1px;">Hong Kong\'s #1 Chinese Streaming Platform</div></div></div>');
+  parts.push('<span style="font-size:28px;">🎬</span><div style="color:#fff;"><div style="font-size:16px;font-weight:900;">HMVod 免費1年影視串流會籍</div><div style="font-size:12px;opacity:0.8;margin-top:1px;">Hong Kong #1 Chinese Streaming Platform</div></div></div>');
   parts.push('<div style="padding:0 0 100px;">');
 
   if(alreadyApplied){
@@ -15704,54 +15704,44 @@ function appHmvodApply(){
   var memberNo=localStorage.getItem('ce85_member_no')||'';
   var phone=localStorage.getItem('ce85_phone')||'';
   var errEl=document.getElementById('appHmvodErr');
-  if(!memberNo||!phone){
-    if(errEl){errEl.textContent='找不到會員資料，請重新登入';errEl.style.display='block';}
-    return;
-  }
-  if(!_hmvodWaNumber){
-    if(errEl){errEl.textContent='系統錯誤：未能取得職員聯絡方式，請稍後再試';errEl.style.display='block';}
-    return;
-  }
   var btn=document.getElementById('appHmvodApplyBtn');
+  function showErr(msg){ if(errEl){errEl.textContent=msg;errEl.style.display='block';} if(btn){btn.disabled=false;btn.textContent='📱 立即申請 · 發送 WhatsApp';} }
+  if(!memberNo||!phone){ showErr('找不到會員資料，請重新登入'); return; }
+  if(!_hmvodWaNumber){ showErr('系統錯誤：未能取得職員聯絡方式，請稍後再試'); return; }
   if(btn){btn.disabled=true;btn.textContent='處理中…';}
-  // Get member name from medical-status API (it returns name_zh/name_en)
+  var _nameZh='';
+  // Step 1: get member name
   fetch('/api/members/'+encodeURIComponent(memberNo)+'/medical-status')
     .then(function(r){return r.json();})
     .then(function(md){
-      var nameZh=md.name_zh||'';
-      var nameEn=md.name_en||'';
+      _nameZh=md.name_zh||'';
+      // Step 2: record application
       return fetch('/api/hmvod/apply',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({member_no:memberNo,name_zh:nameZh,name_en:nameEn,phone:phone})
-      }).then(function(r){return r.json();}).then(function(d){return {d:d,nameZh:nameZh};});
-    }).then(function(result){ var d=result.d; var nameZh=result.nameZh;
-  .then(function(d){
+        body:JSON.stringify({member_no:memberNo,name_zh:_nameZh,name_en:md.name_en||'',phone:phone})
+      });
+    })
+    .then(function(r){return r.json();})
+    .then(function(d){
       if(!d.ok&&d.error==='ALREADY_APPLIED'){
         _hmvodApplied=true;
-        var content=document.getElementById('appBnfDetailContent');
-        if(content) content.innerHTML=appHmvodDetailHtml(true);
+        var c=document.getElementById('appBnfDetailContent');
+        if(c) c.innerHTML=appHmvodDetailHtml(true);
         return;
       }
-      if(!d.ok){
-        if(errEl){errEl.textContent=d.message||'申請失敗，請稍後再試';errEl.style.display='block';}
-        if(btn){btn.disabled=false;btn.textContent='📱 立即申請 · 發送 WhatsApp';}
-        return;
-      }
+      if(!d.ok){ showErr(d.message||'申請失敗，請稍後再試'); return; }
       _hmvodApplied=true;
-      // Open WhatsApp with pre-filled message
-      var waMsg='你好，我是老有聯盟會員 '+nameZh+'，會員卡號 '+memberNo+'，電話 '+phone+'。\n\n我想申請 HMV On Demand 免費1年影視串流會籍，請協助登記，謝謝！';
-      var waUrl='https://wa.me/'+_hmvodWaNumber+'?text='+encodeURIComponent(waMsg);
-      window.open(waUrl,'_blank');
-      // Show applied screen
-      var content2=document.getElementById('appBnfDetailContent');
-      if(content2) content2.innerHTML=appHmvodDetailHtml(true);
-      // Update pin card badge
+      // Step 3: open WhatsApp with pre-filled message
+      var nl=String.fromCharCode(10);
+      var waMsg='你好，我是老有聯盟會員 '+_nameZh+'，會員卡號 '+memberNo+'，電話 '+phone+'。'+nl+nl+'我想申請 HMV On Demand 免費1年影視串流會籍，請協助登記，謝謝！';
+      window.open('https://wa.me/'+_hmvodWaNumber+'?text='+encodeURIComponent(waMsg),'_blank');
+      // Show success screen
+      var c2=document.getElementById('appBnfDetailContent');
+      if(c2) c2.innerHTML=appHmvodDetailHtml(true);
       appHmvodFetchStatus();
-    }).catch(function(){
-      if(errEl){errEl.textContent='網絡錯誤，請稍後再試';errEl.style.display='block';}
-      if(btn){btn.disabled=false;btn.textContent='📱 立即申請 · 發送 WhatsApp';}
-    });
+    })
+    .catch(function(){ showErr('網絡錯誤，請稍後再試'); });
 }
 
 // ── 消息 内容 ─────────────────────────────────────────────────────────────────
