@@ -14532,8 +14532,25 @@ function switchUser() {
   if(testingCode){
     // Clean URL
     window.history.replaceState({},'',window.location.origin+'/app');
-    // After member check, will call testingHandleQRScan
-    window._pendingTestingCode = testingCode;
+    var _savedMemberNo = localStorage.getItem('ce85_member_no');
+    if(_savedMemberNo){
+      // 已登入：立即觸發 QR 掃描流程，不用等候 showCard()
+      window._pendingTestingCode = null;
+      setTimeout(function(){ testingHandleQRScan(testingCode); }, 800);
+    } else {
+      // 未登入：保留 code，登入後由 showCard() 觸發
+      window._pendingTestingCode = testingCode;
+      // 顯示提示 banner 告知用戶
+      setTimeout(function(){
+        var b=document.createElement('div');
+        b.id='testingLoginBanner';
+        b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,0.25);';
+        b.innerHTML='<div style="font-size:28px;">&#129514;</div>'
+          +'<div style="flex:1;"><div style="font-weight:800;font-size:15px;margin-bottom:2px;">試用計劃 QR 已掃描</div>'
+          +'<div style="font-size:13px;opacity:0.9;">請輸入會員號碼登入，系統將自動跳轉至問卷</div></div>';
+        document.body.appendChild(b);
+      }, 300);
+    }
   }
 
   // ── WA Quick Register Token 自動登入 ──────────────────────────────────────
@@ -14803,17 +14820,40 @@ function testingLoadMyCampaigns(){
 // Called when QR scan brings user to /app?testing=CODE
 function testingHandleQRScan(code){
   _testingContext = code;
-  var memberNo = window.MEMBER_NO||'';
+  var memberNo = window.MEMBER_NO || localStorage.getItem('ce85_member_no') || '';
+  // Remove login banner if showing
+  var lb=document.getElementById('testingLoginBanner');
+  if(lb && lb.parentNode) lb.parentNode.removeChild(lb);
   if(!memberNo){ openTestingPanel(); return; }
-  // Show join confirmation
+  // Fetch campaign info
   fetch('/api/testing/scan/'+encodeURIComponent(code))
   .then(function(r){return r.json();})
   .then(function(d){
     if(!d.ok){ openTestingPanel(); return; }
-    var c=d.campaign;
-    _testingContext = {code:code, campaign:c};
-    openTestingPanel();
-    testingShowJoinConfirm(c);
+    var camp=d.campaign;
+    _testingContext = {code:code, campaign:camp};
+    // Check if already joined — if so go straight to survey
+    fetch('/api/testing/my-campaigns/'+encodeURIComponent(memberNo))
+    .then(function(r2){return r2.json();})
+    .then(function(d2){
+      openTestingPanel();
+      var already=(d2.campaigns||[]).find(function(c){ return String(c.campaign_id)===String(camp.id||camp.campaign_id); });
+      if(already){
+        if(already.survey_submitted_at){
+          // Already submitted — show list
+          testingLoadMyCampaigns();
+        } else {
+          // Joined but survey not yet submitted — go straight to survey
+          testingOpenSurvey(already.campaign_id, already.participant_id);
+        }
+      } else {
+        // First time — show join confirmation
+        testingShowJoinConfirm(camp);
+      }
+    }).catch(function(){
+      openTestingPanel();
+      testingShowJoinConfirm(camp);
+    });
   }).catch(function(){ openTestingPanel(); });
 }
 
@@ -14857,8 +14897,13 @@ function testingJoinCampaign(){
     var el2=document.getElementById('tst-my-list');
     if(el2) el2.style.display='block';
     if(d.ok){
-      alert('🎉 成功加入！請向工作人員領取產品樣品，使用後填寫問卷。');
-      testingLoadMyCampaigns();
+      // 加入成功 — 直接跳去填問卷
+      var jCampId=(_testingContext&&_testingContext.campaign&&_testingContext.campaign.id)||(_testingContext&&_testingContext.campaign&&_testingContext.campaign.campaign_id);
+      if(jCampId && d.participant_id){
+        testingOpenSurvey(jCampId, d.participant_id);
+      } else {
+        testingLoadMyCampaigns();
+      }
     } else {
       alert(d.error||'加入失敗，請重試');
     }
@@ -14866,8 +14911,8 @@ function testingJoinCampaign(){
   }).catch(function(){alert('網絡錯誤，請重試');});
 }
 
-function testingOpenSurvey(campaignId){
-  var memberNo=window.MEMBER_NO||'';
+function testingOpenSurvey(campaignId, participantId){
+  var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
   if(!memberNo){alert('請先登入');return;}
   var panelMain=document.getElementById('tst-panel-main');
   var panelSurvey=document.getElementById('tst-panel-survey');
