@@ -8440,6 +8440,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="nav-item" onclick="switchMod('mod-benefits')">
         <i class="fas fa-gift"></i> 福利管理
       </div>
+      <div class="nav-item" onclick="switchMod('mod-hmvod')">
+        <i class="fas fa-film"></i> HMVod 申請
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doAdminLogout()">
@@ -10968,6 +10971,56 @@ function tstSendWA(participantId, type){
 </div>
 </div><!-- end mod-benefits -->
 
+<!-- mod-hmvod: HMVod 申請管理 -->
+<div id="mod-hmvod" class="mod-page" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+    <div style="font-size:20px;font-weight:900;color:#B71C1C;">🎬 HMVod 免費會籍申請記錄</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="hmvodAdminLoad()" style="font-size:14px;padding:8px 16px;"><i class="fas fa-sync"></i> 重新整理</button>
+      <button class="btn btn-primary" onclick="hmvodExportExcel()" style="font-size:14px;padding:8px 16px;background:#1B5E20;border-color:#1B5E20;"><i class="fas fa-file-excel"></i> 下載 Excel</button>
+    </div>
+  </div>
+
+  <!-- WA Number Setting -->
+  <div style="background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+    <div style="font-size:15px;font-weight:800;color:#F57F17;margin-bottom:12px;">⚙️ 職員 WhatsApp 號碼設定</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <label style="font-size:13px;color:#555;font-weight:700;display:block;margin-bottom:4px;">接收申請的 WhatsApp 號碼（含國家號，如 85290001234）</label>
+        <input id="hmvodWaInput" type="tel" placeholder="85290001234" style="width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:monospace;letter-spacing:1px;">
+      </div>
+      <button class="btn btn-primary" onclick="hmvodSaveWa()" style="padding:10px 20px;margin-top:20px;">儲存</button>
+    </div>
+    <div id="hmvodWaMsg" style="font-size:13px;margin-top:8px;display:none;"></div>
+  </div>
+
+  <!-- Stats bar -->
+  <div id="hmvodStats" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+  <!-- Applications table -->
+  <div style="background:#fff;border-radius:12px;border:1.5px solid #e0e0e0;overflow:hidden;">
+    <div id="hmvodTableWrap" style="overflow-x:auto;">
+      <div id="hmvodLoading" style="padding:40px;text-align:center;color:#888;">載入中…</div>
+      <table id="hmvodTable" style="width:100%;border-collapse:collapse;display:none;">
+        <thead>
+          <tr style="background:#B71C1C;color:#fff;font-size:13px;">
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">#</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">申請時間</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">姓名</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">電話</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">會員號</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">狀態</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">備註</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="hmvodTbody"></tbody>
+      </table>
+      <div id="hmvodEmpty" style="padding:40px;text-align:center;color:#aaa;display:none;">暫無申請記錄</div>
+    </div>
+  </div>
+</div><!-- end mod-hmvod -->
+
 <script>
 // ══════════════════════════════════════════════════════════════════════════════
 // BENEFITS MODULE JS
@@ -11249,7 +11302,7 @@ function switchMod(id){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   event.currentTarget.classList.add('active');
-  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核','mod-qr':'🔖 QR 快速登記管理','mod-testing':'🧪 產品測試計劃','mod-benefits':'🎁 福利管理'};
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核','mod-qr':'🔖 QR 快速登記管理','mod-testing':'🧪 產品測試計劃','mod-benefits':'🎁 福利管理','mod-hmvod':'🎬 HMVod 申請管理'};
   document.getElementById('topbar-title').textContent = titles[id]||id;
   if(id==='mod-roadshow') loadRoadshows();
   if(id==='mod-membership' && !_membershipFrameLoaded){
@@ -11266,11 +11319,163 @@ function switchMod(id){
   if(id==='mod-qr') { qrLoadAll(); }
   if(id==='mod-testing') { testingLoadCampaigns(); }
   if(id==='mod-benefits') { bnfLoadAll(); }
+  if(id==='mod-hmvod') { hmvodAdminLoad(); }
 }
 function reloadMembershipFrame(){
   var f = document.getElementById('membership-frame');
   f.src = '/membership/admin';
   _membershipFrameLoaded = true;
+}
+
+// ══════════════════════════════════════════════════════════
+// ── HMVod Admin Tab ──
+// ══════════════════════════════════════════════════════════
+var _hmvodAdminData = [];
+
+function hmvodAdminLoad(){
+  var loading=document.getElementById('hmvodLoading');
+  var table=document.getElementById('hmvodTable');
+  var empty=document.getElementById('hmvodEmpty');
+  if(loading) loading.style.display='block';
+  if(table) table.style.display='none';
+  if(empty) empty.style.display='none';
+  // Load WA setting + applications in parallel
+  Promise.all([
+    fetch('/api/admin/hmvod/applications',{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/hmvod/settings').then(function(r){return r.json();})
+  ]).then(function(results){
+    var appsData=results[0], settings=results[1];
+    if(loading) loading.style.display='none';
+    // Fill WA input
+    var waInput=document.getElementById('hmvodWaInput');
+    if(waInput&&settings.wa_number) waInput.value=settings.wa_number;
+    if(!appsData.ok){ if(empty){empty.textContent='載入失敗';empty.style.display='block';} return; }
+    _hmvodAdminData=appsData.applications||[];
+    hmvodRenderTable(_hmvodAdminData);
+    hmvodRenderStats(_hmvodAdminData);
+  }).catch(function(){
+    if(loading) loading.style.display='none';
+    if(empty){empty.textContent='網絡錯誤';empty.style.display='block';}
+  });
+}
+
+function hmvodRenderStats(apps){
+  var statsEl=document.getElementById('hmvodStats');
+  if(!statsEl) return;
+  var total=apps.length;
+  var done=apps.filter(function(a){return a.status==='DONE';}).length;
+  var pending=total-done;
+  var statItems=[
+    {label:'總申請',value:total,color:'#B71C1C',bg:'#FFEBEE'},
+    {label:'待處理',value:pending,color:'#F57F17',bg:'#FFF8E1'},
+    {label:'已完成',value:done,color:'#2E7D32',bg:'#E8F5E9'},
+    {label:'應收費用',value:'HK$ '+(total*10),color:'#1565C0',bg:'#E3F2FD'}
+  ];
+  statsEl.innerHTML=statItems.map(function(s){
+    return '<div style="background:'+s.bg+';border-radius:10px;padding:14px 20px;min-width:120px;text-align:center;">'
+      +'<div style="font-size:22px;font-weight:900;color:'+s.color+';">'+s.value+'</div>'
+      +'<div style="font-size:12px;color:#555;margin-top:2px;">'+s.label+'</div></div>';
+  }).join('');
+}
+
+function hmvodRenderTable(apps){
+  var table=document.getElementById('hmvodTable');
+  var tbody=document.getElementById('hmvodTbody');
+  var empty=document.getElementById('hmvodEmpty');
+  if(!tbody) return;
+  if(!apps.length){ if(empty)empty.style.display='block'; if(table)table.style.display='none'; return; }
+  if(table) table.style.display='table';
+  tbody.innerHTML=apps.map(function(a,i){
+    var isDone=a.status==='DONE';
+    var statusBadge=isDone
+      ? '<span style="background:#E8F5E9;color:#2E7D32;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;">✅ 已完成</span>'
+      : '<span style="background:#FFF8E1;color:#F57F17;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;">⏳ 待處理</span>';
+    var dt=a.created_at?a.created_at.replace('T',' ').slice(0,16):'';
+    var waUrl='https://wa.me/'+a.phone+'?text='+encodeURIComponent('你好 '+a.name_zh+'，你的 HMVod 驗証碼已準備好，請收看。');
+    return '<tr style="border-bottom:1px solid #f0f0f0;'+(i%2===0?'':'background:#fafafa')+';">'
+      +'<td style="padding:12px 14px;font-size:13px;color:#888;">'+(i+1)+'</td>'
+      +'<td style="padding:12px 14px;font-size:13px;white-space:nowrap;">'+escAdminHtml(dt)+'</td>'
+      +'<td style="padding:12px 14px;font-size:14px;font-weight:700;">'+escAdminHtml(a.name_zh||'')+'</td>'
+      +'<td style="padding:12px 14px;font-size:14px;"><a href="'+waUrl+'" target="_blank" style="color:#B71C1C;font-weight:700;text-decoration:none;">📱 '+escAdminHtml(a.phone||'')+'</a></td>'
+      +'<td style="padding:12px 14px;font-size:13px;font-family:monospace;">'+escAdminHtml(a.member_no||'')+'</td>'
+      +'<td style="padding:12px 14px;">'+statusBadge+'</td>'
+      +'<td style="padding:12px 14px;font-size:13px;color:#555;">'+escAdminHtml(a.notes||'')+'</td>'
+      +'<td style="padding:12px 14px;">'
+        +'<button onclick="hmvodMarkDone('+a.id+',this)" style="padding:6px 12px;border:0;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;'+(isDone?'background:#e0e0e0;color:#888;':'background:#2E7D32;color:#fff;')+'">'+(isDone?'已完成':'標記完成')+'</button>'
+      +'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function hmvodMarkDone(id, btn){
+  var notes=prompt('備註（可填驗証碼或其他）：')||'';
+  if(btn){btn.disabled=true;btn.textContent='處理中…';}
+  fetch('/api/admin/hmvod/applications/'+id,{
+    method:'PUT',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:'DONE',notes:notes})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) hmvodAdminLoad();
+    else{ if(btn){btn.disabled=false;btn.textContent='標記完成';} alert('失敗：'+d.error); }
+  }).catch(function(){ if(btn){btn.disabled=false;btn.textContent='標記完成';} });
+}
+
+function hmvodSaveWa(){
+  var val=(document.getElementById('hmvodWaInput')||{}).value||'';
+  var clean=val.replace(/\D/g,'');
+  var msgEl=document.getElementById('hmvodWaMsg');
+  if(!clean||clean.length<8){
+    if(msgEl){msgEl.textContent='請輸入有效電話號碼（如 85290001234）';msgEl.style.color='#C62828';msgEl.style.display='block';}
+    return;
+  }
+  fetch('/api/admin/hmvod/settings',{
+    method:'PUT',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({wa_number:clean})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      if(msgEl){msgEl.textContent='✅ 儲存成功！WhatsApp 號碼：'+d.wa_number;msgEl.style.color='#2E7D32';msgEl.style.display='block';}
+      if(document.getElementById('hmvodWaInput')) document.getElementById('hmvodWaInput').value=d.wa_number;
+    } else {
+      if(msgEl){msgEl.textContent='儲存失敗：'+d.error;msgEl.style.color='#C62828';msgEl.style.display='block';}
+    }
+  }).catch(function(){
+    if(msgEl){msgEl.textContent='網絡錯誤，請稍後再試';msgEl.style.color='#C62828';msgEl.style.display='block';}
+  });
+}
+
+function hmvodExportExcel(){
+  if(!_hmvodAdminData.length){ alert('暫無數據可下載'); return; }
+  var headers=['#','申請時間','姓名','電話','會員號','狀態','備註'];
+  var rows=_hmvodAdminData.map(function(a,i){
+    return [
+      i+1,
+      (a.created_at||'').replace('T',' ').slice(0,16),
+      a.name_zh||'',
+      a.phone||'',
+      a.member_no||'',
+      a.status==='DONE'?'已完成':'待處理',
+      a.notes||''
+    ];
+  });
+  // Build CSV (Excel-compatible UTF-8 with BOM)
+  var csvContent='\uFEFF'+[headers].concat(rows).map(function(r){
+    return r.map(function(cell){
+      var s=String(cell).replace(/"/g,'""');
+      return (s.indexOf(',')!==-1||s.indexOf('"')!==-1||s.indexOf('\n')!==-1)?'"'+s+'"':s;
+    }).join(',');
+  }).join('\r\n');
+  var blob=new Blob([csvContent],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  var today=new Date().toISOString().slice(0,10);
+  a.href=url; a.download='HMVod申請記錄_'+today+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function escAdminHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -14942,15 +15147,17 @@ function appBnfLoad(catId){
       var items=d.benefits||[];
       // Show medical card pinned card for 全部(0) or 健康(MED_CARD_CAT_ID)
       var showMed=(catId===0||catId===MED_CARD_CAT_ID);
-      if(!items.length && !showMed){if(empty)empty.style.display='block';return;}
+      var showHmvod=(catId===0||catId===HMVOD_ENT_CAT_ID);
+      if(!items.length && !showMed && !showHmvod){if(empty)empty.style.display='block';return;}
       _appBnfBenefits=items;
       if(list){
         var html=showMed?appBnfMedCardPinHtml():'';
+        html+=showHmvod?appHmvodPinHtml():'';
         html+=items.map(function(b){return appBnfCardHtml(b);}).join('');
         list.innerHTML=html;
-        // data-badge-row is now baked into appBnfMedCardPinHtml() HTML directly
-        // Async fetch status badge (replaces the initially-rendered badge)
+        // Async fetch status badges
         if(showMed) setTimeout(appMedFetchPinStatus,100);
+        if(showHmvod) setTimeout(appHmvodFetchStatus,150);
       }
     })
     .catch(function(){if(loading)loading.style.display='none';if(empty)empty.style.display='block';});
@@ -15326,6 +15533,225 @@ function appBnfClaim(id){
 function appBnfCloseDetail(){
   var panel=document.getElementById('appBnfDetail');
   if(panel) panel.style.display='none';
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// HMVod 免費1年會籍 福利卡片
+// ════════════════════════════════════════════════════════════════════════════════
+var HMVOD_ENT_CAT_ID = 2; // 娛樂 category id from migration 0030
+var _hmvodApplied = null; // null=unknown, true=applied, false=not applied
+var _hmvodWaNumber = ''; // loaded async
+
+function appHmvodPinHtml(){
+  var badgeHtml = _hmvodApplied
+    ? '<span class="appHmvodBadge" style="font-size:11px;color:#1565C0;background:#E3F2FD;border:1px solid #90CAF9;padding:2px 10px;border-radius:10px;font-weight:700;">✅ 已申請</span>'
+    : '<span class="appHmvodBadge" style="font-size:11px;color:#B71C1C;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;">🎁 免費申請</span>';
+  var parts=[];
+  parts.push('<div id="appHmvodPinCard" onclick="appHmvodOpen()" style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.1);overflow:hidden;cursor:pointer;border:2px solid #B71C1C;margin-bottom:14px;">');
+  // Red gradient header
+  parts.push('<div style="background:linear-gradient(135deg,#B71C1C,#D32F2F);padding:16px 18px;display:flex;align-items:center;gap:14px;">');
+  parts.push('<div style="width:52px;height:52px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">🎬</div>');
+  parts.push('<div style="color:#fff;"><div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">HMV On Demand</div><div style="font-size:12px;opacity:0.85;margin-top:2px;">免費1年串流會籍 · 無限睇</div></div>');
+  parts.push('</div>');
+  // Body
+  parts.push('<div style="padding:14px 16px;">');
+  parts.push('<div data-hmvod-badge-row="1" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">');
+  parts.push('<span style="font-size:11px;font-weight:700;color:#B71C1C;background:#FFEBEE;padding:2px 8px;border-radius:10px;">🎭 娛樂</span>');
+  parts.push(badgeHtml);
+  parts.push('</div>');
+  parts.push('<div style="font-size:17px;font-weight:800;color:#1a1a1a;line-height:1.3;margin-bottom:6px;">HMVod 免費1年影視串流會籍</div>');
+  parts.push('<div style="font-size:14px;color:#555;line-height:1.5;margin-bottom:4px;">港劇、韓劇、電影、動漫無限收睇，全港最大華語串流平台。</div>');
+  parts.push('<div style="font-size:13px;color:#B71C1C;font-weight:700;margin-bottom:6px;">🎁 路演現場申請 即享禮品一份！</div>');
+  parts.push('<div style="margin-top:10px;display:flex;align-items:center;justify-content:flex-end;">');
+  parts.push('<span style="font-size:13px;font-weight:700;color:#B71C1C;">立即申請 ›</span>');
+  parts.push('</div></div></div>');
+  return parts.join('');
+}
+
+function appHmvodFetchStatus(){
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+  if(!memberNo) return;
+  var phone=localStorage.getItem('ce85_phone')||'';
+  if(!phone) return;
+  fetch('/api/hmvod/check?phone='+encodeURIComponent(phone))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      _hmvodApplied=d.applied||false;
+      // Update badge in pin card
+      var card=document.getElementById('appHmvodPinCard');
+      if(!card) return;
+      var badgeRow=card.querySelector('[data-hmvod-badge-row]');
+      if(!badgeRow) return;
+      badgeRow.querySelectorAll('.appHmvodBadge').forEach(function(b){b.remove();});
+      var span=document.createElement('span');
+      span.className='appHmvodBadge';
+      if(_hmvodApplied){
+        span.style.cssText='font-size:11px;color:#1565C0;background:#E3F2FD;border:1px solid #90CAF9;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='✅ 已申請';
+      } else {
+        span.style.cssText='font-size:11px;color:#B71C1C;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='🎁 免費申請';
+      }
+      badgeRow.appendChild(span);
+    }).catch(function(){});
+}
+
+function appHmvodOpen(){
+  var panel=document.getElementById('appBnfDetail');
+  var content=document.getElementById('appBnfDetailContent');
+  if(!panel||!content) return;
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+  if(!memberNo){
+    content.innerHTML=appHmvodAuthHtml();
+    panel.style.display='block';
+    return;
+  }
+  content.innerHTML='<div style="text-align:center;padding:60px 20px;color:#888;">載入中…</div>';
+  panel.style.display='block';
+  // Load WA number + check status in parallel
+  Promise.all([
+    fetch('/api/hmvod/settings').then(function(r){return r.json();}),
+    (function(){
+      var phone=localStorage.getItem('ce85_phone')||'';
+      return phone ? fetch('/api/hmvod/check?phone='+encodeURIComponent(phone)).then(function(r){return r.json();}) : Promise.resolve({ok:true,applied:false});
+    })()
+  ]).then(function(results){
+    var settings=results[0], check=results[1];
+    _hmvodWaNumber=settings.wa_number||'';
+    _hmvodApplied=check.applied||false;
+    content.innerHTML=appHmvodDetailHtml(_hmvodApplied);
+  }).catch(function(){
+    content.innerHTML=appHmvodDetailHtml(false);
+  });
+}
+
+function appHmvodAuthHtml(){
+  var parts=[];
+  parts.push('<div style="background:linear-gradient(135deg,#B71C1C,#D32F2F);padding:18px 20px 14px;display:flex;align-items:center;gap:12px;">');
+  parts.push('<span style="font-size:28px;">🎬</span><div style="color:#fff;"><div style="font-size:16px;font-weight:900;">HMVod 免費會籍</div></div></div>');
+  parts.push('<div style="padding:30px 20px;text-align:center;">');
+  parts.push('<div style="font-size:40px;margin-bottom:16px;">🔒</div>');
+  parts.push('<div style="font-size:18px;font-weight:700;color:#333;margin-bottom:10px;">請先登入會員卡</div>');
+  parts.push('<div style="font-size:15px;color:#666;line-height:1.6;margin-bottom:24px;">登入後即可申請 HMVod 免費1年會籍。</div>');
+  parts.push('<button onclick="appBnfCloseDetail();switchTab(&apos;card&apos;)" style="width:100%;padding:16px;background:#B71C1C;color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;">前往登入</button>');
+  parts.push('</div>');
+  return parts.join('');
+}
+
+function appHmvodDetailHtml(alreadyApplied){
+  var parts=[];
+  // Header
+  parts.push('<div style="background:linear-gradient(135deg,#B71C1C,#D32F2F);padding:18px 20px 14px;display:flex;align-items:center;gap:12px;">');
+  parts.push('<span style="font-size:28px;">🎬</span><div style="color:#fff;"><div style="font-size:16px;font-weight:900;">HMVod 免費1年影視串流會籍</div><div style="font-size:12px;opacity:0.8;margin-top:1px;">Hong Kong\'s #1 Chinese Streaming Platform</div></div></div>');
+  parts.push('<div style="padding:0 0 100px;">');
+
+  if(alreadyApplied){
+    // Already applied
+    parts.push('<div style="padding:28px 20px;text-align:center;">');
+    parts.push('<div style="font-size:52px;margin-bottom:16px;">✅</div>');
+    parts.push('<div style="font-size:20px;font-weight:900;color:#1565C0;margin-bottom:10px;">你已成功申請！</div>');
+    parts.push('<div style="font-size:15px;color:#555;line-height:1.7;margin-bottom:20px;">你的 HMVod 免費1年會籍申請已登記。<br>我們的職員將盡快以 WhatsApp 發送驗証碼給你。</div>');
+    parts.push('<div style="background:#E3F2FD;border-radius:12px;padding:16px 20px;font-size:14px;color:#1565C0;line-height:1.7;">如有查詢請 WhatsApp：<br><a href="https://wa.me/'+escAppHtml(_hmvodWaNumber)+'" target="_blank" style="color:#0D47A1;font-weight:700;font-size:16px;">📱 '+formatPhoneDisplay(_hmvodWaNumber)+'</a></div>');
+    parts.push('</div>');
+  } else {
+    // Not yet applied — show promo + apply button
+    // Promo banner
+    parts.push('<div style="margin:16px;background:linear-gradient(135deg,#B71C1C,#7B1FA2);border-radius:14px;padding:20px;color:#fff;text-align:center;">');
+    parts.push('<div style="font-size:36px;margin-bottom:8px;">🎬🍿</div>');
+    parts.push('<div style="font-size:22px;font-weight:900;margin-bottom:6px;">免費1年串流會籍</div>');
+    parts.push('<div style="font-size:15px;opacity:0.9;line-height:1.6;">港劇 · 韓劇 · 電影 · 動漫<br>無限收睇，隨時隨地</div>');
+    parts.push('<div style="margin-top:14px;background:rgba(255,255,255,0.2);border-radius:8px;padding:10px;font-size:14px;font-weight:700;">市值 HK$228/年 · 會員完全免費</div>');
+    parts.push('</div>');
+    // Gift promo
+    parts.push('<div style="margin:0 16px 16px;background:#FFF8E1;border:2px solid #FFD54F;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;">');
+    parts.push('<span style="font-size:32px;">🎁</span>');
+    parts.push('<div><div style="font-size:15px;font-weight:900;color:#F57F17;margin-bottom:4px;">路演現場申請 · 即享禮品</div><div style="font-size:13px;color:#795548;line-height:1.5;">凡於老有聯盟路演現場申請，可獲精美禮品一份！數量有限，先到先得。</div></div>');
+    parts.push('</div>');
+    // Features
+    parts.push('<div style="margin:0 16px 16px;background:#fff;border-radius:12px;border:1.5px solid #e0e0e0;padding:16px;">');
+    parts.push('<div style="font-size:15px;font-weight:900;color:#333;margin-bottom:12px;">會籍包含：</div>');
+    var features=[['🎭','港劇/韓劇/台劇','全平台最齊港產及韓國劇集'],['🎬','最新電影','每月新增電影，院線同步上映'],['📺','動漫/兒童','適合全家大細一齊睇'],['📱','多裝置收睇','手機、平板、電視同步使用']];
+    features.forEach(function(f){
+      parts.push('<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;"><span style="font-size:24px;width:32px;text-align:center;">'+f[0]+'</span><div><div style="font-size:14px;font-weight:700;color:#333;">'+f[1]+'</div><div style="font-size:12px;color:#777;">'+f[2]+'</div></div></div>');
+    });
+    parts.push('</div>');
+    // How it works
+    parts.push('<div style="margin:0 16px 16px;background:#E8F5E9;border-radius:12px;padding:14px 16px;">');
+    parts.push('<div style="font-size:14px;font-weight:900;color:#1B5E20;margin-bottom:10px;">📋 申請步驟</div>');
+    parts.push('<div style="font-size:13px;color:#2E7D32;line-height:2;">1️⃣ 點擊「立即申請」發送 WhatsApp 給職員<br>2️⃣ 職員為你登記並取得驗証碼<br>3️⃣ 收到驗証碼後告知職員（或現場出示）<br>4️⃣ 完成！即享1年免費串流服務</div>');
+    parts.push('</div>');
+    // Apply button
+    parts.push('<div style="padding:0 16px 16px;">');
+    parts.push('<div id="appHmvodErr" style="color:#C62828;font-size:14px;margin-bottom:10px;display:none;"></div>');
+    parts.push('<button id="appHmvodApplyBtn" onclick="appHmvodApply()" style="width:100%;min-height:58px;padding:14px;background:#B71C1C;color:#fff;border:0;border-radius:14px;font-size:20px;font-weight:900;cursor:pointer;letter-spacing:0.5px;">📱 立即申請 · 發送 WhatsApp</button>');
+    parts.push('<div style="margin-top:10px;font-size:12px;color:#888;text-align:center;">每個電話號碼只限申請一次 · 完全免費</div>');
+    parts.push('</div>');
+  }
+  parts.push('</div>');
+  return parts.join('');
+}
+
+function formatPhoneDisplay(num){
+  var n=String(num||'');
+  // If starts with 852, format as 852-XXXX-XXXX
+  if(n.startsWith('852')&&n.length>=11) return '(852) '+n.slice(3,7)+'-'+n.slice(7);
+  if(n.length===8) return n.slice(0,4)+'-'+n.slice(4);
+  return n;
+}
+
+function appHmvodApply(){
+  var memberNo=localStorage.getItem('ce85_member_no')||'';
+  var phone=localStorage.getItem('ce85_phone')||'';
+  var errEl=document.getElementById('appHmvodErr');
+  if(!memberNo||!phone){
+    if(errEl){errEl.textContent='找不到會員資料，請重新登入';errEl.style.display='block';}
+    return;
+  }
+  if(!_hmvodWaNumber){
+    if(errEl){errEl.textContent='系統錯誤：未能取得職員聯絡方式，請稍後再試';errEl.style.display='block';}
+    return;
+  }
+  var btn=document.getElementById('appHmvodApplyBtn');
+  if(btn){btn.disabled=true;btn.textContent='處理中…';}
+  // Get member name from medical-status API (it returns name_zh/name_en)
+  fetch('/api/members/'+encodeURIComponent(memberNo)+'/medical-status')
+    .then(function(r){return r.json();})
+    .then(function(md){
+      var nameZh=md.name_zh||'';
+      var nameEn=md.name_en||'';
+      return fetch('/api/hmvod/apply',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({member_no:memberNo,name_zh:nameZh,name_en:nameEn,phone:phone})
+      }).then(function(r){return r.json();}).then(function(d){return {d:d,nameZh:nameZh};});
+    }).then(function(result){ var d=result.d; var nameZh=result.nameZh;
+  .then(function(d){
+      if(!d.ok&&d.error==='ALREADY_APPLIED'){
+        _hmvodApplied=true;
+        var content=document.getElementById('appBnfDetailContent');
+        if(content) content.innerHTML=appHmvodDetailHtml(true);
+        return;
+      }
+      if(!d.ok){
+        if(errEl){errEl.textContent=d.message||'申請失敗，請稍後再試';errEl.style.display='block';}
+        if(btn){btn.disabled=false;btn.textContent='📱 立即申請 · 發送 WhatsApp';}
+        return;
+      }
+      _hmvodApplied=true;
+      // Open WhatsApp with pre-filled message
+      var waMsg='你好，我是老有聯盟會員 '+nameZh+'，會員卡號 '+memberNo+'，電話 '+phone+'。\n\n我想申請 HMV On Demand 免費1年影視串流會籍，請協助登記，謝謝！';
+      var waUrl='https://wa.me/'+_hmvodWaNumber+'?text='+encodeURIComponent(waMsg);
+      window.open(waUrl,'_blank');
+      // Show applied screen
+      var content2=document.getElementById('appBnfDetailContent');
+      if(content2) content2.innerHTML=appHmvodDetailHtml(true);
+      // Update pin card badge
+      appHmvodFetchStatus();
+    }).catch(function(){
+      if(errEl){errEl.textContent='網絡錯誤，請稍後再試';errEl.style.display='block';}
+      if(btn){btn.disabled=false;btn.textContent='📱 立即申請 · 發送 WhatsApp';}
+    });
 }
 
 // ── 消息 内容 ─────────────────────────────────────────────────────────────────
@@ -23707,6 +24133,94 @@ app.get('/api/member/medical-card', async (c) => {
     card_no:       app_row ? (app_row as any).card_no      : null,
     card_image_url:app_row ? (app_row as any).card_image_url : null,
   })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// HMVod API
+// ════════════════════════════════════════════════════════════════════════════════
+
+// GET /api/hmvod/settings — get WA number for staff (public, used by PWA to build WA link)
+app.get('/api/hmvod/settings', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const row = await db.prepare(`SELECT value FROM app_settings WHERE key='hmvod_wa_number'`).first() as any
+  return c.json({ ok: true, wa_number: row?.value || '' })
+})
+
+// PUT /api/admin/hmvod/settings — update WA number (admin only)
+app.put('/api/admin/hmvod/settings', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const sessionId = getCookie(c, 'admin_session') || ''
+  if (!sessionId) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
+  const sess = await db.prepare(`SELECT id FROM admin_sessions WHERE session_id=? AND expires_at>datetime('now')`).bind(sessionId).first()
+  if (!sess) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
+  const { wa_number } = await c.req.json() as any
+  if (!wa_number) return c.json({ ok: false, error: 'missing wa_number' }, 400)
+  const clean = String(wa_number).replace(/\D/g, '')
+  await db.prepare(`INSERT INTO app_settings(key,value,label,updated_at) VALUES('hmvod_wa_number',?,?,datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at`)
+    .bind(clean, 'HMVod 職員 WhatsApp 號碼').run()
+  return c.json({ ok: true, wa_number: clean })
+})
+
+// POST /api/hmvod/apply — record application (called when member taps send WA)
+app.post('/api/hmvod/apply', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  let body: any = {}
+  try { body = await c.req.json() } catch (_) {}
+  const { member_no, name_zh, name_en, phone } = body
+  if (!member_no || !phone) return c.json({ ok: false, error: 'missing fields' }, 400)
+
+  // Check if already applied by phone
+  const existing = await db.prepare(
+    `SELECT id FROM hmvod_applications WHERE phone=? LIMIT 1`
+  ).bind(String(phone)).first() as any
+  if (existing) return c.json({ ok: false, error: 'ALREADY_APPLIED', message: '此電話號碼已申請過' })
+
+  await db.prepare(
+    `INSERT INTO hmvod_applications(member_no,name_zh,name_en,phone,status,created_at,updated_at)
+     VALUES(?,?,?,?,'PENDING',datetime('now'),datetime('now'))`
+  ).bind(String(member_no), String(name_zh||''), String(name_en||''), String(phone)).run()
+  return c.json({ ok: true })
+})
+
+// GET /api/hmvod/check — check if member already applied
+app.get('/api/hmvod/check', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const phone = c.req.query('phone') || ''
+  if (!phone) return c.json({ ok: true, applied: false })
+  const row = await db.prepare(`SELECT id,status,created_at FROM hmvod_applications WHERE phone=? LIMIT 1`).bind(phone).first() as any
+  return c.json({ ok: true, applied: !!row, status: row?.status || null, created_at: row?.created_at || null })
+})
+
+// GET /api/admin/hmvod/applications — list all (admin)
+app.get('/api/admin/hmvod/applications', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const sessionId = getCookie(c, 'admin_session') || ''
+  if (!sessionId) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
+  const sess = await db.prepare(`SELECT id FROM admin_sessions WHERE session_id=? AND expires_at>datetime('now')`).bind(sessionId).first()
+  if (!sess) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
+  const rows = await db.prepare(
+    `SELECT id,member_no,name_zh,name_en,phone,status,notes,created_at,updated_at
+     FROM hmvod_applications ORDER BY created_at DESC`
+  ).all() as any
+  return c.json({ ok: true, applications: rows.results || [] })
+})
+
+// PUT /api/admin/hmvod/applications/:id — update status/notes (admin)
+app.put('/api/admin/hmvod/applications/:id', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const sessionId = getCookie(c, 'admin_session') || ''
+  if (!sessionId) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
+  const sess = await db.prepare(`SELECT id FROM admin_sessions WHERE session_id=? AND expires_at>datetime('now')`).bind(sessionId).first()
+  if (!sess) return c.json({ ok: false, error: 'AUTH_REQUIRED' }, 401)
+  const id = c.req.param('id')
+  let body: any = {}
+  try { body = await c.req.json() } catch (_) {}
+  const { status, notes } = body
+  await db.prepare(
+    `UPDATE hmvod_applications SET status=?,notes=?,updated_at=datetime('now') WHERE id=?`
+  ).bind(String(status||'PENDING'), String(notes||''), id).run()
+  return c.json({ ok: true })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
