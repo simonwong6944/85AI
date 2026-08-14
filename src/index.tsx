@@ -15224,7 +15224,7 @@ function testingOpenSurvey(campaignId, participantId){
       }
     });
 
-    html+='<button onclick="testingSubmitSurvey('+campaignId+','+participantId+')" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;margin-top:8px;">📤 提交問卷</button>'+
+    html+='<button id="tst-submit-btn" onclick="testingSubmitSurvey('+campaignId+','+participantId+')" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;margin-top:8px;">📤 提交問卷</button>'
       '<button onclick="testingPanelShowMain()" style="display:block;width:100%;margin-top:10px;background:transparent;border:none;color:#9ca3af;font-size:14px;cursor:pointer;">← 返回</button>';
     panelSurvey.innerHTML=html;
   }).catch(function(){
@@ -15381,8 +15381,14 @@ function testingSubmitSurvey(campaignId, participantId){
     return;
   }
 
-  var submitBtn=document.querySelector('#tst-panel-survey button[onclick*="testingSubmitSurvey"]');
+  var submitBtn=document.getElementById('tst-submit-btn');
   if(submitBtn){submitBtn.disabled=true;submitBtn.textContent='提交中…';}
+
+  if(!participantId){
+    if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='📤 提交問卷';}
+    alert('錯誤：找不到參與者ID，請返回重新開啟問卷');
+    return;
+  }
 
   fetch('/api/testing/survey/submit',{
     method:'POST',headers:{'Content-Type':'application/json'},
@@ -15398,12 +15404,27 @@ function testingSubmitSurvey(campaignId, participantId){
         '<button onclick="testingPanelShowMain()" style="margin-top:24px;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:16px;font-weight:700;cursor:pointer;">返回</button>'+
       '</div>';
     } else {
-      if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='📤 提交問卷';}
-      alert(d.error||'提交失敗，請重試');
+      var errBtn=document.getElementById('tst-submit-btn');
+      if(errBtn){errBtn.disabled=false;errBtn.textContent='📤 提交問卷';}
+      if(d.error&&d.error.indexOf('已提交')>=0){
+        // Already submitted — show completion screen
+        var panelSurveyDone=document.getElementById('tst-panel-survey');
+        if(panelSurveyDone){
+          panelSurveyDone.innerHTML='<div style="text-align:center;padding:40px;">'+
+            '<div style="font-size:56px;margin-bottom:16px;">✅</div>'+
+            '<div style="font-size:20px;font-weight:900;color:#166534;margin-bottom:10px;">您已提交過此問卷</div>'+
+            '<div style="font-size:15px;color:#6b7280;">感謝您的參與！</div>'+
+            '<button onclick="testingPanelShowMain()" style="margin-top:24px;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:16px;font-weight:700;cursor:pointer;">返回</button>'+
+          '</div>';
+        }
+      } else {
+        alert('提交失敗：'+(d.error||'未知錯誤'));
+      }
     }
-  }).catch(function(){
-    if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='📤 提交問卷';}
-    alert('網絡錯誤，請重試');
+  }).catch(function(err){
+    var errBtn=document.getElementById('tst-submit-btn');
+    if(errBtn){errBtn.disabled=false;errBtn.textContent='📤 提交問卷';}
+    alert('網絡錯誤：'+(err&&err.message?err.message:'請重試'));
   });
 }
 
