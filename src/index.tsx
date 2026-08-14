@@ -15164,7 +15164,7 @@ function testingOpenSurvey(campaignId, participantId){
       }
     });
 
-    html+='<button onclick="testingSubmitSurvey('+campaignId+')" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;margin-top:8px;">📤 提交問卷</button>'+
+    html+='<button onclick="testingSubmitSurvey('+campaignId+','+participantId+')" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;margin-top:8px;">📤 提交問卷</button>'+
       '<button onclick="testingPanelShowMain()" style="display:block;width:100%;margin-top:10px;background:transparent;border:none;color:#9ca3af;font-size:14px;cursor:pointer;">← 返回</button>';
     panelSurvey.innerHTML=html;
   }).catch(function(){
@@ -15261,13 +15261,13 @@ function tstToggleChoice(qid, btn){
   }
 }
 
-function testingSubmitSurvey(campaignId){
+function testingSubmitSurvey(campaignId, participantId){
   var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
   if(!memberNo){alert('請先登入');return;}
 
   // Collect answers from both <div data-qid> (single questions) and <tr data-qid> (rating grid rows)
   var allCards=document.querySelectorAll('#tst-panel-survey [data-qid]');
-  var answers=[];
+  var responses=[];
   var missingRequired=[];
 
   allCards.forEach(function(card){
@@ -15310,7 +15310,7 @@ function testingSubmitSurvey(campaignId){
     if(isRequired&&!answer){
       missingRequired.push(qid);
     }
-    answers.push({question_id:qid,answer:answer});
+    responses.push({question_id:qid,answer:answer});
   });
 
   if(missingRequired.length>0){
@@ -15326,7 +15326,7 @@ function testingSubmitSurvey(campaignId){
 
   fetch('/api/testing/survey/submit',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({campaign_id:campaignId,member_no:memberNo,answers:answers})
+    body:JSON.stringify({campaign_id:campaignId,participant_id:participantId,responses:responses})
   }).then(function(r){return r.json();}).then(function(d){
     var panelSurvey=document.getElementById('tst-panel-survey');
     if(d.ok){
