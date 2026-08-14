@@ -10877,11 +10877,12 @@ function tstViewResponses(pid){
     modal.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'+
       '<div style="padding:16px 18px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'+
         '<div style="font-size:16px;font-weight:900;color:#1f2937;">\ud83d\udcdd \u554f\u5377\u56de\u7b54</div>'+
-        '<button onclick="this.closest(\'div[style*=\\\"position:fixed\\\"]\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;">\u00d7</button>'+
+        '<button id="tst-resp-modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;">\u00d7</button>'+
       '</div>'+
       '<div style="padding:16px 18px;overflow-y:auto;">'+html+'</div>'+
     '</div>';
     document.body.appendChild(modal);
+    modal.querySelector('#tst-resp-modal-close').addEventListener('click',function(){modal.remove();});
     modal.addEventListener('click',function(e){if(e.target===modal)modal.remove();});
   }).catch(function(){alert('\u8f09\u5165\u5931\u6557');});
 }
