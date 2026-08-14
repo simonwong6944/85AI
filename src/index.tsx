@@ -15054,37 +15054,99 @@ function testingOpenSurvey(campaignId, participantId){
       return;
     }
     var qs=d.questions;
+
+    // ── Group consecutive rating questions into one rating_grid block ──────────
+    var groups=[]; // each item: {type:'single'|'rating_grid', questions:[...], displayNum:n}
+    var displayNum=1;
+    var i=0;
+    while(i<qs.length){
+      var q=qs[i];
+      if(q.question_type==='rating'){
+        // collect all consecutive rating questions
+        var ratingGroup=[];
+        while(i<qs.length && qs[i].question_type==='rating'){
+          ratingGroup.push(qs[i]);
+          i++;
+        }
+        groups.push({type:'rating_grid', questions:ratingGroup, displayNum:displayNum});
+        displayNum++;
+      } else {
+        groups.push({type:'single', questions:[q], displayNum:displayNum});
+        displayNum++;
+        i++;
+      }
+    }
+
+    // ── Build HTML ─────────────────────────────────────────────────────────────
     var html='<div style="background:#7c3aed;color:#fff;padding:16px 18px;border-radius:12px;margin-bottom:18px;">'+
       '<div style="font-size:11px;opacity:.8;margin-bottom:4px;">產品試用問卷</div>'+
-      '<div style="font-size:18px;font-weight:800;">'+escHtml(d.product_name||'')+'</div>'+
+      '<div style="font-size:18px;font-weight:800;">'+escHtml(d.campaign&&d.campaign.product_name||d.product_name||'')+'</div>'+
+      (d.campaign&&d.campaign.brand_description?'<div style="font-size:12px;opacity:.8;margin-top:4px;">'+escHtml(d.campaign.brand_description)+'</div>':'')+
       '</div>';
-    qs.forEach(function(q,i){
-      html+='<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08);" data-qid="'+q.id+'" data-qtype="'+q.question_type+'">'+
-        '<div style="font-size:15px;font-weight:800;color:#1f2937;margin-bottom:10px;">'+(i+1)+'. '+escHtml(q.title)+(q.is_required?'  <span style="color:#ef4444;font-size:12px;">必填</span>':'')+'</div>';
-      if(q.question_type==='rating'){
-        html+='<div style="display:flex;gap:8px;justify-content:center;margin:8px 0;" id="stars-'+q.id+'">';
-        for(var s=1;s<=5;s++){
-          html+='<button onclick="tstSetRating('+q.id+','+s+')" data-star="'+s+'" style="font-size:32px;background:none;border:none;cursor:pointer;color:#d1d5db;transition:color .15s;">★</button>';
-        }
-        html+='</div><div id="rating-val-'+q.id+'" style="display:none;"></div>';
-      } else if(q.question_type==='yes_no'){
-        html+='<div style="display:flex;gap:10px;" id="yn-'+q.id+'">'+
-          '<button onclick="tstSetYN('+q.id+',this)" data-val="\u662f" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">\u662f</button>'+
-          '<button onclick="tstSetYN('+q.id+',this)" data-val="\u5426" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">\u5426</button>'+
-        '</div>';
-      } else if(q.question_type==='single_choice'||q.question_type==='multi_choice'){
-        var opts=[];
-        try{ opts=JSON.parse(q.options||'[]'); }catch(e){}
-        html+='<div id="choice-'+q.id+'" data-multi="'+(q.question_type==='multi_choice'?'1':'0')+'">';
-        opts.forEach(function(opt){
-          html+='<button onclick="tstToggleChoice('+q.id+',this)" data-val="'+escHtml(opt)+'" style="display:block;width:100%;text-align:left;padding:11px 14px;margin-bottom:6px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;background:#fff;color:#374151;">'+escHtml(opt)+'</button>';
+
+    groups.forEach(function(g){
+      if(g.type==='rating_grid'){
+        // ── Rating grid: one card, table layout ──────────────────────────────
+        var gridId='ratinggrid-'+g.questions[0].id;
+        html+='<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08);" data-gridstart="'+g.questions[0].id+'" data-gridend="'+g.questions[g.questions.length-1].id+'">'+
+          '<div style="font-size:15px;font-weight:800;color:#1f2937;margin-bottom:4px;">'+g.displayNum+'. 請為以下項目評分：<span style="color:#ef4444;font-size:12px;"> 必填</span></div>'+
+          '<div style="font-size:12px;color:#6b7280;margin-bottom:12px;">1分＝非常不滿意　2分＝不滿意　3分＝一般　4分＝滿意　5分＝非常滿意</div>'+
+          '<div style="overflow-x:auto;">'+
+          '<table style="width:100%;border-collapse:collapse;" id="'+gridId+'">'+
+          '<thead><tr>'+
+            '<th style="text-align:left;padding:8px 6px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;min-width:110px;">評價項目</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">1</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">2</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">3</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">4</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">5</th>'+
+          '</tr></thead><tbody>';
+        g.questions.forEach(function(rq){
+          // strip "評分：" prefix for cleaner display
+          var label=rq.title.replace(/^評分[：:]\s*/,'');
+          html+='<tr data-qid="'+rq.id+'" data-qtype="rating" style="border-bottom:1px solid #f3f4f6;">'+
+            '<td style="padding:10px 6px;font-size:14px;color:#374151;font-weight:600;">'+escHtml(label)+'</td>';
+          for(var s=1;s<=5;s++){
+            html+='<td style="text-align:center;padding:10px 4px;">'+
+              '<button onclick="tstGridSetRating('+rq.id+','+s+',this)" data-qid="'+rq.id+'" data-star="'+s+'" '+
+              'style="width:30px;height:30px;border-radius:50%;border:2px solid #d1d5db;background:#f9fafb;font-size:13px;font-weight:700;cursor:pointer;color:#9ca3af;transition:all .15s;">'+s+'</button>'+
+            '</td>';
+          }
+          html+='<td style="display:none;"><span id="rating-val-'+rq.id+'" data-value=""></span></td>';
+          html+='</tr>';
         });
+        html+='</tbody></table></div></div>';
+
+      } else {
+        // ── Single question ────────────────────────────────────────────────────
+        var q2=g.questions[0];
+        html+='<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08);" data-qid="'+q2.id+'" data-qtype="'+q2.question_type+'">'+
+          '<div style="font-size:15px;font-weight:800;color:#1f2937;margin-bottom:10px;">'+g.displayNum+'. '+escHtml(q2.title)+(q2.is_required?'  <span style="color:#ef4444;font-size:12px;">必填</span>':'')+'</div>';
+        if(q2.description){
+          html+='<div style="font-size:13px;color:#6b7280;margin-bottom:10px;">'+escHtml(q2.description)+'</div>';
+        }
+        if(q2.question_type==='single_choice'||q2.question_type==='multi_choice'){
+          var opts=[];
+          try{ opts=JSON.parse(q2.options||'[]'); }catch(e){}
+          html+='<div id="choice-'+q2.id+'" data-multi="'+(q2.question_type==='multi_choice'?'1':'0')+'">';
+          opts.forEach(function(opt){
+            html+='<button onclick="tstToggleChoice('+q2.id+',this)" data-val="'+escHtml(opt)+'" style="display:block;width:100%;text-align:left;padding:11px 14px;margin-bottom:7px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;cursor:pointer;background:#fff;color:#374151;">'+
+              '<span style="display:inline-block;width:18px;height:18px;border:2px solid #d1d5db;border-radius:50%;margin-right:10px;vertical-align:middle;"></span>'+escHtml(opt)+
+            '</button>';
+          });
+          html+='</div>';
+        } else if(q2.question_type==='yes_no'){
+          html+='<div style="display:flex;gap:10px;" id="yn-'+q2.id+'">'+
+            '<button onclick="tstSetYN('+q2.id+',this)" data-val="\u662f" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">\u662f</button>'+
+            '<button onclick="tstSetYN('+q2.id+',this)" data-val="\u5426" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">\u5426</button>'+
+          '</div>';
+        } else if(q2.question_type==='text'){
+          html+='<textarea id="text-'+q2.id+'" rows="3" placeholder="請輸入您的回答…" style="width:100%;padding:11px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>';
+        }
         html+='</div>';
-      } else if(q.question_type==='text'){
-        html+='<textarea id="text-'+q.id+'" rows="3" placeholder="請輸入您的回答…" style="width:100%;padding:11px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical;"></textarea>';
       }
-      html+='</div>';
     });
+
     html+='<button onclick="testingSubmitSurvey('+campaignId+')" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;margin-top:8px;">📤 提交問卷</button>'+
       '<button onclick="testingPanelShowMain()" style="display:block;width:100%;margin-top:10px;background:transparent;border:none;color:#9ca3af;font-size:14px;cursor:pointer;">← 返回</button>';
     panelSurvey.innerHTML=html;
@@ -15094,13 +15156,20 @@ function testingOpenSurvey(campaignId, participantId){
   });
 }
 
-function tstSetRating(qid, val){
-  var wrap=document.getElementById('stars-'+qid);
-  if(!wrap)return;
-  wrap.querySelectorAll('button').forEach(function(btn){
-    var s=parseInt(btn.getAttribute('data-star'));
-    btn.style.color=s<=val?'#f59e0b':'#d1d5db';
-  });
+// Rating grid: tap a cell to select score for that row
+function tstGridSetRating(qid, val, btn){
+  // Highlight selected cell in this row
+  var table=btn.closest('table');
+  if(table){
+    table.querySelectorAll('button[data-qid="'+qid+'"]').forEach(function(b){
+      var s=parseInt(b.getAttribute('data-star'));
+      if(s<=val){
+        b.style.background='#7c3aed';b.style.borderColor='#7c3aed';b.style.color='#fff';
+      } else {
+        b.style.background='#f9fafb';b.style.borderColor='#d1d5db';b.style.color='#9ca3af';
+      }
+    });
+  }
   var hidden=document.getElementById('rating-val-'+qid);
   if(hidden){ hidden.setAttribute('data-value',String(val)); }
 }
@@ -15135,24 +15204,31 @@ function tstToggleChoice(qid, btn){
 }
 
 function testingSubmitSurvey(campaignId){
-  var memberNo=window.MEMBER_NO||'';
+  var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
   if(!memberNo){alert('請先登入');return;}
-  var qs=document.querySelectorAll('#tst-panel-survey [data-qid]');
+
+  // Collect answers from both <div data-qid> (single questions) and <tr data-qid> (rating grid rows)
+  var allCards=document.querySelectorAll('#tst-panel-survey [data-qid]');
   var answers=[];
-  var valid=true;
-  qs.forEach(function(card){
+  var missingRequired=[];
+
+  allCards.forEach(function(card){
     var qid=parseInt(card.getAttribute('data-qid'));
     var qtype=card.getAttribute('data-qtype');
     var answer='';
+    var isRequired=false;
+
     if(qtype==='rating'){
       var hidden=document.getElementById('rating-val-'+qid);
       answer=hidden?String(hidden.getAttribute('data-value')||''):'';
+      isRequired=true; // all rating rows required
     } else if(qtype==='yes_no'){
       var wrap=document.getElementById('yn-'+qid);
       if(wrap){
         var activeYN=wrap.querySelector('button[data-active="1"]');
         if(activeYN) answer=activeYN.getAttribute('data-val')||'';
       }
+      isRequired=!!card.querySelector('[style*="ef4444"]');
     } else if(qtype==='single_choice'||qtype==='multi_choice'){
       var wrap2=document.getElementById('choice-'+qid);
       if(wrap2){
@@ -15160,14 +15236,30 @@ function testingSubmitSurvey(campaignId){
         wrap2.querySelectorAll('button[data-active="1"]').forEach(function(btn){selected.push(btn.getAttribute('data-val'));});
         answer=selected.join(',');
       }
+      isRequired=!!card.querySelector('[style*="ef4444"]');
     } else if(qtype==='text'){
       var ta=document.getElementById('text-'+qid);
       answer=ta?ta.value.trim():'';
+      isRequired=!!card.querySelector('[style*="ef4444"]');
     }
-    if(!answer&&card.querySelector('.必填')){valid=false;}
+
+    if(isRequired&&!answer){
+      missingRequired.push(qid);
+    }
     answers.push({question_id:qid,answer:answer});
   });
-  if(!valid){alert('請完成所有必填題目');return;}
+
+  if(missingRequired.length>0){
+    // Scroll to first unanswered
+    var first=document.querySelector('#tst-panel-survey [data-qid="'+missingRequired[0]+'"]');
+    if(first) first.scrollIntoView({behavior:'smooth',block:'center'});
+    alert('請完成所有必填題目（共 '+missingRequired.length+' 題未填）');
+    return;
+  }
+
+  var submitBtn=document.querySelector('#tst-panel-survey button[onclick*="testingSubmitSurvey"]');
+  if(submitBtn){submitBtn.disabled=true;submitBtn.textContent='提交中…';}
+
   fetch('/api/testing/survey/submit',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({campaign_id:campaignId,member_no:memberNo,answers:answers})
@@ -15177,13 +15269,18 @@ function testingSubmitSurvey(campaignId){
       panelSurvey.innerHTML='<div style="text-align:center;padding:40px;">'+
         '<div style="font-size:56px;margin-bottom:16px;">🎉</div>'+
         '<div style="font-size:22px;font-weight:900;color:#166534;margin-bottom:10px;">問卷提交成功！</div>'+
-        '<div style="font-size:16px;color:#374151;line-height:1.7;">感謝您完成產品試用問卷！<br>我們將盡快安排您的獎勵。</div>'+
+        '<div style="font-size:16px;color:#374151;line-height:1.7;">感謝您完成產品試用問卷！<br>您的寶貴意見將有助我們持續改善產品。</div>'+
+        (d.reward?'<div style="margin-top:16px;background:#fef3c7;border-radius:12px;padding:14px;font-size:15px;color:#92400e;font-weight:700;">🎁 獎勵：'+escHtml(d.reward)+'</div>':'')+
         '<button onclick="testingPanelShowMain()" style="margin-top:24px;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:16px;font-weight:700;cursor:pointer;">返回</button>'+
       '</div>';
     } else {
+      if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='📤 提交問卷';}
       alert(d.error||'提交失敗，請重試');
     }
-  }).catch(function(){alert('網絡錯誤，請重試');});
+  }).catch(function(){
+    if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='📤 提交問卷';}
+    alert('網絡錯誤，請重試');
+  });
 }
 
 // ── 工作市場 ──
