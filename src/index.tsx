@@ -15141,7 +15141,23 @@ function testingOpenSurvey(campaignId, participantId){
             '<button onclick="tstSetYN('+q2.id+',this)" data-val="\u5426" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">\u5426</button>'+
           '</div>';
         } else if(q2.question_type==='text'){
-          html+='<textarea id="text-'+q2.id+'" rows="3" placeholder="請輸入您的回答…" style="width:100%;padding:11px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>';
+          // Q2 brand question: detect by title/description containing brand keywords
+          var isBrandQ2=(q2.title&&q2.title.indexOf('\u54c1\u724c')>=0)||(q2.description&&q2.description.indexOf('\u5931\u7981')>=0);
+          if(isBrandQ2){
+            html+='<div style="margin-bottom:10px;">'+
+              '<div style="font-size:13px;color:#6b7280;margin-bottom:6px;">\u54c1\u724c\u540d\u7a31\uff1a</div>'+
+              '<input type="text" id="text-'+q2.id+'" placeholder="\u8acb\u8f38\u5165\u54c1\u724c\u540d\u7a31" '+
+              'oninput="tstClearNoPrev('+q2.id+')" '+
+              'style="width:100%;padding:11px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-family:inherit;box-sizing:border-box;">'+
+            '</div>'+
+            '<button id="noprev-'+q2.id+'" onclick="tstToggleNoPrev('+q2.id+')" data-active="0" '+
+            'style="display:flex;align-items:center;width:100%;text-align:left;padding:11px 14px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;cursor:pointer;background:#fff;color:#374151;">'+
+              '<span class="choice-dot" id="noprev-dot-'+q2.id+'" style="display:inline-block;width:18px;height:18px;border:2px solid #d1d5db;border-radius:50%;margin-right:10px;flex-shrink:0;"></span>'+
+              '\u904e\u5f80\u6c92\u6709\u4f7f\u7528\u5931\u7981\u8b77\u588a'+
+            '</button>';
+          } else {
+            html+='<textarea id="text-'+q2.id+'" rows="3" placeholder="\u8acb\u8f38\u5165\u60a8\u7684\u56de\u7b54\u2026" style="width:100%;padding:11px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>';
+          }
         }
         html+='</div>';
       }
@@ -15154,6 +15170,36 @@ function testingOpenSurvey(campaignId, participantId){
     panelSurvey.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444;font-size:16px;">載入失敗</div>'+
       '<button onclick="testingPanelShowMain()" style="display:block;margin:0 auto;background:#f3f4f6;border:none;border-radius:8px;padding:10px 20px;font-size:15px;font-weight:600;cursor:pointer;">返回</button>';
   });
+}
+
+// Q2 brand question: toggle "no previous use" checkbox button
+function tstToggleNoPrev(qid){
+  var btn=document.getElementById('noprev-'+qid);
+  var dot=document.getElementById('noprev-dot-'+qid);
+  var inp=document.getElementById('text-'+qid);
+  if(!btn) return;
+  var nowActive=btn.getAttribute('data-active')==='1'?'0':'1';
+  btn.setAttribute('data-active',nowActive);
+  var on=(nowActive==='1');
+  btn.style.borderColor=on?'#7c3aed':'#e5e7eb';
+  btn.style.background=on?'#f5f3ff':'#fff';
+  btn.style.color=on?'#5b21b6':'#374151';
+  if(dot){dot.style.borderColor=on?'#7c3aed':'#d1d5db';dot.style.background=on?'#7c3aed':'';}
+  if(inp){
+    inp.disabled=on;
+    inp.style.opacity=on?'0.4':'1';
+    inp.style.background=on?'#f3f4f6':'#fff';
+    if(on) inp.value='';
+  }
+}
+// Q2 brand question: when user types, clear the "no previous use" state
+function tstClearNoPrev(qid){
+  var btn=document.getElementById('noprev-'+qid);
+  var dot=document.getElementById('noprev-dot-'+qid);
+  if(!btn||btn.getAttribute('data-active')==='0') return;
+  btn.setAttribute('data-active','0');
+  btn.style.borderColor='#e5e7eb';btn.style.background='#fff';btn.style.color='#374151';
+  if(dot){dot.style.borderColor='#d1d5db';dot.style.background='';}
 }
 
 // Rating grid: tap a cell to select score for that row
@@ -15249,8 +15295,14 @@ function testingSubmitSurvey(campaignId){
       }
       isRequired=!!card.querySelector('[style*="ef4444"]');
     } else if(qtype==='text'){
-      var ta=document.getElementById('text-'+qid);
-      answer=ta?ta.value.trim():'';
+      // Check if this is the brand question with "no previous" checkbox
+      var noprevBtn=document.getElementById('noprev-'+qid);
+      if(noprevBtn&&noprevBtn.getAttribute('data-active')==='1'){
+        answer='\u904e\u5f80\u6c92\u6709\u4f7f\u7528\u5931\u7981\u8b77\u588a';
+      } else {
+        var ta=document.getElementById('text-'+qid);
+        answer=ta?ta.value.trim():'';
+      }
       isRequired=!!card.querySelector('[style*="ef4444"]');
     }
 
