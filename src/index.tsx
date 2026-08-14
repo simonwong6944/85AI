@@ -15131,7 +15131,7 @@ function testingOpenSurvey(campaignId, participantId){
           html+='<div id="choice-'+q2.id+'" data-multi="'+(q2.question_type==='multi_choice'?'1':'0')+'">';
           opts.forEach(function(opt){
             html+='<button onclick="tstToggleChoice('+q2.id+',this)" data-val="'+escHtml(opt)+'" style="display:block;width:100%;text-align:left;padding:11px 14px;margin-bottom:7px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;cursor:pointer;background:#fff;color:#374151;">'+
-              '<span style="display:inline-block;width:18px;height:18px;border:2px solid #d1d5db;border-radius:50%;margin-right:10px;vertical-align:middle;"></span>'+escHtml(opt)+
+              '<span class="choice-dot" style="display:inline-block;width:18px;height:18px;border:2px solid #d1d5db;border-radius:50%;margin-right:10px;vertical-align:middle;flex-shrink:0;"></span>'+escHtml(opt)+
             '</button>';
           });
           html+='</div>';
@@ -15192,15 +15192,26 @@ function tstToggleChoice(qid, btn){
   if(!wrap)return;
   var isMulti=wrap.getAttribute('data-multi')==='1';
   if(!isMulti){
+    // single choice: deselect all first
     wrap.querySelectorAll('button').forEach(function(b){
+      b.setAttribute('data-active','0');
       b.style.borderColor='#e5e7eb';b.style.background='#fff';b.style.color='#374151';
+      var dot=b.querySelector('span.choice-dot');
+      if(dot){dot.style.background='';dot.style.borderColor='#d1d5db';}
     });
   }
   var isActive=btn.getAttribute('data-active')==='1';
-  btn.setAttribute('data-active',isActive?'0':'1');
-  btn.style.borderColor=isActive?'#e5e7eb':'#7c3aed';
-  btn.style.background=isActive?'#fff':'#ede9fe';
-  btn.style.color=isActive?'#374151':'#5b21b6';
+  var nowActive=isMulti?(isActive?'0':'1'):'1'; // single always activates
+  btn.setAttribute('data-active',nowActive);
+  var on=nowActive==='1';
+  btn.style.borderColor=on?'#7c3aed':'#e5e7eb';
+  btn.style.background=on?'#ede9fe':'#fff';
+  btn.style.color=on?'#5b21b6':'#374151';
+  var dot=btn.querySelector('span.choice-dot');
+  if(dot){
+    dot.style.borderColor=on?'#7c3aed':'#d1d5db';
+    dot.style.background=on?'#7c3aed':'';
+  }
 }
 
 function testingSubmitSurvey(campaignId){
