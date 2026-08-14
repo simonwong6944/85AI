@@ -2038,7 +2038,7 @@ app.get('/api/admin/testing/campaigns/:id/participants', async (c) => {
   const db = c.env.DB
   const id = c.req.param('id')
   const rows = await db.prepare(
-    `SELECT tp.*, m.name as member_name, m.phone as member_phone,
+    `SELECT tp.*, m.name_zh as member_name, m.phone as member_phone,
             tq.label as qr_label, tq.tracking_code
      FROM testing_participants tp
      JOIN members m ON tp.member_no = m.member_no
@@ -2046,6 +2046,32 @@ app.get('/api/admin/testing/campaigns/:id/participants', async (c) => {
      WHERE tp.campaign_id=? ORDER BY tp.registered_at DESC`
   ).bind(id).all<any>()
   return c.json({ ok: true, participants: rows.results || [] })
+})
+
+// ── Admin: GET /api/admin/testing/participants/:pid/responses — get answers ─────
+app.get('/api/admin/testing/participants/:pid/responses', async (c) => {
+  const db = c.env.DB
+  const pid = c.req.param('pid')
+  const participant = await db.prepare(
+    `SELECT tp.*, m.name_zh as member_name, m.phone as member_phone
+     FROM testing_participants tp
+     JOIN members m ON tp.member_no = m.member_no
+     WHERE tp.id=? LIMIT 1`
+  ).bind(pid).first<any>()
+  if (!participant) return c.json({ ok: false, error: '找不到參與者' }, 404)
+  const questions = await db.prepare(
+    `SELECT id, question_order, question_type, title FROM testing_questions
+     WHERE campaign_id=? ORDER BY question_order ASC`
+  ).bind(participant.campaign_id).all<any>()
+  const responses = await db.prepare(
+    `SELECT question_id, answer FROM testing_responses WHERE participant_id=? ORDER BY question_id ASC`
+  ).bind(pid).all<any>()
+  const answerMap: Record<number, string> = {}
+  for (const r of (responses.results || [])) { answerMap[r.question_id] = r.answer }
+  const qWithAnswers = (questions.results || []).map((q: any) => ({
+    ...q, answer: answerMap[q.id] ?? ''
+  }))
+  return c.json({ ok: true, participant, questions: qWithAnswers })
 })
 
 // ── Admin: POST /api/admin/testing/campaigns/:id/qr-codes — generate QR code ──
@@ -10754,6 +10780,7 @@ function tstLoadDetailData(id, tab){
             '<td><span style="color:'+statusColor+';font-weight:700;">'+tstEsc(statusLabel)+'</span></td>'+
             '<td style="font-size:12px;color:#6b7280;">'+tstEsc((p.registered_at||'').slice(0,16))+'</td>'+
             '<td>'+
+              (p.status==='survey_submitted'?'<button class="tst-btn tst-btn-primary tst-btn-sm" data-pid="'+p.id+'" onclick="tstViewResponses(this.dataset.pid)">📋 查看答案</button> ':'')+
               '<button class="tst-btn tst-btn-secondary tst-btn-sm" data-pid="'+p.id+'" data-mt="welcome" onclick="tstSendWA(this.dataset.pid,this.dataset.mt)">歡迎</button> '+
               '<button class="tst-btn tst-btn-secondary tst-btn-sm" data-pid="'+p.id+'" data-mt="reminder1" onclick="tstSendWA(this.dataset.pid,this.dataset.mt)">提醒1</button> '+
               '<button class="tst-btn tst-btn-secondary tst-btn-sm" data-pid="'+p.id+'" data-mt="complete" onclick="tstSendWA(this.dataset.pid,this.dataset.mt)">完成</button>'+
@@ -10824,6 +10851,39 @@ function tstFunnelRow(label, num, pct){
     '<div class="tst-funnel-bar-wrap"><div class="tst-funnel-bar" style="width:'+pct+'%"></div></div>'+
     '<div class="tst-funnel-num">'+num+'</div>'+
   '</div>';
+}
+
+// ── View Participant Responses ───────────────────────────────────────────────
+function tstViewResponses(pid){
+  fetch('/api/admin/testing/participants/'+pid+'/responses',{credentials:'include'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok){alert(d.error||'載入失敗');return;}
+    var p=d.participant;
+    var qs=d.questions||[];
+    var TST_Q_LABELS={'rating':'\u8a55\u5206','single_choice':'\u55ae\u9078','multi_choice':'\u591a\u9078','text':'\u6587\u5b57','yes_no':'\u662f\u5426'};
+    var html='<div style="font-weight:800;font-size:16px;margin-bottom:4px;">'+tstEsc(p.member_name||p.member_no)+'</div>'+
+      '<div style="font-size:12px;color:#6b7280;margin-bottom:16px;">'+tstEsc(p.member_no)+' ／ \u63d0\u4ea4\u65f6\u9593\uff1a'+tstEsc((p.survey_submitted_at||'').slice(0,16))+'</div>';
+    qs.forEach(function(q){
+      var ans=q.answer||'';
+      var ansHtml=ans?('<span style="color:#1f2937;font-weight:700;">'+tstEsc(ans)+'</span>'):'<span style="color:#d1d5db;">\u672a\u4f5c\u7b54</span>';
+      html+='<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f3f4f6;">'+
+        '<div style="font-size:12px;color:#7c3aed;font-weight:700;margin-bottom:3px;">Q'+q.question_order+'. '+tstEsc(q.title)+'</div>'+
+        '<div style="font-size:14px;padding:8px 10px;background:#f9fafb;border-radius:8px;">'+ansHtml+'</div>'+
+      '</div>';
+    });
+    var modal=document.createElement('div');
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'+
+      '<div style="padding:16px 18px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'+
+        '<div style="font-size:16px;font-weight:900;color:#1f2937;">\ud83d\udcdd \u554f\u5377\u56de\u7b54</div>'+
+        '<button onclick="this.closest(\'div[style*=\\\"position:fixed\\\"]\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;">\u00d7</button>'+
+      '</div>'+
+      '<div style="padding:16px 18px;overflow-y:auto;">'+html+'</div>'+
+    '</div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click',function(e){if(e.target===modal)modal.remove();});
+  }).catch(function(){alert('\u8f09\u5165\u5931\u6557');});
 }
 
 // ── Add QR Code ─────────────────────────────────────────────────────────────
