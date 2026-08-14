@@ -15127,7 +15127,8 @@ function testingOpenSurvey(campaignId, participantId){
         }
         if(q2.question_type==='single_choice'||q2.question_type==='multi_choice'){
           var opts=[];
-          try{ opts=JSON.parse(q2.options||'[]'); }catch(e){}
+          if(Array.isArray(q2.options)){ opts=q2.options; }
+          else { try{ opts=JSON.parse(q2.options||'[]'); }catch(e){} }
           html+='<div id="choice-'+q2.id+'" data-multi="'+(q2.question_type==='multi_choice'?'1':'0')+'">';
           opts.forEach(function(opt){
             html+='<button onclick="tstToggleChoice('+q2.id+',this)" data-val="'+escHtml(opt)+'" style="display:block;width:100%;text-align:left;padding:11px 14px;margin-bottom:7px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;cursor:pointer;background:#fff;color:#374151;">'+
