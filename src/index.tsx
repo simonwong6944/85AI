@@ -10698,26 +10698,51 @@ function tstLoadDetailData(id, tab){
         html+='<div style="text-align:center;padding:24px;color:#9ca3af;">尚未有題目</div>';
       } else {
         questions.sort(function(a,b){return a.question_order-b.question_order;});
-        questions.forEach(function(q,i){
-          var optsHtml='';
-          if(q.options){
-            try{
-              var opts=JSON.parse(q.options);
-              if(opts.length) optsHtml='<div style="margin-top:6px;font-size:12px;color:#6b7280;">選項：'+opts.map(function(o){return tstEsc(o);}).join(' ／ ')+'</div>';
-            }catch(e){}
+        // Group consecutive rating questions into one display item
+        var displayNum=1;
+        var qi=0;
+        while(qi<questions.length){
+          var q=questions[qi];
+          if(q.question_type==='rating'){
+            // Collect all consecutive rating questions
+            var ratingGroup=[];
+            while(qi<questions.length && questions[qi].question_type==='rating'){
+              ratingGroup.push(questions[qi]); qi++;
+            }
+            html+='<div class="tst-q-card">'+
+              '<div class="tst-q-num">'+displayNum+'</div>'+
+              '<div class="tst-q-body">'+
+                '<div class="tst-q-title">\u8acb\u70ba\u4ee5\u4e0b\u9805\u76ee\u8a55\u5206\uff1a<span style="font-size:12px;font-weight:400;color:#6b7280;">\uff081-5\u5206\uff09</span></div>'+
+                '<div class="tst-q-type">\u8a55\u5206\u8868\uff08'+ratingGroup.length+'\u9805\uff09&nbsp;&nbsp;<span style="color:#ef4444;font-size:11px;">\u5fc5\u586b</span></div>'+
+                '<div style="margin-top:6px;font-size:12px;color:#6b7280;">'+
+                  ratingGroup.map(function(rq,ri){ return (ri+1)+'. '+tstEsc(rq.title.replace(/^\u8a55\u5206[\uff1a:]\s*/,'')); }).join('&emsp;')+
+                '</div>'+
+              '</div>'+
+            '</div>';
+            displayNum++;
+          } else {
+            var optsHtml='';
+            if(q.options){
+              try{
+                var opts=JSON.parse(q.options);
+                if(opts.length) optsHtml='<div style="margin-top:6px;font-size:12px;color:#6b7280;">\u9078\u9805\uff1a'+opts.map(function(o){return tstEsc(o);}).join(' \uff0f ')+'</div>';
+              }catch(e){}
+            }
+            html+='<div class="tst-q-card">'+
+              '<div class="tst-q-num">'+displayNum+'</div>'+
+              '<div class="tst-q-body">'+
+                '<div class="tst-q-title">'+tstEsc(q.title)+(q.is_required?'  <span style="color:#ef4444;font-size:11px;">\u5fc5\u586b</span>':'')+'</div>'+
+                '<div class="tst-q-type">'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+'</div>'+
+                optsHtml+
+              '</div>'+
+              '<div style="display:flex;gap:6px;">'+
+                '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstDeleteQuestion('+q.id+','+id+')"><i class="fas fa-trash" style="color:#ef4444"></i></button>'+
+              '</div>'+
+            '</div>';
+            displayNum++;
+            qi++;
           }
-          html+='<div class="tst-q-card">'+
-            '<div class="tst-q-num">'+(i+1)+'</div>'+
-            '<div class="tst-q-body">'+
-              '<div class="tst-q-title">'+tstEsc(q.title)+(q.is_required?'  <span style="color:#ef4444;font-size:11px;">必填</span>':'')+'</div>'+
-              '<div class="tst-q-type">'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+'</div>'+
-              optsHtml+
-            '</div>'+
-            '<div style="display:flex;gap:6px;">'+
-              '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstDeleteQuestion('+q.id+','+id+')"><i class="fas fa-trash" style="color:#ef4444"></i></button>'+
-            '</div>'+
-          '</div>';
-        });
+        }
       }
       html+='</div>';
       el.innerHTML=html;
@@ -10863,15 +10888,47 @@ function tstViewResponses(pid){
     var qs=d.questions||[];
     var TST_Q_LABELS={'rating':'\u8a55\u5206','single_choice':'\u55ae\u9078','multi_choice':'\u591a\u9078','text':'\u6587\u5b57','yes_no':'\u662f\u5426'};
     var html='<div style="font-weight:800;font-size:16px;margin-bottom:4px;">'+tstEsc(p.member_name||p.member_no)+'</div>'+
-      '<div style="font-size:12px;color:#6b7280;margin-bottom:16px;">'+tstEsc(p.member_no)+' ／ \u63d0\u4ea4\u65f6\u9593\uff1a'+tstEsc((p.survey_submitted_at||'').slice(0,16))+'</div>';
-    qs.forEach(function(q){
-      var ans=q.answer||'';
-      var ansHtml=ans?('<span style="color:#1f2937;font-weight:700;">'+tstEsc(ans)+'</span>'):'<span style="color:#d1d5db;">\u672a\u4f5c\u7b54</span>';
-      html+='<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f3f4f6;">'+
-        '<div style="font-size:12px;color:#7c3aed;font-weight:700;margin-bottom:3px;">Q'+q.question_order+'. '+tstEsc(q.title)+'</div>'+
-        '<div style="font-size:14px;padding:8px 10px;background:#f9fafb;border-radius:8px;">'+ansHtml+'</div>'+
-      '</div>';
-    });
+      '<div style="font-size:12px;color:#6b7280;margin-bottom:16px;">'+tstEsc(p.member_no)+' ／ \u63d0\u4ea4\u6642\u9593\uff1a'+tstEsc((p.survey_submitted_at||'').slice(0,16))+'</div>';
+    // Group consecutive rating questions into one table block
+    var displayNum=1;
+    var ri=0;
+    while(ri<qs.length){
+      var q=qs[ri];
+      if(q.question_type==='rating'){
+        var rGroup=[];
+        while(ri<qs.length && qs[ri].question_type==='rating'){ rGroup.push(qs[ri]); ri++; }
+        html+='<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f3f4f6;">'+
+          '<div style="font-size:12px;color:#7c3aed;font-weight:700;margin-bottom:8px;">Q'+displayNum+'. \u8acb\u70ba\u4ee5\u4e0b\u9805\u76ee\u8a55\u5206\uff1a</div>'+
+          '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+          '<thead><tr>'+
+            '<th style="text-align:left;padding:4px 8px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb;">\u9805\u76ee</th>'+
+            '<th style="text-align:center;padding:4px 8px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb;">\u5206\u6578</th>'+
+          '</tr></thead><tbody>';
+        rGroup.forEach(function(rq){
+          var label=rq.title.replace(/^\u8a55\u5206[\uff1a:]\s*/,'');
+          var ans=rq.answer||'';
+          var stars='';
+          if(ans){ for(var si=0;si<5;si++){ stars+=si<parseInt(ans)?'\u2605':'\u2606'; } }
+          html+='<tr style="border-bottom:1px solid #f9fafb;">'+
+            '<td style="padding:6px 8px;color:#374151;">'+tstEsc(label)+'</td>'+
+            '<td style="text-align:center;padding:6px 8px;">'+
+              (ans?'<span style="color:#7c3aed;font-weight:700;font-size:15px;">'+stars+' '+tstEsc(ans)+'</span>':'<span style="color:#d1d5db;">\u672a\u4f5c\u7b54</span>')+
+            '</td>'+
+          '</tr>';
+        });
+        html+='</tbody></table></div>';
+        displayNum++;
+      } else {
+        var ans2=q.answer||'';
+        var ansHtml2=ans2?('<span style="color:#1f2937;font-weight:700;">'+tstEsc(ans2)+'</span>'):'<span style="color:#d1d5db;">\u672a\u4f5c\u7b54</span>';
+        html+='<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f3f4f6;">'+
+          '<div style="font-size:12px;color:#7c3aed;font-weight:700;margin-bottom:3px;">Q'+displayNum+'. '+tstEsc(q.title)+'</div>'+
+          '<div style="font-size:14px;padding:8px 10px;background:#f9fafb;border-radius:8px;">'+ansHtml2+'</div>'+
+        '</div>';
+        displayNum++;
+        ri++;
+      }
+    }
     var modal=document.createElement('div');
     modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
     modal.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'+
@@ -15326,8 +15383,9 @@ function testingSubmitSurvey(campaignId, participantId){
   var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
   if(!memberNo){alert('請先登入');return;}
 
-  // Collect answers from both <div data-qid> (single questions) and <tr data-qid> (rating grid rows)
-  var allCards=document.querySelectorAll('#tst-panel-survey [data-qid]');
+  // Collect answers: <div data-qid> for single questions, <tr data-qid> for rating rows
+  // Exclude <button data-qid> (rating grid buttons also have data-qid but are not answer containers)
+  var allCards=document.querySelectorAll('#tst-panel-survey div[data-qid], #tst-panel-survey tr[data-qid]');
   var responses=[];
   var missingRequired=[];
 
