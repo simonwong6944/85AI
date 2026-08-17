@@ -14097,7 +14097,7 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 </div>
 
 <!-- Benefits Detail Panel (full screen overlay in app) -->
-<div id="appBnfDetail" style="display:none;position:fixed;inset:0;background:#fff;z-index:800;overflow-y:auto;">
+<div id="appBnfDetail" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;z-index:1100;overflow-y:auto;">
   <div style="position:sticky;top:0;background:#fff;padding:14px 16px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:12px;z-index:1;">
     <button onclick="appBnfCloseDetail()" style="background:#f5f5f5;border:none;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;">←</button>
     <div style="font-size:17px;font-weight:800;color:#1B4332;">福利詳情</div>
