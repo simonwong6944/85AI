@@ -24684,5 +24684,165 @@ app.put('/api/admin/hmvod/applications/:id', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Family Tree API (FAMILY_TREE_API_KEY Bearer auth) ────────────────────────
+// 共用鑑權 helper（inline，不修改任何現有函數）
+function getFamilyTreeApiKey(c: any): string | undefined {
+  return (c.req.header('Authorization') || '').replace('Bearer ', '') || undefined
+}
+
+// 1. POST /api/member/verify — 跨 app 驗證會員身份
+app.post('/api/member/verify', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const apiKey = getFamilyTreeApiKey(c)
+  if (!apiKey || apiKey !== (c.env as any).FAMILY_TREE_API_KEY) {
+    return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  }
+  let body: { member_no?: string } = {}
+  try { body = await c.req.json() } catch (_) {}
+  const memberNo = (body.member_no || '').trim()
+  if (!memberNo) return c.json({ ok: false, error: '缺少 member_no' }, 400)
+  const member = await db.prepare(
+    `SELECT member_no, status, expires_at, member_type FROM members WHERE member_no = ?`
+  ).bind(memberNo).first<{ member_no: string; status: string; expires_at: string; member_type: string }>()
+  if (!member) return c.json({ ok: false, error: 'not found' }, 404)
+  return c.json({ ok: true, member_no: member.member_no, status: member.status, expires_at: member.expires_at, member_type: member.member_type })
+})
+
+// 2. POST /api/family-tree/members — 新增純節點成員
+app.post('/api/family-tree/members', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const apiKey = getFamilyTreeApiKey(c)
+  if (!apiKey || apiKey !== (c.env as any).FAMILY_TREE_API_KEY) {
+    return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  }
+  let body: {
+    name_zh?: string; managed_by?: string;
+    name_en?: string; gender?: string; birth_year?: number;
+    deceased_date?: string; relation?: string; district?: string;
+  } = {}
+  try { body = await c.req.json() } catch (_) {}
+
+  // 驗證必填
+  if (!body.name_zh?.trim()) return c.json({ ok: false, error: '缺少必填欄位 name_zh' }, 400)
+  if (!body.managed_by?.trim()) return c.json({ ok: false, error: '缺少必填欄位 managed_by' }, 400)
+
+  // 驗證代管人存在
+  const managedByNo = body.managed_by.trim()
+  const guardian = await db.prepare(`SELECT member_no FROM members WHERE member_no = ?`).bind(managedByNo).first()
+  if (!guardian) return c.json({ ok: false, error: `代管人 ${managedByNo} 不存在` }, 400)
+
+  const memberNo = await nextMemberNo(db)
+  const now = new Date().toISOString()
+  const deceasedDate = body.deceased_date?.trim() || null
+  const statusVal = deceasedDate ? 'INACTIVE' : 'ACTIVE'
+
+  await db.prepare(`
+    INSERT INTO members
+      (member_no, tier, name_zh, name_en, phone, gender, birth_year,
+       district, relation, kyc_status, role, expires_at, created_at,
+       source, status, member_type, managed_by, deceased_date)
+    VALUES (?, 'FAMILY', ?, ?, '', ?, ?, ?, ?, 'DONE', 'CoExplorery', '2099-12-31', ?, 'family-tree', ?, 'NODE_ONLY', ?, ?)
+  `).bind(
+    memberNo,
+    body.name_zh.trim(),
+    body.name_en?.trim() || '',
+    body.gender || '',
+    body.birth_year ?? null,
+    body.district?.trim() || '',
+    body.relation?.trim() || '',
+    now,
+    statusVal,
+    managedByNo,
+    deceasedDate
+  ).run()
+
+  return c.json({ ok: true, member_no: memberNo, member_type: 'NODE_ONLY' }, 201)
+})
+
+// 3. PATCH /api/family-tree/members/:no — 更新純節點成員 / 升級為正式會員
+app.patch('/api/family-tree/members/:no', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const apiKey = getFamilyTreeApiKey(c)
+  if (!apiKey || apiKey !== (c.env as any).FAMILY_TREE_API_KEY) {
+    return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  }
+  const no = c.req.param('no')
+  const existing = await db.prepare(
+    `SELECT member_no, phone, member_type FROM members WHERE member_no = ?`
+  ).bind(no).first<{ member_no: string; phone: string; member_type: string }>()
+  if (!existing) return c.json({ ok: false, error: 'not found' }, 404)
+
+  let body: {
+    name_zh?: string; name_en?: string; gender?: string; birth_year?: number | null;
+    district?: string; deceased_date?: string | null; managed_by?: string;
+    member_type?: string; phone?: string; status?: string;
+  } = {}
+  try { body = await c.req.json() } catch (_) {}
+
+  // 升級 guard：member_type → REGISTERED
+  if (body.member_type === 'REGISTERED') {
+    const phoneToUse = (body.phone || existing.phone || '').replace(/\D/g, '')
+    if (!phoneToUse) return c.json({ ok: false, error: '升級需有效電話' }, 400)
+    const phoneCheck = validateHKPhone(phoneToUse)
+    if (!phoneCheck.ok) return c.json({ ok: false, error: phoneCheck.error || '升級需有效電話' }, 400)
+    // 檢查電話是否已屬其他 REGISTERED 成員
+    const conflict = await db.prepare(
+      `SELECT member_no FROM members WHERE phone = ? AND member_type = 'REGISTERED' AND member_no != ?`
+    ).bind(phoneToUse, no).first()
+    if (conflict) return c.json({ ok: false, error: '此電話已屬其他會員' }, 409)
+    // 確保 phone 也加入更新
+    if (!body.phone) body.phone = phoneToUse
+  }
+
+  // 驗證 managed_by（若有傳）
+  if (body.managed_by) {
+    const g = await db.prepare(`SELECT member_no FROM members WHERE member_no = ?`).bind(body.managed_by).first()
+    if (!g) return c.json({ ok: false, error: `代管人 ${body.managed_by} 不存在` }, 400)
+  }
+
+  // 若 deceased_date 有值且未明確傳 status，自動設 INACTIVE
+  if (body.deceased_date && body.status === undefined) {
+    body.status = 'INACTIVE'
+  }
+
+  // 組合 UPDATE 欄位（只更新有傳入的）
+  const allowed: (keyof typeof body)[] = [
+    'name_zh', 'name_en', 'gender', 'birth_year', 'district',
+    'deceased_date', 'managed_by', 'member_type', 'phone', 'status'
+  ]
+  const fields: string[] = []
+  const vals: any[] = []
+  for (const key of allowed) {
+    if (body[key] !== undefined) {
+      fields.push(`${key} = ?`)
+      vals.push(body[key])
+    }
+  }
+  if (!fields.length) return c.json({ ok: false, error: '沒有資料需要更新' }, 400)
+
+  await db.prepare(`UPDATE members SET ${fields.join(', ')} WHERE member_no = ?`)
+    .bind(...vals, no).run()
+
+  return c.json({ ok: true })
+})
+
+// 4. GET /api/family-tree/members/:no — 讀取成員完整資料
+app.get('/api/family-tree/members/:no', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const apiKey = getFamilyTreeApiKey(c)
+  if (!apiKey || apiKey !== (c.env as any).FAMILY_TREE_API_KEY) {
+    return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  }
+  const no = c.req.param('no')
+  const member = await db.prepare(`
+    SELECT member_no, name_zh, name_en, gender, birth_year,
+           district, tier, member_type, managed_by, deceased_date,
+           status, expires_at
+    FROM members WHERE member_no = ?
+  `).bind(no).first()
+  if (!member) return c.json({ ok: false, error: 'not found' }, 404)
+  return c.json({ ok: true, member })
+})
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export default app
