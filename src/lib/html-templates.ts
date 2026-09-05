@@ -189,3 +189,137 @@ async function rejectClApp(id){
 loadClPending();
 <\/script>`
 }
+
+export function qrRegisterHtml(source: string) {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>快速加入 CoEldery 85</title>
+<meta name="theme-color" content="#1a6b1a">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:linear-gradient(160deg,#1a6b1a 0%,#388e3c 45%,#2e7d32 100%);min-height:100vh;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:#fff;border-radius:24px;padding:36px 28px 32px;max-width:420px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+.logo-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px;}
+.logo-badge{background:#1a6b1a;color:#fff;font-size:28px;font-weight:900;border-radius:12px;
+  padding:6px 14px;letter-spacing:1px;line-height:1.2;}
+.logo-text{font-size:18px;font-weight:700;color:#1a6b1a;}
+h1{font-size:22px;font-weight:900;color:#1a6b1a;text-align:center;margin:14px 0 4px;line-height:1.35;}
+.subtitle{font-size:14px;color:#666;text-align:center;margin-bottom:28px;line-height:1.5;}
+.field{margin-bottom:22px;}
+.field label{display:block;font-size:15px;font-weight:700;color:#222;margin-bottom:8px;}
+.field label span{color:#c62828;}
+.field input,.field select{width:100%;padding:14px 16px;font-size:18px;
+  border:2px solid #388e3c;border-radius:12px;font-family:inherit;color:#111;
+  background:#fff;outline:none;transition:border-color 0.2s;}
+.field input:focus,.field select:focus{border-color:#1a6b1a;box-shadow:0 0 0 3px rgba(56,142,60,0.15);}
+.field input::placeholder{color:#bbb;}
+.btn{width:100%;padding:16px;font-size:18px;font-weight:900;color:#fff;
+  background:linear-gradient(135deg,#1a6b1a,#388e3c);border:none;border-radius:14px;
+  cursor:pointer;letter-spacing:1px;margin-top:4px;transition:opacity 0.2s;
+  -webkit-tap-highlight-color:transparent;}
+.btn:active{opacity:0.85;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+.error-box{background:#FEE2E2;border:1.5px solid #EF4444;border-radius:10px;
+  padding:12px 16px;font-size:14px;color:#B91C1C;margin-bottom:18px;display:none;}
+.steps{background:#F0FDF4;border-radius:12px;padding:16px 18px;margin-top:22px;}
+.steps h3{font-size:13px;font-weight:700;color:#166534;margin-bottom:10px;letter-spacing:0.5px;}
+.step-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;}
+.step-row:last-child{margin-bottom:0;}
+.step-num{background:#1a6b1a;color:#fff;font-size:11px;font-weight:900;
+  border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-txt{font-size:13px;color:#166534;line-height:1.5;}
+.privacy{font-size:12px;color:#888;text-align:center;margin-top:16px;line-height:1.6;}
+.source-badge{display:inline-block;background:#E8F5E9;color:#2e7d32;font-size:11px;
+  font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:16px;letter-spacing:0.5px;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-row">
+    <div class="logo-badge">85</div>
+    <div class="logo-text">CoEldery<br>老有聯盟</div>
+  </div>
+  <h1>快速加入 CoEldery 85</h1>
+  <p class="subtitle">兩步完成登記，立即獲得數碼會員卡</p>
+
+  <div id="errorBox" class="error-box"></div>
+
+  <div class="field">
+    <label>姓名 <span>✽</span></label>
+    <input type="text" id="fieldName" placeholder="請輸入你的姓名" maxlength="50" autocomplete="name">
+  </div>
+  <div class="field">
+    <label>出生年份 <span>✽</span></label>
+    <input type="number" id="fieldYear" placeholder="例如：1960" min="1920" max="2011" inputmode="numeric">
+  </div>
+
+  <button class="btn" id="submitBtn" onclick="doSubmit()">
+    📱 快速登記（WhatsApp 確認）
+  </button>
+
+  <div class="steps">
+    <h3>📋 登記步驟</h3>
+    <div class="step-row"><div class="step-num">1</div><div class="step-txt">填寫以上資料後點擊「快速登記」</div></div>
+    <div class="step-row"><div class="step-num">2</div><div class="step-txt">WhatsApp 自動開啟，預填訊息已準備好</div></div>
+    <div class="step-row"><div class="step-num">3</div><div class="step-txt">點擊 WhatsApp 的「發送」按鈕</div></div>
+    <div class="step-row"><div class="step-num">4</div><div class="step-txt">系統即時確認，並發送你的數碼會員卡連結</div></div>
+  </div>
+
+  <p class="privacy">🔒 你的個人資料受香港個人資料（私隱）條例保護<br>僅用於 CoEldery 85 會員服務</p>
+</div>
+
+<script>
+var SOURCE = '${source.replace(/'/g,"\\'")}';
+
+function showError(msg){
+  var b=document.getElementById('errorBox');
+  b.textContent=msg; b.style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function hideError(){ document.getElementById('errorBox').style.display='none'; }
+
+function doSubmit(){
+  hideError();
+  var name = document.getElementById('fieldName').value.trim();
+  var yearStr = document.getElementById('fieldYear').value.trim();
+  var year = parseInt(yearStr, 10);
+
+  if (!name || name.length < 1 || name.length > 50){
+    showError('請輸入有效的姓名（1-50字）'); return;
+  }
+  if (!yearStr || isNaN(year) || year < 1920 || year > 2011){
+    showError('請輸入有效的出生年份（1920 - 2011）'); return;
+  }
+
+  var text = '姓名:' + name + '\\n年份:' + year + '\\nSource:' + SOURCE;
+  var url = 'https://wa.me/85254429749?text=' + encodeURIComponent(text);
+
+  // Update button state (keep in sync context for iOS Safari)
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 正在開啟 WhatsApp...';
+
+  // Must open URL synchronously within the user gesture for iOS Safari
+  window.location.href = url;
+
+  // Re-enable button after a delay (in case user returns)
+  setTimeout(function(){
+    btn.disabled = false;
+    btn.textContent = '📱 快速登記（WhatsApp 確認）';
+  }, 3000);
+}
+
+// Allow Enter key to submit
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Enter') doSubmit();
+});
+</script>
+</body>
+</html>`
+}
