@@ -10,6 +10,7 @@ import { nextCwNo } from './lib/coworkery-utils'
 import { sha256hex, appendHashChain } from './lib/revenue-utils'
 import { verifyColinkerySess, requireColinkery } from './lib/colinkery-auth'
 import { htmlHead } from './lib/html-shared'
+import { HK_DISTRICTS } from './lib/constants'
 
 type Bindings = {
   DB: D1Database
@@ -22451,7 +22452,7 @@ async function genMemberNoQR(db: D1Database): Promise<string> {
 }
 
 // ── Helper: Hong Kong districts list ────────────────────────────────────────
-const HK_DISTRICTS = ['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','葵青','荃灣','屯門','元朗','北區','大埔','沙田','西貢','離島']
+// [MOVED to src/lib/constants.ts @ Wave3/Stage0] HK_DISTRICTS — pure mechanical move
 
 // ── GET /qr-register — Mini form page ────────────────────────────────────────
 app.get('/qr-register', (c) => {
