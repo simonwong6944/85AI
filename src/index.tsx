@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
+import { centsToStr } from './lib/utils'
 
 type Bindings = {
   DB: D1Database
@@ -83,14 +84,7 @@ function csvCell(value: unknown): string {
   return s
 }
 
-/**
- * 分 → 元 顯示字串（後端組報表用；前端亦可自行 /100）。
- * 例：12345 → "123.45"
- */
-function centsToStr(cents: number | null | undefined): string {
-  const n = typeof cents === 'number' ? cents : 0
-  return (n / 100).toFixed(2)
-}
+// centsToStr → moved to src/lib/utils.ts
 
 // ─── Admin Auth Helpers ───────────────────────────────────────────────────────
 function makeToken(): string {
