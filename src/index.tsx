@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { centsToStr, csvCell, haversineMeters, resolveRate } from './lib/utils'
+import { makeToken, sessionExpiry, getSessionToken } from './lib/auth'
 
 type Bindings = {
   DB: D1Database
@@ -48,21 +49,9 @@ async function nextCwNo(db: D1Database): Promise<string> {
 // centsToStr → moved to src/lib/utils.ts
 
 // ─── Admin Auth Helpers ───────────────────────────────────────────────────────
-function makeToken(): string {
-  const arr = new Uint8Array(32)
-  crypto.getRandomValues(arr)
-  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-function sessionExpiry(hours = 12): string {
-  const d = new Date()
-  d.setHours(d.getHours() + hours)
-  return d.toISOString().replace('T', ' ').slice(0, 19)
-}
-
-function getSessionToken(c: any): string | undefined {
-  return getCookie(c, 'admin_session')
-}
+// makeToken → moved to src/lib/auth.ts
+// sessionExpiry → moved to src/lib/auth.ts
+// getSessionToken → moved to src/lib/auth.ts
 
 async function verifySession(db: D1Database, token: string | undefined): Promise<boolean> {
   if (!token) return false
