@@ -5,6 +5,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { centsToStr, csvCell, haversineMeters, resolveRate } from './lib/utils'
 import { makeToken, sessionExpiry, getSessionToken } from './lib/auth'
 import { expiryDate, validateHKPhone } from './lib/members'
+import { genTestingCode, genBrandToken } from './lib/testing-utils'
 
 type Bindings = {
   DB: D1Database
@@ -1640,20 +1641,8 @@ app.delete('/api/admin/contents/:id', async (c) => {
 // ─── Product Testing Survey System APIs ──────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ── Helper: generate random tracking code ─────────────────────────────────────
-function genTestingCode(prefix: string = 'TEST'): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let s = ''
-  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)]
-  return `${prefix}-${s}`
-}
-
-// ── Helper: generate brand form token ─────────────────────────────────────────
-async function genBrandToken(): Promise<string> {
-  const arr = new Uint8Array(24)
-  crypto.getRandomValues(arr)
-  return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('')
-}
+// genTestingCode → moved to src/lib/testing-utils.ts
+// genBrandToken → moved to src/lib/testing-utils.ts
 
 // ── Public: GET /api/testing/scan/:code — user scans QR, get campaign info ────
 app.get('/api/testing/scan/:code', async (c) => {
