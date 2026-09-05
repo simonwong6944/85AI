@@ -1,3 +1,12 @@
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+export async function nextMemberNo(db: D1Database): Promise<string> {
+  const row = await db.prepare(
+    'UPDATE counter SET next_val = next_val + 1 WHERE id = 1 RETURNING next_val'
+  ).first<{ next_val: number }>()
+  const n = row?.next_val ?? 1
+  return 'CE85-' + String(n).padStart(6, '0')
+}
+
 export function expiryDate(years = 3): string {
   const d = new Date()
   d.setFullYear(d.getFullYear() + years)

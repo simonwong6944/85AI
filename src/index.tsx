@@ -4,7 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { centsToStr, csvCell, haversineMeters, resolveRate } from './lib/utils'
 import { makeToken, sessionExpiry, getSessionToken } from './lib/auth'
-import { expiryDate, validateHKPhone } from './lib/members'
+import { nextMemberNo, expiryDate, validateHKPhone } from './lib/members'
 import { genTestingCode, genBrandToken } from './lib/testing-utils'
 
 type Bindings = {
@@ -187,13 +187,7 @@ app.get('/icon-192.png', serveStatic({ root: './public' }))
 app.get('/icon-512.png', serveStatic({ root: './public' }))
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-async function nextMemberNo(db: D1Database): Promise<string> {
-  const row = await db.prepare(
-    'UPDATE counter SET next_val = next_val + 1 WHERE id = 1 RETURNING next_val'
-  ).first<{ next_val: number }>()
-  const n = row?.next_val ?? 1
-  return 'CE85-' + String(n).padStart(6, '0')
-}
+// nextMemberNo → moved to src/lib/members.ts
 
 // expiryDate → moved to src/lib/members.ts
 // validateHKPhone → moved to src/lib/members.ts
