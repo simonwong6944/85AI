@@ -34,3 +34,20 @@ export function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return Math.round(R * c)
 }
+
+/**
+ * 時薪 fallback 邏輯（全部以「分」為單位）：
+ *   1) 派更指定時薪 assigned_hourly_rate > 0  → 用
+ *   2) 場次時薪 session_hourly_rate > 0       → 用
+ *   3) 個人預設時薪 default_hourly_rate       → 用（可能為 0）
+ * 回傳最終採用的時薪（分）。
+ */
+export function resolveRate(
+  assignedRate: number | null | undefined,
+  sessionRate: number | null | undefined,
+  defaultRate: number | null | undefined
+): number {
+  if (assignedRate && assignedRate > 0) return assignedRate
+  if (sessionRate && sessionRate > 0) return sessionRate
+  return defaultRate && defaultRate > 0 ? defaultRate : 0
+}

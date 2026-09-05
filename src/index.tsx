@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
-import { centsToStr, csvCell, haversineMeters } from './lib/utils'
+import { centsToStr, csvCell, haversineMeters, resolveRate } from './lib/utils'
 
 type Bindings = {
   DB: D1Database
@@ -41,22 +41,7 @@ async function nextCwNo(db: D1Database): Promise<string> {
 
 // haversineMeters → moved to src/lib/utils.ts
 
-/**
- * 時薪 fallback 邏輯（全部以「分」為單位）：
- *   1) 派更指定時薪 assigned_hourly_rate > 0  → 用
- *   2) 場次時薪 session_hourly_rate > 0       → 用
- *   3) 個人預設時薪 default_hourly_rate       → 用（可能為 0）
- * 回傳最終採用的時薪（分）。
- */
-function resolveRate(
-  assignedRate: number | null | undefined,
-  sessionRate: number | null | undefined,
-  defaultRate: number | null | undefined
-): number {
-  if (assignedRate && assignedRate > 0) return assignedRate
-  if (sessionRate && sessionRate > 0) return sessionRate
-  return defaultRate && defaultRate > 0 ? defaultRate : 0
-}
+// resolveRate → moved to src/lib/utils.ts
 
 // csvCell → moved to src/lib/utils.ts
 
