@@ -8,6 +8,7 @@ import { nextMemberNo, expiryDate, validateHKPhone } from './lib/members'
 import { genTestingCode, genBrandToken } from './lib/testing-utils'
 import { nextCwNo } from './lib/coworkery-utils'
 import { sha256hex, appendHashChain } from './lib/revenue-utils'
+import { verifyColinkerySess } from './lib/colinkery-auth'
 
 type Bindings = {
   DB: D1Database
@@ -20213,17 +20214,7 @@ function makeCsrpnToken(bytes = 32): string {
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function verifyColinkerySess(db: D1Database, token: string | undefined): Promise<string | null> {
-  if (!token) return null
-  const row = await db.prepare(
-    `SELECT member_no FROM colinkery_sessions WHERE token=? AND expires_at > datetime('now')`
-  ).bind(token).first<{ member_no: string }>()
-  if (!row) return null
-  // 確認帳戶仍 active
-  const m = await db.prepare(`SELECT colinkery_account_status FROM members WHERE member_no=?`).bind(row.member_no).first<{ colinkery_account_status: string }>()
-  if (!m || m.colinkery_account_status !== 'active') return null
-  return row.member_no
-}
+// [MOVED to src/lib/colinkery-auth.ts @ Wave2] verifyColinkerySess — pure mechanical move
 
 function requireColinkery() {
   return async (c: any, next: any) => {
