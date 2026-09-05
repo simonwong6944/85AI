@@ -8,7 +8,7 @@ import { nextMemberNo, expiryDate, validateHKPhone } from './lib/members'
 import { genTestingCode, genBrandToken } from './lib/testing-utils'
 import { nextCwNo } from './lib/coworkery-utils'
 import { sha256hex, appendHashChain } from './lib/revenue-utils'
-import { verifyColinkerySess } from './lib/colinkery-auth'
+import { verifyColinkerySess, requireColinkery } from './lib/colinkery-auth'
 
 type Bindings = {
   DB: D1Database
@@ -20216,15 +20216,7 @@ function makeCsrpnToken(bytes = 32): string {
 
 // [MOVED to src/lib/colinkery-auth.ts @ Wave2] verifyColinkerySess — pure mechanical move
 
-function requireColinkery() {
-  return async (c: any, next: any) => {
-    const token = getCookie(c, 'colinkery_session')
-    const memberNo = await verifyColinkerySess(c.env.DB, token)
-    if (!memberNo) return c.json({ ok: false, error: '請先登入' }, 401)
-    c.set('clMemberNo', memberNo)
-    await next()
-  }
-}
+// [MOVED to src/lib/colinkery-auth.ts @ Wave2] requireColinkery — pure mechanical move
 
 // ─── CoLinkery 申請 ───────────────────────────────────────────────────────────
 app.post('/api/colinkery/apply', async (c) => {
