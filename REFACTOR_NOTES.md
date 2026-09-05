@@ -27,23 +27,38 @@
 | **發現於** | Wave 2，搬遷 `verifySession` 前置審查（branch `refactor/split-index`，base commit `557a1ce`） |
 | **涉及函數** | `verifySession(db: D1Database, token: string \| undefined): Promise<boolean>` |
 | **正確簽名** | `verifySession(db, token)` — 第一參數為 D1Database，第二參數為 token 字串 |
-| **問題描述** | `src/index.tsx` 內 benefits + hmvod 路由共 8 個呼叫點使用了**相反參數順序** `verifySession(c, db)`，將 Hono context `c` 傳入 `db` 位置、將 D1Database `db` 傳入 `token` 位置。函數內 `if (!token) return false` 收到 db object（truthy）會繼續執行，再以 `c`（context，非 D1Database）呼叫 `db.prepare(...)` → runtime TypeError。實際效果：auth check 在 runtime 拋出錯誤或永遠失敗，**這 8 條 admin route 可能一直缺乏有效 auth 保護**。 |
+| **問題描述** | 全檔 `src/index.tsx` 共有 **16 個** `verifySession` 呼叫點，分兩種模式：**Pattern A（正確，8 個）**：`verifySession(c.env.DB, token)` — 符合函數簽名；**Pattern B（錯誤，8 個）**：`verifySession(c, db)` — 將 Hono context `c` 傳入 `db` 位置、將 D1Database `db` 傳入 `token` 位置。Pattern B 中函數內 `if (!token) return false` 收到 db object（truthy）會繼續執行，再以 `c`（context，非 D1Database）呼叫 `db.prepare(...)` → runtime TypeError。實際效果：Pattern B 的 auth check 在 runtime 拋出錯誤或永遠失敗，**這 8 條 admin route 可能一直缺乏有效 auth 保護**（惟注意：上游 `app.use('/api/admin/*', ...)` middleware 可能已提供保護，待調查）。Pattern A 的 8 個呼叫點無問題。 |
 | **嚴重程度** | 🔴 **高優先 / 疑似安全漏洞** |
 | **已照搬不改** | ✅ 純機械搬遷原則——呼叫點一隻字都唔動，原行為照保留。 |
-| **待獨立調查** | 須另開工程確認：①這 8 條 route 是否真的在 production 無 auth 保護；② benefits/hmvod 路由是否依賴上游 middleware 保護（`app.use('/api/admin/*', ...)` 已在 line ~80 設定，可能已由 middleware 覆蓋）；③ 若 middleware 已保護，Pattern B 呼叫雖錯但無害；④ 修正時須同時審查所有呼叫點。 |
+| **待獨立調查** | 須另開工程確認：①這 8 條 route 是否真的在 production 無 auth 保護；② benefits/hmvod 路由是否依賴上游 middleware 保護（`app.use('/api/admin/*', ...)` 已在 line ~80 設定，可能已由 middleware 覆蓋）；③ 若 middleware 已保護，Pattern B 呼叫雖錯但無害；④ 修正時須同時審查所有 16 個呼叫點。 |
 
-**8 個錯誤呼叫點（`src/index.tsx`，逐個行號 + 所屬 route）：**
+> ⚠️ **補記（2026-09-05，Commit 1 原文遺漏）**：NOTE-002 初版僅列 Pattern B（8 個），未計入 Pattern A（8 個）。全檔實際呼叫點為 **16 個**（A 8 + B 8），現補全。行號為 commit `ef019b6` 搬遷後的當前行號。
 
-| 行號 | Route handler | 參數（錯誤） |
-|------|--------------|------------|
-| 24274 | `app.get('/api/admin/benefits', ...)` | `verifySession(c, db)` |
-| 24288 | `app.post('/api/admin/benefits', ...)` | `verifySession(c, db)` |
-| 24304 | `app.put('/api/admin/benefits/:id', ...)` | `verifySession(c, db)` |
-| 24322 | `app.delete('/api/admin/benefits/:id', ...)` | `verifySession(c, db)` |
-| 24330 | `app.get('/api/admin/benefits/:id/claims', ...)` | `verifySession(c, db)` |
-| 24343 | `app.get('/api/admin/benefits/claims/summary', ...)` | `verifySession(c, db)` |
-| 24359 | `app.post('/api/admin/benefits/upload-image', ...)` | `verifySession(c, db)` |
-| 24405 | `app.get('/api/admin/benefit-categories', ...)` | `verifySession(c, db)` |
+**Pattern A — 正確呼叫點（`verifySession(c.env.DB, token)`，共 8 個）：**
+
+| 行號（ef019b6 後） | Route / 用途 | 參數 |
+|------------------|------------|------|
+| 60 | `POST /api/admin/login` — login handler | `verifySession(c.env.DB, token)` |
+| 98 | `GET /api/admin/me` — session check | `verifySession(c.env.DB, token)` |
+| 20735 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
+| 20762 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
+| 20804 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
+| 20830 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
+| 20848 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
+| 22332 | `/membership/admin` redirect guard | `verifySession(c.env.DB, token)` |
+
+**Pattern B — 錯誤呼叫點（`verifySession(c, db)`，共 8 個）：**
+
+| 行號（ef019b6 後） | Route handler | 參數（錯誤） |
+|------------------|--------------|------------|
+| 24268 | `app.get('/api/admin/benefits', ...)` | `verifySession(c, db)` |
+| 24282 | `app.post('/api/admin/benefits', ...)` | `verifySession(c, db)` |
+| 24298 | `app.put('/api/admin/benefits/:id', ...)` | `verifySession(c, db)` |
+| 24316 | `app.delete('/api/admin/benefits/:id', ...)` | `verifySession(c, db)` |
+| 24324 | `app.get('/api/admin/benefits/:id/claims', ...)` | `verifySession(c, db)` |
+| 24337 | `app.get('/api/admin/benefits/claims/summary', ...)` | `verifySession(c, db)` |
+| 24353 | `app.post('/api/admin/benefits/upload-image', ...)` | `verifySession(c, db)` |
+| 24399 | `app.get('/api/admin/benefit-categories', ...)` | `verifySession(c, db)` |
 
 ---
 
