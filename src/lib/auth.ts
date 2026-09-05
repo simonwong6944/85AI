@@ -15,3 +15,11 @@ export function sessionExpiry(hours = 12): string {
 export function getSessionToken(c: any): string | undefined {
   return getCookie(c, 'admin_session')
 }
+
+export async function verifySession(db: D1Database, token: string | undefined): Promise<boolean> {
+  if (!token) return false
+  const row = await db.prepare(
+    `SELECT id FROM admin_sessions WHERE token = ? AND expires_at > datetime('now')`
+  ).bind(token).first()
+  return !!row
+}

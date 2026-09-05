@@ -3,7 +3,7 @@ import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { centsToStr, csvCell, haversineMeters, resolveRate } from './lib/utils'
-import { makeToken, sessionExpiry, getSessionToken } from './lib/auth'
+import { makeToken, sessionExpiry, getSessionToken, verifySession } from './lib/auth'
 import { nextMemberNo, expiryDate, validateHKPhone } from './lib/members'
 import { genTestingCode, genBrandToken } from './lib/testing-utils'
 import { nextCwNo } from './lib/coworkery-utils'
@@ -43,13 +43,7 @@ const app = new Hono<{ Bindings: Bindings }>()
 // sessionExpiry → moved to src/lib/auth.ts
 // getSessionToken → moved to src/lib/auth.ts
 
-async function verifySession(db: D1Database, token: string | undefined): Promise<boolean> {
-  if (!token) return false
-  const row = await db.prepare(
-    `SELECT id FROM admin_sessions WHERE token = ? AND expires_at > datetime('now')`
-  ).bind(token).first()
-  return !!row
-}
+// [MOVED to src/lib/auth.ts @ Wave2] verifySession — pure mechanical move, see commit ef527ad
 
 // ─── CORS for API ────────────────────────────────────────────────────────────
 app.use('/api/*', cors())
