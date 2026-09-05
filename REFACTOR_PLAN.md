@@ -183,29 +183,33 @@ src/
 
 ## 五、抽取優先順序（由葉節點開始）
 
-### Wave 1 — 純工具函數 Leaf（最安全，零 TS 依賴）
-每個獨立 commit。
+### Wave 1 — 純工具函數 Leaf（最安全，零副作用）✅ 已完成
+定義：純計算、零副作用、不依賴 D1/全域狀態。每個獨立 commit。
 
-| 優先序 | 目標函數 | 目標檔案 |
-|--------|---------|---------|
-| 1 | `haversineMeters`, `resolveRate`, `csvCell`, `centsToStr` | `src/lib/utils.ts` |
-| 2 | `makeToken`, `sessionExpiry`, `getSessionToken` | `src/lib/auth.ts`（工具部分）|
-| 3 | `validateHKPhone`, `expiryDate`, `nextMemberNo` | `src/lib/members.ts` |
-| 4 | `nextCwNo` | `src/lib/coworkery-utils.ts` |
-| 5 | `genTestingCode`, `genBrandToken` | `src/lib/testing-utils.ts` |
-| 6 | `genToken`, `sha256hex`, `nextHolderNo`, `nextPartnerNo`, `nextProjectCode`, `validateShares` | `src/lib/revenue-utils.ts` |
-| 7 | `pbkdf2Hash`, `pbkdf2Verify`, `makeCsrpnToken`, `verifyColinkerySess` | `src/lib/colinkery-auth.ts` |
-| 8 | `generateToken`, `genMemberNoQR` | `src/lib/qr-utils.ts` |
-| 9 | `getFamilyTreeApiKey` | `src/lib/family-tree.ts` |
+| 優先序 | 目標函數 | 目標檔案 | 狀態 |
+|--------|---------|---------|------|
+| 1 | `haversineMeters`, `resolveRate`, `csvCell`, `centsToStr` | `src/lib/utils.ts` | ✅ 完成 |
+| 2 | `makeToken`, `sessionExpiry`, `getSessionToken` | `src/lib/auth.ts` | ✅ 完成 |
+| 3 | `validateHKPhone`, `expiryDate` | `src/lib/members.ts` | ✅ 完成 |
+| 4 | `genTestingCode`, `genBrandToken` | `src/lib/testing-utils.ts` | ✅ 完成 |
 
-### Wave 2 — 有 TS 依賴的工具函數（需 Wave 1 完成先）
+> ⚠️ **原計劃錯誤更正**：`nextMemberNo`（原優先序 3）和 `nextCwNo`（原優先序 4）
+> 原被錯誤分類為 Wave 1 純 Leaf。
+> 實際上兩者均接受 `db: D1Database` 並執行 `UPDATE ... RETURNING`，有 **D1 寫入副作用**，
+> 不符合「零副作用」定義。已移至 Wave 2 處理。
 
-| 優先序 | 目標函數 | 依賴 |
-|--------|---------|------|
-| 10 | `verifySession` | `makeToken`, `sessionExpiry`, `getSessionToken` |
-| 11 | `appendHashChain` | `sha256hex` |
-| 12 | `requireColinkery` | Wave 1 + `verifySession` |
-| 13 | `registerRevenueRoutes` | Wave 1 + Wave 2 |
+### Wave 2 — 有依賴/副作用的工具函數（Wave 1 完成後進行）
+
+| 優先序 | 目標函數 | 依賴 / 副作用 | 目標檔案 |
+|--------|---------|-------------|---------|
+| 10 | `nextMemberNo` | D1 寫入副作用（UPDATE counter） | `src/lib/members.ts`（追加） |
+| 11 | `nextCwNo` | D1 寫入副作用（UPDATE coworkery_counter） | `src/lib/coworkery-utils.ts` |
+| 12 | `verifySession` | D1 讀取，依賴 `getSessionToken`（已移至 auth.ts） | `src/lib/auth.ts`（追加） |
+| 13 | `appendHashChain` | 依賴 `sha256hex`（待 Wave 1 revenue-utils 完成後） | `src/lib/revenue-utils.ts`（追加） |
+| 14 | `requireColinkery` | 依賴多個 Wave 1+2 函數 | `src/lib/colinkery-auth.ts`（追加） |
+| 15 | `registerRevenueRoutes` | 依賴 Wave 1+2，接受 `app` 參數 | `src/lib/revenue-utils.ts`（追加） |
+
+> ℹ️ Wave 2 批量限制：一次最多 2 個函數，每個獨立 commit，完成即停等 review。
 
 ### Wave 3 — HTML 模板（由小到大，leaf-first）
 
