@@ -1051,3 +1051,409 @@ function escHtml(s) {
 </body>
 </html>`
 }
+
+export function teamConfirmHtml(token: string): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>團隊邀請確認 · CoEldery 85</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:18px;line-height:1.6;color:#111;}
+.topbar{background:linear-gradient(135deg,#8B0000,#C62828);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;}
+.topbar .title{font-size:20px;font-weight:900;letter-spacing:1px;}
+.wrap{max-width:480px;margin:0 auto;padding:18px 16px 40px;}
+.card{background:#fff;border-radius:14px;padding:24px 20px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px;}
+.card h2{font-size:20px;font-weight:900;color:#8B0000;margin-bottom:12px;}
+.info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6;font-size:16px;}
+.info-row:last-child{border-bottom:none;}
+.info-label{color:#6B7280;}
+.info-val{font-weight:700;color:#111;}
+.big-btn{display:block;width:100%;padding:16px;margin-top:12px;border:none;border-radius:10px;font-size:19px;font-weight:900;cursor:pointer;font-family:inherit;}
+.btn-confirm{background:#1B5E20;color:#fff;}
+.btn-reject{background:#9CA3AF;color:#fff;margin-top:8px;}
+.big-btn:disabled{opacity:.5;cursor:not-allowed;}
+.phone-row{display:flex;gap:8px;margin-top:14px;}
+.phone-in{flex:1;padding:13px 14px;font-size:18px;border:2px solid #a5d6a7;border-radius:8px;font-family:inherit;outline:none;}
+.phone-in:focus{border-color:#1B5E20;}
+.err{margin-top:10px;padding:10px 14px;background:#ffebee;border:2px solid #c62828;border-radius:8px;color:#c62828;font-size:15px;font-weight:700;display:none;}
+.err.show{display:block;}
+.ok-box{text-align:center;padding:40px 20px;}
+.ok-icon{font-size:56px;margin-bottom:14px;}
+.ok-title{font-size:22px;font-weight:900;color:#1B5E20;margin-bottom:8px;}
+.ok-text{font-size:16px;color:#555;}
+.rej-box{text-align:center;padding:40px 20px;}
+.rej-icon{font-size:56px;margin-bottom:14px;}
+.rej-title{font-size:22px;font-weight:900;color:#6B7280;margin-bottom:8px;}
+.loading-box{text-align:center;padding:50px 20px;font-size:18px;color:#888;}
+.field-group{margin-bottom:14px;}
+.field-group label{display:block;font-size:15px;font-weight:700;color:#374151;margin-bottom:6px;}
+.field-group input,.field-group select{width:100%;padding:11px 13px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:16px;font-family:inherit;outline:none;}
+.field-group input:focus,.field-group select:focus{border-color:#8B0000;}
+.field-group .hint{font-size:13px;color:#9CA3AF;margin-top:4px;}
+.upload-area{border:2px dashed #C62828;border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:#FFF9F9;margin-top:6px;}
+.upload-status{font-size:14px;color:#666;margin-top:6px;min-height:20px;}
+.upload-status.ok{color:#2E7D32;font-weight:700;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="title">CoEldery 85 · 團隊確認</div>
+</div>
+<div class="wrap">
+  <div id="loadingBox" class="card loading-box">⏳ 載入邀請資訊中…</div>
+  <div id="mainBox" style="display:none;">
+    <div class="card" id="inviteCard">
+      <h2>📋 團隊加入邀請</h2>
+      <div id="inviteDetails"></div>
+    </div>
+    <!-- 步驟1：驗證身份 -->
+    <div class="card" id="stepVerify">
+      <div style="font-size:16px;font-weight:700;color:#374151;margin-bottom:10px;">第一步：輸入你的電話號碼驗證身份</div>
+      <div class="phone-row">
+        <input type="tel" id="confirmPhone" class="phone-in" placeholder="電話號碼" maxlength="8" inputmode="numeric">
+      </div>
+      <div class="err" id="verifyErr"></div>
+      <button class="big-btn btn-confirm" id="btnVerify" style="margin-top:12px;" onclick="doVerify()">🔍 驗證身份</button>
+    </div>
+    <!-- 步驟2：個人正式資料（KYC） -->
+    <div class="card" id="stepKyc" style="display:none;">
+      <h2>📋 第二步：個人正式資料</h2>
+      <div id="kycStatusNote" style="display:none;background:#DCFCE7;border:1.5px solid #4CAF50;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:14px;color:#1B4332;"></div>
+      <div id="kycNewNote" style="display:none;background:#FFF9E6;border:1.5px solid #FFB300;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:14px;color:#795548;">
+        ⚠️ 加入團隊前需先登記個人正式資料，資料將用於身份核實及分成結算。
+      </div>
+      <!-- 身份核實提示 -->
+      <div style="background:#FFF3E0;border:1.5px solid #FF9800;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:#E65100;">
+        🪪 <strong>身份核實說明：</strong>請親身出示 HKID 予管理員核實，分成款項於核實後方可發放。
+      </div>
+      <!-- HKID（1 letter + 3 digits） -->
+      <div class="field-group" id="kycIdGroup">
+        <label>身份證號碼首 4 位 <span style="color:#C62828;">*</span></label>
+        <input type="text" id="tcKycId" placeholder="例: A123" maxlength="4" autocapitalize="characters" oninput="this.value=this.value.toUpperCase()">
+        <div class="hint" id="tcKycIdHint">填寫 HKID 首 1 個英文字母及後 3 位數字，例：A123</div>
+      </div>
+      <!-- 電郵 -->
+      <div class="field-group">
+        <label>電郵地址 <span style="color:#C62828;">*</span></label>
+        <input type="text" id="tcKycEmail" placeholder="your@email.com" inputmode="email" autocorrect="off" autocapitalize="none">
+        <div class="hint">用於接收分成結算通知</div>
+      </div>
+      <!-- 推薦人 -->
+      <div class="field-group">
+        <label>推薦人電話號碼 <span style="color:#C62828;" id="tcRefReq">*</span></label>
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <input type="tel" id="tcRefPhone" placeholder="推薦人電話" maxlength="8" inputmode="numeric" style="flex:1;" oninput="lookupTcReferral()">
+          <div id="tcRefStatus" style="min-width:28px;padding-top:11px;font-size:18px;"></div>
+        </div>
+        <div class="hint">推薦人必須已是 CoEldery 85 會員</div>
+        <div id="tcRefFound" style="display:none;background:#DCFCE7;border-radius:6px;padding:8px 12px;font-size:14px;color:#1B4332;margin-top:6px;"></div>
+      </div>
+      <!-- 銀行 -->
+      <div class="field-group">
+        <label>銀行名稱 <span style="color:#C62828;">*</span></label>
+        <select id="tcKycBank" onchange="autoFillTcSwift()">
+          <option value="">請揀選銀行</option>
+          <option>匯豐銀行 (HSBC)</option>
+          <option>恒生銀行 (Hang Seng)</option>
+          <option>中國銀行 (Bank of China)</option>
+          <option>渣打銀行 (Standard Chartered)</option>
+          <option>中信銀行（中信銀行國際）</option>
+          <option>東亞銀行 (Bank of East Asia)</option>
+          <option>星展銀行 (DBS)</option>
+          <option>花旗銀行 (Citibank)</option>
+          <option>ZA Bank（衆安銀行）</option>
+          <option>Mox Bank</option>
+          <option>WeLab Bank（匯立銀行）</option>
+          <option>Livi Bank</option>
+          <option>其他</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>銀行戶口號碼 <span style="color:#C62828;">*</span></label>
+        <input type="text" id="tcKycAcc" placeholder="銀行戶口號碼" inputmode="numeric">
+        <div class="hint">分成款項將存入此戶口</div>
+      </div>
+      <div class="field-group">
+        <label>SWIFT / BIC 代碼</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="tcKycSwift" placeholder="例: HSBCHKHH" maxlength="11" autocapitalize="characters" style="flex:1;" oninput="this.value=this.value.toUpperCase()">
+          <div id="tcSwiftNote" style="font-size:13px;color:#1B5E20;min-width:60px;"></div>
+        </div>
+        <div class="hint">選擇銀行後自動填入</div>
+      </div>
+      <div class="err" id="kycErr"></div>
+      <button class="big-btn btn-confirm" id="btnKycNext" style="margin-top:12px;" onclick="doKycNext()">下一步 →</button>
+    </div>
+    <!-- 步驟3：確認/拒絕 -->
+    <div class="card" id="stepAction" style="display:none;">
+      <h2>✅ 第三步：確認加入</h2>
+      <div style="font-size:15px;color:#555;margin-bottom:14px;line-height:1.6;">個人資料已登記，請確認是否加入團隊。</div>
+      <div class="err" id="confirmErr"></div>
+      <button class="big-btn btn-confirm" id="btnConfirm" onclick="doAction('confirm')">✅ 確認加入</button>
+      <button class="big-btn btn-reject" id="btnReject" onclick="doAction('reject')">❌ 拒絕邀請</button>
+    </div>
+  </div>
+  <div id="doneBox" style="display:none;"></div>
+  <div id="expiredBox" class="card" style="display:none;text-align:center;padding:40px 20px;">
+    <div style="font-size:48px;margin-bottom:14px;">⏰</div>
+    <div style="font-size:20px;font-weight:900;color:#6B7280;margin-bottom:8px;">邀請已過期或無效</div>
+    <div style="font-size:15px;color:#9CA3AF;">請聯絡申請人重新發送邀請。</div>
+  </div>
+</div>
+<script>
+var TOKEN = '${token}';
+var inviteData = null;
+var tcMemberNo = '';
+var tcKycDone = false;
+var tcKycDocKey = ''; // kept for legacy compat
+var tcRefMemberNo = '';
+
+var TC_SWIFT_MAP = {
+  '匯豐銀行 (HSBC)': 'HSBCHKHH',
+  '恒生銀行 (Hang Seng)': 'HASEHKHH',
+  '中國銀行 (Bank of China)': 'BKCHHKHHXXX',
+  '渣打銀行 (Standard Chartered)': 'SCBLHKHHXXX',
+  '中信銀行（中信銀行國際）': 'KWHKHKHH',
+  '東亞銀行 (Bank of East Asia)': 'BEASHKHH',
+  '星展銀行 (DBS)': 'DHBKHKHH',
+  '花旗銀行 (Citibank)': 'CITIHKHX',
+  'ZA Bank（衆安銀行）': 'ICBKHKHH',
+  'Mox Bank': 'MOXBHKHH',
+  'WeLab Bank（匯立銀行）': 'WLABHKHH',
+  'Livi Bank': 'LIVIHKHH'
+};
+function autoFillTcSwift() {
+  var bank = document.getElementById('tcKycBank').value;
+  var el = document.getElementById('tcKycSwift');
+  var noteEl = document.getElementById('tcSwiftNote');
+  if (!el) return;
+  if (TC_SWIFT_MAP[bank]) {
+    el.value = TC_SWIFT_MAP[bank]; el.readOnly = true; el.style.background = '#F3F4F6';
+    if (noteEl) { noteEl.textContent = '✅ 自動填入'; noteEl.style.color = '#1B5E20'; }
+  } else {
+    el.value = ''; el.readOnly = false; el.style.background = '';
+    if (noteEl) { noteEl.textContent = bank ? '請手動輸入' : ''; }
+  }
+}
+var _tcRefTimer = null;
+function lookupTcReferral() {
+  var phone = document.getElementById('tcRefPhone').value.replace(/\D/g,'');
+  var statusEl = document.getElementById('tcRefStatus');
+  var foundEl = document.getElementById('tcRefFound');
+  foundEl.style.display = 'none'; tcRefMemberNo = '';
+  if (phone.length < 8) { statusEl.textContent = ''; return; }
+  statusEl.textContent = '🔍';
+  clearTimeout(_tcRefTimer);
+  _tcRefTimer = setTimeout(function() {
+    fetch('/api/member/lookup?phone=' + encodeURIComponent(phone))
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.ok && d.member_no) {
+          tcRefMemberNo = d.member_no;
+          statusEl.textContent = '✅';
+          foundEl.style.display = '';
+          foundEl.style.background = '#DCFCE7'; foundEl.style.color = '#1B4332';
+          foundEl.textContent = '✅ ' + (d.name_zh || d.member_no);
+        } else {
+          tcRefMemberNo = '';
+          statusEl.textContent = '❌';
+          foundEl.style.display = '';
+          foundEl.style.background = '#FFEBEE'; foundEl.style.color = '#C62828';
+          foundEl.textContent = '找不到此電話的會員';
+        }
+      }).catch(function() { statusEl.textContent = '❌'; });
+  }, 600);
+}
+
+function showErr(id, msg) {
+  var el = document.getElementById(id);
+  if (el) { el.textContent = msg; el.style.display = 'block'; el.classList.add('show'); }
+}
+function clearErr(id) {
+  var el = document.getElementById(id);
+  if (el) { el.style.display = 'none'; el.classList.remove('show'); }
+}
+
+// 載入邀請資訊
+fetch('/api/team-invite?token=' + encodeURIComponent(TOKEN))
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    document.getElementById('loadingBox').style.display = 'none';
+    if (!d.ok) {
+      document.getElementById('expiredBox').style.display = '';
+      return;
+    }
+    inviteData = d.invite;
+    var roleLabel = inviteData.role === 'COLEADERY' ? 'CoLeadery 領航者' : 'CoLinkery 連結者';
+    var det = document.getElementById('inviteDetails');
+    det.innerHTML =
+      '<div class="info-row"><span class="info-label">角色</span><span class="info-val">' + roleLabel + '</span></div>' +
+      '<div class="info-row"><span class="info-label">申請人</span><span class="info-val">' + escHtml(inviteData.applicant_name) + '</span></div>' +
+      '<div class="info-row"><span class="info-label">你的分成</span><span class="info-val" style="color:#8B0000;font-size:20px;">' + inviteData.share_pct + '%</span></div>' +
+      '<div class="info-row"><span class="info-label">邀請有效期</span><span class="info-val" style="font-size:14px;">' + inviteData.expires_at.replace('T',' ').slice(0,16) + '</span></div>';
+    if (inviteData.confirmed !== 0) {
+      document.getElementById('mainBox').style.display = 'none';
+      var doneBox = document.getElementById('doneBox');
+      if (inviteData.confirmed === 1) {
+        doneBox.innerHTML = '<div class="card ok-box"><div class="ok-icon">✅</div><div class="ok-title">已確認加入！</div><div class="ok-text">你已成功確認加入團隊。</div></div>';
+      } else {
+        doneBox.innerHTML = '<div class="card rej-box"><div class="rej-icon">❌</div><div class="rej-title">已拒絕邀請</div><div class="rej-text" style="font-size:16px;color:#6B7280;">你已拒絕此邀請。</div></div>';
+      }
+      doneBox.style.display = '';
+    } else {
+      document.getElementById('mainBox').style.display = '';
+    }
+  })
+  .catch(function() {
+    document.getElementById('loadingBox').style.display = 'none';
+    document.getElementById('expiredBox').style.display = '';
+  });
+
+// 步驟1：驗證身份
+function doVerify() {
+  clearErr('verifyErr');
+  var phone = document.getElementById('confirmPhone').value.replace(/\D/g,'');
+  if (phone.length < 8) { showErr('verifyErr', '請輸入有效的香港電話號碼'); return; }
+  var btn = document.getElementById('btnVerify');
+  btn.disabled = true; btn.textContent = '驗證中…';
+  fetch('/api/partner/check', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ phone: phone })
+  }).then(function(r){return r.json();}).then(function(d){
+    btn.disabled = false; btn.textContent = '🔍 驗證身份';
+    if (!d.ok) { showErr('verifyErr', d.error || '驗證失敗'); return; }
+    if (inviteData && d.member_no !== inviteData.member_no) {
+      showErr('verifyErr', '電話號碼與邀請成員不符，請確認你的登記電話'); return;
+    }
+    tcMemberNo = d.member_no;
+    document.getElementById('stepVerify').style.display = 'none';
+    document.getElementById('stepKyc').style.display = '';
+    // 預填 KYC 資料
+    tcKycDone = !!d.kyc_id;
+    if (d.kyc_id && d.kyc) {
+      var kyc = d.kyc;
+      document.getElementById('kycStatusNote').style.display = '';
+      document.getElementById('kycStatusNote').textContent = '✅ 已登記個人正式資料：HKID ' + (kyc.id_prefix||'已登記') + '，銀行：' + (kyc.bank_name||'已登記');
+      document.getElementById('kycNewNote').style.display = 'none';
+      // 預填且鎖定 HKID
+      var idEl = document.getElementById('tcKycId');
+      idEl.value = kyc.id_prefix || '';
+      idEl.readOnly = true; idEl.style.background = '#F3F4F6';
+      document.getElementById('tcKycIdHint').textContent = '✅ 已登記身份證';
+      // 預填 email
+      if (kyc.email) { var em = document.getElementById('tcKycEmail'); if(em) em.value = kyc.email; }
+      // 預填推薦人（已有則鎖定）
+      if (kyc.referral_phone) {
+        var rp = document.getElementById('tcRefPhone');
+        if (rp) { rp.value = kyc.referral_phone; rp.readOnly = true; rp.style.background = '#F3F4F6'; }
+        var rf = document.getElementById('tcRefFound');
+        if (rf) { rf.style.display=''; rf.style.background='#DCFCE7'; rf.style.color='#1B4332'; rf.textContent='✅ 推薦人：' + (kyc.referral_name||kyc.referral_phone); }
+        var rs = document.getElementById('tcRefStatus'); if(rs) rs.textContent='✅';
+        var rreq = document.getElementById('tcRefReq'); if(rreq) rreq.style.display='none';
+        tcRefMemberNo = kyc.referral_phone;
+      }
+      // 預填銀行
+      var bkSel = document.getElementById('tcKycBank');
+      for (var i=0;i<bkSel.options.length;i++) {
+        if (bkSel.options[i].text===kyc.bank_name){bkSel.selectedIndex=i;break;}
+      }
+      autoFillTcSwift();
+      document.getElementById('tcKycAcc').value = kyc.bank_acc_no || '';
+      if (kyc.swift_code) { var sw = document.getElementById('tcKycSwift'); if(sw) sw.value=kyc.swift_code; }
+    } else {
+      document.getElementById('kycStatusNote').style.display = 'none';
+      document.getElementById('kycNewNote').style.display = '';
+    }
+  }).catch(function(){ btn.disabled=false; btn.textContent='🔍 驗證身份'; showErr('verifyErr','網絡錯誤，請重試'); });
+}
+
+// 步驟2：KYC 提交
+function doKycNext() {
+  clearErr('kycErr');
+  var idPrefix = document.getElementById('tcKycId').value.trim().toUpperCase();
+  // 清除不可見字符
+  var emailRaw2 = document.getElementById('tcKycEmail').value;
+  var email = emailRaw2.replace(/\u00A0/g,'').replace(/\u200B/g,'').replace(/\uFEFF/g,'').trim();
+  console.log('[KYC-TC debug] email:', JSON.stringify(email));
+  var refPhone = document.getElementById('tcRefPhone').value.replace(/\D/g,'');
+  var bank = document.getElementById('tcKycBank').value;
+  var acc = document.getElementById('tcKycAcc').value.trim();
+  var swift = document.getElementById('tcKycSwift').value.trim().toUpperCase();
+
+  // 驗證 HKID 格式
+  if (!idPrefix || !/^[A-Z][0-9]{3}$/.test(idPrefix)) {
+    showErr('kycErr','請填寫正確的身份證號碼首4位（1個英文字母 + 3位數字，例：A123）'); return;
+  }
+  if (!email || email.indexOf('@') < 1 || email.lastIndexOf('.') < email.indexOf('@') + 2) {
+    showErr('kycErr','請填寫有效的電郵地址（例：name@domain.com）'); return;
+  }
+  if (!tcKycDone && (!refPhone || refPhone.length < 8)) {
+    showErr('kycErr','請填寫推薦人電話號碼'); return;
+  }
+  if (!tcKycDone && !tcRefMemberNo) {
+    showErr('kycErr','推薦人未能驗證，請確認電話號碼'); return;
+  }
+  if (!bank) { showErr('kycErr','請選擇銀行'); return; }
+  if (!acc) { showErr('kycErr','請填寫銀行戶口號碼'); return; }
+
+  var btn = document.getElementById('btnKycNext');
+  btn.disabled = true; btn.textContent = '提交中…';
+  fetch('/api/partner/kyc', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      member_no: tcMemberNo, id_prefix: idPrefix,
+      email: email, referral_phone: refPhone,
+      bank_name: bank, bank_acc_no: acc, swift_code: swift,
+      update_only: tcKycDone
+    })
+  }).then(function(r){return r.json();}).then(function(d){
+    btn.disabled=false; btn.textContent='下一步 →';
+    if (d.ok) { tcKycDone=true; document.getElementById('stepKyc').style.display='none'; document.getElementById('stepAction').style.display=''; }
+    else { showErr('kycErr', d.error||'提交失敗'); }
+  }).catch(function(){ btn.disabled=false; btn.textContent='下一步 →'; showErr('kycErr','網絡錯誤'); });
+}
+
+// 步驟3：確認/拒絕
+function doAction(action) {
+  clearErr('confirmErr');
+  var btnC = document.getElementById('btnConfirm');
+  var btnR = document.getElementById('btnReject');
+  btnC.disabled = true; btnR.disabled = true;
+  btnC.textContent = '處理中…'; btnR.textContent = '處理中…';
+  var phone = document.getElementById('confirmPhone').value.replace(/\\D/g,'');
+  fetch('/api/team-confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: TOKEN, phone: phone, action: action })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      document.getElementById('mainBox').style.display = 'none';
+      var doneBox = document.getElementById('doneBox');
+      if (action === 'confirm') {
+        doneBox.innerHTML = '<div class="card ok-box"><div class="ok-icon">✅</div><div class="ok-title">確認成功！</div><div class="ok-text">你已確認加入團隊，分成比例 <strong style="color:#8B0000;">' + (inviteData ? inviteData.share_pct : '') + '%</strong> 已記錄。<br><br>我們會在審核通過後通知你。</div></div>';
+      } else {
+        doneBox.innerHTML = '<div class="card rej-box"><div class="rej-icon">❌</div><div class="rej-title">已拒絕邀請</div><div class="ok-text" style="color:#6B7280;">你已拒絕此次團隊邀請。</div></div>';
+      }
+      doneBox.style.display = '';
+    } else {
+      btnC.disabled = false; btnR.disabled = false;
+      btnC.textContent = '✅ 確認加入'; btnR.textContent = '❌ 拒絕邀請';
+      showErr('confirmErr', d.error || '操作失敗，請重試');
+    }
+  }).catch(function() {
+    btnC.disabled = false; btnR.disabled = false;
+    btnC.textContent = '✅ 確認加入'; btnR.textContent = '❌ 拒絕邀請';
+    showErr('confirmErr', '網絡錯誤，請重試');
+  });
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>`
+}
