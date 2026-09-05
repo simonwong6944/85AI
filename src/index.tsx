@@ -11,7 +11,7 @@ import { sha256hex, appendHashChain } from './lib/revenue-utils'
 import { verifyColinkerySess, requireColinkery } from './lib/colinkery-auth'
 import { htmlHead } from './lib/html-shared'
 import { HK_DISTRICTS } from './lib/constants'
-import { dashboardHtml, comingSoonHtml } from './lib/html-templates'
+import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml } from './lib/html-templates'
 
 type Bindings = {
   DB: D1Database
@@ -22056,89 +22056,7 @@ app.get('/colinkery/', (c) => c.html(colinkerypwaHtml()))
 app.get('/colinkery/*', (c) => c.html(colinkerypwaHtml()))
 
 // ─── Admin CoLinkery UI（整合進現有 admin shell via JS）──────────────────────
-function adminColinkerySectionHtml(): string {
-  return `
-<!-- CoLinkery 審批 section — 由 admin shell JS 動態注入 -->
-<div id="cl-admin-pending-wrap">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <h2 style="font-size:18px;font-weight:700;">🤝 CoLinkery 申請審批</h2>
-    <button onclick="loadClPending()" style="background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:14px;">重新整理</button>
-  </div>
-  <div id="cl-pending-list"><p style="color:#888;">載入中…</p></div>
-  <h2 style="font-size:18px;font-weight:700;margin:24px 0 12px;">📱 CoLinkery 待發 OTP（忘記密碼）</h2>
-  <div id="cl-otp-list"><p style="color:#888;">載入中…</p></div>
-</div>
-<script>
-async function loadClPending(){
-  try{
-    var res = await fetch('/api/admin/colinkery/pending',{credentials:'include'});
-    var d = await res.json();
-    if(!d.ok){ document.getElementById('cl-pending-list').innerHTML='<p style="color:#c00;">'+d.error+'</p>'; return; }
-
-    var apps = d.applications||[];
-    var html = apps.length===0 ? '<p style="color:#888;">目前無待審批申請</p>' : apps.map(function(a){
-      var typeMap={INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
-      return '<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,.08);">' +
-        '<div style="font-size:15px;font-weight:700;">'+a.name_zh+' （'+a.member_no+'）</div>' +
-        '<div style="font-size:13px;color:#666;">電話：'+a.phone+' ｜ 身份：'+(typeMap[a.applicant_type]||a.applicant_type)+'</div>' +
-        '<div style="font-size:13px;color:#888;margin-top:4px;">'+a.notes+'</div>' +
-        '<div style="font-size:12px;color:#aaa;">申請時間：'+a.created_at+'</div>' +
-        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
-          '<button onclick="approveClApp('+a.id+')" style="background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px;">✅ 批准</button>' +
-          '<button onclick="rejectClApp('+a.id+')" style="background:#C62828;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px;">❌ 拒絕</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-    document.getElementById('cl-pending-list').innerHTML = html;
-
-    var otps = d.pending_otps||[];
-    var otpHtml = otps.length===0 ? '<p style="color:#888;">目前無待發 OTP</p>' : otps.map(function(o){
-      var phoneDigits = (o.phone||'').replace(/\\D/g,'');
-      var fullPhone = phoneDigits.startsWith('852')?phoneDigits:'852'+phoneDigits;
-      var msg = encodeURIComponent('你好'+o.name_zh+'！你的 CoLinkery 密碼重設碼為：'+o.otp_code+'，請於 10 分鐘內使用。');
-      var waLink = 'https://wa.me/'+fullPhone+'?text='+msg;
-      return '<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.08);">' +
-        '<div style="font-size:15px;font-weight:700;">'+o.name_zh+' （'+o.member_no+'）</div>' +
-        '<div style="font-size:13px;color:#666;">電話：'+o.phone+'</div>' +
-        '<div style="font-size:20px;font-weight:900;color:#1B5E20;letter-spacing:4px;margin:8px 0;">'+o.otp_code+'</div>' +
-        '<div style="font-size:12px;color:#aaa;">到期：'+o.expires_at+'</div>' +
-        '<a href="'+waLink+'" target="_blank" style="display:inline-block;background:#25D366;color:#fff;text-decoration:none;border-radius:8px;padding:8px 16px;font-size:14px;margin-top:8px;">💬 WhatsApp 發送 OTP</a>' +
-      '</div>';
-    }).join('');
-    document.getElementById('cl-otp-list').innerHTML = otpHtml;
-  } catch(e){ document.getElementById('cl-pending-list').innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
-}
-
-async function approveClApp(id){
-  if(!confirm('確認批准此 CoLinkery 申請？')) return;
-  try{
-    var res = await fetch('/api/admin/colinkery/approve/'+id,{method:'POST',credentials:'include'});
-    var d = await res.json();
-    if(!d.ok){ alert(d.error||'批准失敗'); return; }
-    alert('✅ 已批准！Holder No: '+d.holder_no+'\\n\\n點擊確定後可用以下連結 WhatsApp 通知申請人：\\n'+d.wa_notify_link);
-    // Open wa link
-    window.open(d.wa_notify_link,'_blank');
-    loadClPending();
-  } catch(e){ alert('網絡錯誤'); }
-}
-
-async function rejectClApp(id){
-  var reason = prompt('請輸入拒絕原因（會顯示給申請人）：');
-  if(reason===null) return;
-  try{
-    var res = await fetch('/api/admin/colinkery/reject/'+id,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})});
-    var d = await res.json();
-    if(!d.ok){ alert(d.error||'拒絕失敗'); return; }
-    alert('✅ 已拒絕。\\n點擊確定後可用以下連結通知申請人：\\n'+d.wa_notify_link);
-    window.open(d.wa_notify_link,'_blank');
-    loadClPending();
-  } catch(e){ alert('網絡錯誤'); }
-}
-
-// 自動載入
-loadClPending();
-<\/script>`
-}
+// [MOVED to src/lib/html-templates.ts @ Wave3/Stage2] adminColinkerySectionHtml — pure mechanical move
 
 // ─── 將 CoLinkery 審批頁面注入現有 admin shell ──────────────────────────────
 app.get('/admin/colinkery', async (c) => {
