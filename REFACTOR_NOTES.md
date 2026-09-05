@@ -75,4 +75,94 @@
 
 ---
 
+## [NOTE-004] Wave 3 施工作戰圖 — Stage 0–5 次序 + Smoke Test 頁面清單
+
+> **性質**：施工計劃記錄（非 bug）。記錄 Wave 3（HTML 模板搬遷）的分 Stage 施工次序，
+> 以及每個模板函數對應的 smoke test 瀏覽頁面，供搬遷後驗証用。
+
+### Stage 0 — 前置依賴（必須最先提取）
+
+| 目標 | 新檔 | 說明 |
+|------|------|------|
+| `htmlHead` | `src/lib/html-shared.ts` | 7 個模板依賴，必須先搬 |
+| `HK_DISTRICTS` | `src/lib/constants.ts` | `qrCompleteHtml` + route handler 依賴 |
+
+### Stage 1 — 零依賴模板（可並行，無需前置）
+
+| 函數 | 行範圍 | Lines | inline script |
+|------|--------|-------|--------------|
+| `dashboardHtml` | 3637–3714 | 78 | 0 |
+| `comingSoonHtml` | 3717–3744 | 28 | 0 |
+| `memberProfileHtml` | 6681–7631 | 951 | 1 |
+| `newAdminShellHtml` | 8204–13272 | 5069 | 5 blocks |
+| `coworkeryAppHtml` | 13275–13804 | 530 | 1 |
+| `pwaAppHtml` | 13807–16531 | 2725 | 1 |
+| `partnerApplyHtml` | 16558–17927 | 1370 | 1 |
+| `teamConfirmHtml` | 17930–18334 | 405 | 1 |
+| `walletHtml` | 18337–18688 | 352 | 1 |
+| `colinkerypwaHtml` | 20867–22203 | 1337 | 1 |
+| `adminColinkerySectionHtml` | 22210–22292 | 83 | 1 |
+| `qrRegisterHtml` | 22510–22642 | 133 | 1 |
+| `adminQrHtml` | 23325–23698 | 374 | 1 |
+| `brandFormHtml` | 23703–24133 | 431 | 1 |
+
+### Stage 2 — 依賴 `htmlHead` 的模板（Stage 0 完成後）
+
+| 函數 | 行範圍 | Lines | inline script |
+|------|--------|-------|--------------|
+| `signupMainHtml` | 3798–4756 | 959 | 1 |
+| `signupSubHtml` | 4760–5503 | 744 | 1 |
+| `adminHtml` | 5506–6492 | 987 | 1 |
+| `posterHtml` | 6495–6620 | 126 | 1 |
+| `sopHtml` | 6623–6678 | 56 | 0 |
+| `homeHtml` | 7634–8056 | 423 | 1 |
+| `loginHtml` | 8059–8201 | 143 | 1 |
+
+### Stage 3 — 依賴 `HK_DISTRICTS` 的模板（Stage 0 完成後）
+
+| 函數 | 行範圍 | Lines | inline script |
+|------|--------|-------|--------------|
+| `qrCompleteHtml` | 22922–23072 | 151 | 1 |
+
+### Stage 4 — Wave 2 遺留（另開討論）
+
+| 函數 | 說明 |
+|------|------|
+| `registerRevenueRoutes` | 明確 defer，待另行討論後執行 |
+
+### Stage 5 — Wave 4 路由 handler（Wave 3 全完成後）
+
+> 所有頂層 `app.get/post/put/delete/use` 路由 handler，待 Wave 3 完成後分批規劃。
+
+---
+
+### Smoke Test 頁面清單（搬遷後手動驗証）
+
+| 模板函數 | HTTP Method | Path | 備注 |
+|---------|-------------|------|------|
+| `dashboardHtml` | GET | `/dashboard` 或 `/` | 確認有渲染 |
+| `comingSoonHtml` | GET | 任何呼叫點 path | 確認 en/zh 參數傳入 |
+| `signupMainHtml` | GET | `/signup` 或類似 | 老有卡申請表 |
+| `signupSubHtml` | GET | `/signup/sub` 或類似 | 家庭同行卡 |
+| `adminHtml` | GET | `/admin` | 會員後台管理 |
+| `posterHtml` | GET | `/poster` | Roadshow Poster |
+| `sopHtml` | GET | `/sop` | Roadshow 作戰手冊 |
+| `memberProfileHtml` | GET | `/member/profile` 或類似 | 會員個人頁 |
+| `homeHtml` | GET | `/` | 主頁 |
+| `loginHtml` | GET | `/login` | 會員登入 |
+| `newAdminShellHtml` | GET | `/new-admin` 或類似 | 新 admin shell |
+| `coworkeryAppHtml` | GET | `/coworkery` 或類似 | |
+| `pwaAppHtml` | GET | `/app` 或類似 | PWA |
+| `partnerApplyHtml` | GET | `/partner/apply` 或類似 | |
+| `teamConfirmHtml` | GET | `/team/confirm` 或類似 | |
+| `walletHtml` | GET | `/wallet` 或類似 | |
+| `colinkerypwaHtml` | GET | `/colinkery` 或類似 | |
+| `adminColinkerySectionHtml` | GET | admin section | |
+| `qrRegisterHtml` | GET | `/qr-register` | source 參數 |
+| `qrCompleteHtml` | GET | `/qr-register/complete` | 須 HK_DISTRICTS |
+| `adminQrHtml` | GET | `/admin/qr` 或類似 | |
+| `brandFormHtml` | GET | `/brand` 或類似 | |
+
+---
+
 <!-- 以後所有搬遷時發現的可疑邏輯，照此格式新增條目 -->
