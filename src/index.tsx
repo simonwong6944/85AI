@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
-import { centsToStr, csvCell } from './lib/utils'
+import { centsToStr, csvCell, haversineMeters } from './lib/utils'
 
 type Bindings = {
   DB: D1Database
@@ -39,22 +39,7 @@ async function nextCwNo(db: D1Database): Promise<string> {
   return 'CW' + String(row.next_val).padStart(6, '0')
 }
 
-/**
- * Haversine 公式：計算兩個經緯度之間的距離（米）。
- * 用於硬性 geofence 判斷。
- */
-function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371000
-  const toRad = (d: number) => (d * Math.PI) / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLng = toRad(lng2 - lng1)
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return Math.round(R * c)
-}
+// haversineMeters → moved to src/lib/utils.ts
 
 /**
  * 時薪 fallback 邏輯（全部以「分」為單位）：
