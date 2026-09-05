@@ -7,6 +7,7 @@ import { makeToken, sessionExpiry, getSessionToken, verifySession } from './lib/
 import { nextMemberNo, expiryDate, validateHKPhone } from './lib/members'
 import { genTestingCode, genBrandToken } from './lib/testing-utils'
 import { nextCwNo } from './lib/coworkery-utils'
+import { sha256hex } from './lib/revenue-utils'
 
 type Bindings = {
   DB: D1Database
@@ -18698,11 +18699,8 @@ function genToken(): string {
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-// ── 工具：SHA-256 哈希（Web Crypto API）────────────────────────────────────
-async function sha256hex(data: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
+// [MOVED to src/lib/revenue-utils.ts @ Wave2] sha256hex — pure mechanical move
+// Note: sha256hex 本屬 Wave 1 純 leaf（原 revenue-utils 優先序 6），因 appendHashChain 依賴而於 Wave 2 提前搬。
 
 // ── 工具：下一個 holder_no（CL000001 / CK000001）────────────────────────────
 async function nextHolderNo(db: D1Database, role: 'COLEADERY' | 'COLINKERY'): Promise<string> {
