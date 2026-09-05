@@ -7,7 +7,7 @@ import { makeToken, sessionExpiry, getSessionToken, verifySession } from './lib/
 import { nextMemberNo, expiryDate, validateHKPhone } from './lib/members'
 import { genTestingCode, genBrandToken } from './lib/testing-utils'
 import { nextCwNo } from './lib/coworkery-utils'
-import { sha256hex } from './lib/revenue-utils'
+import { sha256hex, appendHashChain } from './lib/revenue-utils'
 
 type Bindings = {
   DB: D1Database
@@ -18728,23 +18728,7 @@ async function nextProjectCode(db: D1Database): Promise<string> {
   return 'PRJ' + String(row?.next_val ?? 1).padStart(4, '0')
 }
 
-// ── 工具：追加哈希鏈記錄 ────────────────────────────────────────────────────
-async function appendHashChain(
-  db: D1Database,
-  record_type: string,
-  record_id: number,
-  payload: string
-): Promise<string> {
-  const last = await db.prepare(
-    'SELECT sha256 FROM hash_chain ORDER BY id DESC LIMIT 1'
-  ).first<{ sha256: string }>()
-  const prev = last?.sha256 ?? ''
-  const hash = await sha256hex(prev + record_type + record_id + payload)
-  await db.prepare(
-    'INSERT INTO hash_chain (record_type, record_id, sha256, prev_hash) VALUES (?,?,?,?)'
-  ).bind(record_type, record_id, hash, prev).run()
-  return hash
-}
+// [MOVED to src/lib/revenue-utils.ts @ Wave2] appendHashChain — pure mechanical move
 
 // ── 工具：驗證 project_shares 七方加總 = 10000 bps ──────────────────────────
 function validateShares(s: Record<string, number>): boolean {
