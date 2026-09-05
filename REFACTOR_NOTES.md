@@ -62,4 +62,17 @@
 
 ---
 
+## [NOTE-003] Wave 3 模板函數偵查 — inline JS 同名函數勿混淆 grep 結果
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 3 前置偵查，branch `refactor/split-index`，commit `8f8735b` 之後（純調查，無搬遷） |
+| **涉及範圍** | `newAdminShellHtml`（行 8204–13272）及 `pwaAppHtml`（行 13807–16531）內部的 inline JS 函數定義 |
+| **問題描述** | `src/index.tsx` 內有多個與 TypeScript 頂層函數同名的 **瀏覽器端 inline JS 函數**，定義在 template literal 的 `<script>` block 內。已確認以下撞名情況：① `bnfCardHtml`（JS，在 `newAdminShellHtml` Block 4，行 ~11114）── 外觀與 TS 頂層函數相同，但係 HTML template 內的 browser JS；② `appBnfMedCardPinHtml`、`appBnfMedCardAuthHtml`、`appBnfMedCardStatusHtml`、`appBnfMedCardIssuedHtml`、`appBnfMedCardApplyHtml`、`appBnfCardHtml`、`appHmvodPinHtml`、`appHmvodAuthHtml`、`appHmvodDetailHtml`（全部係 `pwaAppHtml` 內 `<script>` block 的 browser JS 函數，行 15432–16557）；③ `tstEsc`（JS escape helper，在 `newAdminShellHtml` Block 3，行 10324）；④ `switchTab`（JS tab 切換，在 `pwaAppHtml` `<script>` block，行 14267）。 |
+| **影響** | Wave 3 搬遷時用 `grep -n "funcName" src/index.tsx` 確認定義數量，上述函數名會額外 match 到 inline JS 定義，令定義計數 > 1，**誤觸「定義多過 1 即停」前置閘**。 |
+| **處理方式** | 閘 2 grep 時，若發現定義 > 1，先 `Read` 該行上下文確認是否在 template literal `<script>` block 內（non-TS）。若係 inline JS，唔計入「TS 頂層定義」計數，可繼續。 |
+| **已照搬不改** | N/A（純調查記錄，無搬遷） |
+
+---
+
 <!-- 以後所有搬遷時發現的可疑邏輯，照此格式新增條目 -->
