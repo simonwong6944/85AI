@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
-import { centsToStr } from './lib/utils'
+import { centsToStr, csvCell } from './lib/utils'
 
 type Bindings = {
   DB: D1Database
@@ -73,16 +73,7 @@ function resolveRate(
   return defaultRate && defaultRate > 0 ? defaultRate : 0
 }
 
-/**
- * CSV 欄位轉義：處理逗號、引號、換行，並防 CSV injection。
- * 遇到以 = + - @ 開頭的值加前置單引號，避免試算表執行公式。
- */
-function csvCell(value: unknown): string {
-  let s = value === null || value === undefined ? '' : String(value)
-  if (/^[=+\-@]/.test(s)) s = "'" + s
-  if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"'
-  return s
-}
+// csvCell → moved to src/lib/utils.ts
 
 // centsToStr → moved to src/lib/utils.ts
 
