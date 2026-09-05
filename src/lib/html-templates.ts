@@ -698,3 +698,356 @@ document.getElementById('pwInput').addEventListener('keydown',function(e){ if(e.
 </body>
 </html>`
 }
+
+export function walletHtml(prefillMember: string, prefillPhone = ''): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>我的錢包 · CoEldery 85</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#F0EBD8;min-height:100vh;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:18px;line-height:1.6;color:#111;}
+.topbar{background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;}
+.topbar .back{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;border-radius:6px;}
+.topbar .title{font-size:20px;font-weight:900;letter-spacing:1px;}
+.wrap{max-width:480px;margin:0 auto;padding:18px 16px 40px;}
+/* Login */
+.login-card{background:#fff;border-radius:14px;padding:28px 20px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px;}
+.login-card h2{font-size:22px;font-weight:900;color:#1B5E20;margin-bottom:12px;}
+.login-card p{font-size:17px;color:#555;margin-bottom:18px;line-height:1.6;}
+input.big-in{width:100%;padding:13px 14px;font-size:18px;border:2px solid #a5d6a7;border-radius:8px;font-family:inherit;outline:none;}
+input.big-in:focus{border-color:#1B5E20;}
+.big-btn{display:block;width:100%;padding:16px;margin-top:14px;background:#2E7D32;color:#fff;border:none;border-radius:10px;font-size:19px;font-weight:900;cursor:pointer;font-family:inherit;}
+.big-btn:disabled{background:#a5d6a7;cursor:not-allowed;}
+.err{margin-top:10px;padding:10px 14px;background:#ffebee;border:2px solid #c62828;border-radius:8px;color:#c62828;font-size:16px;font-weight:700;display:none;}
+.err.show{display:block;}
+/* Summary */
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.sum-card{background:#fff;border-radius:12px;padding:14px 12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+.sum-num{font-size:22px;font-weight:900;color:#1B5E20;}
+.sum-label{font-size:13px;color:#777;margin-top:4px;}
+/* Entries */
+.section-title{font-size:18px;font-weight:900;color:#1B5E20;margin:16px 0 10px;border-left:4px solid #2E7D32;padding-left:10px;}
+.entry-card{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+.entry-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.entry-project{font-size:15px;font-weight:700;color:#1B5E20;}
+.entry-role{font-size:13px;color:#888;}
+.entry-amount{font-size:20px;font-weight:900;color:#1B5E20;}
+.entry-meta{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+.status-badge{font-size:12px;font-weight:700;padding:3px 8px;border-radius:5px;}
+.status-POSTED{background:#E8F5E9;color:#1B5E20;}
+.status-PENDING_PAYOUT{background:#FFF3E0;color:#E65100;}
+.status-PAID{background:#E3F2FD;color:#1565C0;}
+.status-RESERVED{background:#F3E5F5;color:#6A1B9A;}
+.status-PENDING_CONFIRM{background:#FAFAFA;color:#777;}
+.hash-text{font-size:11px;color:#bbb;word-break:break-all;margin-top:6px;font-family:monospace;}
+.empty-box{text-align:center;padding:50px 20px;color:#999;}
+.empty-box .icon{font-size:52px;margin-bottom:14px;}
+.loading-box{text-align:center;padding:50px 20px;font-size:18px;color:#888;}
+/* Project cards */
+.proj-card-w{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-left:4px solid #2E7D32;}
+.proj-card-w.draft{border-left-color:#9CA3AF;}
+.proj-card-w.settling{border-left-color:#D97706;}
+.proj-card-w.settled{border-left-color:#1565C0;}
+.proj-card-w.closed{border-left-color:#6B7280;}
+.proj-title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;}
+.proj-name-w{font-size:16px;font-weight:800;color:#1B5E20;}
+.proj-code-w{font-size:12px;font-family:monospace;background:#F3F4F6;padding:2px 7px;border-radius:4px;color:#6B7280;}
+.proj-status-w{font-size:12px;font-weight:700;padding:3px 9px;border-radius:10px;}
+.ps-DRAFT{background:#F3F4F6;color:#6B7280;}
+.ps-ACTIVE{background:#D1FAE5;color:#065F46;}
+.ps-SETTLING{background:#FEF3C7;color:#D97706;}
+.ps-SETTLED{background:#DBEAFE;color:#1565C0;}
+.ps-CLOSED{background:#F3F4F6;color:#6B7280;}
+.team-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 6px;}
+.team-chip{font-size:12px;background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;padding:3px 9px;border-radius:8px;font-weight:600;}
+.team-chip.me{background:#ECFDF5;border-color:#6EE7B7;color:#065F46;}
+.my-share-row{font-size:13px;color:#374151;margin-top:4px;}
+.my-share-row strong{color:#8B0000;}
+/* Role group blocks */
+.role-section{margin:10px 0 4px;}
+.role-section-header{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.role-section-label{font-size:13px;font-weight:700;color:#1B5E20;}
+.role-section-pool{font-size:12px;color:#6B7280;background:#F3F4F6;padding:2px 8px;border-radius:10px;}
+.role-members-row{display:flex;flex-wrap:wrap;gap:6px;}
+.member-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;background:#F0FDF4;border:1.5px solid #BBF7D0;color:#166534;padding:4px 11px;border-radius:20px;line-height:1.4;}
+.member-chip .chip-name{font-weight:700;}
+.member-chip .chip-pct{color:#059669;font-weight:700;}
+.role-divider{border:none;border-top:1px solid #F0F0F0;margin:8px 0 0;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="back" onclick="goBack()">&#8592;</button>
+  <span class="title">&#x1F4B0; \u6211\u7684\u9322\u5305</span>
+</div>
+<div class="wrap">
+
+  <!-- 電話登入 -->
+  <div id="loginSection" class="login-card">
+    <h2>&#x1F511; \u9a57\u8b49\u8eab\u4efd</h2>
+    <p>\u8acb\u8f38\u5165\u4f60\u7684\u6703\u54e1\u96fb\u8a71\u865f\u78bc\u4f86\u67e5\u770b\u9322\u5305</p>
+    <input class="big-in" type="tel" id="walletPhone" inputmode="numeric" placeholder="\u96fb\u8a71\u865f\u78bc">
+    <button class="big-btn" id="walletLoginBtn" onclick="loadWallet()">\uD83D\uDD0D \u67e5\u770b\u9322\u5305</button>
+    <div class="err" id="walletErr"></div>
+  </div>
+
+  <!-- 錢包內容 -->
+  <div id="walletContent" style="display:none;">
+    <!-- 角色徽章 -->
+    <div id="holdersRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"></div>
+    <!-- 彙總 -->
+    <div class="summary-grid" id="summaryGrid"></div>
+    <!-- 關聯項目 -->
+    <div class="section-title" id="projSectionTitle" style="display:none;">\uD83D\uDCC2 \u95dc\u806f\u9805\u76ee</div>
+    <div id="projList"></div>
+    <!-- 分成記錄 -->
+    <div class="section-title">\uD83D\uDCB0 \u5206\u6210\u8a18\u9304</div>
+    <div id="entriesList"></div>
+  </div>
+
+  <div id="loadingBox" class="loading-box" style="display:none;">\u8f09\u5165\u4e2d\u2026</div>
+  <div id="emptyBox" class="empty-box" style="display:none;">
+    <div class="icon">&#x1F4BC;</div>
+    <div>\u5c1a\u672a\u6709\u5206\u6210\u8a18\u9304\u3002<br>\u5be9\u6838\u901a\u904e\u5f8c\u5c07\u9677\u5c55\u793a\u5206\u6210\u8a18\u9304\u3002</div>
+  </div>
+
+</div>
+<script>
+var memberNo = '${prefillMember}';
+var walletPhone = '';
+
+function goBack() {
+  window.location.href = '/app' + (memberNo ? '?member=' + encodeURIComponent(memberNo) : '');
+}
+
+// 預填電話：優先用 server 傳入的 prefillPhone，其次 sessionStorage
+(function init() {
+  var p = '${prefillPhone}' || sessionStorage.getItem('ce85_phone') || '';
+  if (p) {
+    document.getElementById('walletPhone').value = p;
+    // 自動觸發載入
+    setTimeout(function() { loadWallet(); }, 100);
+  }
+})();
+
+function loadWallet() {
+  var phone = document.getElementById('walletPhone').value.trim();
+  if (!phone) {
+    showErr('\u8acb\u8f38\u5165\u96fb\u8a71\u865f\u78bc');
+    return;
+  }
+  walletPhone = phone;
+  sessionStorage.setItem('ce85_phone', phone);
+  document.getElementById('walletLoginBtn').disabled = true;
+  document.getElementById('walletLoginBtn').textContent = '\u8f09\u5165\u4e2d\u2026';
+  document.getElementById('loadingBox').style.display = '';
+  document.getElementById('loginSection').style.display = 'none';
+
+  fetch('/api/partner/wallet?phone=' + encodeURIComponent(phone))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('loadingBox').style.display = 'none';
+      document.getElementById('walletLoginBtn').disabled = false;
+      document.getElementById('walletLoginBtn').textContent = '\uD83D\uDD0D \u67e5\u770b\u9322\u5305';
+      if (!d.ok) {
+        document.getElementById('loginSection').style.display = '';
+        showErr(d.error || '\u67e5\u8a62\u5931\u6557');
+        return;
+      }
+      renderWallet(d);
+    }).catch(function() {
+      document.getElementById('loadingBox').style.display = 'none';
+      document.getElementById('loginSection').style.display = '';
+      document.getElementById('walletLoginBtn').disabled = false;
+      document.getElementById('walletLoginBtn').textContent = '\uD83D\uDD0D \u67e5\u770b\u9322\u5305';
+      showErr('\u7db2\u7d61\u932f\u8aa4\uff0c\u8acb\u91cd\u8a66');
+    });
+}
+
+function renderWallet(d) {
+  document.getElementById('walletContent').style.display = '';
+
+  // Holders badges
+  var holdersRow = document.getElementById('holdersRow');
+  holdersRow.innerHTML = '';
+  (d.holders || []).forEach(function(h) {
+    var span = document.createElement('div');
+    span.style.cssText = 'background:#1B5E20;color:#fff;padding:6px 14px;border-radius:20px;font-size:14px;font-weight:700;';
+    var roleLabel = h.role === 'COLEADERY' ? '\uD83C\uDF1F CoLeadery \u9818\u822a\u8005' : '\uD83E\uDD1D CoLinkery \u9023\u7d50\u8005';
+    var typeLabel = h.applicant_type === 'GROUP' ? ' (\u5c0f\u7d44)' : h.applicant_type === 'COMPANY' ? ' (\u516c\u53f8)' : '';
+    span.textContent = roleLabel + ' \u00b7 ' + h.holder_no + typeLabel;
+    holdersRow.appendChild(span);
+  });
+
+  // Summary
+  var s = d.summary || {};
+  var fmt = function(c) { return 'HK$' + ((c || 0) / 100).toLocaleString('zh-HK', { minimumFractionDigits: 0 }); };
+  document.getElementById('summaryGrid').innerHTML =
+    '<div class="sum-card"><div class="sum-num">' + fmt(s.total_posted) + '</div><div class="sum-label">\u5df2\u5165\u5e33 (POSTED)</div></div>' +
+    '<div class="sum-card"><div class="sum-num">' + fmt(s.total_pending_payout) + '</div><div class="sum-label">\u5f85\u51fa\u6b3e</div></div>' +
+    '<div class="sum-card"><div class="sum-num">' + fmt(s.total_paid) + '</div><div class="sum-label">\u5df2\u5be6\u969b\u51fa\u6b3e</div></div>' +
+    '<div class="sum-card"><div class="sum-num">' + fmt((s.total_posted||0) + (s.total_pending_payout||0) + (s.total_paid||0)) + '</div><div class="sum-label">\u7d2f\u8a08\u5206\u6210</div></div>';
+
+  // Projects
+  var projList = document.getElementById('projList');
+  var projects = d.projects || [];
+  var projTitleEl = document.getElementById('projSectionTitle');
+  if (projects.length) {
+    projTitleEl.style.display = '';
+    var myHolderNos = (d.holders || []).map(function(h) { return h.holder_no; });
+    var projStatusLabels = {DRAFT:'\u8349\u7a3f',ACTIVE:'\u9032\u884c\u4e2d',SETTLING:'\u7d50\u7b97\u4e2d',SETTLED:'\u5df2\u7d50\u7b97',CLOSED:'\u5df2\u95dc\u9589'};
+    var roleLabelsShort = {COLEADERY:'\uD83C\uDF1F CoLeadery',COLINKERY:'\uD83E\uDD1D CoLinkery'};
+    projList.innerHTML = projects.map(function(proj) {
+      var stLabel = projStatusLabels[proj.project_status] || proj.project_status;
+      var stKey = proj.project_status || 'DRAFT';
+      var team = proj.team || [];
+
+      // 按 role 分組 team（COLEADERY / COLINKERY 各一組）
+      var roleOrder = ['COLEADERY', 'COLINKERY'];
+      var roleIcons = {COLEADERY: '🌟', COLINKERY: '🤝'};
+      var roleFullLabels = {COLEADERY: 'CoLeadery 領航者', COLINKERY: 'CoLinkery 連結者'};
+
+      // 建立 role → participants 的 map
+      var teamByRole = {};
+      team.forEach(function(tm) {
+        if (!teamByRole[tm.role]) teamByRole[tm.role] = [];
+        teamByRole[tm.role].push(tm);
+      });
+
+      // 我的角色 set，方便判斷 isMyRole
+      var myRoles = proj.myRoles || [];
+      var myRoleSet = {};
+      myRoles.forEach(function(mr) { myRoleSet[mr.role] = true; });
+
+      // 生成每個角色的區塊 HTML（只顯示有參與者的角色）
+      var roleSectionsHtml = '';
+      var hasAnyRole = false;
+      roleOrder.forEach(function(role) {
+        var participants = teamByRole[role];
+        if (!participants || participants.length === 0) return;
+        hasAnyRole = true;
+
+        // 計算角色池佔項目收益 %
+        var poolBps = role === 'COLEADERY' ? (proj.pct_coleadery || 0) : (proj.pct_colinkery || 0);
+        var poolPct = Math.round(poolBps / 100);
+        var poolLabel = poolPct > 0 ? '佔項目收益 ' + poolPct + '%' : '';
+
+        // 展開成員 chips
+        var memberChips = [];
+        participants.forEach(function(tm) {
+          var tmShare = Math.round((tm.team_share_bps || 0) / 100);
+          if (tm.applicant_type === 'GROUP' && tm.group_members && tm.group_members.length > 0) {
+            // GROUP holder → 展開每個小組成員
+            tm.group_members.forEach(function(gm) {
+              memberChips.push(
+                '<span class="member-chip">' +
+                  '<span class="chip-name">' + escHtml(gm.name_zh) + '</span>' +
+                  '<span style="color:#9CA3AF;margin:0 2px;">·</span>' +
+                  '<span class="chip-pct">' + gm.share_pct + '%</span>' +
+                '</span>'
+              );
+            });
+          } else {
+            // INDIVIDUAL / COMPANY → 直接顯示 holder 名
+            memberChips.push(
+              '<span class="member-chip">' +
+                '<span class="chip-name">' + escHtml(tm.name_zh) + '</span>' +
+                '<span style="color:#9CA3AF;margin:0 2px;">·</span>' +
+                '<span class="chip-pct">' + tmShare + '%</span>' +
+              '</span>'
+            );
+          }
+        });
+
+        var isMyRole = myRoleSet[role] ? true : false;
+        roleSectionsHtml +=
+          '<div class="role-section">' +
+            '<div class="role-section-header">' +
+              (isMyRole ? '<span style="font-size:10px;font-weight:700;color:#065F46;background:#D1FAE5;border-radius:4px;padding:1px 6px;margin-right:4px;">我的角色</span>' : '') +
+              '<span class="role-section-label">' + roleIcons[role] + ' ' + roleFullLabels[role] + '</span>' +
+              (poolLabel ? '<span class="role-section-pool">' + poolLabel + '</span>' : '') +
+            '</div>' +
+            '<div class="role-members-row">' + memberChips.join('') + '</div>' +
+          '</div>';
+      });
+
+      return '<div class="proj-card-w ' + stKey.toLowerCase() + '">' +
+        '<div class="proj-title-row">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+            '<span class="proj-name-w">' + escHtml(proj.project_name) + '</span>' +
+            '<span class="proj-code-w">' + escHtml(proj.project_code) + '</span>' +
+          '</div>' +
+          '<span class="proj-status-w ps-' + stKey + '">' + stLabel + '</span>' +
+        '</div>' +
+        (hasAnyRole ? roleSectionsHtml : '') +
+        (proj.confirm_status === 'PENDING' ? '<div style="font-size:12px;color:#D97706;margin-top:6px;">⚠️ 尚待確認參與</div>' : '') +
+      '</div>';
+    }).join('');
+  } else {
+    projTitleEl.style.display = 'none';
+    projList.innerHTML = '';
+  }
+
+  // Entries
+  var list = document.getElementById('entriesList');
+  var entries = d.entries || [];
+  if (!entries.length) {
+    document.getElementById('emptyBox').style.display = '';
+    list.innerHTML = '';
+    return;
+  }
+  var statusLabels = {
+    PENDING_CONFIRM: '\u5f85\u78ba\u8a8d',
+    POSTED: '\u5df2\u5165\u5e33',
+    PENDING_PAYOUT: '\u5f85\u51fa\u6b3e',
+    PAID: '\u5df2\u51fa\u6b3e',
+    RESERVED: '\u6c60\u985e\u9810\u7559'
+  };
+  var roleLabels = {
+    COLEADERY: '\uD83C\uDF1F CoLeadery \u9818\u822a\u8005\u4efd\u984d',
+    COLINKERY: '\uD83E\uDD1D CoLinkery \u9023\u7d50\u8005\u4efd\u984d',
+    COOWNERY_POOL: '\uD83C\uDFE0 CoOwnery \u6c60',
+    COSUPPORTERY_POOL: '\uD83E\uDD1D CoSupportery \u6c60',
+    MUTUAL_FUND: '\uD83D\uDCB3 \u4e92\u52a9\u57fa\u91d1',
+    PLATFORM_FEE: '\uD83D\uDCBC \u5e73\u53f0\u8cbb',
+    SPECIAL_ACCOUNT: '\uD83C\uDF1F \u7279\u5225\u8cc7\u91d1'
+  };
+  list.innerHTML = entries.map(function(e) {
+    var statusClass = 'status-' + (e.status || 'PENDING_CONFIRM');
+    var statusText = statusLabels[e.status] || e.status;
+    var roleText = roleLabels[e.role_or_pool] || e.role_or_pool;
+    var dateStr = e.created_at ? e.created_at.slice(0,10) : '';
+    var paidStr = e.paid_at ? ' \u00b7 \u51fa\u6b3e: ' + e.paid_at.slice(0,10) : '';
+    var hashStr = e.hash ? '<div class="hash-text">\u5b58\u8b49: ' + e.hash + '</div>' : '';
+    return '<div class="entry-card">' +
+      '<div class="entry-header">' +
+        '<div><div class="entry-project">' + (e.project_name||'\u9805\u76ee') + ' <span style="font-size:13px;color:#aaa;">' + (e.project_code||'') + '</span></div>' +
+        '<div class="entry-role">' + roleText + '</div></div>' +
+        '<div class="entry-amount">' + fmt(e.amount_cents) + '</div>' +
+      '</div>' +
+      '<div class="entry-meta">' +
+        '<span class="status-badge ' + statusClass + '">' + statusText + '</span>' +
+        '<span style="font-size:13px;color:#999;">' + dateStr + paidStr + '</span>' +
+      '</div>' +
+      hashStr +
+    '</div>';
+  }).join('');
+}
+
+function showErr(msg) {
+  var el = document.getElementById('walletErr');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>`
+}
