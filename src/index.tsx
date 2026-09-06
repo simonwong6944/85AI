@@ -11,7 +11,7 @@ import { sha256hex, appendHashChain } from './lib/revenue-utils'
 import { verifyColinkerySess, requireColinkery } from './lib/colinkery-auth'
 import { htmlHead } from './lib/html-shared'
 import { HK_DISTRICTS } from './lib/constants'
-import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml , qrCompleteHtml } from './lib/html-templates'
+import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml , qrCompleteHtml , sopHtml } from './lib/html-templates'
 
 type Bindings = {
   DB: D1Database
@@ -6469,62 +6469,7 @@ regen();
 }
 
 // ─── SOP HTML (simplified) ────────────────────────────────────────────────────
-function sopHtml() {
-  return htmlHead('Roadshow 作戰手冊') + `
-<body style="background:#f4f4f0;padding:40px 24px;">
-<div style="max-width:800px;margin:0 auto;">
-  <div style="background:var(--forest-deep);color:#fff;padding:32px 40px;margin-bottom:32px;">
-    <div style="font-size:11px;letter-spacing:4px;color:var(--ferrari);margin-bottom:12px;">◆ ROADSHOW SOP</div>
-    <h1 style="font-family:'Noto Serif TC',serif;font-size:32px;font-weight:900;letter-spacing:4px;">CoEldery 85<br>作戰手冊</h1>
-    <p style="opacity:0.8;margin-top:12px;font-size:14px;">Roadshow 現場操作指引 · 2026</p>
-  </div>
-
-  ${['準備工作（前一天）','到場設置（開始前 30 分鐘）','現場操作流程','處理特殊情況','收場工作'].map((title, i) => `
-  <div style="background:#fff;padding:32px 36px;margin-bottom:16px;position:relative;">
-    <div style="position:absolute;top:24px;right:32px;font-family:'Noto Serif TC',serif;font-size:80px;color:var(--forest-pale);font-weight:900;line-height:1;">${String(i+1).padStart(2,'0')}</div>
-    <div style="font-size:11px;letter-spacing:3px;color:var(--ferrari);font-weight:700;margin-bottom:8px;">◆ STEP ${String(i+1).padStart(2,'0')}</div>
-    <h2 style="font-family:'Noto Serif TC',serif;font-size:22px;color:var(--forest-deep);margin-bottom:16px;">${title}</h2>
-    ${i===0?`<ul style="font-size:14px;line-height:2;color:var(--grey-1);padding-left:20px;">
-      <li>確認 <strong>poster.html</strong> QR code 指向正確網址</li>
-      <li>列印 A2/A3 海報至少 3 張，A4 備用版 10 張</li>
-      <li>測試報名流程：用自己電話掃 QR → 填表 → 確認收到會員編號</li>
-      <li>確認 WhatsApp 客服號碼可以接收查詢</li>
-      <li>帶備：poster.html 網址、admin 後台網址、充電器</li>
-    </ul>`:
-    i===1?`<ul style="font-size:14px;line-height:2;color:var(--grey-1);padding-left:20px;">
-      <li>張貼海報，確保 QR code 清晰可見（建議高度：130-160cm）</li>
-      <li>打開 admin 後台，確認資料庫連接正常</li>
-      <li>準備 demo 用手機，預先打開報名頁面</li>
-      <li>確認自己的電話有網絡連接</li>
-    </ul>`:
-    i===2?`<div style="font-size:14px;line-height:1.8;color:var(--grey-1);">
-      <div style="padding:12px 16px;background:var(--forest-pale);border-left:3px solid var(--forest);margin-bottom:12px;"><strong>① 客人到攤位</strong>：介紹老有聯盟，問「請問你 55 歲以上嗎？」</div>
-      <div style="padding:12px 16px;background:var(--forest-pale);border-left:3px solid var(--forest);margin-bottom:12px;"><strong>② 引導掃碼</strong>：指向海報 QR，「用手機相機掃呢個 QR，填名同電話就完成」</div>
-      <div style="padding:12px 16px;background:var(--forest-pale);border-left:3px solid var(--forest);margin-bottom:12px;"><strong>③ 輔助填表</strong>：長者如有困難，幫佢填，但確認每個資料都係本人核實</div>
-      <div style="padding:12px 16px;background:var(--forest-pale);border-left:3px solid var(--forest);margin-bottom:12px;"><strong>④ 確認成功</strong>：見到「登記成功！」畫面，請客人截圖或儲存</div>
-    </div>`:
-    i===3?`<ul style="font-size:14px;line-height:2;color:var(--grey-1);padding-left:20px;">
-      <li>電話號碼已登記：查詢後台，提供已有編號</li>
-      <li>客人唔識用手機：幫佢填，但須客人口頭確認姓名和電話</li>
-      <li>網絡問題：切換 4G/5G 熱點，或記錄在紙本，事後補錄</li>
-      <li>有疑問：引導聯絡 WhatsApp 客服</li>
-    </ul>`:
-    `<ul style="font-size:14px;line-height:2;color:var(--grey-1);padding-left:20px;">
-      <li>登入 admin 後台，確認當日登記人數</li>
-      <li>截圖統計數字記錄（總數、主卡、家庭同行卡）</li>
-      <li>收起海報，妥善存放</li>
-      <li>向團隊匯報當日成果</li>
-    </ul>`}
-  </div>`).join('')}
-
-  <div style="background:var(--ferrari);color:#fff;padding:24px 32px;border-radius:4px;">
-    <div style="font-size:11px;letter-spacing:3px;margin-bottom:8px;opacity:0.8;">◆ 緊急聯絡</div>
-    <div style="font-family:'Noto Serif TC',serif;font-size:18px;font-weight:700;">技術問題 / 系統故障</div>
-    <div style="margin-top:8px;font-size:14px;opacity:0.9;">WhatsApp 技術支援：<strong>5442-9749</strong><br>後台管理：<a href="/membership/admin" style="color:#FFD86B;">coeldery85.com/admin</a></div>
-  </div>
-</div>
-</body></html>`
-}
+// [MOVED to src/lib/html-templates.ts @ Wave3/Stage4] sopHtml — pure mechanical move
 
 // ─── Member Profile HTML ──────────────────────────────────────────────────────
 // [MOVED to src/lib/html-templates.ts @ Wave3/Stage2] memberProfileHtml — pure mechanical move
