@@ -9680,3 +9680,2729 @@ switchTab = function(name, el) {
 </script>
 </body></html>`
 }
+
+export function pwaAppHtml() {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>CoEldery 85 老有聯盟</title>
+<!-- PWA -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#228B22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CoEldery 85">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<!-- /PWA -->
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--green:#228B22;--green-dark:#1a6b1a;--red:#c62828;--bg:#F0EBD8;--white:#fff;}
+body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-size:20px;line-height:1.7;color:#111;}
+
+/* ── 頂部 ── */
+.topbar{background:var(--green-dark);color:#fff;padding:0 16px;display:flex;align-items:center;gap:10px;height:58px;position:sticky;top:0;z-index:100;}
+.topbar-logo{height:40px;width:auto;object-fit:contain;flex-shrink:0;}
+.topbar-spacer{flex:1;}
+/* Hamburger menu button (left) */
+.menu-btn{background:none;border:none;color:#fff;cursor:pointer;padding:8px;display:flex;flex-direction:column;justify-content:center;gap:5px;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+.menu-btn span{display:block;width:24px;height:2.5px;background:#fff;border-radius:2px;}
+/* Side drawer overlay */
+.drawer-overlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.45);}
+.drawer-overlay.open{display:block;}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:280px;max-width:85vw;background:#fff;z-index:9001;transform:translateX(-100%);transition:transform 0.28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(0,0,0,0.18);}
+.drawer.open{transform:translateX(0);}
+.drawer-header{background:var(--green-dark);color:#fff;padding:20px 18px 16px;display:flex;align-items:center;justify-content:space-between;}
+.drawer-header-title{font-size:18px;font-weight:900;letter-spacing:1px;}
+.drawer-close{background:none;border:none;color:#fff;font-size:26px;cursor:pointer;line-height:1;padding:2px 6px;}
+.drawer-body{flex:1;overflow-y:auto;padding:8px 0 20px;}
+.drawer-section-title{font-size:11px;font-weight:700;color:#9CA3AF;letter-spacing:2px;text-transform:uppercase;padding:16px 20px 6px;}
+.drawer-item{display:flex;align-items:center;gap:12px;padding:13px 20px;font-size:16px;font-weight:600;color:#111827;cursor:pointer;border:none;background:none;width:100%;text-align:left;-webkit-tap-highlight-color:transparent;}
+.drawer-item:active{background:#F3F4F6;}
+.drawer-item .di-icon{font-size:22px;width:28px;text-align:center;flex-shrink:0;}
+.drawer-item .di-sub{font-size:12px;color:#6B7280;font-weight:400;margin-top:2px;}
+.drawer-divider{height:1px;background:#E5E7EB;margin:8px 16px;}
+.drawer-sub-item{display:flex;align-items:center;gap:12px;padding:11px 20px 11px 52px;font-size:15px;font-weight:600;color:#374151;cursor:pointer;border:none;background:none;width:100%;text-align:left;-webkit-tap-highlight-color:transparent;}
+.drawer-sub-item:active{background:#F3F4F6;}
+.drawer-sub-item .di-icon{font-size:20px;width:24px;text-align:center;flex-shrink:0;}
+
+/* ── 主內容 ── */
+.wrap{max-width:480px;margin:0 auto;padding:28px 18px 80px;}
+
+/* ── 輸入區 ── */
+.lookup-card{background:var(--white);border-radius:14px;padding:28px 22px;box-shadow:0 4px 20px rgba(0,0,0,0.08);}
+.lookup-card h2{font-size:26px;font-weight:900;color:var(--green-dark);margin-bottom:8px;line-height:1.3;}
+.lookup-card p{font-size:18px;color:#444;margin-bottom:24px;line-height:1.6;}
+.field-label{font-size:20px;font-weight:700;color:#222;margin-bottom:10px;display:block;}
+.big-input{width:100%;padding:16px 14px;font-size:22px;border:2.5px solid #388e3c;border-radius:10px;
+  font-family:inherit;color:#111;background:#fff;min-height:60px;outline:none;}
+.big-input:focus{border-color:var(--green-dark);box-shadow:0 0 0 3px rgba(34,139,34,0.15);}
+.big-btn{display:block;width:100%;padding:18px;margin-top:18px;background:var(--green);color:#fff;
+  border:none;border-radius:10px;font-size:22px;font-weight:900;cursor:pointer;min-height:60px;
+  letter-spacing:1px;transition:background 0.15s;}
+.big-btn:active{background:var(--green-dark);}
+.big-btn:disabled{background:#a5d6a7;cursor:not-allowed;}
+.err-msg{margin-top:16px;padding:14px 16px;background:#ffebee;border:2px solid var(--red);border-radius:8px;
+  color:var(--red);font-size:20px;font-weight:700;display:none;line-height:1.5;}
+.err-msg.show{display:block;}
+
+/* ── 安裝提示區 ── */
+.install-banner{background:#e8f5e9;border:2px solid #a5d6a7;border-radius:14px;padding:22px 18px;
+  margin-top:24px;}
+.install-banner h3{font-size:22px;font-weight:900;color:var(--green-dark);margin-bottom:10px;}
+.install-banner p{font-size:18px;color:#333;line-height:1.7;margin-bottom:14px;}
+.install-btn{display:block;width:100%;padding:16px;background:var(--green);color:#fff;border:none;
+  border-radius:10px;font-size:20px;font-weight:900;cursor:pointer;min-height:58px;letter-spacing:1px;}
+.copy-btn{display:block;width:100%;padding:14px;background:#fff;color:var(--green-dark);border:2.5px solid var(--green);
+  border-radius:10px;font-size:20px;font-weight:900;cursor:pointer;min-height:58px;margin-top:12px;}
+.ios-steps{background:#fff;border-radius:10px;padding:16px;margin-top:12px;}
+.ios-steps p{font-size:18px;color:#333;margin-bottom:8px;}
+.ios-steps .step{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.ios-steps .step-num{background:var(--green);color:#fff;width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0;margin-top:2px;}
+.ios-steps .step-text{font-size:18px;line-height:1.5;}
+
+/* ── 換人連結 ── */
+.switch-wrap{text-align:center;margin-top:28px;}
+.switch-link{font-size:18px;color:#888;cursor:pointer;background:none;border:none;text-decoration:underline;padding:8px;}
+
+/* ── 卡片框架 ── */
+.card-frame{width:100%;border:none;min-height:600px;background:transparent;}
+
+/* ── Accordion（install section 收結）── */
+.accordion-content{margin-top:0;overflow:hidden;}
+
+/* ── 底部 5-tab 導航列 ── */
+.bottom-tab-bar{position:fixed;bottom:0;left:0;right:0;height:68px;
+  background:#fff;border-top:1.5px solid #ddd;
+  display:flex;align-items:stretch;z-index:999;
+  box-shadow:0 -2px 10px rgba(0,0,0,0.08);}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:none;border:none;cursor:pointer;padding:6px 2px;
+  color:#888;font-family:inherit;transition:color 0.15s;min-height:60px;gap:5px;}
+.tab-btn .tab-icon{font-size:26px;line-height:1;}
+.tab-btn .tab-label{font-size:13px;font-weight:600;line-height:1;letter-spacing:0.3px;margin-top:1px;}
+.tab-btn.active{color:var(--green);}
+.tab-btn.tab-card-btn{color:var(--green-dark);}
+.tab-btn.tab-card-btn .tab-icon{font-size:30px;}
+.tab-btn.tab-card-btn .tab-label{font-size:14px;font-weight:900;margin-top:1px;}
+.tab-btn.tab-card-btn.active{color:var(--green);}
+
+/* ── Coming soon panel ── */
+.coming-soon-panel{display:none;padding:60px 20px;text-align:center;}
+.coming-soon-panel .coming-icon{font-size:56px;margin-bottom:18px;}
+.coming-soon-panel .coming-text{font-size:24px;font-weight:900;color:#444;line-height:1.6;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <!-- 左：CoEldery 85 Logo -->
+  <img src="/static/logo-coeldery85-white.png" alt="CoEldery 85" class="topbar-logo">
+  <!-- 右：漢堡選單 -->
+  <div class="topbar-spacer"></div>
+  <button class="menu-btn" onclick="openDrawer()" aria-label="選單">
+    <span></span><span></span><span></span>
+  </button>
+</div>
+
+<!-- ── 側邊抽屜選單 ── -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="sideDrawer">
+  <div class="drawer-header">
+    <div class="drawer-header-title">CoEldery 85 選單</div>
+    <button class="drawer-close" onclick="closeDrawer()">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <!-- CoEldery 85 合作計劃 -->
+    <div class="drawer-section-title">CoEldery 85 合作計劃</div>
+    <button class="drawer-sub-item" id="drawerBtnCoLeadery" onclick="closeDrawer();drawerOpenCoLeadery()">
+      <span class="di-icon">🌟</span>
+      <div>
+        <div>CoLeadery 領航者</div>
+        <div class="di-sub">分享項目淨利潤</div>
+      </div>
+    </button>
+    <button class="drawer-sub-item" id="drawerBtnCoLinkery" onclick="closeDrawer();drawerOpenCoLinkery()">
+      <span class="di-icon">🤝</span>
+      <div>
+        <div>CoLinkery 連結者</div>
+        <div class="di-sub">連接 B2B 商業客戶</div>
+      </div>
+    </button>
+    <div class="drawer-divider"></div>
+    <!-- 有用資訊 -->
+    <div class="drawer-section-title">資訊</div>
+    <button class="drawer-item" onclick="closeDrawer();openUsefulLinksPanel()">
+      <span class="di-icon">ℹ️</span>
+      <div>
+        <div>有用資訊</div>
+        <div class="di-sub">優惠、資源、連結</div>
+      </div>
+    </button>
+    <div class="drawer-divider"></div>
+    <!-- 產品測試 -->
+    <div class="drawer-section-title">會員專屬活動</div>
+    <button class="drawer-item" onclick="closeDrawer();openTestingPanel()" style="border:2px solid #ede9fe;border-radius:12px;background:linear-gradient(135deg,#faf5ff,#f5f3ff);">
+      <span class="di-icon">🧪</span>
+      <div>
+        <div style="font-weight:800;color:#6d28d9;">產品測試計劃</div>
+        <div class="di-sub">試用新品 → 填問卷 → 贏獎勵</div>
+      </div>
+    </button>
+  </div>
+</div>
+
+<!-- ── Tab 面板：福利 ── -->
+<div id="tabShop" style="display:none;padding:16px 14px 90px;">
+  <!-- Category filter tabs -->
+  <div id="appBnfCatTabs" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:14px;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+    <div style="flex-shrink:0;padding:6px 16px;border-radius:20px;background:#1B4332;color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-cid="0" onclick="appBnfFilterCat(0,this)">全部</div>
+  </div>
+  <!-- Benefits list -->
+  <div id="shopLoadingMsg" style="text-align:center;padding:50px 20px;font-size:18px;color:#6B7280;">載入中…</div>
+  <div id="shopEmptyMsg" style="display:none;text-align:center;padding:50px 20px;">
+    <div style="font-size:52px;margin-bottom:14px;">🎁</div>
+    <div style="font-size:20px;font-weight:700;color:#555;">暫時未有福利，敬請期待 🙏</div>
+  </div>
+  <div id="appBnfList" style="display:flex;flex-direction:column;gap:14px;"></div>
+</div>
+
+<!-- Benefits Detail Panel (full screen overlay in app) -->
+<div id="appBnfDetail" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;z-index:1100;overflow-y:auto;">
+  <div style="position:sticky;top:0;background:#fff;padding:14px 16px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:12px;z-index:1;">
+    <button onclick="appBnfCloseDetail()" style="background:#f5f5f5;border:none;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;">←</button>
+    <div style="font-size:17px;font-weight:800;color:#1B4332;">福利詳情</div>
+  </div>
+  <div id="appBnfDetailContent" style="padding:0 0 100px;"></div>
+</div>
+
+<!-- ── Tab 面板：消息 ── -->
+<div id="tabNews" style="display:none;padding:18px 16px 90px;">
+  <div style="font-size:26px;font-weight:900;color:#1a6b1a;margin-bottom:16px;letter-spacing:1px;">📢 最新消息</div>
+  <div id="newsLoadingMsg" style="text-align:center;padding:50px 20px;font-size:20px;color:#6B7280;">載入中…</div>
+  <div id="newsEmptyMsg" style="display:none;text-align:center;padding:50px 20px;">
+    <div style="font-size:52px;margin-bottom:14px;">🙏</div>
+    <div style="font-size:22px;font-weight:700;color:#555;">暫時未有消息 🙏</div>
+  </div>
+  <div id="newsCards" style="display:flex;flex-direction:column;gap:16px;"></div>
+</div>
+
+<!-- ── Tab 面板：我的卡（預設顯示）── -->
+<div id="tabCard" style="display:block;">
+  <div class="wrap" id="mainWrap">
+
+    <!-- 輸入電話查詢 (初始顯示) -->
+    <div class="lookup-card" id="lookupSection">
+      <h2>📱 查閱你的老有卡</h2>
+      <p>請輸入你登記時用嘅電話號碼，系統即時搵出你張卡。</p>
+      <label class="field-label" for="phoneInput">電話號碼 / 會員編號</label>
+      <input class="big-input" id="phoneInput" type="tel" inputmode="numeric"
+        placeholder="例：91234567" autocomplete="tel" maxlength="20">
+      <button class="big-btn" id="lookupBtn" onclick="doLookup()">🔍 搵我的卡</button>
+      <div class="err-msg" id="errMsg">搵唔到，請確認電話號碼是否正確</div>
+    </div>
+
+    <!-- 安裝提示 (搵到會員後顯示，在 accordion 內) -->
+    <div id="installSection" style="display:none;">
+      <!-- Android / Chrome beforeinstallprompt -->
+      <div class="install-banner" id="installAndroid" style="display:none;">
+        <h3>📱 將會員卡加落手機主畫面</h3>
+        <p>安裝後可以喺主畫面直接開啟，唔使記住網址！</p>
+        <button class="install-btn" id="installBtn" onclick="doInstall()">⬇️ 安裝到主畫面</button>
+      </div>
+      <!-- iPhone Safari -->
+      <div class="install-banner" id="installIOS" style="display:none;">
+        <h3>📱 將會員卡加落主畫面</h3>
+        <div class="ios-steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text">撳 Safari 下面嘅 <strong>「共享」掣</strong> 🔗</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text">向上捲，揀 <strong>「加至主畫面」</strong> ＋</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text">撳右上角 <strong>「新增」</strong> 完成！</div>
+          </div>
+        </div>
+      </div>
+      <!-- WhatsApp / FB 內置瀏覽器 -->
+      <div class="install-banner" id="installInApp" style="display:none;">
+        <h3>📱 請用 Safari 或 Chrome 開啟</h3>
+        <p>你而家係用 WhatsApp / FB 入面嘅瀏覽器，<strong>唔支援安裝到主畫面</strong>。</p>
+        <p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>
+        <button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>
+      </div>
+      <!-- 產品測試問卷快捷入口 -->
+      <div id="testingShortcut" style="margin:14px 0 4px;display:none;">
+        <button onclick="openTestingPanel()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:12px;padding:14px 18px;font-size:16px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:12px;box-shadow:0 3px 12px rgba(124,58,237,0.35);">
+          <span style="font-size:26px;">🧪</span>
+          <div style="text-align:left;flex:1;">
+            <div>產品測試計劃</div>
+            <div style="font-size:13px;font-weight:500;opacity:0.85;margin-top:2px;">查看我的試用 / 填寫問卷</div>
+          </div>
+          <span style="font-size:20px;">›</span>
+        </button>
+      </div>
+      <!-- 換人 -->
+      <div class="switch-wrap">
+        <button class="switch-link" onclick="switchUser()">唔係你？換人</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Tab 面板：心聲 ── -->
+<div id="tabVoice" style="display:none;padding:18px 16px 90px;">
+  <!-- 未登入提示 -->
+  <div id="voiceNoLogin" style="display:none;text-align:center;padding:60px 20px;">
+    <div style="font-size:52px;margin-bottom:16px;">🔐</div>
+    <div style="font-size:22px;font-weight:700;color:#333;margin-bottom:14px;line-height:1.5;">請先登入 / 註冊會員<br>才可以使用心聲功能</div>
+    <button onclick="switchTab('card')" style="min-height:55px;padding:14px 28px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:20px;font-weight:700;cursor:pointer;">
+      💳 前往登入 / 查閱我的卡
+    </button>
+  </div>
+
+  <!-- 已登入：列表頁 -->
+  <div id="voiceListView" style="display:none;">
+    <div style="font-size:26px;font-weight:900;color:#1a6b1a;margin-bottom:16px;letter-spacing:1px;">💬 我的心聲</div>
+    <button onclick="openNewFeedbackForm()" style="display:block;width:100%;min-height:55px;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:20px;font-weight:900;cursor:pointer;margin-bottom:20px;letter-spacing:1px;">
+      ＋ 我要留言 / 提意見
+    </button>
+    <div id="voiceThreads" style="display:flex;flex-direction:column;gap:14px;">
+      <div style="text-align:center;padding:30px;font-size:20px;color:#888;">載入中…</div>
+    </div>
+  </div>
+
+  <!-- 新增意見表單 (hidden) -->
+  <div id="voiceNewForm" style="display:none;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+      <button onclick="closeNewFeedbackForm()" style="background:none;border:none;font-size:28px;cursor:pointer;color:#228B22;padding:0;line-height:1;">&#8592;</button>
+      <div style="font-size:24px;font-weight:900;color:#1a6b1a;">提交意見</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div>
+        <label style="font-size:20px;font-weight:700;color:#222;display:block;margin-bottom:8px;">主題 *</label>
+        <input id="vSubject" type="text" maxlength="80" placeholder="簡短描述你的意見主題"
+          style="width:100%;padding:14px;font-size:20px;border:2.5px solid #388e3c;border-radius:10px;font-family:inherit;min-height:55px;">
+      </div>
+      <div>
+        <label style="font-size:20px;font-weight:700;color:#222;display:block;margin-bottom:8px;">內容 *</label>
+        <textarea id="vContent" rows="5" placeholder="詳細說明你的意見或建議…"
+          style="width:100%;padding:14px;font-size:20px;border:2.5px solid #388e3c;border-radius:10px;font-family:inherit;resize:vertical;line-height:1.6;"></textarea>
+      </div>
+      <button onclick="submitNewFeedback()" id="vSubmitBtn"
+        style="width:100%;min-height:58px;padding:16px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:22px;font-weight:900;cursor:pointer;letter-spacing:1px;">
+        📤 提交意見
+      </button>
+    </div>
+  </div>
+
+  <!-- Thread 詳情頁 (hidden) -->
+  <div id="voiceThreadDetail" style="display:none;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <button onclick="closeVoiceThread()" style="background:none;border:none;font-size:28px;cursor:pointer;color:#228B22;padding:0;line-height:1;">&#8592;</button>
+      <div id="voiceDetailSubject" style="font-size:22px;font-weight:900;color:#1a6b1a;flex:1;"></div>
+    </div>
+    <div id="voiceMsgList" style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;"></div>
+    <div id="voiceReplyBox" style="background:#fff;border:2px solid #388e3c;border-radius:10px;padding:16px;">
+      <label style="font-size:20px;font-weight:700;color:#222;display:block;margin-bottom:8px;">繼續回覆</label>
+      <textarea id="vReplyText" rows="3" placeholder="輸入你的回覆…"
+        style="width:100%;padding:12px;font-size:20px;border:1.5px solid #ddd;border-radius:8px;font-family:inherit;resize:vertical;line-height:1.6;margin-bottom:10px;"></textarea>
+      <button onclick="submitVoiceReply()" id="vReplyBtn"
+        style="width:100%;min-height:55px;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:20px;font-weight:900;cursor:pointer;">
+        📤 發送
+      </button>
+    </div>
+    <div id="voiceClosedNote" style="display:none;text-align:center;padding:14px;font-size:18px;color:#888;background:#f5f5f5;border-radius:8px;margin-top:10px;">
+      🔒 此對話已關閉，如有需要請新開意見
+    </div>
+  </div>
+</div>
+
+<!-- ── Tab 面板：工作 ── -->
+<div id="tabWork" style="display:none;padding-bottom:80px">
+  <!-- 工作列表頁 -->
+  <div id="jobListView">
+    <div style="padding:16px 16px 8px;font-size:22px;font-weight:800;color:#111827">💼 工作市場</div>
+    <!-- CoWorkery 打卡入口 -->
+    <a href="/app/coworkery" style="display:block;margin:4px 12px 16px;padding:20px 20px 18px;background:linear-gradient(135deg,#0369a1 0%,#0284c7 100%);border-radius:16px;color:#fff;text-decoration:none;box-shadow:0 4px 16px rgba(3,105,161,0.25);-webkit-tap-highlight-color:transparent">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:40px;line-height:1">👷</div>
+        <div>
+          <div style="font-size:20px;font-weight:800;letter-spacing:0.5px;margin-bottom:3px">CoWorkery 打卡</div>
+          <div style="font-size:15px;opacity:0.88">上班 / 下班打卡 · 人手管理</div>
+        </div>
+        <div style="margin-left:auto;font-size:26px;opacity:0.7">›</div>
+      </div>
+    </a>
+    <div id="job-list-loading" style="text-align:center;padding:60px 20px;font-size:20px;color:#6B7280">載入中...</div>
+    <div id="job-list-empty" style="display:none;text-align:center;padding:60px 20px">
+      <div style="font-size:56px;margin-bottom:16px">🔍</div>
+      <div style="font-size:20px;font-weight:700;color:#374151">暫無招聘資訊</div>
+      <div style="font-size:16px;color:#6B7280;margin-top:8px">請稍後再來查看</div>
+    </div>
+    <div id="job-list-cards" style="padding:0 12px;display:flex;flex-direction:column;gap:16px"></div>
+  </div>
+  <!-- 工作詳情頁 -->
+  <div id="jobDetailView" style="display:none">
+    <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:1.5px solid #E5E7EB;background:#fff;position:sticky;top:0;z-index:10">
+      <button onclick="showJobList()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#228B22;padding:0 12px 0 0;line-height:1">&#8592;</button>
+      <span style="font-size:18px;font-weight:700;color:#111827">職位詳情</span>
+    </div>
+    <div id="job-detail-content" style="padding-bottom:100px"></div>
+    <!-- 申請掣 -->
+    <div style="position:fixed;bottom:68px;left:0;right:0;padding:12px 16px;background:#fff;border-top:1.5px solid #E5E7EB;z-index:50">
+      <button id="job-apply-btn" onclick="applyJob()" style="width:100%;min-height:55px;font-size:20px;font-weight:800;background:#228B22;color:#fff;border:none;border-radius:14px;cursor:pointer;letter-spacing:1px">
+        我要申請
+      </button>
+      <div id="job-apply-msg" style="text-align:center;font-size:18px;font-weight:700;margin-top:10px;display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 有用資訊 Panel (overlay) ── -->
+<div id="useful-links-panel" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.5);flex-direction:column;align-items:center;justify-content:flex-end">
+  <div style="background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:0 0 env(safe-area-inset-bottom,16px);max-height:85vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1.5px solid #E5E7EB">
+      <div style="font-size:22px;font-weight:800;color:#111827">&#x2139;&#xFE0F; 有用資訊</div>
+      <button onclick="closeUsefulLinksPanel()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#6B7280;padding:4px 8px;line-height:1">&times;</button>
+    </div>
+    <div id="ul-panel-list" style="overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch"></div>
+  </div>
+</div>
+
+<!-- ── 產品測試計劃 面板 ── -->
+<div id="testing-panel" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.5);flex-direction:column;align-items:center;justify-content:flex-end">
+  <div style="background:#f9fafb;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:0 0 env(safe-area-inset-bottom,16px);max-height:92vh;display:flex;flex-direction:column">
+    <div style="background:#7c3aed;color:#fff;border-radius:20px 20px 0 0;padding:16px 20px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="font-size:20px;font-weight:900;">🧪 產品測試計劃</div>
+      <button onclick="closeTestingPanel()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#fff;padding:4px 8px;line-height:1">&times;</button>
+    </div>
+    <div style="overflow-y:auto;padding:14px 16px 16px;-webkit-overflow-scrolling:touch;flex:1;">
+      <!-- Main view -->
+      <div id="tst-panel-main">
+        <!-- Join confirm (shown when arriving via QR) -->
+        <div id="tst-join-confirm" style="display:none;margin-bottom:14px;"></div>
+        <!-- Available campaigns to join -->
+        <div id="tst-available-section" style="margin-bottom:16px;">
+          <div style="font-size:14px;font-weight:800;color:#5b21b6;margin-bottom:10px;">🎯 可參加的試用計劃</div>
+          <div id="tst-available-list">
+            <div style="text-align:center;padding:20px;color:#9ca3af;font-size:15px;">載入中…</div>
+          </div>
+        </div>
+        <!-- My joined campaigns -->
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#5b21b6;margin-bottom:10px;">📋 我的測試計劃</div>
+          <div id="tst-my-list">
+            <div style="text-align:center;padding:20px;color:#9ca3af;font-size:15px;">載入中…</div>
+          </div>
+        </div>
+      </div>
+      <!-- Survey view -->
+      <div id="tst-panel-survey" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 底部 5-tab 導航列 ── -->
+<nav class="bottom-tab-bar" id="bottomTabBar">
+  <button class="tab-btn" id="tabBtnShop" onclick="switchTab('shop')">
+    <span class="tab-icon">🎁</span>
+    <span class="tab-label">福利</span>
+  </button>
+  <button class="tab-btn" id="tabBtnNews" onclick="switchTab('news')">
+    <span class="tab-icon">📢</span>
+    <span class="tab-label">消息</span>
+  </button>
+  <button class="tab-btn tab-card-btn active" id="tabBtnCard" onclick="switchTab('card')">
+    <span class="tab-icon">💳</span>
+    <span class="tab-label">我的卡</span>
+  </button>
+  <button class="tab-btn" id="tabBtnVoice" onclick="switchTab('voice')" style="position:relative;">
+    <span class="tab-icon">💬</span>
+    <span class="tab-label">心聲</span>
+    <span id="voiceRedDot" style="display:none;position:absolute;top:8px;right:14px;width:10px;height:10px;background:#e53935;border-radius:50%;border:2px solid #fff;"></span>
+  </button>
+  <button class="tab-btn" id="tabBtnWork" onclick="switchTab('work')">
+    <span class="tab-icon">💼</span>
+    <span class="tab-label">工作</span>
+  </button>
+</nav>
+
+<script>
+// ── Tab 切換 ──
+var TAB_PANELS = { shop:'tabShop', news:'tabNews', card:'tabCard', voice:'tabVoice', work:'tabWork' };
+var TAB_BTNS   = { shop:'tabBtnShop', news:'tabBtnNews', card:'tabBtnCard', voice:'tabBtnVoice', work:'tabBtnWork' };
+var currentTab = 'card';
+
+function switchTab(name) {
+  if (name === currentTab) return;
+  // 隱藏現在的 panel
+  var oldPanel = document.getElementById(TAB_PANELS[currentTab]);
+  if (oldPanel) oldPanel.style.display = 'none';
+  // 移除 active class
+  var oldBtn = document.getElementById(TAB_BTNS[currentTab]);
+  if (oldBtn) oldBtn.classList.remove('active');
+  // 顯示新 panel
+  currentTab = name;
+  var newPanel = document.getElementById(TAB_PANELS[name]);
+  if (newPanel) newPanel.style.display = 'block';
+  // 加 active class
+  var newBtn = document.getElementById(TAB_BTNS[name]);
+  if (newBtn) newBtn.classList.add('active');
+  // 捲到頂部
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── toggleAccordion 已不再使用（accordion-btn 已移除）──
+function toggleAccordion() {}
+
+// ── PWA 安裝提示儲存 ──
+var deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  deferredPrompt = e;
+  // 如果安裝區段已顯示（用戶已點 WA），補顯示/更新 Android 安裝掣
+  var sec = document.getElementById('installSection');
+  if (sec && sec.style.display !== 'none') {
+    document.getElementById('installAndroid').style.display = '';
+    document.getElementById('installIOS').style.display = 'none';
+    document.getElementById('installInApp').style.display = 'none';
+  }
+});
+
+// ── 接收 card iframe 的 postMessage ──
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'ce85_wa_clicked') {
+    localStorage.setItem('ce85_wa_clicked', '1');
+    showInstallBanner();
+  }
+  if (e.data && e.data.type === 'ce85_logout') {
+    // 卡頁按登出 → 清除所有 session 並重新載入 /app 顯示輸入框
+    localStorage.removeItem('ce85_member_no');
+    localStorage.removeItem('ce85_wa_clicked');
+    sessionStorage.removeItem('cw_session');
+    window.location.reload();
+  }
+});
+
+// ── Service Worker 注冊 ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function(e) {
+      console.warn('SW register failed:', e);
+    });
+  });
+}
+
+// ── 偵測瀏覽器類型 ──
+function detectBrowser() {
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPhone|iPad|iPod/.test(ua);
+  var isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|mercury/.test(ua);
+  var isInApp = new RegExp('FBAN|FBAV|Instagram|WhatsApp|Line').test(ua);
+  return { isIOS: isIOS, isSafari: isSafari, isInApp: isInApp };
+}
+
+function showInstallBanner() {
+  // 已係 standalone（已安裝 PWA）就唔顯示
+  if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return;
+  var info = detectBrowser();
+  var sec = document.getElementById('installSection');
+  if (!sec) return;
+  sec.style.display = '';
+  if (info.isInApp) {
+    document.getElementById('installInApp').style.display = '';
+    document.getElementById('installAndroid').style.display = 'none';
+    document.getElementById('installIOS').style.display = 'none';
+  } else if (info.isIOS && info.isSafari) {
+    document.getElementById('installIOS').style.display = '';
+    document.getElementById('installInApp').style.display = 'none';
+    document.getElementById('installAndroid').style.display = 'none';
+  } else {
+    document.getElementById('installAndroid').style.display = '';
+    var btn = document.getElementById('installBtn');
+    if (btn && !deferredPrompt) {
+      btn.textContent = '⬇️ 安裝到主畫面';
+      btn.onclick = function() {
+        if (deferredPrompt) {
+          doInstall();
+        } else {
+          btn.textContent = '請喺 Chrome 選單（⋮）→ 加至主螢幕';
+          btn.style.background = '#888';
+        }
+      };
+    }
+    document.getElementById('installInApp').style.display = 'none';
+    document.getElementById('installIOS').style.display = 'none';
+  }
+  sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ── 安裝觸發 ──
+function doInstall() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(function(r) {
+    deferredPrompt = null;
+    if (r.outcome === 'accepted') {
+      document.getElementById('installAndroid').style.display = 'none';
+    }
+  });
+}
+
+// ── 複製網址 ──
+function copyUrl() {
+  var url = window.location.origin + '/app';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function() {
+      alert('已複製！請喺 Safari 或 Chrome 開啟：' + url);
+    });
+  } else {
+    prompt('請複製以下網址：', url);
+  }
+}
+
+// ── 主查詢邏輯 ──
+function doLookup() {
+  var input = document.getElementById('phoneInput').value.trim();
+  var btn = document.getElementById('lookupBtn');
+  var err = document.getElementById('errMsg');
+  if (!input) {
+    err.textContent = '請輸入電話號碼或會員編號';
+    err.classList.add('show');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '搜尋中…';
+  err.classList.remove('show');
+
+  fetch('/api/members/lookup?q=' + encodeURIComponent(input))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = '🔍 搵我的卡';
+      var memberNo = data.member_no || (data.member && data.member.member_no);
+      if (data.ok && memberNo) {
+        // 換新帳號登入時，清除舊的 CoWorkery 打卡 session
+        sessionStorage.removeItem('cw_session');
+        localStorage.setItem('ce85_member_no', memberNo);
+        // 同時存 phone（電話號碼），方便跳轉申請頁/錢包頁時預填
+        var inputVal = document.getElementById('phoneInput').value.trim();
+        if (inputVal) localStorage.setItem('ce85_phone', inputVal);
+        var waClickedAt = data.wa_clicked_at || (data.member && data.member.wa_clicked_at) || null;
+        if (waClickedAt) {
+          localStorage.setItem('ce85_wa_clicked', '1');
+        }
+        var waClicked = !!waClickedAt || localStorage.getItem('ce85_wa_clicked') === '1';
+        showCard(memberNo, waClicked);
+      } else {
+        err.textContent = '搵唔到，請確認電話號碼是否正確';
+        err.classList.add('show');
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = '🔍 搵我的卡';
+      err.textContent = '網絡錯誤，請稍後再試';
+      err.classList.add('show');
+    });
+}
+
+// ── 顯示會員卡（查到後替換主內容）──
+// waClicked: boolean — 用戶已點過 WA 按鈕（立即顯示安裝提示）
+function showCard(memberNo, waClicked) {
+  var wrap = document.getElementById('mainWrap');
+  // 卡 iframe
+  var iframeHtml = '<iframe class="card-frame" src="/membership/card/' + encodeURIComponent(memberNo) +
+    '" title="老有卡" frameborder="0" allow="fullscreen"></iframe>';
+  // install section + 換人（預設隱藏，由 showInstallBanner() 展開）
+  var installHtml =
+    '<div id="installSection" style="display:none;">' +
+      '<div class="install-banner" id="installAndroid" style="display:none;">' +
+        '<h3>📱 將會員卡加落手機主畫面</h3>' +
+        '<p>安裝後可以喺主畫面直接開啟，唔使記住網址！</p>' +
+        '<button class="install-btn" id="installBtn" onclick="doInstall()">⬇️ 安裝到主畫面</button>' +
+      '</div>' +
+      '<div class="install-banner" id="installIOS" style="display:none;">' +
+        '<h3>📱 將會員卡加落主畫面</h3>' +
+        '<div class="ios-steps">' +
+          '<div class="step"><div class="step-num">1</div><div class="step-text">撳 Safari 下面嘅 <strong>「共享」掣</strong> 🔗</div></div>' +
+          '<div class="step"><div class="step-num">2</div><div class="step-text">向上捲，揀 <strong>「加至主畫面」</strong> ＋</div></div>' +
+          '<div class="step"><div class="step-num">3</div><div class="step-text">撳右上角 <strong>「新增」</strong> 完成！</div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="install-banner" id="installInApp" style="display:none;">' +
+        '<h3>📱 請用 Safari 或 Chrome 開啟</h3>' +
+        '<p>你而家係用 WhatsApp / FB 入面嘅瀏覽器，<strong>唔支援安裝到主畫面</strong>。</p>' +
+        '<p>請複製以下網址，喺 Safari 或 Chrome 開啟：</p>' +
+        '<button class="copy-btn" onclick="copyUrl()">📋 複製網址</button>' +
+      '</div>' +
+      '<div id="testingShortcut" style="margin:14px 0 4px;">' +
+        '<button onclick="openTestingPanel()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:12px;padding:14px 18px;font-size:16px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:12px;box-shadow:0 3px 12px rgba(124,58,237,0.35);">' +
+          '<span style="font-size:26px;">🧪</span>' +
+          '<div style="text-align:left;flex:1;">' +
+            '<div>產品測試計劃</div>' +
+            '<div style="font-size:13px;font-weight:500;opacity:0.85;margin-top:2px;">查看我的試用 / 填寫問卷</div>' +
+          '</div>' +
+          '<span style="font-size:20px;">›</span>' +
+        '</button>' +
+      '</div>' +
+      '<div class="switch-wrap"><button class="switch-link" onclick="switchUser()">唔係你？換人</button></div>' +
+    '</div>';
+  // partnerEntrySection removed — CoLeadery / CoLinkery moved to ☰ side drawer menu
+  wrap.innerHTML = iframeHtml + installHtml;
+  // Pre-load partner status for drawer buttons
+  loadDrawerPartnerStatus(memberNo);
+  // 用戶已點過 WA 按鈕 → 立即展開安裝提示
+  if (waClicked) {
+    showInstallBanner();
+  }
+  // 處理產品測試 QR 掃描
+  if(window._pendingTestingCode){
+    var tc = window._pendingTestingCode;
+    window._pendingTestingCode = null;
+    setTimeout(function(){ testingHandleQRScan(tc); }, 400);
+  }
+}
+
+// 查詢申請狀態並動態調整按鈕
+function loadPartnerStatus(memberNo) {
+  var p = localStorage.getItem('ce85_phone') || '';
+  fetch('/api/partner/my-status?member_no=' + encodeURIComponent(memberNo))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      setupPartnerBtns(memberNo, p, d.coleadery || null, d.colinkery || null);
+    })
+    .catch(function() {
+      // 查詢失敗時降級到普通申請入口
+      setupPartnerBtns(memberNo, p, null, null);
+    });
+}
+
+function setupPartnerBtns(memberNo, phone, clStatus, ckStatus) {
+  var bpa = document.getElementById('btnPartnerApply');
+  var bcl = document.getElementById('btnCoLinkery');
+
+  // ── CoLeadery 按鈕 ──
+  if (bpa) {
+    if (clStatus === 'APPROVED') {
+      // 已批准：進入錢包/工具
+      bpa.querySelector('div:last-child').textContent = '領航者｜進入工具 →';
+      bpa.style.background = 'linear-gradient(135deg,#1B5E20,#2E7D32)';
+      bpa.addEventListener('click', function() {
+        window.location.href = '/app/wallet?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '');
+      });
+    } else if (clStatus === 'PENDING') {
+      // 待審核：顯示狀態，仍可用其他類型申請
+      bpa.querySelector('div:last-child').textContent = '審核中… ⏳';
+      bpa.style.opacity = '0.85';
+      bpa.style.background = 'linear-gradient(135deg,#78350F,#B45309)';
+      bpa.addEventListener('click', function() {
+        if (confirm('⏳ CoLeadery 申請審核中（3-5 工作天）。如想以不同類型再申請（如：個人→小組），請按確定前往申請頁。')) {
+          window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLEADERY';
+        }
+      });
+    } else {
+      // 未申請：進入申請
+      bpa.addEventListener('click', function() {
+        window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLEADERY';
+      });
+    }
+  }
+
+  // ── CoLinkery 按鈕 ──
+  if (bcl) {
+    if (ckStatus === 'APPROVED') {
+      // 已批准：進入 CoLinkery 工具
+      bcl.querySelector('div:last-child').textContent = '連結者｜進入工具 →';
+      bcl.style.background = 'linear-gradient(135deg,#0D47A1,#1565C0)';
+      bcl.addEventListener('click', function() {
+        window.location.href = '/colinkery/' + (phone ? '?phone=' + encodeURIComponent(phone) : '');
+      });
+    } else if (ckStatus === 'PENDING') {
+      // 待審核：顯示狀態，仍可用其他類型申請
+      bcl.querySelector('div:last-child').textContent = '審核中… ⏳';
+      bcl.style.opacity = '0.85';
+      bcl.style.background = 'linear-gradient(135deg,#0A2F6F,#1A4BA0)';
+      bcl.addEventListener('click', function() {
+        if (confirm('⏳ CoLinkery 申請審核中（3-5 工作天）。如想以不同類型再申請（如：個人→公司），請按確定前往申請頁。')) {
+          window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLINKERY';
+        }
+      });
+    } else {
+      // 未申請：進入申請
+      bcl.addEventListener('click', function() {
+        window.location.href = '/app/partner-apply?member=' + encodeURIComponent(memberNo) + (phone ? '&phone=' + encodeURIComponent(phone) : '') + '&role=COLINKERY';
+      });
+    }
+  }
+}
+
+// ── 換人（清除 localStorage + CoWorkery session）──
+function switchUser() {
+  if (confirm('確定要換人？將會清除記住的帳號。')) {
+    localStorage.removeItem('ce85_member_no');
+    localStorage.removeItem('ce85_wa_clicked');
+    // 同時清除 CoWorkery 打卡 session，避免新帳號進入時仍用舊帳號打卡
+    sessionStorage.removeItem('cw_session');
+    window.location.reload();
+  }
+}
+
+// ── 頁面載入：檢查 localStorage ──
+(function init() {
+  // Enter 鍵觸發查詢
+  var phoneInput = document.getElementById('phoneInput');
+  if (phoneInput) {
+    phoneInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doLookup();
+    });
+  }
+
+  // ── 產品測試 QR 掃描參數 ──────────────────────────────────────────────────
+  var urlParams = new URLSearchParams(window.location.search);
+  var testingCode = urlParams.get('testing');
+  if(testingCode){
+    // Clean URL
+    window.history.replaceState({},'',window.location.origin+'/app');
+    var _savedMemberNo = localStorage.getItem('ce85_member_no');
+    if(_savedMemberNo){
+      // 已登入：立即觸發 QR 掃描流程，不用等候 showCard()
+      window._pendingTestingCode = null;
+      setTimeout(function(){ testingHandleQRScan(testingCode); }, 800);
+    } else {
+      // 未登入：保留 code，登入後由 showCard() 觸發
+      window._pendingTestingCode = testingCode;
+      // 顯示提示 banner 告知用戶
+      setTimeout(function(){
+        var b=document.createElement('div');
+        b.id='testingLoginBanner';
+        b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,0.25);';
+        b.innerHTML='<div style="font-size:28px;">&#129514;</div>'
+          +'<div style="flex:1;"><div style="font-weight:800;font-size:15px;margin-bottom:2px;">試用計劃 QR 已掃描</div>'
+          +'<div style="font-size:13px;opacity:0.9;">請輸入會員號碼登入，系統將自動跳轉至問卷</div></div>';
+        document.body.appendChild(b);
+      }, 300);
+    }
+  }
+
+  // ── WA Quick Register Token 自動登入 ──────────────────────────────────────
+  var waToken = urlParams.get('token');
+  var waSource = urlParams.get('source');
+  if (waToken && waSource === 'wa_quick_register') {
+    // Show loading state
+    var wrap = document.getElementById('mainWrap') || document.body;
+    var loadEl = document.createElement('div');
+    loadEl.id = 'tokenLoadingBanner';
+    loadEl.style.cssText = 'position:fixed;inset:0;background:linear-gradient(160deg,#1a6b1a,#388e3c);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    loadEl.innerHTML = '<div style="text-align:center;color:#fff;padding:40px"><div style="font-size:48px;margin-bottom:16px">🎉</div><div style="font-size:22px;font-weight:900;margin-bottom:8px">歡迎加入 CoEldery 85！</div><div style="font-size:15px;opacity:0.85">正在驗證你的會員身份...</div></div>';
+    document.body.appendChild(loadEl);
+
+    fetch('/api/wa-token/verify', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token: waToken })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      document.body.removeChild(loadEl);
+      // Clean URL (remove token params)
+      var cleanUrl = window.location.origin + '/app';
+      window.history.replaceState({}, '', cleanUrl);
+
+      if (d.ok && d.member) {
+        var m = d.member;
+        localStorage.setItem('ce85_member_no', m.member_no);
+        localStorage.setItem('ce85_wa_clicked', '1');
+        if (m.phone) localStorage.setItem('ce85_phone', m.phone);
+
+        // If profile incomplete → redirect to complete page
+        if (m.registration_method === 'whatsapp_qr' && m.registration_status === 'incomplete') {
+          try { sessionStorage.setItem('wa_member', JSON.stringify(m)); } catch(_){}
+          window.location.href = '/qr-register/complete';
+          return;
+        }
+        // Profile complete → show card normally
+        showCard(m.member_no, true);
+      } else {
+        // Token invalid / expired
+        var expiredBanner = document.createElement('div');
+        expiredBanner.style.cssText = 'background:#FEE2E2;border:1.5px solid #EF4444;border-radius:12px;padding:20px 24px;margin:20px;text-align:center;';
+        expiredBanner.innerHTML =
+          '<div style="font-size:36px;margin-bottom:8px">⏰</div>' +
+          '<div style="font-size:16px;font-weight:700;color:#B91C1C;margin-bottom:6px">' + (d.error||'登入連結已過期') + '</div>' +
+          '<div style="font-size:13px;color:#666;margin-bottom:16px">請重新掃描QR碼或前往會員登記頁面</div>' +
+          '<a href="/membership/join" style="background:#1a6b1a;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">重新登記</a>';
+        var lookupCard = document.querySelector('.lookup-card');
+        if (lookupCard) lookupCard.parentNode.insertBefore(expiredBanner, lookupCard);
+      }
+    })
+    .catch(function(){
+      if (document.getElementById('tokenLoadingBanner')) {
+        document.body.removeChild(loadEl);
+      }
+    });
+    return; // Don't run saved-member check while token is being verified
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
+  var saved = localStorage.getItem('ce85_member_no');
+  if (saved) {
+    var savedWaClicked = localStorage.getItem('ce85_wa_clicked') === '1';
+    // Verify member still exists before showing card
+    fetch('/api/members/lookup?q=' + encodeURIComponent(saved))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          var latestWaClickedAt = data.wa_clicked_at || (data.member && data.member.wa_clicked_at) || null;
+          if (latestWaClickedAt && !savedWaClicked) {
+            localStorage.setItem('ce85_wa_clicked', '1');
+            savedWaClicked = true;
+          }
+          showCard(saved, savedWaClicked);
+          // 頁面載入時檢查心聲紅點
+          setTimeout(function() { loadVoiceRedDot(); }, 500);
+        } else {
+          // Member no longer exists — clear localStorage and show login
+          localStorage.removeItem('ce85_member_no');
+          localStorage.removeItem('ce85_wa_clicked');
+        }
+      })
+      .catch(function() {
+        // Network error — still show cached card but don't crash
+        showCard(saved, savedWaClicked);
+        setTimeout(function() { loadVoiceRedDot(); }, 500);
+      });
+  }
+})();
+
+// ── 側邊抽屜選單 ──
+function openDrawer(){
+  document.getElementById('sideDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  // 載入合作計劃按鈕狀態（與原有 partnerEntry 邏輯一致）
+  var memberNo = window.MEMBER_NO || '';
+  if(memberNo){ loadDrawerPartnerStatus(memberNo); }
+}
+function closeDrawer(){
+  document.getElementById('sideDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+// 載入 CoLeadery / CoLinkery 狀態並更新 drawer 按鈕
+function loadDrawerPartnerStatus(memberNo){
+  fetch('/api/partner/my-status?member_no='+encodeURIComponent(memberNo))
+    .then(function(r){return r.json();})
+    .then(function(d){ setupDrawerBtns(memberNo, d.coleadery||null, d.colinkery||null); })
+    .catch(function(){ setupDrawerBtns(memberNo, null, null); });
+}
+function setupDrawerBtns(memberNo, clStatus, ckStatus){
+  var phone = localStorage.getItem('ce85_phone')||'';
+  var bCL = document.getElementById('drawerBtnCoLeadery');
+  var bCK = document.getElementById('drawerBtnCoLinkery');
+  if(bCL){
+    var clSub = bCL.querySelector('.di-sub');
+    if(clStatus==='APPROVED'){
+      if(clSub) clSub.textContent='領航者｜進入工具 →';
+      bCL.onclick=function(){ closeDrawer(); window.location.href='/coleadery/'+(phone?'?phone='+encodeURIComponent(phone):''); };
+    } else if(clStatus==='PENDING'){
+      if(clSub) clSub.textContent='⏳ 審核中（3-5 工作天）';
+      bCL.onclick=function(){ closeDrawer(); if(confirm('⏳ CoLeadery 申請審核中。如想重新申請請按確定。')){ window.location.href='/app/partner-apply?role=COLEADERY&member='+memberNo; } };
+    } else {
+      bCL.onclick=function(){ closeDrawer(); drawerOpenCoLeadery(); };
+    }
+  }
+  if(bCK){
+    var ckSub = bCK.querySelector('.di-sub');
+    if(ckStatus==='APPROVED'){
+      if(ckSub) ckSub.textContent='連結者｜進入工具 →';
+      bCK.onclick=function(){ closeDrawer(); window.location.href='/colinkery/'+(phone?'?phone='+encodeURIComponent(phone):''); };
+    } else if(ckStatus==='PENDING'){
+      if(ckSub) ckSub.textContent='⏳ 審核中（3-5 工作天）';
+      bCK.onclick=function(){ closeDrawer(); if(confirm('⏳ CoLinkery 申請審核中。如想重新申請請按確定。')){ window.location.href='/app/partner-apply?role=COLINKERY&member='+memberNo; } };
+    } else {
+      bCK.onclick=function(){ closeDrawer(); drawerOpenCoLinkery(); };
+    }
+  }
+}
+function drawerOpenCoLeadery(){
+  var memberNo = window.MEMBER_NO||'';
+  window.location.href='/app/partner-apply?role=COLEADERY&member='+memberNo;
+}
+function drawerOpenCoLinkery(){
+  var memberNo = window.MEMBER_NO||'';
+  window.location.href='/app/partner-apply?role=COLINKERY&member='+memberNo;
+}
+
+// ── 有用資訊 Modal ──
+function openUsefulLinksPanel(){
+  var panel = document.getElementById('useful-links-panel');
+  var list = document.getElementById('ul-panel-list');
+  panel.style.display='flex';
+  list.innerHTML='<div style="text-align:center;padding:40px;font-size:18px;color:#6B7280">載入中...</div>';
+  fetch('/api/useful-links')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok||!d.links||!d.links.length){
+        list.innerHTML='<div style="text-align:center;padding:40px;font-size:18px;color:#6B7280">暫無資訊</div>';
+        return;
+      }
+      list.innerHTML=d.links.map(function(l){
+        var inner='';
+        if(l.link_type==='phone'){
+          inner='<a href="tel:'+encodeURIComponent(l.content)+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%">'+
+            '<span style="font-size:26px">📞</span>'+
+            '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
+            '<div style="font-size:17px;color:#059669;margin-top:2px">'+escHtml(l.content)+'</div></span>'+
+            '<span style="font-size:22px;color:#059669">›</span>'+
+          '</a>';
+        } else if(l.link_type==='whatsapp'){
+          var waNum=l.content.replace(/[^0-9]/g,'');
+          inner='<a href="https://wa.me/'+waNum+'" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%">'+
+            '<span style="font-size:26px">💬</span>'+
+            '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
+            '<div style="font-size:17px;color:#059669;margin-top:2px">WhatsApp: '+escHtml(l.content)+'</div></span>'+
+            '<span style="font-size:22px;color:#059669">›</span>'+
+          '</a>';
+        } else if(l.link_type==='url'){
+          inner='<a href="'+escHtml(l.content)+'" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;width:100%">'+
+            '<span style="font-size:26px">🔗</span>'+
+            '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
+            '<div style="font-size:17px;color:#059669;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">'+escHtml(l.content)+'</div></span>'+
+            '<span style="font-size:22px;color:#059669">›</span>'+
+          '</a>';
+        } else {
+          inner='<div style="display:flex;align-items:center;gap:10px;width:100%">'+
+            '<span style="font-size:26px">📝</span>'+
+            '<span style="flex:1"><div style="font-size:20px;font-weight:700;color:#111827">'+escHtml(l.title)+'</div>'+
+            '<div style="font-size:17px;color:#374151;margin-top:2px;white-space:pre-wrap">'+escHtml(l.content)+'</div></span>'+
+          '</div>';
+        }
+        return '<div style="background:#fff;border-radius:12px;padding:14px 16px;min-height:55px;display:flex;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,0.08);border:1.5px solid #D1FAE5">'+inner+'</div>';
+      }).join('');
+    })
+    .catch(function(){
+      list.innerHTML='<div style="text-align:center;padding:40px;font-size:18px;color:#DC2626">載入失敗，請稍後再試</div>';
+    });
+}
+function closeUsefulLinksPanel(){
+  document.getElementById('useful-links-panel').style.display='none';
+}
+function escHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── 產品測試計劃 ─────────────────────────────────────────────────────────────
+var _testingPanel = null;
+var _testingContext = null; // set when arriving via QR scan
+
+function openTestingPanel(){
+  var panel = document.getElementById('testing-panel');
+  if(!panel) return;
+  panel.style.display='flex';
+  testingPanelShowMain();
+}
+function closeTestingPanel(){
+  var panel = document.getElementById('testing-panel');
+  if(panel) panel.style.display='none';
+}
+
+function testingPanelShowMain(){
+  var el = document.getElementById('tst-panel-main');
+  var el2 = document.getElementById('tst-panel-survey');
+  if(el) el.style.display='block';
+  if(el2) el2.style.display='none';
+  var memberNo = window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
+  testingLoadAvailable(memberNo);
+  testingLoadMyCampaigns();
+}
+
+function testingLoadAvailable(memberNo){
+  var el = document.getElementById('tst-available-list');
+  var sec = document.getElementById('tst-available-section');
+  if(!el) return;
+  if(!memberNo){
+    if(sec) sec.style.display='none';
+    return;
+  }
+  fetch('/api/testing/available/'+encodeURIComponent(memberNo))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var camps=d.campaigns||[];
+    // Only show campaigns not yet joined
+    var notJoined=camps.filter(function(c){ return !c.participant_id; });
+    if(notJoined.length===0){
+      if(sec) sec.style.display='none';
+      return;
+    }
+    if(sec) sec.style.display='block';
+    el.innerHTML=notJoined.map(function(c){
+      return '<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:12px;border:2px solid #ddd6fe;">'+
+        '<div style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:2px;">'+escHtml(c.product_name)+'</div>'+
+        '<div style="font-size:14px;color:#6b7280;margin-bottom:10px;">由 '+escHtml(c.brand_name)+' 提供</div>'+
+        (c.brand_description?'<div style="font-size:13px;color:#374151;background:#f5f3ff;border-radius:8px;padding:10px;margin-bottom:10px;line-height:1.6;">'+escHtml(c.brand_description)+'</div>':'')+
+        '<button onclick="testingDirectJoin('+c.id+')" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;">✅ 加入試用並填問卷</button>'+
+      '</div>';
+    }).join('');
+  }).catch(function(){
+    if(sec) sec.style.display='none';
+  });
+}
+
+function testingLoadMyCampaigns(){
+  var memberNo = window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
+  var el = document.getElementById('tst-my-list');
+  if(!el) return;
+  if(!memberNo){ el.innerHTML='<div style="text-align:center;padding:24px;color:#9ca3af;font-size:16px;">請先登入查看您的測試計劃。</div>'; return; }
+  el.innerHTML='<div style="text-align:center;padding:24px;color:#9ca3af;font-size:16px;">載入中…</div>';
+  fetch('/api/testing/my-campaigns/'+encodeURIComponent(memberNo))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok||(d.campaigns||[]).length===0){
+      el.innerHTML='<div style="text-align:center;padding:24px;color:#9ca3af;font-size:16px;">您尚未參與任何產品測試計劃。<br>請掃描活動 QR 碼加入！</div>';
+      return;
+    }
+    var TST_P_STATUS={registered:'已登記',sample_claimed:'已取樣品',survey_started:'填寫中',survey_submitted:'已提交問卷',reward_sent:'已收獎勵'};
+    var html=d.campaigns.map(function(c){
+      var statusColor={registered:'#374151',sample_claimed:'#c2410c',survey_started:'#1e40af',survey_submitted:'#166534',reward_sent:'#5b21b6'}[c.status]||'#374151';
+      // canSurvey: campaign must be live AND participant status allows survey
+      var campLive=(c.campaign_status==='live'||!c.campaign_status);
+      var canSurvey=campLive && (c.status==='sample_claimed'||c.status==='survey_started'||c.status==='registered');
+      var done=(c.status==='survey_submitted'||c.status==='reward_sent');
+      var borderCol=canSurvey?'#7c3aed':done?'#bbf7d0':'#ede9fe';
+      return '<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);margin-bottom:12px;border:2px solid '+borderCol+';">'+
+        (c.brand_logo_url?'<img src="'+escHtml(c.brand_logo_url)+'" alt="" style="height:36px;object-fit:contain;margin-bottom:10px;">':'')+
+        '<div style="font-size:17px;font-weight:800;color:#1f2937;margin-bottom:3px;">'+escHtml(c.product_name)+'</div>'+
+        '<div style="font-size:14px;color:#6b7280;margin-bottom:8px;">'+escHtml(c.brand_name)+'</div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:'+(canSurvey?'10':'0')+'px;">'+
+          '<span style="font-size:14px;font-weight:700;color:'+statusColor+';">'+(TST_P_STATUS[c.status]||c.status)+'</span>'+
+          (done?'<span style="font-size:13px;color:#166534;background:#dcfce7;border-radius:6px;padding:3px 9px;font-weight:700;">✅ 已完成</span>':'')+
+        '</div>'+
+        (canSurvey?'<button onclick="testingOpenSurvey('+c.campaign_id+','+c.participant_id+')" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:10px;padding:13px;font-size:16px;font-weight:800;cursor:pointer;letter-spacing:0.5px;">📝 立即填寫問卷</button>':'')+
+        (c.survey_deadline&&!done?'<div style="font-size:12px;color:#9ca3af;margin-top:8px;text-align:center;">問卷截止：'+escHtml(c.survey_deadline)+'</div>':'')+
+      '</div>';
+    }).join('');
+    el.innerHTML=html;
+  }).catch(function(){
+    el.innerHTML='<div style="text-align:center;padding:24px;color:#ef4444;font-size:16px;">載入失敗</div>';
+  });
+}
+
+// Called when QR scan brings user to /app?testing=CODE
+function testingHandleQRScan(code){
+  _testingContext = code;
+  var memberNo = window.MEMBER_NO || localStorage.getItem('ce85_member_no') || '';
+  // Remove login banner if showing
+  var lb=document.getElementById('testingLoginBanner');
+  if(lb && lb.parentNode) lb.parentNode.removeChild(lb);
+  if(!memberNo){ openTestingPanel(); return; }
+  // Fetch campaign info — API returns flat fields (campaign_id, campaign_name, etc.), not nested .campaign
+  fetch('/api/testing/scan/'+encodeURIComponent(code))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok){ openTestingPanel(); return; }
+    // Build a campaign object from the flat API response
+    var camp={
+      id: d.campaign_id,
+      campaign_id: d.campaign_id,
+      campaign_name: d.campaign_name,
+      brand_name: d.brand_name,
+      brand_logo_url: d.brand_logo_url,
+      brand_description: d.brand_description,
+      product_name: d.product_name,
+      product_image_url: d.product_image_url,
+      testing_duration_days: d.testing_duration_days,
+      survey_deadline: d.survey_deadline,
+      qr_code_id: d.qr_code_id
+    };
+    _testingContext = {code:code, campaign:camp};
+    // Check if already joined — if so go straight to survey
+    fetch('/api/testing/my-campaigns/'+encodeURIComponent(memberNo))
+    .then(function(r2){return r2.json();})
+    .then(function(d2){
+      openTestingPanel();
+      var already=(d2.campaigns||[]).find(function(c){ return String(c.campaign_id)===String(camp.id); });
+      if(already){
+        if(already.survey_submitted_at){
+          // Already submitted — show list
+          testingLoadMyCampaigns();
+        } else {
+          // Joined but survey not yet submitted — go straight to survey
+          testingOpenSurvey(already.campaign_id, already.participant_id);
+        }
+      } else {
+        // First time — show join confirmation
+        testingShowJoinConfirm(camp);
+      }
+    }).catch(function(){
+      openTestingPanel();
+      testingShowJoinConfirm(camp);
+    });
+  }).catch(function(){ openTestingPanel(); });
+}
+
+// Direct join from available list (no QR needed)
+function testingDirectJoin(campaignId){
+  var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
+  if(!memberNo){alert('請先登入會員');return;}
+  var btn=event&&event.target;
+  if(btn){btn.disabled=true;btn.textContent='處理中…';}
+  fetch('/api/testing/join',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({campaign_id:campaignId,member_no:memberNo})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      testingOpenSurvey(campaignId, d.participant_id);
+    } else {
+      if(btn){btn.disabled=false;btn.textContent='✅ 加入試用並填問卷';}
+      alert(d.error||'加入失敗，請重試');
+    }
+  }).catch(function(){
+    if(btn){btn.disabled=false;btn.textContent='✅ 加入試用並填問卷';}
+    alert('網絡錯誤，請重試');
+  });
+}
+
+function testingShowJoinConfirm(campaign){
+  var el = document.getElementById('tst-join-confirm');
+  var el2 = document.getElementById('tst-my-list');
+  if(!el||!el2) return;
+  el2.style.display='none';
+  el.style.display='block';
+  el.innerHTML='<div style="background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:2px solid #7c3aed;text-align:center;">'+
+    '<div style="font-size:40px;margin-bottom:10px;">🧪</div>'+
+    (campaign.brand_logo_url?'<img src="'+escHtml(campaign.brand_logo_url)+'" alt="" style="height:40px;object-fit:contain;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto;">':'')+
+    '<div style="font-size:20px;font-weight:900;color:#1f2937;margin-bottom:4px;">'+escHtml(campaign.product_name)+'</div>'+
+    '<div style="font-size:15px;color:#6b7280;margin-bottom:12px;">由 '+escHtml(campaign.brand_name)+' 提供</div>'+
+    (campaign.brand_description?'<div style="font-size:14px;color:#374151;text-align:left;background:#f9fafb;border-radius:8px;padding:12px;margin-bottom:14px;line-height:1.7;">'+escHtml(campaign.brand_description)+'</div>':'')+
+    '<div style="font-size:14px;color:#6b7280;margin-bottom:16px;">測試期：'+tstEsc(String(campaign.testing_duration_days||14))+' 天</div>'+
+    '<button onclick="testingJoinCampaign()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:14px;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:10px;">✅ 確認加入並領取樣品</button>'+
+    '<button onclick="testingCancelJoin()" style="width:100%;background:#f3f4f6;color:#374151;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;">取消</button>'+
+  '</div>';
+}
+
+function testingCancelJoin(){
+  var el=document.getElementById('tst-join-confirm');
+  var el2=document.getElementById('tst-my-list');
+  if(el) el.style.display='none';
+  if(el2) el2.style.display='block';
+  _testingContext=null;
+}
+
+function testingJoinCampaign(){
+  var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
+  if(!memberNo){alert('請先登入');return;}
+  var camp=_testingContext&&_testingContext.campaign;
+  var campId=camp&&camp.id;
+  var qrCodeId=camp&&camp.qr_code_id;
+  if(!campId){alert('無效的活動碼');return;}
+  fetch('/api/testing/join',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({campaign_id:campId, qr_code_id:qrCodeId||null, member_no:memberNo})
+  }).then(function(r){return r.json();}).then(function(d){
+    var el=document.getElementById('tst-join-confirm');
+    if(el) el.style.display='none';
+    var el2=document.getElementById('tst-my-list');
+    if(el2) el2.style.display='block';
+    if(d.ok){
+      // 加入成功（或已加入）— 直接跳去填問卷
+      if(campId && d.participant_id){
+        testingOpenSurvey(campId, d.participant_id);
+      } else {
+        testingLoadMyCampaigns();
+      }
+    } else {
+      alert(d.error||'加入失敗，請重試');
+    }
+    _testingContext=null;
+  }).catch(function(){alert('網絡錯誤，請重試');});
+}
+
+function testingOpenSurvey(campaignId, participantId){
+  var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
+  if(!memberNo){alert('請先登入');return;}
+  var panelMain=document.getElementById('tst-panel-main');
+  var panelSurvey=document.getElementById('tst-panel-survey');
+  if(panelMain) panelMain.style.display='none';
+  if(panelSurvey){
+    panelSurvey.style.display='block';
+    panelSurvey.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;font-size:16px;">載入問卷中…</div>';
+  }
+  fetch('/api/testing/survey/'+campaignId+'?member_no='+encodeURIComponent(memberNo))
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok||!(d.questions||[]).length){
+      panelSurvey.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444;font-size:16px;">'+(d.error||'無法載入問卷')+'</div>'+
+        '<button onclick="testingPanelShowMain()" style="display:block;margin:0 auto;background:#f3f4f6;border:none;border-radius:8px;padding:10px 20px;font-size:15px;font-weight:600;cursor:pointer;">返回</button>';
+      return;
+    }
+    var qs=d.questions;
+
+    // ── Group consecutive rating questions into one rating_grid block ──────────
+    var groups=[]; // each item: {type:'single'|'rating_grid', questions:[...], displayNum:n}
+    var displayNum=1;
+    var i=0;
+    while(i<qs.length){
+      var q=qs[i];
+      if(q.question_type==='rating'){
+        // collect all consecutive rating questions
+        var ratingGroup=[];
+        while(i<qs.length && qs[i].question_type==='rating'){
+          ratingGroup.push(qs[i]);
+          i++;
+        }
+        groups.push({type:'rating_grid', questions:ratingGroup, displayNum:displayNum});
+        displayNum++;
+      } else {
+        groups.push({type:'single', questions:[q], displayNum:displayNum});
+        displayNum++;
+        i++;
+      }
+    }
+
+    // ── Build HTML ─────────────────────────────────────────────────────────────
+    var html='<div style="background:#7c3aed;color:#fff;padding:16px 18px;border-radius:12px;margin-bottom:18px;">'+
+      '<div style="font-size:11px;opacity:.8;margin-bottom:4px;">產品試用問卷</div>'+
+      '<div style="font-size:18px;font-weight:800;">'+escHtml(d.campaign&&d.campaign.product_name||d.product_name||'')+'</div>'+
+      (d.campaign&&d.campaign.brand_description?'<div style="font-size:12px;opacity:.8;margin-top:4px;">'+escHtml(d.campaign.brand_description)+'</div>':'')+
+      '</div>';
+
+    groups.forEach(function(g){
+      if(g.type==='rating_grid'){
+        // ── Rating grid: one card, table layout ──────────────────────────────
+        var gridId='ratinggrid-'+g.questions[0].id;
+        html+='<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08);" data-gridstart="'+g.questions[0].id+'" data-gridend="'+g.questions[g.questions.length-1].id+'">'+
+          '<div style="font-size:15px;font-weight:800;color:#1f2937;margin-bottom:4px;">'+g.displayNum+'. 請為以下項目評分：<span style="color:#ef4444;font-size:12px;"> 必填</span></div>'+
+          '<div style="font-size:12px;color:#6b7280;margin-bottom:12px;">1分＝非常不滿意　2分＝不滿意　3分＝一般　4分＝滿意　5分＝非常滿意</div>'+
+          '<div style="overflow-x:auto;">'+
+          '<table style="width:100%;border-collapse:collapse;" id="'+gridId+'">'+
+          '<thead><tr>'+
+            '<th style="text-align:left;padding:8px 6px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;min-width:110px;">評價項目</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">1</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">2</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">3</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">4</th>'+
+            '<th style="text-align:center;padding:8px 4px;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;width:36px;">5</th>'+
+          '</tr></thead><tbody>';
+        g.questions.forEach(function(rq){
+          // strip "評分：" prefix for cleaner display
+          var label=rq.title.replace(/^評分[：:]\s*/,'');
+          html+='<tr data-qid="'+rq.id+'" data-qtype="rating" style="border-bottom:1px solid #f3f4f6;">'+
+            '<td style="padding:10px 6px;font-size:14px;color:#374151;font-weight:600;">'+escHtml(label)+'</td>';
+          for(var s=1;s<=5;s++){
+            html+='<td style="text-align:center;padding:10px 4px;">'+
+              '<button onclick="tstGridSetRating('+rq.id+','+s+',this)" data-qid="'+rq.id+'" data-star="'+s+'" '+
+              'style="width:30px;height:30px;border-radius:50%;border:2px solid #d1d5db;background:#f9fafb;font-size:13px;font-weight:700;cursor:pointer;color:#9ca3af;transition:all .15s;">'+s+'</button>'+
+            '</td>';
+          }
+          html+='<td style="display:none;"><span id="rating-val-'+rq.id+'" data-value=""></span></td>';
+          html+='</tr>';
+        });
+        html+='</tbody></table></div></div>';
+
+      } else {
+        // ── Single question ────────────────────────────────────────────────────
+        var q2=g.questions[0];
+        html+='<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08);" data-qid="'+q2.id+'" data-qtype="'+q2.question_type+'">'+
+          '<div style="font-size:15px;font-weight:800;color:#1f2937;margin-bottom:10px;">'+g.displayNum+'. '+escHtml(q2.title)+(q2.is_required?'  <span style="color:#ef4444;font-size:12px;">必填</span>':'')+'</div>';
+        if(q2.description){
+          html+='<div style="font-size:13px;color:#6b7280;margin-bottom:10px;">'+escHtml(q2.description)+'</div>';
+        }
+        if(q2.question_type==='single_choice'||q2.question_type==='multi_choice'){
+          var opts=[];
+          if(Array.isArray(q2.options)){ opts=q2.options; }
+          else { try{ opts=JSON.parse(q2.options||'[]'); }catch(e){} }
+          html+='<div id="choice-'+q2.id+'" data-multi="'+(q2.question_type==='multi_choice'?'1':'0')+'">';
+          opts.forEach(function(opt){
+            html+='<button onclick="tstToggleChoice('+q2.id+',this)" data-val="'+escHtml(opt)+'" style="display:block;width:100%;text-align:left;padding:11px 14px;margin-bottom:7px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;cursor:pointer;background:#fff;color:#374151;">'+
+              '<span class="choice-dot" style="display:inline-block;width:18px;height:18px;border:2px solid #d1d5db;border-radius:50%;margin-right:10px;vertical-align:middle;flex-shrink:0;"></span>'+escHtml(opt)+
+            '</button>';
+          });
+          html+='</div>';
+        } else if(q2.question_type==='yes_no'){
+          html+='<div style="display:flex;gap:10px;" id="yn-'+q2.id+'">'+
+            '<button onclick="tstSetYN('+q2.id+',this)" data-val="\u662f" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">\u662f</button>'+
+            '<button onclick="tstSetYN('+q2.id+',this)" data-val="\u5426" style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;background:#fff;">\u5426</button>'+
+          '</div>';
+        } else if(q2.question_type==='text'){
+          // Q2 brand question: detect by title/description containing brand keywords
+          var isBrandQ2=(q2.title&&q2.title.indexOf('\u54c1\u724c')>=0)||(q2.description&&q2.description.indexOf('\u5931\u7981')>=0);
+          if(isBrandQ2){
+            html+='<div style="margin-bottom:10px;">'+
+              '<div style="font-size:13px;color:#6b7280;margin-bottom:6px;">\u54c1\u724c\u540d\u7a31\uff1a</div>'+
+              '<input type="text" id="text-'+q2.id+'" placeholder="\u8acb\u8f38\u5165\u54c1\u724c\u540d\u7a31" '+
+              'oninput="tstClearNoPrev('+q2.id+')" '+
+              'style="width:100%;padding:11px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-family:inherit;box-sizing:border-box;">'+
+            '</div>'+
+            '<button id="noprev-'+q2.id+'" onclick="tstToggleNoPrev('+q2.id+')" data-active="0" '+
+            'style="display:flex;align-items:center;width:100%;text-align:left;padding:11px 14px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;cursor:pointer;background:#fff;color:#374151;">'+
+              '<span class="choice-dot" id="noprev-dot-'+q2.id+'" style="display:inline-block;width:18px;height:18px;border:2px solid #d1d5db;border-radius:50%;margin-right:10px;flex-shrink:0;"></span>'+
+              '\u904e\u5f80\u6c92\u6709\u4f7f\u7528\u5931\u7981\u8b77\u588a'+
+            '</button>';
+          } else {
+            html+='<textarea id="text-'+q2.id+'" rows="3" placeholder="\u8acb\u8f38\u5165\u60a8\u7684\u56de\u7b54\u2026" style="width:100%;padding:11px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>';
+          }
+        }
+        html+='</div>';
+      }
+    });
+
+    html+='<button id="tst-submit-btn" onclick="testingSubmitSurvey('+campaignId+','+participantId+')" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;margin-top:8px;">📤 提交問卷</button>'
+      '<button onclick="testingPanelShowMain()" style="display:block;width:100%;margin-top:10px;background:transparent;border:none;color:#9ca3af;font-size:14px;cursor:pointer;">← 返回</button>';
+    panelSurvey.innerHTML=html;
+  }).catch(function(){
+    panelSurvey.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444;font-size:16px;">載入失敗</div>'+
+      '<button onclick="testingPanelShowMain()" style="display:block;margin:0 auto;background:#f3f4f6;border:none;border-radius:8px;padding:10px 20px;font-size:15px;font-weight:600;cursor:pointer;">返回</button>';
+  });
+}
+
+// Q2 brand question: toggle "no previous use" checkbox button
+function tstToggleNoPrev(qid){
+  var btn=document.getElementById('noprev-'+qid);
+  var dot=document.getElementById('noprev-dot-'+qid);
+  var inp=document.getElementById('text-'+qid);
+  if(!btn) return;
+  var nowActive=btn.getAttribute('data-active')==='1'?'0':'1';
+  btn.setAttribute('data-active',nowActive);
+  var on=(nowActive==='1');
+  btn.style.borderColor=on?'#7c3aed':'#e5e7eb';
+  btn.style.background=on?'#f5f3ff':'#fff';
+  btn.style.color=on?'#5b21b6':'#374151';
+  if(dot){dot.style.borderColor=on?'#7c3aed':'#d1d5db';dot.style.background=on?'#7c3aed':'';}
+  if(inp){
+    inp.disabled=on;
+    inp.style.opacity=on?'0.4':'1';
+    inp.style.background=on?'#f3f4f6':'#fff';
+    if(on) inp.value='';
+  }
+}
+// Q2 brand question: when user types, clear the "no previous use" state
+function tstClearNoPrev(qid){
+  var btn=document.getElementById('noprev-'+qid);
+  var dot=document.getElementById('noprev-dot-'+qid);
+  if(!btn||btn.getAttribute('data-active')==='0') return;
+  btn.setAttribute('data-active','0');
+  btn.style.borderColor='#e5e7eb';btn.style.background='#fff';btn.style.color='#374151';
+  if(dot){dot.style.borderColor='#d1d5db';dot.style.background='';}
+}
+
+// Rating grid: tap a cell to select score for that row
+function tstGridSetRating(qid, val, btn){
+  // Highlight selected cell in this row
+  var table=btn.closest('table');
+  if(table){
+    table.querySelectorAll('button[data-qid="'+qid+'"]').forEach(function(b){
+      var s=parseInt(b.getAttribute('data-star'));
+      if(s<=val){
+        b.style.background='#7c3aed';b.style.borderColor='#7c3aed';b.style.color='#fff';
+      } else {
+        b.style.background='#f9fafb';b.style.borderColor='#d1d5db';b.style.color='#9ca3af';
+      }
+    });
+  }
+  var hidden=document.getElementById('rating-val-'+qid);
+  if(hidden){ hidden.setAttribute('data-value',String(val)); }
+}
+
+function tstSetYN(qid, clickedBtn){
+  var val=clickedBtn.getAttribute('data-val');
+  var wrap=document.getElementById('yn-'+qid);
+  if(!wrap)return;
+  wrap.querySelectorAll('button').forEach(function(btn){
+    var isThis=btn.getAttribute('data-val')===val;
+    btn.setAttribute('data-active', isThis?'1':'0');
+    btn.style.borderColor=isThis?'#7c3aed':'#e5e7eb';
+    btn.style.background=isThis?'#ede9fe':'#fff';
+    btn.style.color=isThis?'#5b21b6':'#374151';
+  });
+}
+
+function tstToggleChoice(qid, btn){
+  var wrap=document.getElementById('choice-'+qid);
+  if(!wrap)return;
+  var isMulti=wrap.getAttribute('data-multi')==='1';
+  if(!isMulti){
+    // single choice: deselect all first
+    wrap.querySelectorAll('button').forEach(function(b){
+      b.setAttribute('data-active','0');
+      b.style.borderColor='#e5e7eb';b.style.background='#fff';b.style.color='#374151';
+      var dot=b.querySelector('span.choice-dot');
+      if(dot){dot.style.background='';dot.style.borderColor='#d1d5db';}
+    });
+  }
+  var isActive=btn.getAttribute('data-active')==='1';
+  var nowActive=isMulti?(isActive?'0':'1'):'1'; // single always activates
+  btn.setAttribute('data-active',nowActive);
+  var on=nowActive==='1';
+  btn.style.borderColor=on?'#7c3aed':'#e5e7eb';
+  btn.style.background=on?'#ede9fe':'#fff';
+  btn.style.color=on?'#5b21b6':'#374151';
+  var dot=btn.querySelector('span.choice-dot');
+  if(dot){
+    dot.style.borderColor=on?'#7c3aed':'#d1d5db';
+    dot.style.background=on?'#7c3aed':'';
+  }
+}
+
+function testingSubmitSurvey(campaignId, participantId){
+  var memberNo=window.MEMBER_NO||localStorage.getItem('ce85_member_no')||'';
+  if(!memberNo){alert('請先登入');return;}
+
+  // Collect answers: <div data-qid> for single questions, <tr data-qid> for rating rows
+  // Exclude <button data-qid> (rating grid buttons also have data-qid but are not answer containers)
+  var allCards=document.querySelectorAll('#tst-panel-survey div[data-qid], #tst-panel-survey tr[data-qid]');
+  var responses=[];
+  var missingRequired=[];
+
+  allCards.forEach(function(card){
+    var qid=parseInt(card.getAttribute('data-qid'));
+    var qtype=card.getAttribute('data-qtype');
+    var answer='';
+    var isRequired=false;
+
+    if(qtype==='rating'){
+      var hidden=document.getElementById('rating-val-'+qid);
+      answer=hidden?String(hidden.getAttribute('data-value')||''):'';
+      isRequired=true; // all rating rows required
+    } else if(qtype==='yes_no'){
+      var wrap=document.getElementById('yn-'+qid);
+      if(wrap){
+        var activeYN=wrap.querySelector('button[data-active="1"]');
+        if(activeYN) answer=activeYN.getAttribute('data-val')||'';
+      }
+      isRequired=!!card.querySelector('[style*="ef4444"]');
+    } else if(qtype==='single_choice'||qtype==='multi_choice'){
+      var wrap2=document.getElementById('choice-'+qid);
+      if(wrap2){
+        var selected=[];
+        wrap2.querySelectorAll('button[data-active="1"]').forEach(function(btn){selected.push(btn.getAttribute('data-val'));});
+        answer=selected.join(',');
+      }
+      isRequired=!!card.querySelector('[style*="ef4444"]');
+    } else if(qtype==='text'){
+      // Check if this is the brand question with "no previous" checkbox
+      var noprevBtn=document.getElementById('noprev-'+qid);
+      if(noprevBtn&&noprevBtn.getAttribute('data-active')==='1'){
+        answer='\u904e\u5f80\u6c92\u6709\u4f7f\u7528\u5931\u7981\u8b77\u588a';
+      } else {
+        var ta=document.getElementById('text-'+qid);
+        answer=ta?ta.value.trim():'';
+      }
+      isRequired=!!card.querySelector('[style*="ef4444"]');
+    }
+
+    if(isRequired&&!answer){
+      missingRequired.push(qid);
+    }
+    responses.push({question_id:qid,answer:answer});
+  });
+
+  if(missingRequired.length>0){
+    // Scroll to first unanswered
+    var first=document.querySelector('#tst-panel-survey [data-qid="'+missingRequired[0]+'"]');
+    if(first) first.scrollIntoView({behavior:'smooth',block:'center'});
+    alert('請完成所有必填題目（共 '+missingRequired.length+' 題未填）');
+    return;
+  }
+
+  var submitBtn=document.getElementById('tst-submit-btn');
+  if(submitBtn){submitBtn.disabled=true;submitBtn.textContent='提交中…';}
+
+  if(!participantId){
+    if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='📤 提交問卷';}
+    alert('錯誤：找不到參與者ID，請返回重新開啟問卷');
+    return;
+  }
+
+  fetch('/api/testing/survey/submit',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({campaign_id:campaignId,participant_id:participantId,responses:responses})
+  }).then(function(r){return r.json();}).then(function(d){
+    var panelSurvey=document.getElementById('tst-panel-survey');
+    if(d.ok){
+      panelSurvey.innerHTML='<div style="text-align:center;padding:40px;">'+
+        '<div style="font-size:56px;margin-bottom:16px;">🎉</div>'+
+        '<div style="font-size:22px;font-weight:900;color:#166534;margin-bottom:10px;">問卷提交成功！</div>'+
+        '<div style="font-size:16px;color:#374151;line-height:1.7;">感謝您完成產品試用問卷！<br>您的寶貴意見將有助我們持續改善產品。</div>'+
+        (d.reward?'<div style="margin-top:16px;background:#fef3c7;border-radius:12px;padding:14px;font-size:15px;color:#92400e;font-weight:700;">🎁 獎勵：'+escHtml(d.reward)+'</div>':'')+
+        '<button onclick="testingPanelShowMain()" style="margin-top:24px;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:16px;font-weight:700;cursor:pointer;">返回</button>'+
+      '</div>';
+    } else {
+      var errBtn=document.getElementById('tst-submit-btn');
+      if(errBtn){errBtn.disabled=false;errBtn.textContent='📤 提交問卷';}
+      if(d.error&&d.error.indexOf('已提交')>=0){
+        // Already submitted — show completion screen
+        var panelSurveyDone=document.getElementById('tst-panel-survey');
+        if(panelSurveyDone){
+          panelSurveyDone.innerHTML='<div style="text-align:center;padding:40px;">'+
+            '<div style="font-size:56px;margin-bottom:16px;">✅</div>'+
+            '<div style="font-size:20px;font-weight:900;color:#166534;margin-bottom:10px;">您已提交過此問卷</div>'+
+            '<div style="font-size:15px;color:#6b7280;">感謝您的參與！</div>'+
+            '<button onclick="testingPanelShowMain()" style="margin-top:24px;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:16px;font-weight:700;cursor:pointer;">返回</button>'+
+          '</div>';
+        }
+      } else {
+        alert('提交失敗：'+(d.error||'未知錯誤'));
+      }
+    }
+  }).catch(function(err){
+    var errBtn=document.getElementById('tst-submit-btn');
+    if(errBtn){errBtn.disabled=false;errBtn.textContent='📤 提交問卷';}
+    alert('網絡錯誤：'+(err&&err.message?err.message:'請重試'));
+  });
+}
+
+// ── 工作市場 ──
+var _jobsLoaded = false;
+var _currentJobId = null;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── 福利 Tab ──────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+var _appBnfCats = [];
+var _appBnfCurrentCat = 0;
+var _appBnfBenefits = [];
+
+function appBnfInit(){
+  // Load categories
+  fetch('/api/benefits/categories')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      _appBnfCats=d.categories||[];
+      var tabs=document.getElementById('appBnfCatTabs');
+      if(!tabs) return;
+      tabs.innerHTML='<div style="flex-shrink:0;padding:6px 16px;border-radius:20px;background:#1B4332;color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-cid="0" onclick="appBnfFilterCat(0,this)">全部</div>';
+      _appBnfCats.forEach(function(c){
+        tabs.innerHTML+='<div style="flex-shrink:0;padding:6px 16px;border-radius:20px;border:2px solid #e0e0e0;background:#fff;font-size:14px;font-weight:600;cursor:pointer;" data-cid="'+c.id+'" onclick="appBnfFilterCat('+c.id+',this)">'+escAppHtml(c.icon)+' '+escAppHtml(c.name)+'</div>';
+      });
+    });
+  appBnfLoad(0);
+}
+
+function appBnfFilterCat(catId, el){
+  _appBnfCurrentCat=catId;
+  var tabs=document.getElementById('appBnfCatTabs');
+  if(tabs) tabs.querySelectorAll('[data-cid]').forEach(function(t){
+    var active=t.dataset.cid==catId;
+    t.style.background=active?'#1B4332':'#fff';
+    t.style.color=active?'#fff':'#333';
+    t.style.border=active?'2px solid #1B4332':'2px solid #e0e0e0';
+  });
+  appBnfLoad(catId);
+}
+
+// 健康分類 ID (id=1 from migration 0030)
+var MED_CARD_CAT_ID = 1;
+
+// _appMedStatus: cached status for pin card badge ('PENDING','SENT','ISSUED','DECLINED',null)
+var _appMedStatus=null;
+
+function appBnfMedCardPinHtml(){
+  // Hardcoded 醫健卡置頂卡片 — always shown in 全部(0) and 健康(1)
+  // Right-side badge: null→免費申請(green), PENDING/SENT→審批中(orange), ISSUED→已啟用(green), DECLINED→未批准(red)
+  // Badge is rendered server-side from cached _appMedStatus, then replaced async by appMedFetchPinStatus()
+  var rightBadge='';
+  if(_appMedStatus==='PENDING'||_appMedStatus==='SENT'){
+    rightBadge='<span class="appMedBadge" style="font-size:11px;color:#F57F17;background:#FFFDE7;border:1px solid #FFE082;padding:2px 10px;border-radius:10px;font-weight:700;">⏳ 審批中</span>';
+  } else if(_appMedStatus==='ISSUED'){
+    rightBadge='<span class="appMedBadge" style="font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;">✅ 已啟用</span>';
+  } else if(_appMedStatus==='DECLINED'){
+    rightBadge='<span class="appMedBadge" style="font-size:11px;color:#C62828;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;">❌ 未批准</span>';
+  } else {
+    // No status (not applied yet) — show green 免費申請 on right
+    rightBadge='<span class="appMedBadge" style="font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;">免費申請</span>';
+  }
+  var parts=[];
+  parts.push('<div id="appMedPinCard" onclick="appBnfOpenMedCard()" style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.09);overflow:hidden;cursor:pointer;border:2px solid #1565C0;">');
+  parts.push('<div style="height:90px;background:linear-gradient(135deg,#1565C0,#0D47A1);display:flex;align-items:center;justify-content:center;gap:14px;">');
+  parts.push('<span style="font-size:44px;">🏥</span>');
+  parts.push('<div style="color:#fff;"><div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">免費醫健卡</div><div style="font-size:13px;opacity:0.85;margin-top:2px;">HMMP 醫療保障計劃</div></div>');
+  parts.push('</div>');
+  parts.push('<div style="padding:14px 16px;">');
+  // Badge row: 💊健康 tag on left, right-side status badge floated right
+  parts.push('<div data-badge-row="1" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">');
+  parts.push('<span style="font-size:11px;font-weight:700;color:#1565C0;background:#E3F2FD;padding:2px 8px;border-radius:10px;">💊 健康</span>');
+  parts.push(rightBadge);
+  parts.push('</div>');
+  parts.push('<div style="font-size:18px;font-weight:800;color:#1a1a1a;line-height:1.3;margin-bottom:6px;">香港商貿慈善基金醫健卡</div>');
+  parts.push('<div style="font-size:14px;color:#555;line-height:1.5;margin-bottom:6px;">免費申請：專享網絡醫療優惠服務</div>');
+  parts.push('<div style="margin-top:10px;display:flex;align-items:center;justify-content:flex-end;">');
+  parts.push('<span style="font-size:13px;font-weight:700;color:#1565C0;">查看 / 申請 ›</span>');
+  parts.push('</div></div></div>');
+  return parts.join('');
+}
+
+// Fetch status badge async and update pin card after render
+function appMedFetchPinStatus(){
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+  if(!memberNo) return;
+  fetch('/api/members/'+encodeURIComponent(memberNo)+'/medical-status')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      _appMedStatus=d.status||null;
+      // Re-render pin card badge — replace the single .appMedBadge span in [data-badge-row]
+      var card=document.getElementById('appMedPinCard');
+      if(!card) return;
+      var badgeRow=card.querySelector('[data-badge-row]');
+      if(!badgeRow) return;
+      // Remove ALL existing .appMedBadge elements (prevents duplicates on repeated fetch)
+      badgeRow.querySelectorAll('.appMedBadge').forEach(function(b){b.remove();});
+      // Build new badge based on status
+      var span=document.createElement('span');
+      span.className='appMedBadge';
+      if(_appMedStatus==='PENDING'||_appMedStatus==='SENT'){
+        span.style.cssText='font-size:11px;color:#F57F17;background:#FFFDE7;border:1px solid #FFE082;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='⏳ 審批中';
+      } else if(_appMedStatus==='ISSUED'){
+        span.style.cssText='font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='✅ 已啟用';
+      } else if(_appMedStatus==='DECLINED'){
+        span.style.cssText='font-size:11px;color:#C62828;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='❌ 未批准';
+      } else {
+        // No application — keep showing 免費申請
+        span.style.cssText='font-size:11px;color:#2E7D32;background:#E8F5E9;border:1px solid #A5D6A7;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='免費申請';
+      }
+      badgeRow.appendChild(span);
+    }).catch(function(){});
+}
+
+function appBnfLoad(catId){
+  var loading=document.getElementById('shopLoadingMsg'),empty=document.getElementById('shopEmptyMsg'),list=document.getElementById('appBnfList');
+  if(loading) loading.style.display='block';
+  if(empty) empty.style.display='none';
+  if(list) list.innerHTML='';
+  var url='/api/benefits'+(catId?'?category_id='+catId:'');
+  fetch(url)
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(loading) loading.style.display='none';
+      var items=d.benefits||[];
+      // Show medical card pinned card for 全部(0) or 健康(MED_CARD_CAT_ID)
+      var showMed=(catId===0||catId===MED_CARD_CAT_ID);
+      var showHmvod=(catId===0||catId===HMVOD_ENT_CAT_ID);
+      if(!items.length && !showMed && !showHmvod){if(empty)empty.style.display='block';return;}
+      _appBnfBenefits=items;
+      if(list){
+        var html=showMed?appBnfMedCardPinHtml():'';
+        html+=showHmvod?appHmvodPinHtml():'';
+        html+=items.map(function(b){return appBnfCardHtml(b);}).join('');
+        list.innerHTML=html;
+        // Async fetch status badges
+        if(showMed) setTimeout(appMedFetchPinStatus,100);
+        if(showHmvod) setTimeout(appHmvodFetchStatus,150);
+      }
+    })
+    .catch(function(){if(loading)loading.style.display='none';if(empty)empty.style.display='block';});
+}
+
+// ── 醫健卡詳情 panel (in 福利 tab) ──────────────────────────────────────────
+function appBnfOpenMedCard(){
+  var panel=document.getElementById('appBnfDetail');
+  var content=document.getElementById('appBnfDetailContent');
+  if(!panel||!content) return;
+
+  // Get member_no from localStorage (same as the rest of the PWA app)
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+
+  if(!memberNo){
+    // Not logged in to the app — show prompt to go to 我的卡 tab
+    content.innerHTML=appBnfMedCardAuthHtml();
+    panel.style.display='block';
+    return;
+  }
+
+  // Show panel with loading state immediately
+  content.innerHTML='<div style="text-align:center;padding:60px 20px;color:#888;font-size:16px;">載入中…</div>';
+  panel.style.display='block';
+
+  // Use the member_no-based API (no app_session cookie needed)
+  fetch('/api/members/'+encodeURIComponent(memberNo)+'/medical-status')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok){
+        content.innerHTML=appBnfMedCardAuthHtml();
+        return;
+      }
+      if(d.card_no){
+        content.innerHTML=appBnfMedCardIssuedHtml(d);
+      } else if(d.status){
+        content.innerHTML=appBnfMedCardStatusHtml(d);
+      } else {
+        // No application yet — show apply form pre-filled with member name
+        content.innerHTML=appBnfMedCardApplyHtml(d);
+      }
+    })
+    .catch(function(){
+      content.innerHTML='<div style="padding:40px 20px;text-align:center;color:#c00;">網絡錯誤，請稍後再試</div>';
+    });
+}
+
+// MC Sample card image URL (hardcoded)
+var MC_SAMPLE_IMG='/static/mc-sample.png';
+
+function appBnfMedCardHeader(){
+  // Simple compact header bar for issued/status/auth panels
+  return '<div style="background:linear-gradient(135deg,#1565C0,#0D47A1);padding:18px 20px 14px;display:flex;align-items:center;gap:12px;"><span style="font-size:28px;">🏥</span><div style="color:#fff;"><div style="font-size:16px;font-weight:900;">免費醫健卡</div><div style="font-size:12px;opacity:0.8;margin-top:1px;">香港商貿慈善基金 · HMMP</div></div></div>';
+}
+
+function appBnfMedCardAuthHtml(){
+  var parts=[];
+  parts.push(appBnfMedCardHeader());
+  parts.push('<div style="padding:30px 20px;text-align:center;">');
+  parts.push('<div style="font-size:40px;margin-bottom:16px;">🔒</div>');
+  parts.push('<div style="font-size:18px;font-weight:700;color:#333;margin-bottom:10px;">請先登入會員卡</div>');
+  parts.push('<div style="font-size:15px;color:#666;line-height:1.6;margin-bottom:24px;">登入後即可查看醫健卡狀態或提交申請。</div>');
+  parts.push('<button onclick="appBnfCloseDetail();switchTab(&apos;card&apos;)" style="width:100%;padding:16px;background:#1565C0;color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;">前往登入</button>');
+  parts.push('</div>');
+  return parts.join('');
+}
+
+function appBnfMedCardStatusHtml(d){
+  var statusMap={'PENDING':'⏳ 審核中','SENT':'📮 已發送','ISSUED':'✅ 已發出','DECLINED':'❌ 未批准'};
+  var colorMap={'PENDING':'#F57F17','SENT':'#1565C0','ISSUED':'#2E7D32','DECLINED':'#C62828'};
+  var bgMap={'PENDING':'#FFFDE7','SENT':'#E3F2FD','ISSUED':'#E8F5E9','DECLINED':'#FFEBEE'};
+  var st=d.status||'PENDING';
+  var label=statusMap[st]||st;
+  var color=colorMap[st]||'#555';
+  var bg=bgMap[st]||'#f5f5f5';
+  var parts=[];
+  parts.push(appBnfMedCardHeader());
+  parts.push('<div style="padding:28px 20px;">');
+  parts.push('<div style="font-size:16px;color:#37474F;margin-bottom:14px;font-weight:700;">你的醫健卡申請狀態：</div>');
+  parts.push('<div style="background:'+bg+';border-radius:12px;padding:18px 20px;text-align:center;margin-bottom:20px;">');
+  parts.push('<div style="font-size:28px;font-weight:900;color:'+color+';">'+label+'</div>');
+  parts.push('</div>');
+  parts.push('<div style="font-size:15px;color:#546E7A;line-height:1.7;margin-bottom:20px;">如有查詢請 WhatsApp：<a href="https://wa.me/85254429749" target="_blank" style="color:#1565C0;font-weight:700;">📱 5442-9749</a></div>');
+  parts.push('</div>');
+  return parts.join('');
+}
+
+function appBnfMedCardIssuedHtml(d){
+  // MC1.png layout: show card_image_url prominently at top, then green 查看醫生 button
+  // MC2.png: doctor panel shown inline after clicking 查看醫生
+  var nameEnFull=(d.name_en||'').trim().toUpperCase();
+  var nameParts=nameEnFull.split(/\s+/).filter(function(p){return p.length>0;});
+  var hasTwoParts=nameParts.length>=2;
+  var surnamePart=hasTwoParts?nameParts[0]:'';
+  var givenPart=hasTwoParts?nameParts.slice(1).join(' '):'';
+  var cardNo=d.card_no||'';
+  // Hidden data store for copy (avoids quote issues in onclick)
+  var dataStore='<div id="appMedData" style="display:none;">'
+    +'<span id="appMedData1">'+escAppHtml(cardNo)+'</span>'
+    +'<span id="appMedData2">'+escAppHtml(surnamePart)+'</span>'
+    +'<span id="appMedData3">'+escAppHtml(givenPart)+'</span>'
+    +'<span id="appMedData4">'+escAppHtml(nameEnFull)+'</span>'
+    +'</div>';
+
+  var parts=[];
+  parts.push(appBnfMedCardHeader());
+  parts.push(dataStore);
+  parts.push('<div style="padding:0 0 100px;">');
+
+  // ── Card image ──
+  if(d.card_image_url){
+    parts.push('<div style="padding:16px 16px 0;">');
+    parts.push('<img src="'+escAppHtml(d.card_image_url)+'" style="width:100%;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:block;" alt="醫健卡">');
+    parts.push('</div>');
+  } else {
+    // No image yet — show card no prominently
+    parts.push('<div style="padding:20px 16px 0;">');
+    parts.push('<div style="background:#E3F2FD;border-radius:10px;padding:18px;text-align:center;">');
+    parts.push('<div style="font-size:14px;color:#1565C0;font-weight:700;margin-bottom:8px;">你的醫健卡號碼</div>');
+    parts.push('<div style="font-size:32px;font-weight:900;color:#0D47A1;letter-spacing:4px;font-family:monospace;">'+escAppHtml(cardNo)+'</div>');
+    parts.push('<button onclick="appMedCopyById(1,this,&apos;複製卡號&apos;)" style="margin-top:12px;padding:10px 24px;background:#1565C0;color:#fff;border:0;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;">複製卡號</button>');
+    parts.push('</div></div>');
+  }
+
+  // ── 查看醫生 green button ──
+  parts.push('<div style="padding:16px;">');
+  parts.push('<button onclick="appMedShowDoctorPanel()" id="appBtnMedDoctor" style="width:100%;min-height:58px;padding:14px;background:#2E7D32;color:#fff;border:0;border-radius:14px;font-size:20px;font-weight:900;cursor:pointer;letter-spacing:1px;">🩺 查看醫生</button>');
+  parts.push('</div>');
+
+  // ── Doctor panel (MC2.png) — hidden by default ──
+  parts.push('<div id="appMedDoctorPanel" style="display:none;padding:0 16px 20px;">');
+  // Card login info
+  parts.push('<div style="background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:12px;padding:16px 18px;margin-bottom:16px;">');
+  parts.push('<div style="font-size:16px;font-weight:900;color:#1B5E20;margin-bottom:14px;">🔐 HMMP 系統登入資料</div>');
+  parts.push('<ol style="padding-left:20px;font-size:16px;line-height:2.2;color:#1B5E20;margin:0;">');
+  parts.push('<li><span style="font-weight:700;">登入名稱：</span>你的醫健卡號碼<div style="display:flex;align-items:center;gap:10px;margin:4px 0 8px;flex-wrap:wrap;"><span style="font-size:20px;font-weight:900;letter-spacing:3px;color:#0D47A1;font-family:monospace;">'+escAppHtml(cardNo)+'</span><button onclick="appMedCopyById(1,this,&apos;複製&apos;)" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;">複製</button></div></li>');
+  if(hasTwoParts){
+    parts.push('<li><span style="font-weight:700;">姓氏：</span>'+escAppHtml(surnamePart)+'<div style="margin:4px 0 8px;"><button onclick="appMedCopyById(2,this,&apos;複製&apos;)" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;">複製</button></div></li>');
+    parts.push('<li><span style="font-weight:700;">名稱：</span>'+escAppHtml(givenPart)+'<div style="margin:4px 0 8px;"><button onclick="appMedCopyById(3,this,&apos;複製&apos;)" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;">複製</button></div></li>');
+  } else {
+    parts.push('<li><span style="font-weight:700;">英文全名：</span>'+escAppHtml(nameEnFull)+'<div style="margin:4px 0 8px;"><button onclick="appMedCopyById(4,this,&apos;複製&apos;)" style="padding:8px 14px;background:#1565C0;color:#fff;border:0;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;">複製</button></div></li>');
+  }
+  parts.push('<li><span style="font-weight:700;">電郵地址：</span><span style="color:#78909C;">不用填</span></li>');
+  parts.push('<li><span style="font-weight:700;">按「登入」</span></li>');
+  parts.push('</ol></div>');
+  // Open doctor list link
+  parts.push('<a href="https://www.hmmp.com.hk/DefaultDoctorList_cn.aspx" target="_blank" rel="noopener" style="display:block;width:100%;min-height:55px;padding:14px;background:#1565C0;color:#fff;border:0;border-radius:12px;font-size:18px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;line-height:1.4;box-sizing:border-box;">🌐 開啟 HMMP 醫生名單網站</a>');
+  parts.push('<div style="margin-top:12px;font-size:14px;color:#546E7A;line-height:1.6;text-align:center;">前往 HMMP 官網，使用上方登入資料查看網絡醫生名單。</div>');
+  parts.push('</div>'); // end doctor panel
+
+  parts.push('</div>'); // end padding div
+  return parts.join('');
+}
+
+function appBnfMedCardApplyHtml(d){
+  // MC Apply layout: Sample card image on top, form below
+  // d may contain name_zh / name_en from member record for pre-fill
+  var preNameZh=(d&&d.name_zh)||'';
+  var preNameEn=(d&&d.name_en)||'';
+  var parts=[];
+  // No blue header — start directly with sample card image
+  parts.push('<div style="padding:0 0 100px;">');
+
+  // ── Sample card image (served from /static/mc-sample.png in the same deployment) ──
+  parts.push('<img src="'+escAppHtml(MC_SAMPLE_IMG)+'" style="width:100%;display:block;" alt="醫健卡樣本">');
+
+  // ── NGO description ──
+  parts.push('<div style="padding:16px 16px 0;">');
+  parts.push('<div style="font-size:15px;color:#546E7A;margin-bottom:16px;line-height:1.7;">由合作 NGO <strong>香港商貿慈善基金</strong>提供，免費申請。<br>申請後職員將以 WhatsApp 聯絡辦理。</div>');
+
+  // ── Form card ──
+  parts.push('<div style="background:#fff;border-radius:12px;border:1.5px solid #e0e0e0;padding:20px;margin-bottom:16px;">');
+  parts.push('<div style="font-size:16px;font-weight:900;color:#1B4332;margin-bottom:16px;">📝 填寫申請資料</div>');
+  // nameZh
+  parts.push('<div style="margin-bottom:14px;">');
+  parts.push('<label style="font-size:14px;font-weight:700;color:#444;display:block;margin-bottom:6px;">中文全名 <span style="color:#C62828;">✽ 必填</span>（與身份證相同）</label>');
+  parts.push('<input id="appMfNameZh" type="text" placeholder="例：陳大文" value="'+escAppHtml(preNameZh)+'" style="width:100%;padding:12px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:inherit;">');
+  parts.push('</div>');
+  // nameEn
+  parts.push('<div style="margin-bottom:14px;">');
+  parts.push('<label style="font-size:14px;font-weight:700;color:#444;display:block;margin-bottom:6px;">英文全名 <span style="color:#C62828;">✽ 必填</span>（與身份證相同）</label>');
+  parts.push('<input id="appMfNameEn" type="text" placeholder="例：CHAN TAI MAN" value="'+escAppHtml(preNameEn)+'" style="width:100%;padding:12px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:inherit;text-transform:uppercase;">');
+  parts.push('</div>');
+  // hkid
+  parts.push('<div style="margin-bottom:14px;">');
+  parts.push('<label style="font-size:14px;font-weight:700;color:#444;display:block;margin-bottom:6px;">身份證頭 4 位 <span style="color:#C62828;">✽ 必填</span></label>');
+  parts.push('<input id="appMfHkid" type="text" placeholder="例：K608" maxlength="4" style="width:100%;padding:12px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:20px;font-weight:700;box-sizing:border-box;text-transform:uppercase;letter-spacing:4px;font-family:monospace;">');
+  parts.push('</div>');
+  // consent
+  parts.push('<div style="margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;">');
+  parts.push('<input type="checkbox" id="appMfConsent" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;">');
+  parts.push('<label for="appMfConsent" style="font-size:13px;color:#555;line-height:1.6;">本人同意將以上個人資料（包括姓名及身份證頭4位）提供予<strong>香港商貿慈善基金</strong>，用於申請及發出醫健卡。本人明白 NGO 職員將以電話或 WhatsApp 與本人聯絡辦理手續，並同意接受聯絡。</label>');
+  parts.push('</div>');
+  // error
+  parts.push('<div id="appMedErr" style="color:#C62828;font-size:14px;margin-bottom:10px;display:none;"></div>');
+  // submit
+  parts.push('<button id="appMedSubmitBtn" onclick="appMedSubmit()" style="width:100%;padding:16px;background:#1565C0;color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;">提交申請</button>');
+  parts.push('</div>');
+
+  // disclaimer
+  parts.push('<div style="background:#FFF8E1;border-radius:10px;padding:14px 16px;font-size:13px;color:#5D4037;line-height:1.7;margin-bottom:16px;">');
+  parts.push('⚕️ 醫健卡資料必須與<strong>香港身份證完全一致</strong>，請確保中英文姓名及身份證號碼頭4位正確無誤。');
+  parts.push('</div>');
+  parts.push('</div>'); // end padding
+  parts.push('</div>'); // end outer
+  return parts.join('');
+}
+
+function appMedSubmit(){
+  var nameZh=(document.getElementById('appMfNameZh')||{}).value||'';
+  var nameEn=(document.getElementById('appMfNameEn')||{}).value||'';
+  var hkid=(document.getElementById('appMfHkid')||{}).value||'';
+  var consent=document.getElementById('appMfConsent')&&document.getElementById('appMfConsent').checked;
+  var errEl=document.getElementById('appMedErr');
+  var showErr=function(msg){if(errEl){errEl.textContent=msg;errEl.style.display='block';}};
+  if(errEl) errEl.style.display='none';
+  if(!nameZh.trim()){showErr('請填寫中文全名');return;}
+  if(!nameEn.trim()){showErr('請填寫英文全名');return;}
+  if(!hkid.trim()||hkid.trim().length<3){showErr('請填寫身份證頭4位（如 K608）');return;}
+  if(!consent){showErr('請同意私隱條款，授權 NGO 聯絡你');return;}
+  var btn=document.getElementById('appMedSubmitBtn');
+  if(btn){btn.textContent='提交中…';btn.style.opacity='0.7';btn.onclick=null;}
+  // Use localStorage member_no (same as rest of PWA app, no MEMBER_NO global needed)
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+  if(!memberNo){showErr('請先查閱你的會員卡再申請');if(btn){btn.textContent='提交申請';btn.style.opacity='1';btn.onclick=appMedSubmit;}return;}
+  fetch('/api/members/'+encodeURIComponent(memberNo)+'/medical',{
+    method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({nameZh:nameZh.trim(),nameEn:nameEn.trim().toUpperCase(),hkid:hkid.trim().toUpperCase()})
+  }).then(function(r){return r.json();})
+  .then(function(d){
+    if(d.ok||d.alreadyApplied){
+      // Show success state
+      var content=document.getElementById('appBnfDetailContent');
+      if(content){
+        var p=[];
+        p.push(appBnfMedCardHeader());
+        p.push('<div style="padding:40px 20px;text-align:center;">');
+        p.push('<div style="font-size:52px;margin-bottom:16px;">✅</div>');
+        p.push('<div style="font-size:20px;font-weight:800;color:#2E7D32;margin-bottom:12px;">醫健卡申請已提交！</div>');
+        p.push('<div style="font-size:16px;color:#546E7A;line-height:1.7;">你的醫健卡申請已記錄，<strong>香港商貿慈善基金</strong>職員將會以<strong>電話或 WhatsApp</strong> 聯絡你安排發卡手續。如有查詢請致電或 WhatsApp：<strong>9888 5708</strong></div>');
+        p.push('</div>');
+        content.innerHTML=p.join('');
+      }
+    } else {
+      if(btn){btn.textContent='提交申請';btn.style.opacity='1';btn.onclick=appMedSubmit;}
+      showErr(d.error||'提交失敗，請稍後再試');
+    }
+  }).catch(function(){
+    if(btn){btn.textContent='提交申請';btn.style.opacity='1';btn.onclick=appMedSubmit;}
+    showErr('網絡錯誤，請稍後再試');
+  });
+}
+
+function appBnfCardHtml(b){
+  var imgHtml=b.image_url
+    ?'<div style="border-radius:14px 14px 0 0;overflow:hidden;height:180px;background:#f5f5f5;"><img src="'+escAppHtml(b.image_url)+'" style="width:100%;height:100%;object-fit:cover;display:block;"></div>'
+    :'<div style="border-radius:14px 14px 0 0;height:80px;background:linear-gradient(135deg,#e8f5e9,#c8e6c9);display:flex;align-items:center;justify-content:center;font-size:40px;">'+(b.category_icon||'🎁')+'</div>';
+  var dateHtml=(b.start_date||b.end_date)?'<div style="font-size:14px;color:#888;margin-top:4px;">📅 '+(b.start_date||'')+(b.start_date&&b.end_date?' ~ ':'')+(b.end_date||'長期')+'</div>':'';
+  return '<div onclick="appBnfOpenDetail('+b.id+')" style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.09);overflow:hidden;cursor:pointer;">'+
+    imgHtml+
+    '<div style="padding:14px 16px;">'+
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'+
+        '<span style="font-size:11px;font-weight:700;color:#388E3C;background:#E8F5E9;padding:2px 8px;border-radius:10px;">'+(b.category_icon||'')+' '+(b.category_name||'')+'</span>'+
+        (b.end_date&&b.end_date<new Date().toISOString().slice(0,10)?'<span style="font-size:11px;color:#9e9e9e;background:#f5f5f5;padding:2px 8px;border-radius:10px;">已過期</span>':'<span style="font-size:11px;color:#2E7D32;background:#E8F5E9;padding:2px 8px;border-radius:10px;">有效</span>')+
+      '</div>'+
+      '<div style="font-size:18px;font-weight:800;color:#1a1a1a;line-height:1.3;margin-bottom:6px;">'+escAppHtml(b.title)+'</div>'+
+      (b.description?'<div style="font-size:14px;color:#555;line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">'+escAppHtml(b.description)+'</div>':'')+
+      dateHtml+
+      '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">'+
+        '<span style="font-size:13px;color:#888;">👥 '+b.claim_count+' 人已領取</span>'+
+        '<span style="font-size:13px;font-weight:700;color:#1B4332;">查看詳情 ›</span>'+
+      '</div>'+
+    '</div></div>';
+}
+
+function appBnfOpenDetail(id){
+  var b=_appBnfBenefits.find(function(x){return x.id==id;});
+  if(!b) return;
+  var panel=document.getElementById('appBnfDetail');
+  var content=document.getElementById('appBnfDetailContent');
+  if(!panel||!content) return;
+
+  var imgHtml=b.image_url
+    ?'<img src="'+escAppHtml(b.image_url)+'" style="width:100%;max-height:280px;object-fit:cover;display:block;">'
+    :'<div style="height:120px;background:linear-gradient(135deg,#e8f5e9,#a5d6a7);display:flex;align-items:center;justify-content:center;font-size:60px;">'+(b.category_icon||'🎁')+'</div>';
+
+  var extraHtml='';
+  try{
+    var ef=JSON.parse(b.extra_fields||'[]');
+    if(ef.length){
+      extraHtml='<div style="background:#f9fdf9;border-radius:10px;padding:14px 16px;margin:16px 0;">';
+      ef.forEach(function(f){
+        if(f.label) extraHtml+='<div style="margin-bottom:8px;"><span style="font-size:13px;font-weight:700;color:#555;">'+escAppHtml(f.label)+'：</span><span style="font-size:14px;color:#222;">'+escAppHtml(f.value||'')+'</span></div>';
+      });
+      extraHtml+='</div>';
+    }
+  }catch(e){}
+
+  var claimBtn='<button id="appBnfClaimBtn" onclick="appBnfClaim('+b.id+')" style="width:100%;padding:16px;background:#1B4332;color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;margin-top:16px;">🎁 申請領取</button>';
+
+  content.innerHTML=
+    imgHtml+
+    '<div style="padding:18px 16px;">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'+
+        '<span style="font-size:13px;font-weight:700;color:#388E3C;background:#E8F5E9;padding:3px 10px;border-radius:12px;">'+(b.category_icon||'')+' '+(b.category_name||'')+'</span>'+
+        (b.claim_count>0?'<span style="font-size:13px;color:#888;">👥 '+b.claim_count+' 人已領取</span>':'')+
+      '</div>'+
+      '<div style="font-size:22px;font-weight:900;color:#1a1a1a;line-height:1.3;margin-bottom:10px;">'+escAppHtml(b.title)+'</div>'+
+      (b.description?'<div style="font-size:16px;color:#555;line-height:1.6;margin-bottom:12px;">'+escAppHtml(b.description)+'</div>':'')+
+      ((b.start_date||b.end_date)?'<div style="font-size:14px;color:#888;margin-bottom:12px;">📅 有效期：'+(b.start_date||'即日')+(b.end_date?' 至 '+b.end_date:' 長期有效')+'</div>':'')+
+      (b.benefit_content?'<div style="background:#f0f7f0;border-left:4px solid #1B4332;border-radius:0 10px 10px 0;padding:14px 16px;margin:14px 0;">'+
+        '<div style="font-size:13px;font-weight:700;color:#1B4332;margin-bottom:6px;">🎁 福利內容</div>'+
+        '<div style="font-size:15px;color:#333;white-space:pre-wrap;line-height:1.6;">'+escAppHtml(b.benefit_content)+'</div>'+
+      '</div>':'')+
+      extraHtml+
+      claimBtn+
+    '</div>';
+
+  panel.style.display='block';
+  // Check if already claimed
+  appBnfCheckClaimed(b.id);
+}
+
+function appBnfCheckClaimed(id){
+  fetch('/api/benefits/'+id+'/my-claim',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var btn=document.getElementById('appBnfClaimBtn');
+      if(!btn) return;
+      if(d.claimed){
+        btn.textContent='✅ 已領取';
+        btn.style.background='#4CAF50';
+        btn.style.cursor='default';
+        btn.onclick=null;
+        if(d.claimed_at) btn.insertAdjacentHTML('afterend','<div style="text-align:center;font-size:13px;color:#888;margin-top:6px;">領取時間：'+(d.claimed_at+'').slice(0,16)+'</div>');
+      }
+    });
+}
+
+function appBnfClaim(id){
+  var btn=document.getElementById('appBnfClaimBtn');
+  if(btn){btn.textContent='處理中…';btn.style.opacity='0.7';btn.onclick=null;}
+  fetch('/api/benefits/'+id+'/claim',{method:'POST',credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.code==='AUTH_REQUIRED'){
+        if(btn){btn.textContent='🎁 申請領取';btn.style.opacity='1';btn.onclick=function(){appBnfClaim(id);};}
+        alert('請先登入會員卡才可申領福利');
+        appBnfCloseDetail();
+        switchTab('card');
+        return;
+      }
+      if(d.ok||d.already_claimed){
+        if(btn){
+          btn.textContent=d.already_claimed?'✅ 已領取':'✅ 成功領取！';
+          btn.style.background='#4CAF50';btn.style.cursor='default';btn.onclick=null;
+        }
+        if(!d.already_claimed) alert('🎁 成功領取！');
+        // Refresh claim count
+        appBnfLoad(_appBnfCurrentCat);
+      } else {
+        if(btn){btn.textContent='🎁 申請領取';btn.style.opacity='1';btn.onclick=function(){appBnfClaim(id);};}
+        alert(d.error||'領取失敗，請稍後再試');
+      }
+    })
+    .catch(function(){
+      if(btn){btn.textContent='🎁 申請領取';btn.style.opacity='1';btn.onclick=function(){appBnfClaim(id);};}
+      alert('網絡錯誤，請稍後再試');
+    });
+}
+
+function appBnfCloseDetail(){
+  var panel=document.getElementById('appBnfDetail');
+  if(panel) panel.style.display='none';
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// HMVod 免費1年會籍 福利卡片
+// ════════════════════════════════════════════════════════════════════════════════
+var HMVOD_ENT_CAT_ID = 2; // 娛樂 category id from migration 0030
+var _hmvodApplied = null; // null=unknown, true=applied, false=not applied
+var _hmvodWaNumber = ''; // loaded async
+
+function appHmvodPinHtml(){
+  var badgeHtml = _hmvodApplied
+    ? '<span class="appHmvodBadge" style="font-size:11px;color:#1565C0;background:#E3F2FD;border:1px solid #90CAF9;padding:2px 10px;border-radius:10px;font-weight:700;">✅ 已申請</span>'
+    : '<span class="appHmvodBadge" style="font-size:11px;color:#B71C1C;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;">🎁 免費申請</span>';
+  var parts=[];
+  parts.push('<div id="appHmvodPinCard" onclick="appHmvodOpen()" style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.1);overflow:hidden;cursor:pointer;border:2px solid #B71C1C;margin-bottom:14px;">');
+  // Red gradient header
+  parts.push('<div style="background:linear-gradient(135deg,#B71C1C,#D32F2F);padding:16px 18px;display:flex;align-items:center;gap:14px;">');
+  parts.push('<div style="width:52px;height:52px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">🎬</div>');
+  parts.push('<div style="color:#fff;"><div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">HMV On Demand</div><div style="font-size:12px;opacity:0.85;margin-top:2px;">免費1年串流會籍 · 無限睇</div></div>');
+  parts.push('</div>');
+  // Body
+  parts.push('<div style="padding:14px 16px;">');
+  parts.push('<div data-hmvod-badge-row="1" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">');
+  parts.push('<span style="font-size:11px;font-weight:700;color:#B71C1C;background:#FFEBEE;padding:2px 8px;border-radius:10px;">🎭 娛樂</span>');
+  parts.push(badgeHtml);
+  parts.push('</div>');
+  parts.push('<div style="font-size:17px;font-weight:800;color:#1a1a1a;line-height:1.3;margin-bottom:6px;">HMVod 免費1年影視串流會籍</div>');
+  parts.push('<div style="font-size:14px;color:#555;line-height:1.5;margin-bottom:4px;">港劇、韓劇、電影、動漫無限收睇，全港最大華語串流平台。</div>');
+  parts.push('<div style="font-size:13px;color:#B71C1C;font-weight:700;margin-bottom:6px;">🎁 路演現場申請 即享禮品一份！</div>');
+  parts.push('<div style="margin-top:10px;display:flex;align-items:center;justify-content:flex-end;">');
+  parts.push('<span style="font-size:13px;font-weight:700;color:#B71C1C;">立即申請 ›</span>');
+  parts.push('</div></div></div>');
+  return parts.join('');
+}
+
+function appHmvodFetchStatus(){
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+  if(!memberNo) return;
+  var phone=localStorage.getItem('ce85_phone')||'';
+  if(!phone) return;
+  fetch('/api/hmvod/check?phone='+encodeURIComponent(phone))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      _hmvodApplied=d.applied||false;
+      // Update badge in pin card
+      var card=document.getElementById('appHmvodPinCard');
+      if(!card) return;
+      var badgeRow=card.querySelector('[data-hmvod-badge-row]');
+      if(!badgeRow) return;
+      badgeRow.querySelectorAll('.appHmvodBadge').forEach(function(b){b.remove();});
+      var span=document.createElement('span');
+      span.className='appHmvodBadge';
+      if(_hmvodApplied){
+        span.style.cssText='font-size:11px;color:#1565C0;background:#E3F2FD;border:1px solid #90CAF9;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='✅ 已申請';
+      } else {
+        span.style.cssText='font-size:11px;color:#B71C1C;background:#FFEBEE;border:1px solid #EF9A9A;padding:2px 10px;border-radius:10px;font-weight:700;';
+        span.textContent='🎁 免費申請';
+      }
+      badgeRow.appendChild(span);
+    }).catch(function(){});
+}
+
+function appHmvodOpen(){
+  var panel=document.getElementById('appBnfDetail');
+  var content=document.getElementById('appBnfDetailContent');
+  if(!panel||!content) return;
+  var memberNo=localStorage.getItem('ce85_member_no')||window.MEMBER_NO||'';
+  if(!memberNo){
+    content.innerHTML=appHmvodAuthHtml();
+    panel.style.display='block';
+    return;
+  }
+  content.innerHTML='<div style="text-align:center;padding:60px 20px;color:#888;">載入中…</div>';
+  panel.style.display='block';
+  // Load WA number + check status in parallel
+  Promise.all([
+    fetch('/api/hmvod/settings').then(function(r){return r.json();}),
+    (function(){
+      var phone=localStorage.getItem('ce85_phone')||'';
+      return phone ? fetch('/api/hmvod/check?phone='+encodeURIComponent(phone)).then(function(r){return r.json();}) : Promise.resolve({ok:true,applied:false});
+    })()
+  ]).then(function(results){
+    var settings=results[0], check=results[1];
+    _hmvodWaNumber=settings.wa_number||'';
+    _hmvodApplied=check.applied||false;
+    content.innerHTML=appHmvodDetailHtml(_hmvodApplied);
+  }).catch(function(){
+    content.innerHTML=appHmvodDetailHtml(false);
+  });
+}
+
+function appHmvodAuthHtml(){
+  var parts=[];
+  parts.push('<div style="background:linear-gradient(135deg,#B71C1C,#D32F2F);padding:18px 20px 14px;display:flex;align-items:center;gap:12px;">');
+  parts.push('<span style="font-size:28px;">🎬</span><div style="color:#fff;"><div style="font-size:16px;font-weight:900;">HMVod 免費會籍</div></div></div>');
+  parts.push('<div style="padding:30px 20px;text-align:center;">');
+  parts.push('<div style="font-size:40px;margin-bottom:16px;">🔒</div>');
+  parts.push('<div style="font-size:18px;font-weight:700;color:#333;margin-bottom:10px;">請先登入會員卡</div>');
+  parts.push('<div style="font-size:15px;color:#666;line-height:1.6;margin-bottom:24px;">登入後即可申請 HMVod 免費1年會籍。</div>');
+  parts.push('<button onclick="appBnfCloseDetail();switchTab(&apos;card&apos;)" style="width:100%;padding:16px;background:#B71C1C;color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;">前往登入</button>');
+  parts.push('</div>');
+  return parts.join('');
+}
+
+function appHmvodDetailHtml(alreadyApplied){
+  var parts=[];
+  // Header
+  parts.push('<div style="background:linear-gradient(135deg,#B71C1C,#D32F2F);padding:18px 20px 14px;display:flex;align-items:center;gap:12px;">');
+  parts.push('<span style="font-size:28px;">🎬</span><div style="color:#fff;"><div style="font-size:16px;font-weight:900;">HMVod 免費1年影視串流會籍</div><div style="font-size:12px;opacity:0.8;margin-top:1px;">Hong Kong #1 Chinese Streaming Platform</div></div></div>');
+  parts.push('<div style="padding:0 0 100px;">');
+
+  if(alreadyApplied){
+    // Already applied
+    parts.push('<div style="padding:28px 20px;text-align:center;">');
+    parts.push('<div style="font-size:52px;margin-bottom:16px;">✅</div>');
+    parts.push('<div style="font-size:20px;font-weight:900;color:#1565C0;margin-bottom:10px;">你已成功申請！</div>');
+    parts.push('<div style="font-size:15px;color:#555;line-height:1.7;margin-bottom:20px;">你的 HMVod 免費1年會籍申請已登記。<br>我們的職員將盡快以 WhatsApp 發送驗証碼給你。</div>');
+    parts.push('<div style="background:#E3F2FD;border-radius:12px;padding:16px 20px;font-size:14px;color:#1565C0;line-height:1.7;">如有查詢請 WhatsApp：<br><a href="https://wa.me/'+escAppHtml(_hmvodWaNumber)+'" target="_blank" style="color:#0D47A1;font-weight:700;font-size:16px;">📱 '+formatPhoneDisplay(_hmvodWaNumber)+'</a></div>');
+    parts.push('</div>');
+  } else {
+    // Not yet applied — show promo + apply button
+    // Promo banner
+    parts.push('<div style="margin:16px;background:linear-gradient(135deg,#B71C1C,#7B1FA2);border-radius:14px;padding:20px;color:#fff;text-align:center;">');
+    parts.push('<div style="font-size:36px;margin-bottom:8px;">🎬🍿</div>');
+    parts.push('<div style="font-size:22px;font-weight:900;margin-bottom:6px;">免費1年串流會籍</div>');
+    parts.push('<div style="font-size:15px;opacity:0.9;line-height:1.6;">港劇 · 韓劇 · 電影 · 動漫<br>無限收睇，隨時隨地</div>');
+    parts.push('<div style="margin-top:14px;background:rgba(255,255,255,0.2);border-radius:8px;padding:10px;font-size:14px;font-weight:700;">市值 HK$228/年 · 會員完全免費</div>');
+    parts.push('</div>');
+    // Gift promo
+    parts.push('<div style="margin:0 16px 16px;background:#FFF8E1;border:2px solid #FFD54F;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;">');
+    parts.push('<span style="font-size:32px;">🎁</span>');
+    parts.push('<div><div style="font-size:15px;font-weight:900;color:#F57F17;margin-bottom:4px;">路演現場申請 · 即享禮品</div><div style="font-size:13px;color:#795548;line-height:1.5;">凡於老有聯盟路演現場申請，可獲精美禮品一份！數量有限，先到先得。</div></div>');
+    parts.push('</div>');
+    // Features
+    parts.push('<div style="margin:0 16px 16px;background:#fff;border-radius:12px;border:1.5px solid #e0e0e0;padding:16px;">');
+    parts.push('<div style="font-size:15px;font-weight:900;color:#333;margin-bottom:12px;">會籍包含：</div>');
+    var features=[['🎭','港劇/韓劇/台劇','全平台最齊港產及韓國劇集'],['🎬','最新電影','每月新增電影，院線同步上映'],['📺','動漫/兒童','適合全家大細一齊睇'],['📱','多裝置收睇','手機、平板、電視同步使用']];
+    features.forEach(function(f){
+      parts.push('<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;"><span style="font-size:24px;width:32px;text-align:center;">'+f[0]+'</span><div><div style="font-size:14px;font-weight:700;color:#333;">'+f[1]+'</div><div style="font-size:12px;color:#777;">'+f[2]+'</div></div></div>');
+    });
+    parts.push('</div>');
+    // How it works
+    parts.push('<div style="margin:0 16px 16px;background:#E8F5E9;border-radius:12px;padding:14px 16px;">');
+    parts.push('<div style="font-size:14px;font-weight:900;color:#1B5E20;margin-bottom:10px;">📋 申請步驟</div>');
+    parts.push('<div style="font-size:13px;color:#2E7D32;line-height:2;">1️⃣ 點擊「立即申請」發送 WhatsApp 給職員<br>2️⃣ 職員為你登記並取得驗証碼<br>3️⃣ 收到驗証碼後告知職員（或現場出示）<br>4️⃣ 完成！即享1年免費串流服務</div>');
+    parts.push('</div>');
+    // Apply button
+    parts.push('<div style="padding:0 16px 16px;">');
+    parts.push('<div id="appHmvodErr" style="color:#C62828;font-size:14px;margin-bottom:10px;display:none;"></div>');
+    parts.push('<button id="appHmvodApplyBtn" onclick="appHmvodApply()" style="width:100%;min-height:58px;padding:14px;background:#B71C1C;color:#fff;border:0;border-radius:14px;font-size:20px;font-weight:900;cursor:pointer;letter-spacing:0.5px;">📱 立即申請 · 發送 WhatsApp</button>');
+    parts.push('<div style="margin-top:10px;font-size:12px;color:#888;text-align:center;">每個電話號碼只限申請一次 · 完全免費</div>');
+    parts.push('</div>');
+  }
+  parts.push('</div>');
+  return parts.join('');
+}
+
+function formatPhoneDisplay(num){
+  var n=String(num||'');
+  // If starts with 852, format as 852-XXXX-XXXX
+  if(n.startsWith('852')&&n.length>=11) return '(852) '+n.slice(3,7)+'-'+n.slice(7);
+  if(n.length===8) return n.slice(0,4)+'-'+n.slice(4);
+  return n;
+}
+
+function appHmvodApply(){
+  var memberNo=localStorage.getItem('ce85_member_no')||'';
+  var phone=localStorage.getItem('ce85_phone')||'';
+  var errEl=document.getElementById('appHmvodErr');
+  var btn=document.getElementById('appHmvodApplyBtn');
+  function showErr(msg){ if(errEl){errEl.textContent=msg;errEl.style.display='block';} if(btn){btn.disabled=false;btn.textContent='📱 立即申請 · 發送 WhatsApp';} }
+  if(!memberNo||!phone){ showErr('找不到會員資料，請重新登入'); return; }
+  if(!_hmvodWaNumber){ showErr('系統錯誤：未能取得職員聯絡方式，請稍後再試'); return; }
+  if(btn){btn.disabled=true;btn.textContent='處理中…';}
+  var _nameZh='';
+  // Step 1: get member name
+  fetch('/api/members/'+encodeURIComponent(memberNo)+'/medical-status')
+    .then(function(r){return r.json();})
+    .then(function(md){
+      _nameZh=md.name_zh||'';
+      // Step 2: record application
+      return fetch('/api/hmvod/apply',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({member_no:memberNo,name_zh:_nameZh,name_en:md.name_en||'',phone:phone})
+      });
+    })
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok&&d.error==='ALREADY_APPLIED'){
+        _hmvodApplied=true;
+        var c=document.getElementById('appBnfDetailContent');
+        if(c) c.innerHTML=appHmvodDetailHtml(true);
+        return;
+      }
+      if(!d.ok){ showErr(d.message||'申請失敗，請稍後再試'); return; }
+      _hmvodApplied=true;
+      // Step 3: open WhatsApp with pre-filled message
+      var nl=String.fromCharCode(10);
+      var waMsg='你好，我是老有聯盟會員 '+_nameZh+'，會員卡號 '+memberNo+'，電話 '+phone+'。'+nl+nl+'我想申請 HMV On Demand 免費1年影視串流會籍，請協助登記，謝謝！';
+      window.open('https://wa.me/'+_hmvodWaNumber+'?text='+encodeURIComponent(waMsg),'_blank');
+      // Show success screen
+      var c2=document.getElementById('appBnfDetailContent');
+      if(c2) c2.innerHTML=appHmvodDetailHtml(true);
+      appHmvodFetchStatus();
+    })
+    .catch(function(){ showErr('網絡錯誤，請稍後再試'); });
+}
+
+// ── 消息 内容 ─────────────────────────────────────────────────────────────────
+var _newsLoaded = false;
+
+function loadAppContents(section) {
+  if(section==='shopping') { appBnfInit(); return; }
+  // News section
+  var prefix = 'news';
+  var loadingEl = document.getElementById(prefix + 'LoadingMsg');
+  var emptyEl   = document.getElementById(prefix + 'EmptyMsg');
+  var cardsEl   = document.getElementById(prefix + 'Cards');
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (emptyEl)   emptyEl.style.display   = 'none';
+  if (cardsEl)   cardsEl.innerHTML       = '';
+  fetch('/api/contents?section=news')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (loadingEl) loadingEl.style.display = 'none';
+      var items = (d.ok && d.items) ? d.items : [];
+      if (!items.length) { if (emptyEl) emptyEl.style.display = 'block'; return; }
+      if (cardsEl) {
+        cardsEl.innerHTML = items.map(function(item) {
+          var dt = item.updated_at ? item.updated_at.slice(0,10) : '';
+          var imgHtml = item.image_url
+            ? '<div style="border-radius:14px 14px 0 0;overflow:hidden;background:#f9f9f9;"><img src="' + escAppHtml(item.image_url) + '" alt="' + escAppHtml(item.title) + '" style="width:100%;height:auto;display:block;"></div>'
+            : '';
+          return '<div style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.08);border-left:5px solid #228B22;overflow:hidden;">' +
+            imgHtml + '<div style="padding:22px 20px;">' +
+              '<div style="font-size:24px;font-weight:900;color:#1a6b1a;margin-bottom:10px;line-height:1.3;">' + escAppHtml(item.title) + '</div>' +
+              (item.address ? '<div style="font-size:20px;color:#555;margin-bottom:10px;font-weight:600;">📍 地址：' + escAppHtml(item.address) + '</div>' : '') +
+              '<div style="font-size:20px;color:#333;white-space:pre-wrap;line-height:1.7;margin-bottom:' + (dt ? '12px' : '0') + ';">' + escAppHtml(item.body) + '</div>' +
+              (dt ? '<div style="font-size:16px;color:#aaa;margin-top:8px;">📅 ' + dt + '</div>' : '') +
+            '</div></div>';
+        }).join('');
+      }
+    })
+    .catch(function() {
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (emptyEl) emptyEl.style.display = 'block';
+    });
+}
+
+function escAppHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── 心聲 (Voice / Feedback) ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+var _voiceMemberNo = null;
+var _voiceCurrentThreadId = null;
+var _voiceCurrentThreadStatus = null;
+
+function initVoiceTab() {
+  _voiceMemberNo = localStorage.getItem('ce85_member_no');
+  if (!_voiceMemberNo) {
+    document.getElementById('voiceNoLogin').style.display = 'block';
+    document.getElementById('voiceListView').style.display = 'none';
+    document.getElementById('voiceNewForm').style.display = 'none';
+    document.getElementById('voiceThreadDetail').style.display = 'none';
+    return;
+  }
+  document.getElementById('voiceNoLogin').style.display = 'none';
+  showVoiceList();
+}
+
+function showVoiceList() {
+  document.getElementById('voiceListView').style.display = 'block';
+  document.getElementById('voiceNewForm').style.display = 'none';
+  document.getElementById('voiceThreadDetail').style.display = 'none';
+  loadVoiceThreads();
+}
+
+function loadVoiceThreads() {
+  if (!_voiceMemberNo) return;
+  var container = document.getElementById('voiceThreads');
+  container.innerHTML = '<div style="text-align:center;padding:30px;font-size:20px;color:#888;">載入中…</div>';
+  fetch('/api/feedback?m=' + encodeURIComponent(_voiceMemberNo))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var threads = (d.ok && d.threads) ? d.threads : [];
+      // update red dot on tab
+      var hasUnread = threads.some(function(t) { return t.has_unread_for_member; });
+      var dot = document.getElementById('voiceRedDot');
+      if (dot) dot.style.display = hasUnread ? 'block' : 'none';
+      if (!threads.length) {
+        container.innerHTML = '<div style="text-align:center;padding:40px 20px;font-size:20px;color:#888;">暫無意見記錄，歡迎提交你的心聲！</div>';
+        return;
+      }
+      container.innerHTML = threads.map(function(t) {
+        var statusColor = t.status === 'replied' ? '#1565C0' : t.status === 'closed' ? '#888' : '#228B22';
+        var statusLabel = t.status === 'replied' ? '✅ 已回覆' : t.status === 'closed' ? '🔒 已關閉' : '⏳ 等待回覆';
+        var unreadBadge = t.has_unread_for_member ? '<span style="background:#e53935;color:#fff;border-radius:20px;font-size:14px;font-weight:700;padding:2px 9px;margin-left:8px;">新回覆</span>' : '';
+        var dt = t.updated_at ? t.updated_at.slice(0,16).replace('T',' ') : '';
+        return '<div onclick="openVoiceThread(' + t.id + ')" style="background:#fff;border-radius:14px;padding:18px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.08);cursor:pointer;border-left:5px solid ' + statusColor + ';">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">' +
+            '<div style="font-size:20px;font-weight:700;color:#111;flex:1;">' + escAppHtml(t.subject) + unreadBadge + '</div>' +
+            '<span style="font-size:16px;font-weight:700;color:' + statusColor + ';">' + statusLabel + '</span>' +
+          '</div>' +
+          '<div style="font-size:16px;color:#888;margin-top:6px;">📅 ' + dt + '</div>' +
+        '</div>';
+      }).join('');
+    })
+    .catch(function() {
+      container.innerHTML = '<div style="text-align:center;padding:30px;font-size:20px;color:#e53935;">載入失敗，請重試</div>';
+    });
+}
+
+function openNewFeedbackForm() {
+  document.getElementById('voiceListView').style.display = 'none';
+  document.getElementById('voiceNewForm').style.display = 'block';
+  document.getElementById('vSubject').value = '';
+  document.getElementById('vContent').value = '';
+}
+
+function closeNewFeedbackForm() {
+  document.getElementById('voiceNewForm').style.display = 'none';
+  document.getElementById('voiceListView').style.display = 'block';
+}
+
+function submitNewFeedback() {
+  var subject = document.getElementById('vSubject').value.trim();
+  var content = document.getElementById('vContent').value.trim();
+  if (!subject) { alert('請填寫主題'); return; }
+  if (!content) { alert('請填寫內容'); return; }
+  if (!_voiceMemberNo) { alert('請先登入'); return; }
+  var btn = document.getElementById('vSubmitBtn');
+  btn.disabled = true; btn.textContent = '提交中…';
+  fetch('/api/feedback', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ member_no: _voiceMemberNo, subject: subject, content: content })
+  }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false; btn.textContent = '📤 提交意見';
+      if (d.ok) {
+        closeNewFeedbackForm();
+        loadVoiceThreads();
+      } else { alert('提交失敗：' + (d.error || '請稍後再試')); }
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = '📤 提交意見'; alert('網絡錯誤，請稍後再試'); });
+}
+
+function openVoiceThread(threadId) {
+  _voiceCurrentThreadId = threadId;
+  document.getElementById('voiceListView').style.display = 'none';
+  document.getElementById('voiceThreadDetail').style.display = 'block';
+  document.getElementById('voiceMsgList').innerHTML = '<div style="text-align:center;padding:30px;font-size:20px;color:#888;">載入中…</div>';
+  fetch('/api/feedback/' + threadId + '?m=' + encodeURIComponent(_voiceMemberNo))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) {
+        document.getElementById('voiceMsgList').innerHTML = '<div style="color:#e53935;padding:20px;font-size:18px;">載入失敗</div>';
+        return;
+      }
+      _voiceCurrentThreadStatus = d.thread ? d.thread.status : 'new';
+      document.getElementById('voiceDetailSubject').textContent = d.thread ? d.thread.subject : '';
+      var msgs = d.messages || [];
+      document.getElementById('voiceMsgList').innerHTML = msgs.length ? msgs.map(function(msg) {
+        var isMember = msg.sender === 'member';
+        var dt = msg.created_at ? msg.created_at.slice(0,16).replace('T',' ') : '';
+        return '<div style="display:flex;flex-direction:column;align-items:' + (isMember ? 'flex-end' : 'flex-start') + ';gap:4px;">' +
+          '<div style="max-width:88%;background:' + (isMember ? '#e8f5e9' : '#e3f2fd') + ';border-radius:12px;padding:14px 16px;">' +
+            '<div style="font-size:16px;font-weight:700;color:' + (isMember ? '#1B5E20' : '#1565C0') + ';margin-bottom:6px;">' + (isMember ? '👤 我' : '🔧 管理員') + ' · ' + dt + '</div>' +
+            '<div style="font-size:20px;color:#222;white-space:pre-wrap;line-height:1.6;">' + escAppHtml(msg.content) + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') : '<div style="text-align:center;padding:20px;font-size:18px;color:#888;">暫無訊息</div>';
+      // update red dot since we just read it
+      loadVoiceRedDot();
+      // show/hide reply box
+      var closed = _voiceCurrentThreadStatus === 'closed';
+      document.getElementById('voiceReplyBox').style.display = closed ? 'none' : 'block';
+      document.getElementById('voiceClosedNote').style.display = closed ? 'block' : 'none';
+    })
+    .catch(function() {
+      document.getElementById('voiceMsgList').innerHTML = '<div style="color:#e53935;padding:20px;font-size:18px;">網絡錯誤，請稍後再試</div>';
+    });
+}
+
+function closeVoiceThread() {
+  _voiceCurrentThreadId = null;
+  _voiceCurrentThreadStatus = null;
+  document.getElementById('voiceThreadDetail').style.display = 'none';
+  document.getElementById('voiceReplyBox').style.display = 'block';
+  document.getElementById('voiceClosedNote').style.display = 'none';
+  document.getElementById('vReplyText').value = '';
+  showVoiceList();
+}
+
+function submitVoiceReply() {
+  var content = document.getElementById('vReplyText').value.trim();
+  if (!content) { alert('請輸入回覆內容'); return; }
+  if (!_voiceMemberNo || !_voiceCurrentThreadId) { alert('錯誤，請重試'); return; }
+  var btn = document.getElementById('vReplyBtn');
+  btn.disabled = true; btn.textContent = '發送中…';
+  fetch('/api/feedback/' + _voiceCurrentThreadId + '/reply', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ member_no: _voiceMemberNo, content: content })
+  }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false; btn.textContent = '📤 發送';
+      if (d.ok) {
+        document.getElementById('vReplyText').value = '';
+        openVoiceThread(_voiceCurrentThreadId);
+      } else { alert('發送失敗：' + (d.error || '請稍後再試')); }
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = '📤 發送'; alert('網絡錯誤'); });
+}
+
+function loadVoiceRedDot() {
+  if (!_voiceMemberNo) return;
+  fetch('/api/feedback?m=' + encodeURIComponent(_voiceMemberNo))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var threads = (d.ok && d.threads) ? d.threads : [];
+      var hasUnread = threads.some(function(t) { return t.has_unread_for_member; });
+      var dot = document.getElementById('voiceRedDot');
+      if (dot) dot.style.display = hasUnread ? 'block' : 'none';
+    }).catch(function() {});
+}
+
+// switchTab 切到 work 時自動載入
+var _origSwitchTab = switchTab;
+switchTab = function(name) {
+  _origSwitchTab(name);
+  if (name === 'work' && !_jobsLoaded) { loadJobList(); }
+  if (name === 'shop') { loadAppContents('shopping'); }
+  if (name === 'news') { loadAppContents('news'); }
+  if (name === 'voice') { initVoiceTab(); }
+};
+
+function loadJobList() {
+  var loading = document.getElementById('job-list-loading');
+  var empty = document.getElementById('job-list-empty');
+  var cards = document.getElementById('job-list-cards');
+  if (loading) loading.style.display = 'block';
+  if (empty) empty.style.display = 'none';
+  if (cards) cards.innerHTML = '';
+  fetch('/api/jobs')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (loading) loading.style.display = 'none';
+      if (!d.ok || !d.jobs || !d.jobs.length) {
+        if (empty) empty.style.display = 'block';
+        return;
+      }
+      _jobsLoaded = true;
+      if (cards) {
+        cards.innerHTML = d.jobs.map(function(j) {
+          var imgHtml = j.image_url
+            ? '<div style="width:100%;border-radius:12px 12px 0 0;overflow:hidden;background:#F3F4F6"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:auto;display:block;" loading="lazy" onerror="this.style.display=String.fromCharCode(110,111,110,101)"></div>'
+            : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:18px">&#128247; \u6682\u7121\u5716\u7247</div>';
+          var loc = j.location ? '<div style="font-size:18px;color:#374151;margin-top:4px">📍 ' + escHtml(j.location) + '</div>' : '';
+          var type = j.job_type ? '<div style="display:inline-block;margin-top:8px;padding:4px 12px;background:#D1FAE5;color:#065F46;border-radius:20px;font-size:16px;font-weight:600">' + escHtml(j.job_type) + '</div>' : '';
+          return '<div onclick="showJobDetail(' + j.id + ')" style="background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.10);border:1.5px solid #E5E7EB;cursor:pointer;overflow:hidden;-webkit-tap-highlight-color:rgba(0,0,0,0.05)">'+
+            imgHtml +
+            '<div style="padding:14px 16px 16px">' +
+              '<div style="font-size:22px;font-weight:800;color:#111827;line-height:1.3">' + escHtml(j.title) + '</div>' +
+              loc + type +
+              (j.salary ? '<div style="font-size:17px;color:#228B22;font-weight:700;margin-top:8px">💰 ' + escHtml(j.salary) + '</div>' : '') +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+    })
+    .catch(function() {
+      if (loading) loading.style.display = 'none';
+      if (empty) { empty.style.display = 'block'; empty.querySelector('div:last-child').textContent = '載入失敗，請稍後再試'; }
+    });
+}
+
+function showJobDetail(jobId) {
+  _currentJobId = jobId;
+  document.getElementById('jobListView').style.display = 'none';
+  document.getElementById('jobDetailView').style.display = 'block';
+  var content = document.getElementById('job-detail-content');
+  var applyMsg = document.getElementById('job-apply-msg');
+  var applyBtn = document.getElementById('job-apply-btn');
+  content.innerHTML = '<div style="text-align:center;padding:60px 20px;font-size:20px;color:#6B7280">載入中...</div>';
+  applyMsg.style.display = 'none';
+  applyBtn.disabled = false;
+  applyBtn.style.background = '#228B22';
+  applyBtn.textContent = '我要申請';
+  window.scrollTo({ top: 0 });
+  fetch('/api/jobs/' + jobId)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { content.innerHTML = '<div style="padding:40px;text-align:center;color:#DC2626;font-size:20px">載入失敗</div>'; return; }
+      var j = d.job;
+      var imgHtml = j.image_url
+        ? '<div style="width:100%;background:#F3F4F6;overflow:hidden"><img src="' + escHtml(j.image_url) + '" style="width:100%;height:auto;display:block;" onerror="this.parentNode.style.display=String.fromCharCode(110,111,110,101)"></div>'
+        : '<div style="width:100%;aspect-ratio:4/3;background:#F3F4F6;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:20px">&#128247; \u6682\u7121\u5716\u7247</div>';
+      var rows = [
+        j.company ? ['🏢 公司／機構', j.company] : null,
+        j.location ? ['📍 工作地點', j.location] : null,
+        j.job_type ? ['⏰ 工作性質', j.job_type] : null,
+        j.salary ? ['💰 待遇', j.salary] : null,
+      ].filter(Boolean);
+      var rowsHtml = rows.map(function(r) {
+        return '<div style="display:flex;gap:10px;padding:12px 0;border-bottom:1px solid #F3F4F6">'+
+          '<div style="font-size:18px;color:#6B7280;min-width:130px;flex-shrink:0">' + r[0] + '</div>'+
+          '<div style="font-size:18px;font-weight:600;color:#111827;flex:1">' + escHtml(r[1]) + '</div>'+
+        '</div>';
+      }).join('');
+      var descHtml = j.description ? '<div style="margin-top:20px"><div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:8px">📋 詳細資料</div><div style="font-size:18px;color:#374151;line-height:1.7;white-space:pre-wrap">' + escHtml(j.description) + '</div></div>' : '';
+      var reqHtml = j.requirement ? '<div style="margin-top:20px"><div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:8px">✅ 要求</div><div style="font-size:18px;color:#374151;line-height:1.7;white-space:pre-wrap">' + escHtml(j.requirement) + '</div></div>' : '';
+      content.innerHTML = imgHtml +
+        '<div style="padding:16px">' +
+          '<div style="font-size:24px;font-weight:800;color:#111827;line-height:1.3;margin-bottom:12px">' + escHtml(j.title) + '</div>' +
+          rowsHtml + descHtml + reqHtml +
+          '<div style="height:20px"></div>' +
+        '</div>';
+    })
+    .catch(function() {
+      content.innerHTML = '<div style="padding:40px;text-align:center;color:#DC2626;font-size:20px">載入失敗，請稍後再試</div>';
+    });
+}
+
+function showJobList() {
+  _currentJobId = null;
+  document.getElementById('jobDetailView').style.display = 'none';
+  document.getElementById('jobListView').style.display = 'block';
+  window.scrollTo({ top: 0 });
+}
+
+function applyJob() {
+  if (!_currentJobId) return;
+  var memberNo = localStorage.getItem('ce85_member_no') || '';
+  var applyBtn = document.getElementById('job-apply-btn');
+  var applyMsg = document.getElementById('job-apply-msg');
+  if (!memberNo) {
+    applyMsg.style.display = 'block';
+    applyMsg.style.color = '#D97706';
+    applyMsg.textContent = '⚠️ 請先喺「我的卡」登記會員';
+    return;
+  }
+  applyBtn.disabled = true;
+  applyBtn.style.background = '#6B7280';
+  applyBtn.textContent = '申請中...';
+  applyMsg.style.display = 'none';
+  fetch('/api/jobs/' + _currentJobId + '/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ member_no: memberNo })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      applyMsg.style.display = 'block';
+      if (d.ok) {
+        applyBtn.style.display = 'none';
+        applyMsg.style.color = '#065F46';
+        applyMsg.textContent = '✅ 已收到你嘅申請，我哋會跟進';
+      } else if (d.already) {
+        applyBtn.disabled = false;
+        applyBtn.style.background = '#9CA3AF';
+        applyBtn.textContent = '已申請';
+        applyMsg.style.color = '#374151';
+        applyMsg.textContent = '你已經申請咗呢份工';
+      } else {
+        applyBtn.disabled = false;
+        applyBtn.style.background = '#228B22';
+        applyBtn.textContent = '我要申請';
+        applyMsg.style.color = '#DC2626';
+        applyMsg.textContent = d.error || '申請失敗，請稍後再試';
+      }
+    })
+    .catch(function() {
+      applyBtn.disabled = false;
+      applyBtn.style.background = '#228B22';
+      applyBtn.textContent = '我要申請';
+      applyMsg.style.display = 'block';
+      applyMsg.style.color = '#DC2626';
+      applyMsg.textContent = '網絡錯誤，請稍後再試';
+    });
+}
+
+// ── 醫健卡 panel 互動函數（appBnfMedCardIssuedHtml 用）──
+function appMedTogglePanel(panelId){
+  var panels=['medCardInfoPanel','medDoctorInfoPanel'];
+  var btnMap={'medCardInfoPanel':'appBtnMedCard','medDoctorInfoPanel':'appBtnMedDoctor'};
+  var activeCol={'medCardInfoPanel':'#1565C0','medDoctorInfoPanel':'#2E7D32'};
+  panels.forEach(function(id){
+    var el=document.getElementById(id);
+    var btn=document.getElementById(btnMap[id]);
+    var isTarget=(id===panelId);
+    var isOpen=el&&el.style.display!=='none';
+    if(isTarget){if(el)el.style.display=isOpen?'none':'block';if(btn)btn.style.background=isOpen?activeCol[id]:'#37474F';}
+    else{if(el)el.style.display='none';if(btn)btn.style.background=activeCol[id];}
+  });
+}
+// Copy value stored in hidden #appMedData{n} span; btn is the clicked element
+function appMedCopyById(n,btn,origLabel){
+  var src=document.getElementById('appMedData'+n);
+  var txt=src?src.textContent:'';
+  navigator.clipboard.writeText(txt).then(function(){
+    if(btn){btn.textContent='已複製 ✓';btn.style.background='#2E7D32';setTimeout(function(){btn.textContent=origLabel;btn.style.background='#1565C0';},2000);}
+  }).catch(function(){alert(txt);});
+}
+// Open card image url stored in data-url attr
+function appMedOpenImg(btn){
+  var url=btn&&btn.getAttribute('data-url');
+  if(url) window.open(url,'_blank');
+}
+// Toggle 查看醫生 doctor panel (MC2.png)
+function appMedShowDoctorPanel(){
+  var panel=document.getElementById('appMedDoctorPanel');
+  var btn=document.getElementById('appBtnMedDoctor');
+  if(!panel) return;
+  var isOpen=panel.style.display!=='none';
+  panel.style.display=isOpen?'none':'block';
+  if(btn){
+    btn.style.background=isOpen?'#2E7D32':'#1B5E20';
+    btn.textContent=isOpen?'🩺 查看醫生':'🩺 收起醫生資料';
+  }
+}
+</script>
+</body>
+</html>`
+}
