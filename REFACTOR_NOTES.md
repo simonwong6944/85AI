@@ -224,4 +224,79 @@
 
 ---
 
+## [NOTE-010] /app 及 /admin 頁面 pre-existing 1×404（Service Worker 生命週期觸發）
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 3 Stage 5 QA，pwaAppHtml（commit `41f232f`）及 newAdminShellHtml（commit `ecf3856`）搬遷後驗証 |
+| **涉及頁面** | `GET /app`（pwaAppHtml）、`GET /admin`（newAdminShellHtml） |
+| **問題描述** | PlaywrightConsoleCapture 在真實瀏覽器環境（HTTPS 公開 URL）對 `/app` 及 `/admin` 均捕獲 1×`Failed to load resource: the server responded with a status of 404 ()`，console error 各一條。所有靜態資源（`/manifest.webmanifest`、`/icon-192.png`、`/static/logo-coeldery85-white.png`、`/shared.css`、`/sw.js`、`/static/mc-sample.png`）curl 驗証全部返回 200。Python headless Playwright（`--disable-features=ServiceWorker`）捕獲不到該 404——說明 404 由 Service Worker 生命週期（install/activate/fetch 攔截）觸發，非 page JS 直接 fetch。 |
+| **Baseline 對照** | 針對 `/app`：checkout `41f232f^`（`4c5f9ba`）rebuild 後用 PlaywrightConsoleCapture 同樣捕獲完全相同的 1×404；針對 `/admin`：checkout `ecf3856^`（`41f232f`）rebuild 後同樣 1×404。兩個頁面的 404 均在搬遷前已存在，**確認為 pre-existing，零 regression**。 |
+| **來源未定** | `sw.js`（CACHE_NAME `coeldery85-v4`，`OFFLINE_URLS: ['/app']`）curl 返回 200；`cache.addAll(['/app'])` 在 install event 中有 `.catch(() => {})` 吞錯；404 觸發時機及具體請求 URL 尚未完全確定（headless 工具因 SW 攔截無法捕獲網絡層詳情）。 |
+| **狀態** | 🟡 **pre-existing，非 regression**；來源未定，待調查。 |
+| **已照搬不改** | N/A（純 QA 發現，非搬遷引入）。 |
+| **建議後續行動** | Wave 4 或獨立安全調查時，在真實 Chrome DevTools Network 面板（清除 SW cache 後）確認 404 的具體請求 URL；若為非必要資源，可修改 `sw.js` 的 precache 清單或升級 CACHE_NAME 版本強制重安裝。 |
+
+---
+
+## [NOTE-011] Wave 3 拆檔完成摘要
+
+| 欄目 | 內容 |
+|------|------|
+| **完成於** | Wave 3 Stage 5，commit `ecf3856`（newAdminShellHtml，最後一個 template） |
+| **涉及範圍** | `src/index.tsx` → `src/lib/html-templates.ts`（22 個 exported functions） |
+| **搬遷規模** | `src/index.tsx`：Wave 3 開始前 ~16,963 行 → 完成後 **7,227 行**（減少 **~9,736 行，約 −57%**） |
+
+> **注意**：本條 NOTE-011 所稱「24,848 行」為本次 refactor branch 整個 session 起點（Wave 1 開始前）計算值；Wave 3 開始前基線約 16,963 行；Wave 3 完成後 7,227 行，Wave 3 本身減少約 9,736 行（−57%）。全程 index.tsx 淨減幅（含 Wave 1–3）約 −71%。
+
+### 搬遷結果指標
+
+| 指標 | 數值 |
+|------|------|
+| html-templates.ts exported functions | **22 個** |
+| index.tsx 行數（Wave 3 開始前） | ~16,963 行 |
+| index.tsx 行數（Wave 3 完成後） | **7,227 行** |
+| Wave 3 減少行數 | ~9,736 行（約 −57%） |
+| index.tsx 行數（session 起點，含 Wave 1–2 前） | ~24,848 行 |
+| index.tsx 總減少行數（Wave 1–3 累計） | ~17,621 行（約 −71%） |
+| bundle size（全程恆定） | **1,221.53 kB** |
+| module count（全程恆定） | **50** |
+| logic 改動 | **零** |
+| regression | **零** |
+
+### Wave 3 各 Stage commit hash 清單
+
+| Stage | 函數 | Commit | 備注 |
+|-------|------|--------|------|
+| Stage 0 | `htmlHead` | `573b533` | html-shared.ts 新建 |
+| Stage 0 | `HK_DISTRICTS` | `f5e6ee6` | constants.ts 新建 |
+| Stage 1 | `dashboardHtml` + `comingSoonHtml` | `b9c29cd` | 零依賴，batch |
+| Stage 2 | `adminColinkerySectionHtml` | `89d1b72` | `<\/script>` escape 保留 |
+| Stage 2 | `qrRegisterHtml` | `2d5c25c` | source param |
+| Stage 2 | `adminQrHtml` | `4fd92f4` | inline script |
+| Stage 1 | `walletHtml` | `b5bca2a` | Stage label 誤植，見 NOTE-005 |
+| Stage 2 | `teamConfirmHtml` | `3f3feea` | inline script |
+| Stage 2 | `coworkeryAppHtml` | `a50212d` | inline script |
+| Stage 2 | `brandFormHtml` | `c2c6f83` | JSON.stringify param |
+| Stage 2 | `memberProfileHtml` | `bf14899` | local-const deps |
+| Stage 2 | `colinkerypwaHtml` | `ac58677` | pure static HTML |
+| Stage 2 | `partnerApplyHtml` | `b76cbe2` | prefill params |
+| Stage 3 | `qrCompleteHtml` | `4c96a16` | HK_DISTRICTS import |
+| Stage 4 | `sopHtml` | `c3b708d` | dead code，見 NOTE-006 |
+| Stage 4 | `posterHtml` | `84e8292` | dead code，見 NOTE-006 |
+| Stage 4 | `loginHtml` | `7f2e6ec` | dead code，見 NOTE-006 |
+| Stage 4 | `homeHtml` | `068ecfd` | dead code，見 NOTE-006 |
+| Stage 4 | `signupSubHtml` | `3354ea2` | htmlHead chain |
+| Stage 4 | `signupMainHtml` | `27d173a` | htmlHead chain，import 事故，見 NOTE-008 |
+| Stage 4 | `adminHtml` | `e4d7645` | htmlHead chain，新 regex 首用 |
+| chore | REFACTOR_NOTES + import normalize | `4c5f9ba` | NOTE-005–009，20→21 symbols normalize |
+| Stage 5 | `pwaAppHtml` | `41f232f` | HIGH-RISK，2725L，1 inline JS app |
+| Stage 5 | `newAdminShellHtml` | `ecf3856` | 最終 template，5069L，5 script blocks |
+
+### Wave 3 完成宣告
+
+Wave 3（HTML template 模組化）全部完成。`src/lib/html-templates.ts` 現為 22 個 exported functions 的獨立模組，`src/index.tsx` 已清空所有 template 定義，僅保留路由 handler、middleware、業務邏輯及 lib 函數。
+
+---
+
 <!-- 以後所有搬遷時發現的可疑邏輯，照此格式新增條目 -->
