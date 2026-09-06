@@ -20,45 +20,73 @@
 
 ---
 
-## [NOTE-002] verifySession — 呼叫點參數順序錯誤【高優先 / 疑似安全問題 / 待獨立調查】
+## [NOTE-002] verifySession — 呼叫點參數順序錯誤【✅ RESOLVED — commit `ada12f2`】
 
 | 欄目 | 內容 |
 |------|------|
 | **發現於** | Wave 2，搬遷 `verifySession` 前置審查（branch `refactor/split-index`，base commit `557a1ce`） |
+| **解決於** | Wave 4，commit `ada12f2`（2026-09-06） |
 | **涉及函數** | `verifySession(db: D1Database, token: string \| undefined): Promise<boolean>` |
 | **正確簽名** | `verifySession(db, token)` — 第一參數為 D1Database，第二參數為 token 字串 |
-| **問題描述** | 全檔 `src/index.tsx` 共有 **16 個** `verifySession` 呼叫點，分兩種模式：**Pattern A（正確，8 個）**：`verifySession(c.env.DB, token)` — 符合函數簽名；**Pattern B（錯誤，8 個）**：`verifySession(c, db)` — 將 Hono context `c` 傳入 `db` 位置、將 D1Database `db` 傳入 `token` 位置。Pattern B 中函數內 `if (!token) return false` 收到 db object（truthy）會繼續執行，再以 `c`（context，非 D1Database）呼叫 `db.prepare(...)` → runtime TypeError。實際效果：Pattern B 的 auth check 在 runtime 拋出錯誤或永遠失敗，**這 8 條 admin route 可能一直缺乏有效 auth 保護**（惟注意：上游 `app.use('/api/admin/*', ...)` middleware 可能已提供保護，待調查）。Pattern A 的 8 個呼叫點無問題。 |
-| **嚴重程度** | 🔴 **高優先 / 疑似安全漏洞** |
-| **已照搬不改** | ✅ 純機械搬遷原則——呼叫點一隻字都唔動，原行為照保留。 |
-| **待獨立調查** | 須另開工程確認：①這 8 條 route 是否真的在 production 無 auth 保護；② benefits/hmvod 路由是否依賴上游 middleware 保護（`app.use('/api/admin/*', ...)` 已在 line ~80 設定，可能已由 middleware 覆蓋）；③ 若 middleware 已保護，Pattern B 呼叫雖錯但無害；④ 修正時須同時審查所有 16 個呼叫點。 |
+| **受影響範圍** | benefits 系列 admin route 共 **8 條**：7 條 `/api/admin/benefits*` + 1 條 `/api/admin/benefit-categories` |
+| **成因** | Pattern B 呼叫 `verifySession(c, db)` 參數對調：`db` 位置收到 Hono context `c`（object，truthy），`if (!token) return false` 不攔截，繼續以 `c`（非 D1Database）呼叫 `c.prepare(...)` → **runtime TypeError**；Hono 不吞 TypeError，直接 propagate 為 **500 Internal Server Error** |
+| **安全結論** | 🟢 **無安全漏洞**。`app.use('/api/admin/*')` middleware（line 58）一直以正確參數 `verifySession(c.env.DB, token)` 鑑權，未登入者在 handler 執行前已被攔截返 401。無 cookie 實測三條（GET `/api/admin/benefits`、POST `/api/admin/benefits`、GET `/api/admin/benefit-categories`）全部返回 `401 + {"ok":false,"error":"Unauthorized","code":"AUTH_REQUIRED"}`，坐實 middleware 保護完整。 |
+| **功能結論** | 🔴→✅ **修前**：8 條 route 對已登入 admin 亦壞死（全返 500）；**修後**：6 條 → 200、`/api/admin/benefit-categories` → 200、`upload-image` → handler 正常執行至業務層（沙箱無 Cloudinary 環境變數，返受控 `{"ok":false,"error":"Cloudinary 未設定"}`，非 TypeError） |
+| **修法** | Option B：純刪除 8 處冗餘 `verifySession(c, db)` call，倚靠已驗證 middleware；其中 `upload-image` handler 連 unused `const db = ...` 宣告一併刪（後續全程操作 Cloudinary，不用 db）；其餘 7 條保留 `const db` 宣告（後續有 D1 查詢） |
+| **commit** | `ada12f2` — `fix: remove dead verifySession(c,db) calls in 8 benefits admin routes (NOTE-002, functional fix — 500→200 for authed admin, middleware already enforces auth; hmvod NOT affected)` |
+| **diff 統計** | `src/index.tsx \| 9 ---------`（1 file changed, 9 deletions）；純刪除，零新增；bundle 1,221.53 → 1,220.95 kB（−0.58 kB） |
 
-> ⚠️ **補記（2026-09-05，Commit 1 原文遺漏）**：NOTE-002 初版僅列 Pattern B（8 個），未計入 Pattern A（8 個）。全檔實際呼叫點為 **16 個**（A 8 + B 8），現補全。行號為 commit `ef019b6` 搬遷後的當前行號。
+### 受影響 Route 清單（修復前後對照）
 
-**Pattern A — 正確呼叫點（`verifySession(c.env.DB, token)`，共 8 個）：**
+| Method | Route | 修前 Status | 修後 Status | 備注 |
+|--------|-------|:-----------:|:-----------:|------|
+| GET | `/api/admin/benefits` | 500 | **200** | |
+| POST | `/api/admin/benefits` | 500 | **200** | |
+| PUT | `/api/admin/benefits/:id` | 500 | **200** | |
+| DELETE | `/api/admin/benefits/:id` | 500 | **200** | |
+| GET | `/api/admin/benefits/:id/claims` | 500 | **200** | |
+| GET | `/api/admin/benefits/claims/summary` | 500 | **200** | |
+| POST | `/api/admin/benefits/upload-image` | 500 | **500**† | †業務層受控錯誤（無 Cloudinary 設定），非 TypeError |
+| GET | `/api/admin/benefit-categories` | 500 | **200** | |
 
-| 行號（ef019b6 後） | Route / 用途 | 參數 |
-|------------------|------------|------|
-| 60 | `POST /api/admin/login` — login handler | `verifySession(c.env.DB, token)` |
-| 98 | `GET /api/admin/me` — session check | `verifySession(c.env.DB, token)` |
-| 20735 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
-| 20762 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
-| 20804 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
-| 20830 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
-| 20848 | admin colinkery 管理路由 | `verifySession(c.env.DB, token)` |
-| 22332 | `/membership/admin` redirect guard | `verifySession(c.env.DB, token)` |
+### 描述演變記錄（供日後審計）
 
-**Pattern B — 錯誤呼叫點（`verifySession(c, db)`，共 8 個）：**
+| 版本 | 描述 | 狀態 |
+|------|------|------|
+| 初版（Wave 2 發現） | 「benefits/hmvod 8 條 Pattern B」 | ❌ 不準確：hmvod admin route 實際用 inline 手寫鑑權（`verifySession(c.env.DB, token)`），不屬此批 |
+| 中期更正（Wave 4 勘查） | 「7 條 `/api/admin/benefits*`」 | ⚠️ 一度誤為 7：測試時誤打不存在 path 致 404 混入統計（如 `/api/admin/benefits/categories`、`/api/admin/benefits/stats`、`/api/admin/benefits/export`） |
+| 最終確認（Wave 4 實測） | **「benefits 系列 8 條：7 條 `/api/admin/benefits*` + 1 條 `/api/admin/benefit-categories`」** | ✅ 正確 |
 
-| 行號（ef019b6 後） | Route handler | 參數（錯誤） |
-|------------------|--------------|------------|
-| 24268 | `app.get('/api/admin/benefits', ...)` | `verifySession(c, db)` |
-| 24282 | `app.post('/api/admin/benefits', ...)` | `verifySession(c, db)` |
-| 24298 | `app.put('/api/admin/benefits/:id', ...)` | `verifySession(c, db)` |
-| 24316 | `app.delete('/api/admin/benefits/:id', ...)` | `verifySession(c, db)` |
-| 24324 | `app.get('/api/admin/benefits/:id/claims', ...)` | `verifySession(c, db)` |
-| 24337 | `app.get('/api/admin/benefits/claims/summary', ...)` | `verifySession(c, db)` |
-| 24353 | `app.post('/api/admin/benefits/upload-image', ...)` | `verifySession(c, db)` |
-| 24399 | `app.get('/api/admin/benefit-categories', ...)` | `verifySession(c, db)` |
+> **hmvod 不受影響確認**：`/api/admin/hmvod/applications` 實測帶有效 cookie 返 200，不在 Pattern B 批次內。
+
+### 原始 Pattern A / B 呼叫點記錄（歷史參考）
+
+**Pattern A — 正確呼叫點（`verifySession(c.env.DB, token)`，修復後仍存在，共 8 個）：**
+
+| 行號（ada12f2 後） | Route / 用途 |
+|------------------|------------|
+| 6 (import) | import declaration |
+| 65 | `app.use('/api/admin/*')` middleware |
+| 103 | `GET /api/admin/me` — session check |
+| 5723 | admin colinkery 管理路由 |
+| 5750 | admin colinkery 管理路由 |
+| 5792 | admin colinkery 管理路由 |
+| 5818 | admin colinkery 管理路由 |
+| 5836 | admin colinkery 管理路由 |
+| 5902 | `/membership/admin` redirect guard |
+
+**Pattern B — 錯誤呼叫點（`verifySession(c, db)`，已全部刪除，原共 8 個）：**
+
+| 原行號（ada12f2 前） | Route handler |
+|--------------------|--------------|
+| 6753 | `GET /api/admin/benefits` |
+| 6767 | `POST /api/admin/benefits` |
+| 6783 | `PUT /api/admin/benefits/:id` |
+| 6801 | `DELETE /api/admin/benefits/:id` |
+| 6809 | `GET /api/admin/benefits/:id/claims` |
+| 6822 | `GET /api/admin/benefits/claims/summary` |
+| 6837–6838 | `POST /api/admin/benefits/upload-image`（含 unused `const db` 2 行） |
+| 6884 | `GET /api/admin/benefit-categories` |
 
 ---
 
