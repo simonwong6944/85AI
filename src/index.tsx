@@ -11,7 +11,7 @@ import { sha256hex, appendHashChain } from './lib/revenue-utils'
 import { verifyColinkerySess, requireColinkery } from './lib/colinkery-auth'
 import { htmlHead } from './lib/html-shared'
 import { HK_DISTRICTS } from './lib/constants'
-import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml , qrCompleteHtml , sopHtml } from './lib/html-templates'
+import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml , qrCompleteHtml , sopHtml , posterHtml } from './lib/html-templates'
 
 type Bindings = {
   DB: D1Database
@@ -6341,132 +6341,7 @@ switchTab = function(name, el) {
 }
 
 // ─── Poster HTML ──────────────────────────────────────────────────────────────
-function posterHtml() {
-  return htmlHead('Roadshow Poster', `<style>
-body{background:#333;padding:24px 0;}
-.poster-wrap{display:flex;justify-content:center;padding-bottom:40px;}
-.controls{position:fixed;top:20px;right:20px;background:#fff;padding:16px 20px;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:100;font-family:"Noto Sans TC",sans-serif;font-size:12px;max-width:260px;}
-.controls h4{font-family:"Noto Serif TC",serif;color:var(--forest-deep);font-size:14px;margin-bottom:10px;}
-.controls label{display:block;margin-bottom:8px;color:var(--grey-1);}
-.controls input{width:100%;padding:6px 8px;border:1px solid var(--line);font-size:12px;font-family:monospace;}
-.controls .hint{font-size:10px;color:var(--grey-3);margin-top:8px;line-height:1.5;}
-.controls .btn{display:inline-block;margin-top:12px;padding:8px 14px;background:var(--forest);color:#fff;border:0;cursor:pointer;font-size:12px;font-family:"Noto Sans TC",sans-serif;font-weight:700;letter-spacing:1px;}
-.poster{width:900px;height:1273px;background:#FAF7F0;position:relative;overflow:hidden;font-family:"Noto Sans TC",sans-serif;color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,0.4);}
-.poster-header{height:220px;background:linear-gradient(135deg,#0d3e12 0%,#1B5E20 55%,#2d5016 100%);color:#fff;padding:40px 60px;position:relative;overflow:hidden;}
-.poster-header::before{content:"85";position:absolute;right:-30px;top:-80px;font-family:"Noto Serif TC",serif;font-size:380px;font-weight:900;color:var(--ferrari);opacity:0.18;line-height:1;}
-.poster-header .logo-chip{display:inline-block;background:rgba(255,255,255,0.97);padding:14px 22px 12px;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.2);position:relative;z-index:2;font-family:"Noto Serif TC",serif;color:var(--forest-deep);font-size:22px;font-weight:900;letter-spacing:2px;}
-.poster-header .logo-chip em{color:var(--ferrari);font-style:normal;}
-.poster-header .tagline{position:absolute;right:60px;bottom:40px;text-align:right;font-family:"Noto Serif TC",serif;z-index:2;}
-.poster-header .tagline .l1{font-size:22px;font-weight:700;letter-spacing:3px;margin-bottom:4px;}
-.poster-header .tagline .l2{font-size:12px;letter-spacing:4px;opacity:0.85;}
-.poster-main{padding:44px 60px 20px;text-align:center;}
-.poster-main .kicker{font-family:"Noto Serif TC",serif;font-size:15px;letter-spacing:10px;color:var(--ferrari);font-weight:700;margin-bottom:16px;}
-.poster-main h1{font-family:"Noto Serif TC",serif;font-size:72px;font-weight:900;color:var(--forest-deep);line-height:1.1;letter-spacing:4px;margin-bottom:12px;}
-.poster-main h1 .red{color:var(--ferrari);}
-.poster-main .subline{font-family:"Noto Serif TC",serif;font-size:22px;color:var(--grey-1);letter-spacing:4px;font-weight:400;}
-.poster-main .rule{width:60px;height:4px;background:var(--ferrari);margin:24px auto 0;}
-.entries{padding:30px 50px 0;display:grid;grid-template-columns:1fr 1fr;gap:24px;}
-.entry{background:#fff;border:3px solid var(--forest);padding:28px 24px 24px;position:relative;text-align:center;}
-.entry.sub{border-color:var(--ferrari);}
-.entry .step-badge{position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:var(--forest);color:#fff;padding:6px 20px;font-family:"Noto Serif TC",serif;font-size:13px;letter-spacing:4px;font-weight:700;}
-.entry.sub .step-badge{background:var(--ferrari);}
-.entry h2{font-family:"Noto Serif TC",serif;font-size:32px;color:var(--forest-deep);margin-top:14px;margin-bottom:6px;letter-spacing:3px;font-weight:900;}
-.entry.sub h2{color:var(--ferrari-deep);}
-.entry .sub-desc{font-size:14px;color:var(--grey-2);letter-spacing:1px;margin-bottom:18px;line-height:1.5;}
-.entry .qr-holder{width:260px;height:260px;margin:0 auto;background:#fff;padding:14px;border:1px solid var(--line);}
-.entry .qr-holder canvas{width:100%;height:100%;display:block;}
-.entry .who{margin-top:18px;font-family:"Noto Serif TC",serif;font-size:18px;color:var(--ink);font-weight:700;letter-spacing:2px;}
-.entry .who-en{font-size:11px;letter-spacing:3px;color:var(--grey-3);margin-top:4px;}
-.steps-band{margin:32px 60px 0;padding:24px 28px;background:var(--forest-deep);color:#fff;}
-.steps-band .band-title{font-family:"Noto Serif TC",serif;font-size:16px;letter-spacing:4px;color:var(--ferrari);margin-bottom:16px;text-align:center;font-weight:700;}
-.steps-band .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;position:relative;}
-.steps-band .step{text-align:center;padding:0 8px;position:relative;}
-.steps-band .step .num{width:32px;height:32px;border-radius:50%;background:var(--ferrari);color:#fff;font-family:"Noto Serif TC",serif;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;}
-.steps-band .step h4{font-family:"Noto Serif TC",serif;font-size:15px;margin-bottom:4px;font-weight:700;letter-spacing:2px;}
-.steps-band .step p{font-size:11px;opacity:0.85;line-height:1.5;letter-spacing:0.5px;}
-.steps-band .step:not(:last-child)::after{content:"→";position:absolute;right:-12px;top:6px;color:var(--ferrari);font-size:18px;font-weight:900;}
-.values{padding:24px 60px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-.value{text-align:center;padding:14px;border:1px dashed var(--forest);background:rgba(232,245,233,0.5);}
-.value .icon{font-family:"Noto Serif TC",serif;font-size:26px;color:var(--ferrari);font-weight:900;margin-bottom:6px;}
-.value h4{font-family:"Noto Serif TC",serif;font-size:15px;color:var(--forest-deep);letter-spacing:2px;font-weight:700;margin-bottom:4px;}
-.value p{font-size:11px;color:var(--grey-1);line-height:1.5;}
-.poster-footer{position:absolute;bottom:0;left:0;right:0;background:var(--forest-deep);color:#fff;padding:20px 60px;display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:1.5px;}
-.poster-footer .brand{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;letter-spacing:3px;}
-.poster-footer .brand em{color:var(--ferrari);font-style:normal;}
-.poster-footer .hotline{font-family:"Space Grotesk",sans-serif;font-size:14px;letter-spacing:2px;color:var(--ferrari);font-weight:700;}
-@media print{body{background:#fff;padding:0;}.controls{display:none!important;}.poster{box-shadow:none;}@page{size:A2 portrait;margin:0;}}
-</style>`) + `
-<body>
-<div class="controls">
-  <h4>▶ QR Code 設定</h4>
-  <label>主卡表單網址 <input id="urlMain" type="text" value="https://coeldery85.com/join"></label>
-  <label>附屬卡表單網址 <input id="urlSub" type="text" value="https://coeldery85.com/join-family"></label>
-  <button class="btn" onclick="regen()">更新 QR</button>
-  <button class="btn" onclick="window.print()" style="background:var(--ferrari);margin-left:6px;">列印/PDF</button>
-  <div class="hint">▸ 更改網址後按「更新 QR」<br>▸ 列印時建議 A2 / A3 尺寸</div>
-</div>
-<div class="poster-wrap">
-<div class="poster">
-  <div class="poster-header">
-    <div class="logo-chip">CoEldery <em>85</em> 老有聯盟</div>
-    <div class="tagline">
-      <div class="l1">香港銀髮經濟的<br>系統性重構</div>
-      <div class="l2">不是解決老齡化 · 是解放第二人生</div>
-    </div>
-  </div>
-  <div class="poster-main">
-    <div class="kicker">◆ 免費入會 · 即刻登記 ◆</div>
-    <h1>加入我哋 · <span class="red">共同擁有</span></h1>
-    <div class="subline">每一位長者 · 都係共同創辦人</div>
-    <div class="rule"></div>
-  </div>
-  <div class="entries">
-    <div class="entry main">
-      <div class="step-badge">55 歲或以上</div>
-      <h2>長者主卡</h2>
-      <div class="sub-desc">CoEldery 85 主要成員<br>可累積利潤分成資格</div>
-      <div class="qr-holder"><canvas id="qrMain"></canvas></div>
-      <div class="who">用你嘅手機掃我</div>
-      <div class="who-en">SCAN WITH YOUR PHONE CAMERA</div>
-    </div>
-    <div class="entry sub">
-      <div class="step-badge">家人 &lt; 55 歲</div>
-      <h2>家庭同行卡</h2>
-      <div class="sub-desc">畀你嘅子女 / 家人<br>用消費支持屋企長輩</div>
-      <div class="qr-holder"><canvas id="qrSub"></canvas></div>
-      <div class="who">用你嘅手機掃我</div>
-      <div class="who-en">SCAN WITH YOUR PHONE CAMERA</div>
-    </div>
-  </div>
-  <div class="steps-band">
-    <div class="band-title">◆ 三十秒完成登記 · 即刻攞卡 ◆</div>
-    <div class="steps">
-      <div class="step"><div class="num">1</div><h4>用手機掃碼</h4><p>打開手機相機<br>對準上方 QR</p></div>
-      <div class="step"><div class="num">2</div><h4>填名+電話</h4><p>只需姓名同<br>WhatsApp 電話</p></div>
-      <div class="step"><div class="num">3</div><h4>即時發卡</h4><p>手機收到<br>數碼會員卡</p></div>
-      <div class="step"><div class="num">4</div><h4>加入銀包</h4><p>Apple Wallet<br>Google Wallet</p></div>
-    </div>
-  </div>
-  <div class="values">
-    <div class="value"><div class="icon">85</div><h4>85% 利潤回饋</h4><p>公司 85% 利潤<br>回歸長者社群</p></div>
-    <div class="value"><div class="icon">$0</div><h4>入會全免費</h4><p>無入會費<br>無年費 · 無隱藏收費</p></div>
-    <div class="value"><div class="icon">◆</div><h4>消費即參與</h4><p>日常買嘢<br>就係共同擁有嘅一份</p></div>
-  </div>
-  <div class="poster-footer">
-    <div><div class="brand">CoEldery <em>85</em> 老有聯盟</div><div class="site" style="opacity:0.85;font-size:11px;margin-top:4px;">www.coeldery85.com</div></div>
-    <div class="hotline">☎ 有疑問？WhatsApp: 5442-9749</div>
-  </div>
-</div>
-</div>
-<script>
-function regen(){
-  QRCode.toCanvas(document.getElementById('qrMain'),document.getElementById('urlMain').value,{width:232,margin:1,color:{dark:'#0d3e12',light:'#ffffff'},errorCorrectionLevel:'H'},function(err){if(err)console.error(err);});
-  QRCode.toCanvas(document.getElementById('qrSub'),document.getElementById('urlSub').value,{width:232,margin:1,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'},function(err){if(err)console.error(err);});
-}
-regen();
-</script>
-</body></html>`
-}
+// [MOVED to src/lib/html-templates.ts @ Wave3/Stage4] posterHtml — pure mechanical move
 
 // ─── SOP HTML (simplified) ────────────────────────────────────────────────────
 // [MOVED to src/lib/html-templates.ts @ Wave3/Stage4] sopHtml — pure mechanical move
