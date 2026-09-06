@@ -12406,3 +12406,5073 @@ function appMedShowDoctorPanel(){
 </body>
 </html>`
 }
+
+export function newAdminShellHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>85 AI 管理後台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+:root{--brand:#1B4332;--brand-light:#2D6A4F;--accent:#40916C;}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;min-height:100vh;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F3F4F6;color:#1F2937;min-height:100vh;}
+/* ── Login Screen ── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1B4332 0%,#2D6A4F 100%);}
+.login-card{background:#fff;border-radius:12px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.login-logo{text-align:center;margin-bottom:28px;}
+.login-logo .mark{display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;background:var(--brand);color:#fff;font-size:26px;font-weight:900;border-radius:10px;margin-bottom:12px;}
+.login-logo h1{font-size:20px;font-weight:700;color:var(--brand);}
+.login-logo p{font-size:12px;color:#6B7280;margin-top:4px;}
+.login-field{margin-bottom:18px;}
+.login-field label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;}
+.login-field input{width:100%;padding:12px 14px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:16px;transition:border 0.2s;}
+.login-field input:focus{outline:none;border-color:var(--brand);}
+.login-btn{width:100%;padding:13px;background:var(--brand);color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s;}
+.login-btn:hover{background:var(--brand-light);}
+.login-btn:disabled{background:#9CA3AF;cursor:not-allowed;}
+.login-err{background:#FEF2F2;border:1px solid #FECACA;color:#DC2626;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:14px;display:none;}
+.login-err.show{display:block;}
+/* ── App Shell ── */
+#app-shell{display:none;min-height:100vh;width:100%;}
+.sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background:var(--brand);color:#fff;display:flex;flex-direction:column;z-index:100;}
+.sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid rgba(255,255,255,0.1);}
+.sidebar-logo .mark{display:inline-block;background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:6px;font-weight:900;font-size:16px;letter-spacing:1px;margin-bottom:4px;}
+.sidebar-logo p{font-size:11px;opacity:0.7;margin-top:2px;}
+.sidebar-nav{flex:1;overflow-y:auto;padding:12px 0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 18px;cursor:pointer;transition:background 0.15s;font-size:14px;font-weight:500;}
+.nav-item:hover{background:rgba(255,255,255,0.08);}
+.nav-item.active{background:rgba(255,255,255,0.15);border-right:3px solid #fff;}
+.nav-item i{width:18px;text-align:center;opacity:0.8;}
+.sidebar-footer{padding:14px 16px;border-top:1px solid rgba(255,255,255,0.1);}
+.logout-btn{display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:13px;cursor:pointer;width:100%;transition:background 0.15s;}
+.logout-btn:hover{background:rgba(255,255,255,0.15);}
+.main-content{margin-left:220px;min-height:100vh;width:calc(100% - 220px);display:flex;flex-direction:column;}
+.topbar{background:#fff;border-bottom:1px solid #E5E7EB;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
+.topbar h2{font-size:18px;font-weight:700;color:#111827;}
+.page-area{flex:1;padding:24px;overflow-y:auto;}
+/* ── Module Pages ── */
+.mod-page{display:none;}
+.mod-page.active{display:block;}
+/* Modules rendered outside .page-area: position fixed to overlay the whole screen */
+#app-shell ~ .mod-page.active {
+  display:block !important;
+  position:fixed !important;
+  top:0 !important;
+  left:220px !important;
+  right:0 !important;
+  bottom:0 !important;
+  overflow-y:auto;
+  padding:24px !important;
+  box-sizing:border-box;
+  background:#F3F4F6;
+  z-index:50;
+}
+
+/* ── Roadshow Module ── */
+.rs-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+.rs-tabs{display:flex;gap:8px;border-bottom:2px solid #E5E7EB;margin-bottom:20px;}
+.rs-tab{padding:10px 18px;border:none;background:none;font-size:14px;font-weight:500;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color 0.15s;}
+.rs-tab.active{color:var(--brand);border-bottom-color:var(--brand);}
+.rs-card{background:#fff;border-radius:10px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:12px;}
+.rs-card-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.rs-card-name{font-size:15px;font-weight:700;color:#111827;}
+.rs-card-code{font-size:12px;color:#6B7280;font-family:monospace;background:#F3F4F6;padding:2px 8px;border-radius:4px;}
+.rs-card-meta{font-size:12px;color:#6B7280;margin-top:4px;}
+.status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;}
+.status-active{background:#D1FAE5;color:#065F46;}
+.status-inactive{background:#F3F4F6;color:#6B7280;}
+.status-ended{background:#FEE2E2;color:#991B1B;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all 0.15s;}
+.btn-primary{background:var(--brand);color:#fff;border-color:var(--brand);}
+.btn-primary:hover{background:var(--brand-light);}
+.btn-secondary{background:#fff;color:#374151;border-color:#D1D5DB;}
+.btn-secondary:hover{background:#F9FAFB;}
+.btn-danger{background:#EF4444;color:#fff;border-color:#EF4444;}
+.btn-danger:hover{background:#DC2626;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+/* ── Store grid ── */
+.store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+.store-card{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:14px 16px;}
+.store-card-code{font-family:monospace;font-size:11px;color:#6B7280;background:#F3F4F6;padding:2px 6px;border-radius:4px;margin-bottom:6px;display:inline-block;}
+.store-card-name{font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;}
+.store-card-dist{font-size:12px;color:#6B7280;}
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:12px;padding:28px 28px 24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:18px;color:#111827;}
+.form-field{margin-bottom:14px;}
+.form-field label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:5px;}
+.form-field input,.form-field select,.form-field textarea{width:100%;padding:9px 11px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{outline:none;border-color:var(--brand);}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
+/* ── Search ── */
+.search-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.search-bar input,.search-bar select{padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;}
+.search-bar input:focus,.search-bar select:focus{outline:none;border-color:var(--brand);}
+/* ── Membership redirect panel ── */
+.redirect-panel{background:#fff;border-radius:10px;border:1px solid #E5E7EB;padding:20px;text-align:center;}
+.redirect-panel p{color:#6B7280;font-size:14px;margin-bottom:14px;}
+.redirect-panel a{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:var(--brand);color:#fff;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="mark">老</div>
+      <h1>85 AI 管理後台</h1>
+      <p>CoEldery 85 老有聯盟 · 管理員專用</p>
+    </div>
+    <div class="login-err" id="login-err"></div>
+    <div class="login-field">
+      <label>管理員密碼</label>
+      <input type="password" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAdminLogin()">
+    </div>
+    <button class="login-btn" id="login-btn" onclick="doAdminLogin()">
+      <i class="fas fa-sign-in-alt" style="margin-right:8px"></i>登入
+    </button>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="mark">老</div>
+      <p>85 AI 管理後台</p>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item" onclick="switchMod('mod-membership')">
+        <i class="fas fa-id-card"></i> 會員系統
+      </div>
+      <div class="nav-item active" onclick="switchMod('mod-roadshow')">
+        <i class="fas fa-map-marker-alt"></i> Roadshow 管理
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-products')">
+        <i class="fas fa-box"></i> 產品管理
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-useful-links')">
+        <i class="fas fa-info-circle"></i> 有用資訊管理
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-jobs')">
+        <i class="fas fa-briefcase"></i> 工作管理
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-coworkery')">
+        <i class="fas fa-hard-hat"></i> CoWorkery 人手
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-revenue')">
+        <i class="fas fa-star"></i> CoLeadery 申請
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-colinkery-admin')">
+        <i class="fas fa-handshake"></i> CoLinkery 申請
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-qr')">
+        <i class="fas fa-qrcode"></i> QR 快速登記
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-testing')">
+        <i class="fas fa-flask"></i> 產品測試計劃
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-benefits')">
+        <i class="fas fa-gift"></i> 福利管理
+      </div>
+      <div class="nav-item" onclick="switchMod('mod-hmvod')">
+        <i class="fas fa-film"></i> HMVod 申請
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doAdminLogout()">
+        <i class="fas fa-sign-out-alt"></i> 登出
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="topbar">
+      <h2 id="topbar-title">Roadshow 管理</h2>
+      <span style="font-size:12px;color:#6B7280">CoEldery 85 老有聯盟</span>
+    </div>
+    <div class="page-area">
+
+      <!-- Membership Module (embedded via iframe — 原生一體外觀) -->
+      <div id="mod-membership" class="mod-page">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;margin-bottom:10px;background:#fff;border:1px solid #E5E7EB;border-radius:8px;">
+          <span style="font-size:13px;font-weight:600;color:#374151;">
+            <i class="fas fa-id-card" style="margin-right:6px;color:var(--brand)"></i>會員管理系統
+          </span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="reloadMembershipFrame()">
+              <i class="fas fa-rotate-right"></i> 重新載入
+            </button>
+            <a class="btn btn-secondary btn-sm" href="/membership/admin" target="_blank" style="text-decoration:none;">
+              <i class="fas fa-external-link-alt"></i> 新分頁開啟
+            </a>
+          </div>
+        </div>
+        <iframe id="membership-frame" src="about:blank"
+          style="width:100%;height:calc(100vh - 110px);border:1px solid #E5E7EB;border-radius:8px;background:#fff;display:block;">
+        </iframe>
+      </div>
+
+      <!-- Roadshow Module -->
+      <div id="mod-roadshow" class="mod-page active">
+        <!-- Tabs -->
+        <div class="rs-tabs">
+          <button class="rs-tab active" onclick="rsTab('roadshows')" id="rs-tab-roadshows">
+            <i class="fas fa-calendar-alt" style="margin-right:6px"></i>Roadshow 活動
+          </button>
+          <button class="rs-tab" onclick="rsTab('stores')" id="rs-tab-stores">
+            <i class="fas fa-store" style="margin-right:6px"></i>JHC 商店
+          </button>
+        </div>
+
+        <!-- Roadshow List Panel -->
+        <div id="rs-panel-roadshows">
+          <div class="rs-header">
+            <div>
+              <h3 style="font-size:16px;font-weight:700;color:#111827">Roadshow 活動列表</h3>
+              <p style="font-size:12px;color:#6B7280;margin-top:2px" id="rs-count-label"></p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <select id="rs-filter-status" onchange="loadRoadshows()" style="padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px;">
+                <option value="">全部狀態</option>
+                <option value="active">進行中</option>
+                <option value="inactive">暫停</option>
+                <option value="ended">已結束</option>
+              </select>
+              <button class="btn btn-primary" onclick="openCreateRs()">
+                <i class="fas fa-plus"></i> 新增 Roadshow
+              </button>
+            </div>
+          </div>
+          <div id="rs-list"></div>
+        </div>
+
+        <!-- Store List Panel -->
+        <div id="rs-panel-stores" style="display:none">
+          <div class="rs-header">
+            <div>
+              <h3 style="font-size:16px;font-weight:700;color:#111827">JHC 商店列表</h3>
+              <p style="font-size:12px;color:#6B7280;margin-top:2px" id="store-count-label"></p>
+            </div>
+          </div>
+          <div class="search-bar">
+            <input type="text" id="store-search" placeholder="搜尋商店名稱/代號..." oninput="loadStores()" style="flex:1;min-width:200px">
+            <select id="store-district-filter" onchange="loadStores()" style="min-width:120px">
+              <option value="">全部地區</option>
+            </select>
+          </div>
+          <div class="store-grid" id="store-grid"></div>
+        </div>
+      </div>
+
+<!-- Products Module (Batch 3) -->
+<div id="mod-products" class="mod-page">
+  <div class="rs-header">
+    <div>
+      <h3 style="font-size:16px;font-weight:700;color:#111827">產品主庫</h3>
+      <p style="font-size:12px;color:#6B7280;margin-top:2px" id="prod-count-label"></p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateProduct()">
+      <i class="fas fa-plus"></i> 新增產品
+    </button>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="prod-search" placeholder="搜尋名稱／品牌／SKU..." oninput="loadProducts()" style="flex:1;min-width:200px">
+    <select id="prod-category-filter" onchange="loadProducts()" style="min-width:120px">
+      <option value="">全部分類</option>
+    </select>
+    <select id="prod-status-filter" onchange="loadProducts()" style="min-width:120px">
+      <option value="active">使用中</option>
+      <option value="">全部</option>
+      <option value="inactive">已停用</option>
+    </select>
+  </div>
+  <div class="store-grid" id="prod-grid"></div>
+</div>
+
+<!-- Useful Links Module -->
+<div id="mod-useful-links" class="mod-page">
+  <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <h3 style="font-size:16px;font-weight:700;color:#111827">有用資訊管理</h3>
+      <p style="font-size:12px;color:#6B7280;margin-top:2px" id="ul-count-label"></p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateUsefulLink()">
+      <i class="fas fa-plus"></i> 新增資訊
+    </button>
+  </div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:14px" id="ul-table">
+      <thead>
+        <tr style="background:#F3F4F6;text-align:left">
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">標題</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">類型</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">內容</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">排序</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">狀態</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">操作</th>
+        </tr>
+      </thead>
+      <tbody id="ul-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Useful Links Create/Edit Modal -->
+<div class="modal-overlay" id="modal-useful-link">
+  <div class="modal">
+    <h3 id="ul-modal-title"><i class="fas fa-info-circle" style="margin-right:8px;color:var(--brand)"></i>新增有用資訊</h3>
+    <input type="hidden" id="ul-id">
+    <div class="form-field"><label>標題 <span style="color:#EF4444">*</span></label><input type="text" id="ul-title" placeholder="例：長者熱線"></div>
+    <div class="form-field">
+      <label>類型 <span style="color:#EF4444">*</span></label>
+      <select id="ul-link-type">
+        <option value="phone">phone（電話）</option>
+        <option value="whatsapp">whatsapp（WhatsApp）</option>
+        <option value="url">url（網址）</option>
+        <option value="text">text（純文字）</option>
+      </select>
+    </div>
+    <div class="form-field"><label>內容 <span style="color:#EF4444">*</span></label><input type="text" id="ul-content" placeholder="電話號碼 / WhatsApp號碼 / 網址 / 純文字"></div>
+    <div class="form-field"><label>排序（細數排前）</label><input type="number" id="ul-sort-order" value="0" min="0"></div>
+    <div class="form-field" id="ul-active-field" style="display:none">
+      <label>狀態</label>
+      <select id="ul-is-active"><option value="1">顯示</option><option value="0">隱藏</option></select>
+    </div>
+    <div id="ul-modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-useful-link')">取消</button>
+      <button class="btn btn-primary" onclick="submitUsefulLink()"><i class="fas fa-save"></i> 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Jobs Module -->
+<div id="mod-jobs" class="mod-page">
+  <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <h3 style="font-size:16px;font-weight:700;color:#111827">工作市場管理</h3>
+      <p style="font-size:12px;color:#6B7280;margin-top:2px" id="jobs-count-label"></p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateJob()">
+      <i class="fas fa-plus"></i> 新增工作
+    </button>
+  </div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:14px" id="jobs-table">
+      <thead>
+        <tr style="background:#F3F4F6;text-align:left">
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">縮圖</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">職位名稱</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">地點</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">性質</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">排序</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">狀態</th>
+          <th style="padding:10px 12px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB">操作</th>
+        </tr>
+      </thead>
+      <tbody id="jobs-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Jobs Create/Edit Modal -->
+<div class="modal-overlay" id="modal-job">
+  <div class="modal" style="max-height:90vh;overflow-y:auto">
+    <h3 id="job-modal-title"><i class="fas fa-briefcase" style="margin-right:8px;color:var(--brand)"></i>新增工作</h3>
+    <input type="hidden" id="job-id">
+    <input type="hidden" id="job-image-url">
+    <div class="form-field">
+      <label>職位圖片（選填）</label>
+      <div id="jobImgDropZone"
+        ondragover="event.preventDefault();this.style.borderColor='var(--brand)';this.style.background='#f0fff0';"
+        ondragleave="this.style.borderColor='#D1D5DB';this.style.background='#F9FAFB';"
+        ondrop="jobImgHandleDrop(event)"
+        onclick="document.getElementById('jobImgFileInput').click()"
+        style="border:2px dashed #D1D5DB;border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:#F9FAFB;transition:all 0.2s;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+        <div id="jobImgPreviewWrap" style="display:none;width:100%;">
+          <img id="jobImgPreview" src="" alt="preview" style="max-width:100%;max-height:120px;object-fit:contain;border-radius:6px;display:block;margin:0 auto 6px;">
+          <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
+            <span id="jobImgPreviewName" style="font-size:11px;color:#555;"></span>
+            <button type="button" onclick="event.stopPropagation();jobImgClear()" style="font-size:11px;color:#DC2626;background:none;border:none;cursor:pointer;padding:0;">✕ 移除</button>
+          </div>
+        </div>
+        <div id="jobImgPlaceholder">
+          <div style="font-size:22px;margin-bottom:2px;">🖼️</div>
+          <div style="font-size:12px;color:#6B7280;">拖放或點擊上傳圖片</div>
+          <div style="font-size:11px;color:#9CA3AF;margin-top:1px;">建議 4:3 比例，JPG / PNG / WEBP</div>
+        </div>
+        <div id="jobImgUploadProgress" style="display:none;font-size:12px;color:var(--brand);">
+          <i class="fas fa-spinner fa-spin"></i> 上傳中…
+        </div>
+      </div>
+      <input id="jobImgFileInput" type="file" accept="image/*" style="display:none;" onchange="jobImgHandleFile(this.files[0])">
+    </div>
+    <div class="form-field"><label>職位名稱 <span style="color:#EF4444">*</span></label><input type="text" id="job-title"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field"><label>工作地點</label><input type="text" id="job-location" placeholder="例：旺角"></div>
+      <div class="form-field"><label>工作性質</label><input type="text" id="job-type" placeholder="兼職/全職/義工"></div>
+      <div class="form-field"><label>公司／機構</label><input type="text" id="job-company"></div>
+      <div class="form-field"><label>待遇／時薪</label><input type="text" id="job-salary" placeholder="例：$60/小時"></div>
+    </div>
+    <div class="form-field"><label>詳細資料</label><textarea id="job-description" rows="3" style="resize:vertical"></textarea></div>
+    <div class="form-field"><label>要求</label><textarea id="job-requirement" rows="2" style="resize:vertical"></textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field"><label>排序（細數排前）</label><input type="number" id="job-sort-order" value="0" min="0"></div>
+      <div class="form-field" id="job-status-field" style="display:none">
+        <label>狀態</label>
+        <select id="job-status"><option value="open">開放申請</option><option value="closed">已截止</option></select>
+      </div>
+    </div>
+    <div id="job-modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-job')">取消</button>
+      <button class="btn btn-primary" onclick="submitJob()"><i class="fas fa-save"></i> 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Job Applications Modal -->
+<div class="modal-overlay" id="modal-job-apps">
+  <div class="modal" style="max-width:620px;max-height:90vh;overflow-y:auto">
+    <h3 id="job-apps-title"><i class="fas fa-users" style="margin-right:8px;color:var(--brand)"></i>申請名單</h3>
+    <div id="job-apps-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-job-apps')">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Create/Edit Modal -->
+<div class="modal-overlay" id="modal-product">
+  <div class="modal">
+    <h3 id="prod-modal-title"><i class="fas fa-box" style="margin-right:8px;color:var(--brand)"></i>新增產品</h3>
+    <input type="hidden" id="prod-id">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field"><label>中文名稱 <span style="color:#EF4444">*</span></label><input type="text" id="prod-name-zh"></div>
+      <div class="form-field"><label>英文名稱 <span style="color:#EF4444">*</span></label><input type="text" id="prod-name-en"></div>
+      <div class="form-field"><label>品牌／供應商</label><input type="text" id="prod-brand"></div>
+      <div class="form-field"><label>分類</label><input type="text" id="prod-category" placeholder="醬料／飲品／紙品…"></div>
+      <div class="form-field"><label>SKU 貨號</label><input type="text" id="prod-sku"></div>
+      <div class="form-field"><label>單位</label><input type="text" id="prod-unit" placeholder="支／包／盒"></div>
+      <div class="form-field"><label>成本價 (HK$)</label><input type="number" id="prod-cost" step="0.1" min="0"></div>
+      <div class="form-field"><label>建議售價 (HK$)</label><input type="number" id="prod-price" step="0.1" min="0"></div>
+    </div>
+    <div class="form-field"><label>相片連結 (URL)</label><input type="text" id="prod-photo" placeholder="https://..."></div>
+    <div class="form-field"><label>產品描述</label><textarea id="prod-desc" rows="2" style="resize:vertical"></textarea></div>
+    <div class="form-field" id="prod-active-field" style="display:none">
+      <label>狀態</label>
+      <select id="prod-active"><option value="1">使用中</option><option value="0">已停用</option></select>
+    </div>
+    <div id="prod-modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-product')">取消</button>
+      <button class="btn btn-primary" onclick="submitProduct()"><i class="fas fa-save"></i> 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CoWorkery Module ── -->
+<div id="mod-coworkery" class="mod-page">
+  <style>
+    .cw-tab{padding:8px 16px;border:1.5px solid #D1D5DB;background:#fff;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;color:#374151;transition:all 0.15s;}
+    .cw-tab.active{background:var(--brand);color:#fff;border-color:var(--brand);}
+    .cw-tab-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #E5E7EB;}
+    .cw-panel{display:none;}
+    .cw-stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+    .cw-stat{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:14px 18px;min-width:100px;text-align:center;}
+    .cw-stat .n{font-size:28px;font-weight:700;color:var(--brand);}
+    .cw-stat .l{font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+  </style>
+  <div class="cw-tab-bar">
+    <button class="cw-tab active" data-tab="cw-overview" onclick="cwTab('cw-overview')">\u7e3d\u89bd</button>
+    <button class="cw-tab" data-tab="cw-approval" onclick="cwTab('cw-approval')">\u5f85\u5be9\u6279</button>
+    <button class="cw-tab" data-tab="cw-sessions" onclick="cwTab('cw-sessions')">\u5834\u6b21\u8a2d\u5b9a</button>
+    <button class="cw-tab" data-tab="cw-assign" onclick="cwTab('cw-assign')">\u6d3e\u66f4</button>
+    <button class="cw-tab" data-tab="cw-payroll" onclick="cwTab('cw-payroll')">\u6253\u5361\u51fa\u7cae</button>
+  </div>
+  <!-- Tab 1: 總覽 -->
+  <div id="cw-overview" class="cw-panel" style="display:block">
+    <div class="cw-stat-row">
+      <div class="cw-stat"><div class="n" id="cwStatTotal">-</div><div class="l">\u7e3d\u6578</div></div>
+      <div class="cw-stat"><div class="n" id="cwStatActive">-</div><div class="l">ACTIVE</div></div>
+      <div class="cw-stat"><div class="n" id="cwStatPending">-</div><div class="l">\u5f85\u5be9\u6279</div></div>
+      <div class="cw-stat"><div class="n" id="cwStatSusp">-</div><div class="l">\u505c\u724c</div></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input id="cwSearch" placeholder="\u641c\u5c0b CW\u7de8\u865f/\u59d3\u540d/\u96fb\u8a71/\u6703\u54e1\u865f" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px" onkeydown="if(event.key==='Enter')cwLoadList()">
+      <button class="btn btn-secondary" onclick="cwLoadList()">\u641c\u5c0b</button>
+      <button class="btn btn-secondary" onclick="location.href='/api/admin/coworkery/export/csv'">\u5305\u51faCSV</button>
+      <button class="btn btn-primary" onclick="cwOpenRegister()">\uff0b \u958b\u5361</button>
+    </div>
+    <div id="cwListBox">\u8f09\u5165\u4e2d\u2026</div>
+  </div>
+  <!-- Tab 2: 待審批 -->
+  <div id="cw-approval" class="cw-panel">
+    <div id="cwApprovalBox">\u8f09\u5165\u4e2d\u2026</div>
+  </div>
+  <!-- Tab 3: 場次設定 -->
+  <div id="cw-sessions" class="cw-panel">
+    <div id="cwSessionsBox">\u8f09\u5165\u4e2d\u2026</div>
+  </div>
+  <!-- Tab 4: 派更 -->
+  <div id="cw-assign" class="cw-panel">
+    <div style="margin-bottom:12px">
+      <select id="cwAssignSession" style="padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;min-width:300px" onchange="cwLoadAssign()"></select>
+    </div>
+    <div id="cwAssignBox">\u8acb\u5148\u9078\u64c7\u5834\u6b21</div>
+  </div>
+  <!-- Tab 5: 打卡出糧 -->
+  <div id="cw-payroll" class="cw-panel">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+      <select id="cwPayrollSession" style="padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:14px;min-width:300px" onchange="cwLoadPayroll()"></select>
+      <button class="btn btn-primary" onclick="cwCalcPayroll()">\u8a08\u7b97\u51fa\u7cae</button>
+      <button class="btn btn-secondary" onclick="cwExportPayroll()">\u5305\u51faCSV</button>
+    </div>
+    <div id="cwPayrollTotals" style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px"></div>
+    <div id="cwPayrollBox">\u8acb\u5148\u9078\u64c7\u5834\u6b21</div>
+  </div>
+
+  <!-- ── 開卡 Modal ───────────────────────────────────────────────── -->
+  <div id="cwRegModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:14px;max-width:520px;width:92%;max-height:90vh;overflow-y:auto;padding:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0">&#xFF0B; \u958b\u5361\uff08\u65b0\u589e CoWorkery\uff09</h3>
+        <button class="btn btn-sm" onclick="cwCloseRegister()" style="line-height:1">&#x2715;</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="grid-column:1/3">
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u6703\u54e1\u7de8\u865f <span style="color:#dc2626">*</span></label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input id="regMemberNo" placeholder="\u8001\u6709\u5361\u6703\u54e1\u7de8\u865f" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+            <button class="btn btn-sm btn-secondary" onclick="cwCheckMember()">\u67e5\u6703\u54e1</button>
+          </div>
+          <span id="regMemberHint" style="font-size:13px;margin-top:4px;display:block"></span>
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u4e2d\u6587\u59d3\u540d <span style="color:#dc2626">*</span></label>
+          <input id="regNameZh" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u82f1\u6587\u59d3\u540d</label>
+          <input id="regNameEn" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u96fb\u8a71 <span style="color:#dc2626">*</span></label>
+          <input id="regPhone" inputmode="numeric" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u6027\u5225</label>
+          <select id="regGender" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+            <option value="">\u2014</option><option value="M">\u7537</option><option value="F">\u5973</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u5730\u5340</label>
+          <input id="regDistrict" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">HKID \u982d 4 \u4f4d</label>
+          <input id="regHkid" maxlength="4" placeholder="\u4f8b\u5982 A123" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div style="grid-column:1/3">
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u5730\u5740</label>
+          <input id="regAddress" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u9280\u884c\u540d\u7a31</label>
+          <input id="regBankName" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u6236\u540d</label>
+          <input id="regBankAcctName" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u9280\u884c\u8cec\u865f</label>
+          <input id="regBankAcctNo" inputmode="numeric" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div>
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u9810\u8a2d\u6642\u85aa\uff08\u5143/\u5c0f\u6642\uff09</label>
+          <input id="regRate" inputmode="decimal" placeholder="0" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+        </div>
+        <div style="grid-column:1/3">
+          <label style="font-weight:600;display:block;margin-bottom:4px">\u8eab\u4efd\u8b49\u6b63\u672c\uff08\u5716\u7247\uff0c\u53ef\u9078\uff09</label>
+          <input type="file" accept="image/*" id="regIdFront" onchange="cwPreviewId()" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:13px">
+          <img id="regIdPreview" style="max-width:100%;margin-top:8px;border-radius:8px;display:none" alt="\u8eab\u4efd\u8b49\u9810\u89bd">
+          <div style="font-size:12px;color:#6b7280;margin-top:4px">\u4e0a\u50b3\u5f8c\u53ea\u6709\u5f8c\u53f0\u53ef\u8b80\uff0c\u524d\u7aef\u906e\u853d\uff08PDPO \u5408\u898f\uff09</div>
+        </div>
+      </div>
+      <div id="regMsg" style="margin-top:12px;font-size:14px;min-height:20px"></div>
+      <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="cwCloseRegister()">\u53d6\u6d88</button>
+        <button class="btn btn-primary" id="regSubmitBtn" onclick="cwSubmitRegister()">\u78ba\u8a8d\u958b\u5361</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Create Roadshow Modal -->
+<div class="modal-overlay" id="modal-create-rs">
+  <div class="modal">
+    <h3><i class="fas fa-plus-circle" style="margin-right:8px;color:var(--brand)"></i>新增 Roadshow 活動</h3>
+    <div class="form-field">
+      <label>Roadshow Code <span style="color:#EF4444">*</span></label>
+      <input type="text" id="new-rs-code" placeholder="例: RS2024-001" style="font-family:monospace">
+    </div>
+    <div class="form-field">
+      <label>活動名稱 <span style="color:#EF4444">*</span></label>
+      <input type="text" id="new-rs-name" placeholder="例: 北角健威坊 Roadshow">
+    </div>
+    <div class="form-field">
+      <label>選擇商店 (選填)</label>
+      <select id="new-rs-store">
+        <option value="">-- 不指定商店 --</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field">
+        <label>開始日期</label>
+        <input type="date" id="new-rs-start">
+      </div>
+      <div class="form-field">
+        <label>結束日期</label>
+        <input type="date" id="new-rs-end">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>備註</label>
+      <textarea id="new-rs-notes" rows="2" style="resize:vertical" placeholder="選填備註"></textarea>
+    </div>
+    <div id="modal-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-create-rs')">取消</button>
+      <button class="btn btn-primary" onclick="submitCreateRs()">
+        <i class="fas fa-save"></i> 儲存
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Roadshow Modal -->
+<div class="modal-overlay" id="modal-edit-rs">
+  <div class="modal">
+    <h3><i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯 Roadshow</h3>
+    <input type="hidden" id="edit-rs-id">
+    <div class="form-field">
+      <label>活動名稱 <span style="color:#EF4444">*</span></label>
+      <input type="text" id="edit-rs-name">
+    </div>
+    <div class="form-field">
+      <label>選擇商店</label>
+      <select id="edit-rs-store"></select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field">
+        <label>開始日期</label>
+        <input type="date" id="edit-rs-start">
+      </div>
+      <div class="form-field">
+        <label>結束日期</label>
+        <input type="date" id="edit-rs-end">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>狀態</label>
+      <select id="edit-rs-status">
+        <option value="active">進行中</option>
+        <option value="inactive">暫停</option>
+        <option value="ended">已結束</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>備註</label>
+      <textarea id="edit-rs-notes" rows="2" style="resize:vertical"></textarea>
+    </div>
+    <div id="modal-edit-err" style="color:#DC2626;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit-rs')">取消</button>
+      <button class="btn btn-primary" onclick="submitEditRs()">
+        <i class="fas fa-save"></i> 儲存
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="mod-revenue" class="mod-page">
+  <style>
+    .app-card{background:#fff;border-radius:10px;border:1.5px solid #E5E7EB;padding:16px 18px;margin-bottom:12px;cursor:pointer;transition:box-shadow 0.15s;}
+    .app-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.09);}
+    .app-card .ac-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+    .app-card .ac-name{font-size:17px;font-weight:700;color:#111;}
+    .app-card .ac-role{font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;}
+    .ac-role.CL{background:#FFF3CD;color:#92400e;}
+    .ac-role.CK{background:#E0F2FE;color:#0369a1;}
+    .app-card .ac-meta{font-size:13px;color:#6B7280;margin-top:4px;}
+    .app-card .ac-detail{font-size:14px;color:#374151;margin-top:8px;line-height:1.6;border-top:1px solid #F3F4F6;padding-top:8px;}
+    .status-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;}
+    .status-PENDING{background:#FFFBEB;color:#92400e;border:1px solid #FCD34D;}
+    .status-APPROVED{background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;}
+    .status-REJECTED{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;}
+    .rev-filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+    .rev-filter-btn{padding:6px 16px;border:1.5px solid #D1D5DB;background:#fff;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;color:#374151;}
+    .rev-filter-btn.active{background:var(--brand);color:#fff;border-color:var(--brand);}
+    .review-actions{display:flex;gap:8px;margin-top:12px;}
+    .btn-approve{padding:9px 20px;background:#065F46;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+    .btn-reject{padding:9px 20px;background:#991B1B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+    .review-notes{width:100%;padding:8px 10px;font-size:14px;border:1.5px solid #D1D5DB;border-radius:6px;resize:vertical;font-family:inherit;margin-top:8px;}
+    .doc-link{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#F3F4F6;border-radius:6px;font-size:13px;font-weight:600;color:#1B4332;text-decoration:none;margin-top:6px;}
+    /* Rev Tabs */
+    .rev-tabs{display:flex;gap:0;border-bottom:2px solid #E5E7EB;margin-bottom:20px;}
+    .rev-tab{padding:10px 20px;border:none;background:none;font-size:14px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;}
+    .rev-tab.active{color:var(--brand);border-bottom-color:var(--brand);}
+    /* Project cards */
+    .proj-card{background:#fff;border-radius:10px;border:1.5px solid #E5E7EB;padding:14px 16px;margin-bottom:10px;}
+    .proj-card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+    .proj-code{font-size:12px;font-family:monospace;background:#F3F4F6;padding:2px 8px;border-radius:4px;color:#6B7280;}
+    .proj-name{font-size:16px;font-weight:700;color:#111;}
+    .proj-status-DRAFT{background:#F3F4F6;color:#374151;}
+    .proj-status-ACTIVE{background:#D1FAE5;color:#065F46;}
+    .proj-status-SETTLING{background:#FEF3C7;color:#92400e;}
+    .proj-status-SETTLED{background:#DBEAFE;color:#1D4ED8;}
+    .proj-status-CLOSED{background:#F3F4F6;color:#9CA3AF;}
+    .ledger-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:13px;}
+    .ledger-INCOME{color:#065F46;font-weight:700;}
+    .ledger-cost{color:#991B1B;}
+    .share-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0;}
+    .share-row{display:flex;justify-content:space-between;background:#F9FAFB;padding:5px 10px;border-radius:6px;font-size:13px;}
+    .holder-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:20px;font-size:12px;font-weight:600;color:#065F46;margin:2px;}
+  </style>
+
+  <!-- Rev Module Tabs -->
+  <div class="rev-tabs">
+    <button class="rev-tab active" onclick="revTabSwitch('tab-apps',this)">📋 申請審核</button>
+    <button class="rev-tab" onclick="revTabSwitch('tab-holders',this)">🏅 已認證持有人</button>
+    <button class="rev-tab" onclick="revTabSwitch('tab-projects',this)">📊 項目管理</button>
+  </div>
+
+  <!-- Tab 1: 申請審核 -->
+  <div id="tab-apps" class="rev-tab-panel" style="max-width:700px;">
+    <div id="revStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;"></div>
+    <div class="rev-filter-bar">
+      <button class="rev-filter-btn active" onclick="loadRevApps('PENDING',this)">⏳ 待審批</button>
+      <button class="rev-filter-btn" onclick="loadRevApps('APPROVED',this)">✅ 已批准</button>
+      <button class="rev-filter-btn" onclick="loadRevApps('REJECTED',this)">❌ 已拒絕</button>
+    </div>
+    <div id="revAppList">載入中…</div>
+  </div>
+
+  <!-- Tab 2: 已認證持有人 -->
+  <div id="tab-holders" class="rev-tab-panel" style="display:none;max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 style="font-size:16px;font-weight:700;color:#374151;">🏅 已認證 CoLeadery / CoLinkery</h3>
+      <button class="btn btn-secondary btn-sm" onclick="loadRevHolders()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="revHolderList">載入中…</div>
+  </div>
+
+  <!-- Tab 3: 項目管理 -->
+  <div id="tab-projects" class="rev-tab-panel" style="display:none;max-width:900px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <h3 style="font-size:16px;font-weight:700;color:#374151;">📊 項目列表</h3>
+      <button class="btn btn-primary btn-sm" onclick="openCreateProject()"><i class="fas fa-plus"></i> 新增項目</button>
+    </div>
+    <div id="projList">載入中…</div>
+  </div>
+
+  <!-- 審核 Detail Modal -->
+  <div id="revModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;padding:20px;">
+    <div style="background:#fff;border-radius:12px;max-width:560px;margin:0 auto;padding:24px;position:relative;">
+      <button onclick="closeRevModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#6B7280;">✕</button>
+      <h3 style="font-size:20px;font-weight:900;margin-bottom:16px;color:#1B4332;">📋 申請詳情</h3>
+      <div id="revModalBody"></div>
+    </div>
+  </div>
+
+  <!-- 項目詳情 Modal -->
+  <div id="projModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;overflow-y:auto;padding:20px;">
+    <div style="background:#fff;border-radius:12px;max-width:680px;margin:0 auto;padding:24px;position:relative;">
+      <button onclick="closeProjModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#6B7280;">✕</button>
+      <h3 id="projModalTitle" style="font-size:18px;font-weight:900;margin-bottom:16px;color:#1B4332;">項目詳情</h3>
+      <div id="projModalBody"></div>
+    </div>
+  </div>
+
+  <!-- 持有人詳情 Modal -->
+  <div id="holderDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;overflow-y:auto;padding:20px;">
+    <div style="background:#fff;border-radius:12px;max-width:620px;margin:0 auto;padding:24px;position:relative;">
+      <button onclick="document.getElementById('holderDetailModal').style.display='none'" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#6B7280;">✕</button>
+      <h3 id="holderDetailTitle" style="font-size:18px;font-weight:900;margin-bottom:16px;color:#1B4332;">持有人詳情</h3>
+      <div id="holderDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- 新增/編輯項目 Modal -->
+  <div id="createProjModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;overflow-y:auto;padding:20px;">
+    <div style="background:#fff;border-radius:12px;max-width:520px;margin:0 auto;padding:24px;position:relative;">
+      <button onclick="closeCreateProjModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#6B7280;">✕</button>
+      <h3 style="font-size:18px;font-weight:900;margin-bottom:16px;color:#1B4332;">➕ 新增項目</h3>
+      <div class="search-bar" style="flex-direction:column;gap:10px;">
+        <div style="width:100%;">
+          <label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;display:block;">項目名稱 <span style="color:#DC2626">*</span></label>
+          <input id="cpName" type="text" placeholder="例：葵青社區日用品項目" style="width:100%;padding:9px 12px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:14px;">
+        </div>
+        <div style="width:100%;">
+          <label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;display:block;">業務場景 <span style="color:#DC2626">*</span></label>
+          <select id="cpScenario" style="width:100%;padding:9px 12px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:14px;">
+            <option value="PURE_B2C">PURE_B2C — 純消費者銷售</option>
+            <option value="B2C_TO_B2B">B2C_TO_B2B — 消費者轉商業</option>
+            <option value="PURE_B2B">PURE_B2B — 純商業合作</option>
+          </select>
+        </div>
+        <div style="width:100%;">
+          <label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;display:block;">業務類型</label>
+          <input id="cpBizType" type="text" placeholder="例：日用品、餐飲、服務" style="width:100%;padding:9px 12px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:14px;">
+        </div>
+        <div style="width:100%;">
+          <label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;display:block;">備注</label>
+          <textarea id="cpNotes" rows="2" placeholder="項目說明" style="width:100%;padding:9px 12px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:14px;resize:vertical;font-family:inherit;"></textarea>
+        </div>
+        <div id="cpErr" style="color:#DC2626;font-size:13px;display:none;"></div>
+        <button class="btn btn-primary" onclick="submitCreateProject()" style="width:100%;">建立項目</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MOD: CoLinkery 申請審核
+════════════════════════════════════════════════════════════════════ -->
+<div id="mod-colinkery-admin" class="mod-page">
+  <style>
+    .ck-app-card{background:#fff;border-radius:10px;border:1.5px solid #BAE6FD;padding:16px 18px;margin-bottom:12px;}
+    .ck-app-card .cka-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+    .ck-app-card .cka-name{font-size:17px;font-weight:700;color:#0C4A6E;}
+    .ck-app-card .cka-meta{font-size:13px;color:#6B7280;margin-top:4px;}
+    .ck-app-card .cka-notes{font-size:13px;color:#374151;margin-top:8px;background:#F0F9FF;border-radius:6px;padding:8px 10px;}
+    .ck-filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+    .ck-filter-btn{padding:6px 16px;border:1.5px solid #BAE6FD;background:#fff;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;color:#0369A1;}
+    .ck-filter-btn.active{background:#0284C7;color:#fff;border-color:#0284C7;}
+    .ck-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+    .btn-ck-approve{padding:8px 18px;background:#065F46;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+    .btn-ck-reject{padding:8px 18px;background:#991B1B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+    .btn-ck-wa{padding:8px 18px;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+    .ck-otp-card{background:#fff;border-radius:10px;border:1.5px solid #A7F3D0;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+    .ck-otp-code{font-size:26px;font-weight:900;color:#065F46;letter-spacing:6px;font-family:monospace;}
+    .ck-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
+    .ck-stat-card{background:#fff;border-radius:10px;border:1.5px solid #E5E7EB;padding:14px 16px;text-align:center;}
+    .ck-stat-num{font-size:28px;font-weight:900;color:#0284C7;}
+    .ck-stat-lbl{font-size:12px;color:#6B7280;margin-top:2px;}
+    .ck-tab-bar{display:flex;gap:0;border-bottom:2px solid #E5E7EB;margin-bottom:20px;}
+    .ck-tab{padding:10px 20px;border:none;background:none;font-size:14px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;}
+    .ck-tab.active{color:#0284C7;border-bottom-color:#0284C7;}
+    .ck-type-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#E0F2FE;color:#0369A1;}
+    .ck-holder-card{background:#fff;border-radius:10px;border:1.5px solid #BAE6FD;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  </style>
+
+  <!-- 統計卡片 -->
+  <div id="ckStatGrid" class="ck-stat-grid"></div>
+
+  <!-- Tab 列 -->
+  <div class="ck-tab-bar">
+    <button class="ck-tab active" id="ckTab-pending" onclick="ckSwitchTab('pending',this)">⏳ 待審批</button>
+    <button class="ck-tab" id="ckTab-approved" onclick="ckSwitchTab('approved',this)">✅ 已批准</button>
+    <button class="ck-tab" id="ckTab-rejected" onclick="ckSwitchTab('rejected',this)">❌ 已拒絕</button>
+    <button class="ck-tab" id="ckTab-otp" onclick="ckSwitchTab('otp',this)">📱 OTP 管理</button>
+  </div>
+
+  <!-- 待審批 -->
+  <div id="ckPanel-pending" style="max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="font-size:14px;color:#6B7280;">點擊「批准」或「拒絕」處理申請</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadCkAdminData()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckPendingList">載入中…</div>
+  </div>
+
+  <!-- 已批准 -->
+  <div id="ckPanel-approved" style="display:none;max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="font-size:14px;color:#6B7280;">已批准的 CoLinkery 連結者</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadCkApproved()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckApprovedList">載入中…</div>
+  </div>
+
+  <!-- 已拒絕 -->
+  <div id="ckPanel-rejected" style="display:none;max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="font-size:14px;color:#6B7280;">已拒絕的 CoLinkery 申請</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadCkRejected()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckRejectedList">載入中…</div>
+  </div>
+
+  <!-- OTP 管理 -->
+  <div id="ckPanel-otp" style="display:none;max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#374151;">📱 待發 OTP（忘記密碼）</div>
+        <div style="font-size:13px;color:#6B7280;margin-top:2px;">用 WhatsApp 發送 OTP 給申請重設密碼的用戶</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="loadCkAdminData()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div id="ckOtpList">載入中…</div>
+  </div>
+</div>
+
+
+<script>
+// v2 2026-08-04
+// ── Login ──
+function doAdminLogin(){
+  var pw = document.getElementById('login-pw').value;
+  var btn = document.getElementById('login-btn');
+  var err = document.getElementById('login-err');
+  if(!pw){err.textContent='請輸入密碼';err.classList.add('show');return;}
+  btn.disabled=true;btn.textContent='登入中...';err.classList.remove('show');
+  fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){showAppShell();}
+      else{err.textContent=d.error||'密碼錯誤';err.classList.add('show');btn.disabled=false;btn.textContent='登入';}
+    })
+    .catch(function(e){err.textContent='網絡錯誤';err.classList.add('show');btn.disabled=false;btn.textContent='登入';});
+}
+
+function doAdminLogout(){
+  fetch('/api/admin/logout',{method:'POST'}).finally(function(){
+    window.location.reload();
+  });
+}
+
+function showAppShell(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app-shell').style.display='flex';
+  loadRoadshows();
+  loadDistricts();
+  loadStoreDropdown();
+}
+
+// ── State ──
+var allStores = [];
+var allDistricts = [];
+var rsCache = {};
+
+// ── Init: check existing session ──
+(function(){
+  fetch('/api/admin/me').then(function(r){return r.json();}).then(function(d){
+    if(d.loggedIn){ showAppShell(); }
+    else { document.getElementById('login-screen').style.display='flex'; }
+  }).catch(function(){
+    document.getElementById('login-screen').style.display='flex';
+  });
+})();
+
+// ── QR 快速登記管理 Module ──────────────────────────────────────────────────
+</script>
+
+<div id="mod-qr" class="mod-page" style="display:none">
+  <style>
+    /* ── QR mod layout ── */
+    .qrmod-layout{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;}
+    @media(max-width:900px){.qrmod-layout{grid-template-columns:1fr;}}
+    .qrmod-card{background:#fff;border-radius:10px;border:1px solid #E5E7EB;padding:22px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+    .qrmod-card h3{font-size:15px;font-weight:700;color:#1B4332;margin:0 0 16px;}
+    /* type selector */
+    .qrmod-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+    .qrmod-type-btn{border:1.5px solid #E5E7EB;border-radius:8px;background:#fff;padding:10px 8px;font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;text-align:center;transition:all .15s;}
+    .qrmod-type-btn .icon{display:block;font-size:18px;margin-bottom:4px;}
+    .qrmod-type-btn.active{border-color:#1B4332;background:#F0FDF4;color:#1B4332;}
+    /* form fields */
+    .qrmod-field{margin-bottom:12px;}
+    .qrmod-field label{display:block;font-size:11px;font-weight:700;color:#555;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;}
+    .qrmod-field input,.qrmod-field select,.qrmod-field textarea{width:100%;border:1.5px solid #D1D5DB;border-radius:6px;padding:9px 10px;font-size:13px;box-sizing:border-box;font-family:inherit;}
+    .qrmod-field input:focus,.qrmod-field select:focus{border-color:#1B4332;outline:none;}
+    .qrmod-hint{font-size:11px;color:#9CA3AF;margin-top:3px;line-height:1.5;}
+    /* preview card */
+    .qrmod-preview{background:#fff;border-radius:10px;border:1px solid #E5E7EB;padding:22px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);position:sticky;top:20px;}
+    .qrmod-preview h3{font-size:15px;font-weight:700;color:#1B4332;margin:0 0 14px;}
+    .qrmod-canvas-wrap{width:200px;height:200px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;background:#F9FAFB;border-radius:8px;border:1px solid #E5E7EB;}
+    .qrmod-url-box{font-family:monospace;font-size:11px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:8px 10px;word-break:break-all;margin-bottom:10px;color:#374151;}
+    .qrmod-action-btn{width:100%;padding:10px;border-radius:6px;border:none;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;}
+    .qrmod-dl-btn{background:#1B4332;color:#fff;}
+    .qrmod-cp-btn{background:#F3F4F6;color:#1B4332;border:1.5px solid #D1D5DB;}
+    .qrmod-tips{background:#FFFDE7;border-radius:6px;padding:10px 12px;font-size:11px;color:#795548;line-height:1.7;margin-top:12px;}
+    /* sources list */
+    .qrmod-src-list{margin-top:16px;}
+    .qrmod-src-item{background:#fff;border-radius:8px;border:1px solid #E5E7EB;border-left:4px solid #1B4332;padding:14px 16px;margin-bottom:10px;}
+    .qrmod-src-item.inactive{border-left-color:#D1D5DB;opacity:.7;}
+    .qrmod-src-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+    .qrmod-src-name{font-size:14px;font-weight:700;color:#111827;}
+    .qrmod-src-meta{font-size:11px;color:#6B7280;line-height:1.8;margin-bottom:8px;}
+    .qrmod-src-count{font-size:22px;font-weight:900;color:#1B4332;}
+    .qrmod-src-url{font-size:10px;font-family:monospace;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:4px;padding:5px 8px;word-break:break-all;margin:6px 0;}
+    /* tab bar */
+    .qrmod-tabs{display:flex;gap:0;border-bottom:2px solid #E5E7EB;margin-bottom:18px;}
+    .qrmod-tab{padding:9px 16px;border:none;background:none;font-size:13px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;}
+    .qrmod-tab.active{color:#1B4332;border-bottom-color:#1B4332;}
+    /* log table */
+    .qrmod-log-table{width:100%;border-collapse:collapse;font-size:12px;}
+    .qrmod-log-table th{background:#F9FAFB;padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #E5E7EB;}
+    .qrmod-log-table td{padding:7px 10px;border-bottom:1px solid #F0F0F0;vertical-align:top;}
+    .qrmod-log-table tr:hover td{background:#FAFAFA;}
+    .lbadge{display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;}
+    .lb-success{background:#D1FAE5;color:#065F46;}
+    .lb-format_error,.lb-db_error{background:#FEE2E2;color:#991B1B;}
+    .lb-invalid_year,.lb-invalid_phone{background:#FEF3C7;color:#92400E;}
+    .lb-duplicate_phone{background:#DBEAFE;color:#1E40AF;}
+    .lb-pending{background:#F3F4F6;color:#6B7280;}
+    /* stat boxes */
+    .qrmod-stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px;}
+    .qrmod-stat-box{background:#fff;border-radius:8px;border:1px solid #E5E7EB;padding:12px;text-align:center;}
+    .qrmod-stat-num{font-size:22px;font-weight:900;color:#1B4332;}
+    .qrmod-stat-lbl{font-size:11px;color:#6B7280;margin-top:2px;}
+  </style>
+
+  <!-- Tab bar -->
+  <div class="qrmod-tabs">
+    <button class="qrmod-tab active" id="qrtab-create" onclick="qrModTab('create',this)">➕ 新增 QR 碼</button>
+    <button class="qrmod-tab" id="qrtab-sources" onclick="qrModTab('sources',this)">🔖 已有 QR 來源</button>
+    <button class="qrmod-tab" id="qrtab-logs" onclick="qrModTab('logs',this)">📋 Webhook 日誌</button>
+    <button class="qrmod-tab" id="qrtab-stats" onclick="qrModTab('stats',this)">📊 統計分析</button>
+    <button class="qrmod-tab" id="qrtab-test" onclick="qrModTab('test',this)" style="color:#b45309;">🧪 測試登記流程</button>
+  </div>
+
+  <!-- ── CREATE PANEL (left form + right live preview) ── -->
+  <div id="qrmodpanel-create">
+    <div class="qrmod-layout">
+
+      <!-- LEFT: form -->
+      <div>
+        <div class="qrmod-card">
+          <h3>🔗 生成登記連結 &amp; QR Code</h3>
+
+          <!-- type selector -->
+          <div style="font-size:11px;font-weight:700;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">登記來源類型</div>
+          <div class="qrmod-type-grid">
+            <button class="qrmod-type-btn active" id="qrmodtype-roadshow" onclick="qrModSetType('roadshow')"><span class="icon">🏪</span>Roadshow 攤位</button>
+            <button class="qrmod-type-btn" id="qrmodtype-institution" onclick="qrModSetType('institution')"><span class="icon">🏢</span>機構 / 合作夥伴</button>
+            <button class="qrmod-type-btn" id="qrmodtype-referral" onclick="qrModSetType('referral')"><span class="icon">👤</span>會員個人介紹</button>
+            <button class="qrmod-type-btn" id="qrmodtype-online" onclick="qrModSetType('online')"><span class="icon">🌐</span>網上 / 社媒推廣</button>
+          </div>
+
+          <!-- ROADSHOW fields -->
+          <div id="qrmodfields-roadshow">
+            <div class="qrmod-field">
+              <label>Roadshow 場次代碼 <span style="color:#dc2626">*</span></label>
+              <input id="qrmodRsCode" type="text" placeholder="例：cwb_2025_07_01" oninput="qrModUpdatePreview()" style="font-family:monospace;letter-spacing:1px;">
+              <div class="qrmod-hint">只用英文小寫、數字、底線。建議格式：地區_年份_月份_場次</div>
+            </div>
+            <div class="qrmod-field">
+              <label>活動名稱 / 地點</label>
+              <input id="qrmodRsLabel" type="text" placeholder="例：銅鑼灣時代廣場 7月份攤位" oninput="qrModUpdatePreview()">
+            </div>
+            <div class="qrmod-field">
+              <label>活動日期</label>
+              <input id="qrmodRsDate" type="date" oninput="qrModUpdatePreview()">
+            </div>
+            <div class="qrmod-field">
+              <label>備註（選填）</label>
+              <input id="qrmodRsNotes" type="text" placeholder="（可選）">
+            </div>
+          </div>
+
+          <!-- INSTITUTION fields -->
+          <div id="qrmodfields-institution" style="display:none;">
+            <div class="qrmod-field">
+              <label>機構名稱 <span style="color:#dc2626">*</span></label>
+              <input id="qrmodInstName" type="text" placeholder="例：基督教家庭服務中心 荃灣" oninput="qrModUpdatePreview()">
+            </div>
+            <div class="qrmod-field">
+              <label>機構代碼（選填）</label>
+              <input id="qrmodInstCode" type="text" placeholder="例：cfsc_tw" oninput="qrModUpdatePreview()" style="font-family:monospace;letter-spacing:1px;">
+              <div class="qrmod-hint">只用英文小寫、數字、底線。留空則用機構名稱縮寫</div>
+            </div>
+            <div class="qrmod-field">
+              <label>備註（選填）</label>
+              <input id="qrmodInstNotes" type="text" placeholder="（可選）">
+            </div>
+          </div>
+
+          <!-- REFERRAL fields -->
+          <div id="qrmodfields-referral" style="display:none;">
+            <div class="qrmod-field">
+              <label>介紹人會員編號 <span style="color:#dc2626">*</span></label>
+              <input id="qrmodRefNo" type="text" placeholder="例：CE85-000012" oninput="qrModUpdatePreview()" style="font-family:monospace;letter-spacing:2px;font-weight:700;">
+              <div class="qrmod-hint">掃碼後自動填入 referrer_no 欄位</div>
+            </div>
+            <div class="qrmod-field">
+              <label>介紹人姓名（選填）</label>
+              <input id="qrmodRefName" type="text" placeholder="例：陳大文" oninput="qrModUpdatePreview()">
+            </div>
+          </div>
+
+          <!-- ONLINE fields -->
+          <div id="qrmodfields-online" style="display:none;">
+            <div class="qrmod-field">
+              <label>推廣渠道 <span style="color:#dc2626">*</span></label>
+              <select id="qrmodOnlineCh" onchange="qrModUpdatePreview()">
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="website">官方網站</option>
+                <option value="email">電子郵件</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+            <div class="qrmod-field">
+              <label>推廣活動標籤（選填）</label>
+              <input id="qrmodOnlineTag" type="text" placeholder="例：july_promo" oninput="qrModUpdatePreview()" style="font-family:monospace;letter-spacing:1px;">
+            </div>
+          </div>
+
+          <!-- target page -->
+          <div class="qrmod-field" style="margin-top:8px;">
+            <label>目標登記頁面</label>
+            <select id="qrmodTarget" onchange="qrModUpdatePreview()">
+              <option value="primary">主卡登記（長者用）</option>
+              <option value="family">家庭同行卡（家人用）</option>
+              <option value="both">登記頁主頁（有 Login/Register tab）</option>
+            </select>
+          </div>
+
+          <div id="qrmodCreateErr" style="color:#dc2626;font-size:12px;margin:8px 0;display:none;padding:8px 12px;background:#FEF2F2;border-radius:6px;"></div>
+          <div id="qrmodCreateOk" style="color:#065F46;font-size:12px;margin:8px 0;display:none;padding:8px 12px;background:#D1FAE5;border-radius:6px;font-weight:700;">✅ QR 碼來源已成功建立！</div>
+
+          <button class="btn btn-primary" style="width:100%;padding:12px;margin-top:4px;font-size:14px;" onclick="qrModCreate()">
+            💾 建立並儲存 QR 來源
+          </button>
+        </div>
+
+        <!-- saved sources mini-table -->
+        <div class="qrmod-src-list" id="qrmodSrcListWrap">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-size:13px;font-weight:700;color:#374151;">📋 已建立的 QR 來源</span>
+            <button class="btn btn-secondary btn-sm" onclick="qrModLoadSources()">🔄 重新整理</button>
+          </div>
+          <div id="qrmodSrcList"><div style="color:#aaa;font-size:13px;text-align:center;padding:16px;">載入中…</div></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: live preview -->
+      <div>
+        <div class="qrmod-preview">
+          <h3>📱 即時預覽</h3>
+          <div class="qrmod-canvas-wrap" id="qrmodCanvasWrap">
+            <div style="color:#ccc;font-size:12px;text-align:center;line-height:1.6;">填寫左方資料<br>即時生成 QR Code</div>
+          </div>
+          <div id="qrmodLabelText" style="text-align:center;font-size:12px;color:#555;font-weight:600;margin-bottom:8px;min-height:18px;"></div>
+          <div class="qrmod-url-box" id="qrmodUrlBox" style="display:none;"></div>
+          <div id="qrmodActionBtns" style="display:none;">
+            <button class="qrmod-action-btn qrmod-dl-btn" onclick="qrModDownload()">⬇ 下載 QR Code (PNG)</button>
+            <button class="qrmod-action-btn qrmod-cp-btn" id="qrmodCpBtn" onclick="qrModCopyUrl()">📋 複製連結</button>
+          </div>
+          <div class="qrmod-tips">
+            <strong>💡 使用提示</strong><br>
+            • 下載 PNG 後可直接列印或發送<br>
+            • 掃碼者登記時，來源渠道自動記錄<br>
+            • 建立後可在「已有 QR 來源」管理
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── SOURCES PANEL ── -->
+  <div id="qrmodpanel-sources" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div>
+        <h3 style="font-size:15px;font-weight:700;color:#111827">QR 碼來源列表</h3>
+        <p style="font-size:12px;color:#6B7280;margin-top:2px">管理所有 Roadshow QR 碼，可啟用／暫停、查看統計</p>
+      </div>
+      <button class="btn btn-primary" onclick="qrModTab('create',document.getElementById('qrtab-create'))">
+        <i class="fas fa-plus"></i> 新增 QR 碼
+      </button>
+    </div>
+    <div id="qrSourceGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
+      <div style="color:#aaa;font-size:13px;text-align:center;padding:24px;">載入中…</div>
+    </div>
+  </div>
+
+  <!-- ── LOGS PANEL ── -->
+  <div id="qrmodpanel-logs" style="display:none">
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+      <select id="qrLogStatus" onchange="qrLoadLogs()" style="padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px">
+        <option value="">全部狀態</option>
+        <option value="success">成功</option>
+        <option value="format_error">格式錯誤</option>
+        <option value="invalid_year">年份無效</option>
+        <option value="duplicate_phone">重複電話</option>
+        <option value="db_error">系統錯誤</option>
+      </select>
+      <select id="qrLogSource" onchange="qrLoadLogs()" style="padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px">
+        <option value="">全部來源</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="qrLoadLogs()"><i class="fas fa-rotate-right"></i> 刷新</button>
+    </div>
+    <div style="overflow-x:auto">
+      <div id="qrLogsTable"><p style="color:#888;font-size:14px">載入中...</p></div>
+    </div>
+    <div id="qrLogsPager" style="margin-top:12px;display:flex;gap:8px;align-items:center"></div>
+  </div>
+
+  <!-- ── STATS PANEL ── -->
+  <div id="qrmodpanel-stats" style="display:none">
+    <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <label style="font-size:13px;font-weight:600;color:#374151">選擇 QR 來源：</label>
+      <select id="qrStatsSelect" onchange="qrLoadStats()" style="padding:7px 12px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px">
+        <option value="">── 請選擇 ──</option>
+      </select>
+    </div>
+    <div id="qrStatsContent"><p style="color:#888;font-size:14px">請選擇一個 QR 來源以查看統計</p></div>
+  </div>
+
+  <!-- ── TEST PANEL ── -->
+  <div id="qrmodpanel-test" style="display:none">
+    <div style="background:#FFFBEB;border:1.5px solid #F59E0B;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:10px;">
+      <span style="font-size:20px;line-height:1.2;">🧪</span>
+      <div style="font-size:13px;color:#92400E;line-height:1.7;">
+        <strong>測試模式：</strong>此功能模擬 WhatsApp 用戶掃碼後發送訊息的完整流程，用於在 Meta API 審批前測試系統是否正常運作。<br>
+        測試完成後會建立真實的會員記錄，請記得在測試後手動刪除測試資料（或使用測試電話號碼）。
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+
+      <!-- Left: Test Form -->
+      <div style="background:#fff;border-radius:10px;border:1px solid #E5E7EB;padding:22px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <h3 style="font-size:15px;font-weight:700;color:#1B4332;margin:0 0 18px;">📱 模擬 WhatsApp 訊息</h3>
+
+        <div class="qrmod-field">
+          <label>WhatsApp 電話號碼（8位香港號碼）<span style="color:#dc2626">*</span></label>
+          <input id="qrTestPhone" type="text" placeholder="例：91234567" maxlength="8" style="font-size:16px;letter-spacing:2px;">
+          <div class="qrmod-hint">建議用測試號碼（如：99999999）避免影響真實用戶</div>
+        </div>
+
+        <div class="qrmod-field">
+          <label>姓名 <span style="color:#dc2626">*</span></label>
+          <input id="qrTestName" type="text" placeholder="例：測試用戶" maxlength="50">
+        </div>
+
+        <div class="qrmod-field">
+          <label>出生年份 <span style="color:#dc2626">*</span></label>
+          <input id="qrTestYear" type="number" placeholder="例：1960" min="1920" max="2011">
+        </div>
+
+        <div class="qrmod-field">
+          <label>QR 來源 (Source)</label>
+          <select id="qrTestSource" style="padding:9px 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:13px;width:100%;">
+            <option value="online_website">online_website（預設）</option>
+          </select>
+        </div>
+
+        <div style="background:#F0FDF4;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#166534;">
+          <strong>📨 模擬 WhatsApp 訊息內容：</strong>
+          <pre id="qrTestMsgPreview" style="margin:6px 0 0;font-family:monospace;white-space:pre-wrap;font-size:12px;color:#166534;background:none;border:none;padding:0;">姓名:...\n年份:...\nSource:...</pre>
+        </div>
+
+        <div id="qrTestErr" style="display:none;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:6px;padding:10px 14px;font-size:13px;color:#B91C1C;margin-bottom:12px;"></div>
+
+        <button id="qrTestBtn" onclick="qrTestSubmit()" style="width:100%;padding:13px;background:linear-gradient(135deg,#1B4332,#2D6A4F);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.5px;">
+          🚀 模擬發送 &amp; 測試登記流程
+        </button>
+      </div>
+
+      <!-- Right: Result -->
+      <div style="background:#fff;border-radius:10px;border:1px solid #E5E7EB;padding:22px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <h3 style="font-size:15px;font-weight:700;color:#1B4332;margin:0 0 18px;">📋 測試結果</h3>
+        <div id="qrTestResult">
+          <div style="text-align:center;padding:40px 20px;color:#9CA3AF;">
+            <div style="font-size:40px;margin-bottom:12px;">⏳</div>
+            <div style="font-size:13px;">點擊左方按鈕開始測試</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Edit Modal ── -->
+  <div id="qrmodEditOverlay" onclick="if(event.target===this)qrModCloseEdit()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:28px 24px;width:90%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 style="font-size:16px;font-weight:700;color:#1B4332;margin:0;">✏️ 編輯 QR 來源</h3>
+        <button onclick="qrModCloseEdit()" style="background:none;border:none;font-size:20px;color:#6B7280;cursor:pointer;line-height:1;">✕</button>
+      </div>
+      <input type="hidden" id="qrmodEditId">
+      <div class="qrmod-field">
+        <label>Source ID <span style="font-size:11px;color:#9CA3AF;font-weight:400;text-transform:none;">(不可更改)</span></label>
+        <input id="qrmodEditSourceIdDisplay" type="text" disabled style="background:#F9FAFB;color:#6B7280;font-family:monospace;letter-spacing:1px;">
+      </div>
+      <div class="qrmod-field">
+        <label>顯示名稱 <span style="color:#dc2626">*</span></label>
+        <input id="qrmodEditName" type="text" placeholder="例：旺角 Roadshow">
+      </div>
+      <div class="qrmod-field">
+        <label>活動日期</label>
+        <input id="qrmodEditDate" type="date">
+      </div>
+      <div class="qrmod-field">
+        <label>地點</label>
+        <input id="qrmodEditLocation" type="text" placeholder="例：旺角朗豪坊廣場">
+      </div>
+      <div class="qrmod-field">
+        <label>備註</label>
+        <input id="qrmodEditNotes" type="text" placeholder="（選填）">
+      </div>
+      <div id="qrmodEditErr" style="color:#dc2626;font-size:12px;padding:8px 12px;background:#FEF2F2;border-radius:6px;display:none;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button onclick="qrModCloseEdit()" style="padding:9px 18px;background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;cursor:pointer;color:#374151;">取消</button>
+        <button onclick="qrModSaveEdit()" id="qrmodEditSaveBtn" style="padding:9px 18px;background:#1B4332;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">💾 儲存變更</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// QR Module JS  (session-cookie auth, no localStorage pw)
+// ═══════════════════════════════════════════════════════
+var _qrLogPage = 1;
+var _qrModCurrentType = 'roadshow';
+var _qrModCurrentUrl = '';
+
+// ── tab switching ──────────────────────────────────────────────────────────────
+function qrModTab(tab, btnEl){
+  ['create','sources','logs','stats','test'].forEach(function(t){
+    var panel = document.getElementById('qrmodpanel-'+t);
+    if(panel) panel.style.display = t===tab?'block':'none';
+    var tb = document.getElementById('qrtab-'+t);
+    if(tb) tb.classList.toggle('active', t===tab);
+  });
+  if(tab==='sources'){ qrModLoadSources(); qrFillSourceSelects(); }
+  if(tab==='test'){ qrTestInit(); }
+  if(tab==='logs'){ qrFillSourceSelects(); qrLoadLogs(); }
+  if(tab==='stats'){ qrFillSourceSelects(); }
+}
+
+// ── type selector ──────────────────────────────────────────────────────────────
+function qrModSetType(type){
+  _qrModCurrentType = type;
+  ['roadshow','institution','referral','online'].forEach(function(t){
+    var btn = document.getElementById('qrmodtype-'+t);
+    var fields = document.getElementById('qrmodfields-'+t);
+    if(btn) btn.classList.toggle('active', t===type);
+    if(fields) fields.style.display = t===type ? '' : 'none';
+  });
+  qrModUpdatePreview();
+}
+
+// ── build source_id and label from form inputs ─────────────────────────────────
+function qrModGetIdAndLabel(){
+  var type = _qrModCurrentType;
+  var sourceId = '', label = '', location = '', eventDate = '', notes = '';
+  if(type==='roadshow'){
+    var code = (document.getElementById('qrmodRsCode').value||'').trim().toLowerCase().replace(/[^a-z0-9_\-]/g,'');
+    label = (document.getElementById('qrmodRsLabel').value||'').trim() || code;
+    eventDate = document.getElementById('qrmodRsDate').value||'';
+    notes = (document.getElementById('qrmodRsNotes').value||'').trim();
+    sourceId = code || '';
+    location = label;
+  } else if(type==='institution'){
+    var instName = (document.getElementById('qrmodInstName').value||'').trim();
+    var instCode = (document.getElementById('qrmodInstCode').value||'').trim().toLowerCase().replace(/[^a-z0-9_\-]/g,'');
+    sourceId = instCode || instName.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/__+/g,'_').substring(0,30);
+    label = instName;
+    notes = (document.getElementById('qrmodInstNotes').value||'').trim();
+    location = instName;
+  } else if(type==='referral'){
+    var refNo = (document.getElementById('qrmodRefNo').value||'').trim();
+    var refName = (document.getElementById('qrmodRefName').value||'').trim();
+    sourceId = 'ref_'+(refNo.toLowerCase().replace(/[^a-z0-9]/g,'_'));
+    label = refName ? refName+'（'+refNo+'）' : refNo;
+    location = '';
+  } else if(type==='online'){
+    var ch = document.getElementById('qrmodOnlineCh').value||'facebook';
+    var tag = (document.getElementById('qrmodOnlineTag').value||'').trim().toLowerCase().replace(/[^a-z0-9_\-]/g,'');
+    sourceId = 'online_'+ch+(tag?'_'+tag:'');
+    label = '網上推廣 · '+ch.charAt(0).toUpperCase()+ch.slice(1)+(tag?' ('+tag+')':'');
+    location = '';
+  }
+  return { sourceId:sourceId, label:label, location:location, eventDate:eventDate, notes:notes };
+}
+
+// ── build registration URL ─────────────────────────────────────────────────────
+function qrModBuildUrl(sourceId){
+  if(!sourceId) return '';
+  var base = window.location.origin;
+  // Real route: /qr-register?source=xxx  (target selector kept for future use)
+  return base + '/qr-register?source=' + encodeURIComponent(sourceId);
+}
+
+// ── QR image render via reliable external API ─────────────────────────────────
+function qrModRenderCanvas(url, wrap){
+  wrap.innerHTML = '';
+  var img = document.createElement('img');
+  // Use goqr.me API — reliable, no CORS issues, returns clean QR PNG
+  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=' + encodeURIComponent(url);
+  img.width = 200; img.height = 200;
+  img.style.cssText = 'display:block;border-radius:6px;';
+  img.alt = 'QR Code';
+  // loading indicator
+  img.onload = function(){ wrap.style.background = 'transparent'; };
+  img.onerror = function(){
+    wrap.innerHTML = '<div style="color:#e53935;font-size:11px;text-align:center;padding:16px;">QR 生成失敗<br>請檢查網絡連線</div>';
+  };
+  wrap.appendChild(img);
+  // Store reference for download
+  wrap._qrImg = img;
+}
+
+// ── update live preview ────────────────────────────────────────────────────────
+function qrModUpdatePreview(){
+  var info = qrModGetIdAndLabel();
+  var url = qrModBuildUrl(info.sourceId);
+  _qrModCurrentUrl = url;
+
+  var wrap = document.getElementById('qrmodCanvasWrap');
+  var labelEl = document.getElementById('qrmodLabelText');
+  var urlBox = document.getElementById('qrmodUrlBox');
+  var actionBtns = document.getElementById('qrmodActionBtns');
+
+  if(!url){
+    wrap.innerHTML = '<div style="color:#ccc;font-size:12px;text-align:center;line-height:1.6;">填寫左方資料<br>即時生成 QR Code</div>';
+    labelEl.textContent = '';
+    urlBox.style.display = 'none';
+    actionBtns.style.display = 'none';
+    return;
+  }
+  qrModRenderCanvas(url, wrap);
+  labelEl.textContent = info.label || info.sourceId;
+  urlBox.textContent = url;
+  urlBox.style.display = '';
+  actionBtns.style.display = '';
+}
+
+// ── download PNG (high-res 600x600) ───────────────────────────────────────────
+function qrModDownload(){
+  if(!_qrModCurrentUrl){ alert('請先填寫表單'); return; }
+  var info = qrModGetIdAndLabel();
+  var a = document.createElement('a');
+  a.href = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=20&format=png&data=' + encodeURIComponent(_qrModCurrentUrl);
+  a.download = 'qr-' + (info.sourceId || 'code') + '.png';
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ── copy URL ───────────────────────────────────────────────────────────────────
+function qrModCopyUrl(){
+  if(!_qrModCurrentUrl){ alert('請先填寫表單'); return; }
+  var btn = document.getElementById('qrmodCpBtn');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(_qrModCurrentUrl).then(function(){
+      btn.textContent = '✅ 已複製！';
+      setTimeout(function(){ btn.textContent = '📋 複製連結'; }, 2000);
+    }).catch(function(){ prompt('請複製以下連結：', _qrModCurrentUrl); });
+  } else {
+    prompt('請複製以下連結：', _qrModCurrentUrl);
+  }
+}
+
+// ── CREATE: POST to API (uses session cookie) ──────────────────────────────────
+function qrModCreate(){
+  var info = qrModGetIdAndLabel();
+  var errEl = document.getElementById('qrmodCreateErr');
+  var okEl = document.getElementById('qrmodCreateOk');
+  errEl.style.display = 'none';
+  okEl.style.display = 'none';
+
+  if(!info.sourceId){
+    errEl.textContent = '請填寫必填欄位（代碼或名稱）以生成 Source ID';
+    errEl.style.display = 'block'; return;
+  }
+  if(!info.label){
+    errEl.textContent = '請填寫顯示名稱';
+    errEl.style.display = 'block'; return;
+  }
+
+  var payload = {
+    source_id: info.sourceId,
+    display_name: info.label,
+    location: info.location || null,
+    event_date: info.eventDate || null,
+    notes: info.notes || null
+  };
+
+  fetch('/api/admin/qr-sources', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d.ok){
+      okEl.textContent = '✅ QR 來源「' + info.sourceId + '」已成功建立！';
+      okEl.style.display = 'block';
+      // Refresh mini list
+      qrModLoadSources();
+      // Keep preview so user can download QR
+    } else {
+      errEl.textContent = d.error || '建立失敗';
+      errEl.style.display = 'block';
+    }
+  }).catch(function(e){
+    errEl.textContent = '網絡錯誤：' + String(e);
+    errEl.style.display = 'block';
+  });
+}
+
+// ── load sources list (mini version in create panel) ──────────────────────────
+function qrModLoadSources(){
+  var list = document.getElementById('qrmodSrcList');
+  var grid = document.getElementById('qrSourceGrid');
+  if(list) list.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:16px;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
+  if(grid) grid.innerHTML = '<div style="color:#aaa;font-size:13px;text-align:center;padding:24px;grid-column:1/-1;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
+  fetch('/api/admin/qr-sources', { credentials: 'include' })
+  .then(function(r){
+    if(r.status === 401){
+      var errHtml = '<div style="color:#e53935;font-size:13px;padding:12px;text-align:center;"><i class="fas fa-lock"></i> 未授權，請重新登入</div>';
+      if(list) list.innerHTML = errHtml;
+      if(grid) grid.innerHTML = '<p style="color:#e53935;font-size:14px;grid-column:1/-1;text-align:center;padding:24px;"><i class="fas fa-lock"></i> 未授權，請重新登入</p>';
+      return null;
+    }
+    return r.json();
+  })
+  .then(function(d){
+    if(!d) return;
+    var list2 = document.getElementById('qrmodSrcList');
+    var grid2 = document.getElementById('qrSourceGrid');
+    if(!d.ok){
+      var errMsg = d.error || '載入失敗';
+      if(list2) list2.innerHTML = '<div style="color:#e53935;font-size:13px;padding:12px;text-align:center;"><i class="fas fa-exclamation-circle"></i> '+escHtml(errMsg)+'</div>';
+      if(grid2) grid2.innerHTML = '<p style="color:#e53935;font-size:14px;grid-column:1/-1;text-align:center;padding:24px;">'+escHtml(errMsg)+'</p>';
+      return;
+    }
+    var sources = d.sources || [];
+    // alias for block below
+    var list = list2, grid = grid2;
+
+    // Mini list for create panel
+    if(list){
+      if(!sources.length){
+        list.innerHTML = '<div style="color:#aaa;font-size:12px;text-align:center;padding:12px;">尚無 QR 來源</div>';
+      } else {
+        list.innerHTML = sources.map(function(s){
+          var url = window.location.origin + '/qr-register?source=' + encodeURIComponent(s.source_id);
+          return '<div class="qrmod-src-item'+(s.status==='inactive'?' inactive':'')+'">' +
+            '<div class="qrmod-src-header">' +
+              '<div class="qrmod-src-name">' + escHtml(s.display_name) + '</div>' +
+              '<span class="status-badge ' + (s.status==='active'?'status-active':'status-inactive') + '">' + (s.status==='active'?'啟用':'暫停') + '</span>' +
+            '</div>' +
+            '<div class="qrmod-src-meta">' +
+              (s.event_date ? '📅 '+s.event_date+'&nbsp;&nbsp;':'') +
+              (s.location ? '📍 '+escHtml(s.location)+'&nbsp;&nbsp;' : '') +
+              '<span style="font-family:monospace;font-size:10px;color:#9CA3AF">'+escHtml(s.source_id)+'</span>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">' +
+              '<div><div class="qrmod-src-count">'+s.member_count+'</div><div style="font-size:10px;color:#6B7280;">已登記會員</div></div>' +
+            '</div>' +
+            '<div class="qrmod-src-url">'+url+'</div>' +
+            '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+              '<button class="btn btn-secondary btn-sm" onclick="qrModCopyLink(&apos;'+escHtml(url)+'&apos;)"><i class="fas fa-copy"></i> 複製</button>' +
+              '<a class="btn btn-secondary btn-sm" href="'+url+'" target="_blank"><i class="fas fa-eye"></i> 預覽</a>' +
+              '<button class="btn btn-secondary btn-sm" onclick="qrModViewStats(&apos;'+escHtml(s.source_id)+'&apos;)"><i class="fas fa-chart-bar"></i> 統計</button>' +
+              '<button class="btn btn-secondary btn-sm" onclick="qrModOpenEdit(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+escHtml(s.display_name)+'&apos;,&apos;'+(s.event_date||'')+'&apos;,&apos;'+escHtml(s.location||'')+'&apos;,&apos;'+escHtml(s.notes||'')+'&apos;)"><i class="fas fa-pen"></i> 編輯</button>' +
+              '<button class="btn btn-sm '+(s.status==='active'?'btn-danger':'btn-primary')+'" onclick="qrModToggle(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+s.status+'&apos;)">'+(s.status==='active'?'⏸ 暫停':'▶ 啟用')+'</button>' +
+              '<button class="btn btn-sm" style="background:#FEF2F2;color:#DC2626;border:1px solid #FCA5A5;" onclick="qrModDelete(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+escHtml(s.display_name)+'&apos;,'+s.member_count+')"><i class="fas fa-trash"></i></button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+    }
+
+    // Full grid in sources panel
+    if(grid){
+      if(!sources.length){
+        grid.innerHTML = '<p style="color:#888;font-size:14px;grid-column:1/-1;">尚無QR碼，請點「新增QR碼」</p>';
+      } else {
+        grid.innerHTML = sources.map(function(s){
+          var url = window.location.origin + '/qr-register?source=' + encodeURIComponent(s.source_id);
+          var qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(url);
+          return '<div class="qrmod-src-item'+(s.status==='inactive'?' inactive':'')+'" style="border-radius:10px;border:1.5px solid #E5E7EB;">' +
+            '<div class="qrmod-src-header">' +
+              '<div class="qrmod-src-name">'+escHtml(s.display_name)+'</div>' +
+              '<span class="status-badge '+(s.status==='active'?'status-active':'status-inactive')+'">'+(s.status==='active'?'啟用':'暫停')+'</span>' +
+            '</div>' +
+            '<div class="qrmod-src-meta">' +
+              (s.event_date?'📅 '+s.event_date+'&nbsp;&nbsp;':'') +
+              (s.location?'📍 '+escHtml(s.location)+'&nbsp;&nbsp;':'') +
+              '<br><span style="font-family:monospace;font-size:10px;color:#9CA3AF">'+escHtml(s.source_id)+'</span>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">' +
+              '<img src="'+qrApiUrl+'" width="80" height="80" style="border:1.5px solid #E5E7EB;border-radius:6px">' +
+              '<div><div class="qrmod-src-count">'+s.member_count+'</div><div style="font-size:10px;color:#6B7280;">已登記會員</div></div>' +
+            '</div>' +
+            '<div class="qrmod-src-url">'+url+'</div>' +
+            '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">' +
+              '<a class="btn btn-secondary btn-sm" href="'+qrApiUrl+'" target="_blank"><i class="fas fa-download"></i> 下載QR</a>' +
+              '<button class="btn btn-secondary btn-sm" onclick="qrModCopyLink(&apos;'+escHtml(url)+'&apos;)"><i class="fas fa-copy"></i> 複製連結</button>' +
+              '<a class="btn btn-secondary btn-sm" href="'+url+'" target="_blank"><i class="fas fa-eye"></i> 預覽</a>' +
+              '<button class="btn btn-secondary btn-sm" onclick="qrModViewStats(&apos;'+escHtml(s.source_id)+'&apos;)"><i class="fas fa-chart-bar"></i> 統計</button>' +
+              '<button class="btn btn-secondary btn-sm" onclick="qrModOpenEdit(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+escHtml(s.display_name)+'&apos;,&apos;'+(s.event_date||'')+'&apos;,&apos;'+escHtml(s.location||'')+'&apos;,&apos;'+escHtml(s.notes||'')+'&apos;)"><i class="fas fa-pen"></i> 編輯</button>' +
+              '<button class="btn btn-sm '+(s.status==='active'?'btn-danger':'btn-primary')+'" onclick="qrModToggle(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+s.status+'&apos;)">'+(s.status==='active'?'⏸ 暫停':'▶ 啟用')+'</button>' +
+              '<button class="btn btn-sm" style="background:#FEF2F2;color:#DC2626;border:1px solid #FCA5A5;" onclick="qrModDelete(&apos;'+escHtml(s.source_id)+'&apos;,&apos;'+escHtml(s.display_name)+'&apos;,'+s.member_count+')"><i class="fas fa-trash"></i> 刪除</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+    }
+  }).catch(function(err){
+    console.error('qrModLoadSources error:', err);
+    var list = document.getElementById('qrmodSrcList');
+    var grid = document.getElementById('qrSourceGrid');
+    if(list) list.innerHTML = '<div style="color:#e53935;font-size:13px;padding:12px;text-align:center;"><i class="fas fa-exclamation-triangle"></i> 載入失敗，請確認已登入</div>';
+    if(grid) grid.innerHTML = '<p style="color:#e53935;font-size:14px;grid-column:1/-1;text-align:center;padding:24px;"><i class="fas fa-exclamation-triangle"></i> 載入失敗，請確認已登入</p>';
+  });
+}
+
+function qrModCopyLink(url){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){ alert('已複製連結！'); }).catch(function(){ prompt('複製此連結：',url); });
+  } else {
+    prompt('複製此連結：',url);
+  }
+}
+
+function qrModToggle(sourceId, currentStatus){
+  var newStatus = currentStatus==='active'?'inactive':'active';
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId),{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    credentials: 'include',
+    body:JSON.stringify({status:newStatus})
+  }).then(function(){ qrModLoadSources(); });
+}
+
+// ── Edit Modal ─────────────────────────────────────────────────────────────────
+function qrModOpenEdit(sourceId, displayName, eventDate, location, notes){
+  document.getElementById('qrmodEditId').value = sourceId;
+  document.getElementById('qrmodEditSourceIdDisplay').value = sourceId;
+  document.getElementById('qrmodEditName').value = displayName;
+  document.getElementById('qrmodEditDate').value = eventDate || '';
+  document.getElementById('qrmodEditLocation').value = location || '';
+  document.getElementById('qrmodEditNotes').value = notes || '';
+  document.getElementById('qrmodEditErr').style.display = 'none';
+  document.getElementById('qrmodEditSaveBtn').disabled = false;
+  document.getElementById('qrmodEditSaveBtn').textContent = '💾 儲存變更';
+  var overlay = document.getElementById('qrmodEditOverlay');
+  overlay.style.display = 'flex';
+}
+
+function qrModCloseEdit(){
+  document.getElementById('qrmodEditOverlay').style.display = 'none';
+}
+
+function qrModSaveEdit(){
+  var sourceId = document.getElementById('qrmodEditId').value;
+  var displayName = (document.getElementById('qrmodEditName').value||'').trim();
+  var eventDate = document.getElementById('qrmodEditDate').value || null;
+  var location = (document.getElementById('qrmodEditLocation').value||'').trim() || null;
+  var notes = (document.getElementById('qrmodEditNotes').value||'').trim() || null;
+  var errEl = document.getElementById('qrmodEditErr');
+  errEl.style.display = 'none';
+  if(!displayName){ errEl.textContent='請填寫顯示名稱'; errEl.style.display='block'; return; }
+  var btn = document.getElementById('qrmodEditSaveBtn');
+  btn.disabled = true; btn.textContent = '儲存中…';
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId),{
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    credentials: 'include',
+    body: JSON.stringify({display_name:displayName, event_date:eventDate, location:location, notes:notes})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false; btn.textContent = '💾 儲存變更';
+    if(d.ok){
+      qrModCloseEdit();
+      qrModLoadSources();
+    } else {
+      errEl.textContent = d.error || '更新失敗';
+      errEl.style.display = 'block';
+    }
+  }).catch(function(e){
+    btn.disabled = false; btn.textContent = '💾 儲存變更';
+    errEl.textContent = '網絡錯誤：'+String(e);
+    errEl.style.display = 'block';
+  });
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────────
+function qrModDelete(sourceId, displayName, memberCount){
+  if(memberCount > 0){
+    alert('❌ 無法刪除「'+displayName+'」 - 此 QR 來源已有 '+memberCount+' 名會員登記。如不再使用，請改為「暫停」。');
+    return;
+  }
+  if(!confirm('確認刪除「'+displayName+'」（'+sourceId+'）？此操作不可撤銷！')){return;}
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId),{
+    method: 'DELETE',
+    credentials: 'include'
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d.ok){
+      qrModLoadSources();
+    } else {
+      alert('刪除失敗：'+(d.error||'未知錯誤'));
+    }
+  }).catch(function(e){ alert('網絡錯誤：'+String(e)); });
+}
+
+function qrModViewStats(sourceId){
+  qrModTab('stats', document.getElementById('qrtab-stats'));
+  var sel = document.getElementById('qrStatsSelect');
+  if(sel) sel.value = sourceId;
+  qrLoadStats();
+}
+
+// ── init when mod-qr is shown ──────────────────────────────────────────────────
+function qrLoadAll(){
+  qrModLoadSources();
+  qrFillSourceSelects();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QR TEST PANEL
+// ══════════════════════════════════════════════════════════════════════════════
+function qrTestInit(){
+  // Populate source dropdown from API
+  fetch('/api/admin/qr-sources', { credentials:'include' })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var sel = document.getElementById('qrTestSource');
+    if(!sel) return;
+    sel.innerHTML = '<option value="online_website">online_website（預設）</option>';
+    (d.sources||[]).forEach(function(s){
+      sel.innerHTML += '<option value="'+escHtml(s.source_id)+'">'+escHtml(s.source_id)+' — '+escHtml(s.display_name)+'</option>';
+    });
+  }).catch(function(){});
+  // Live preview
+  ['qrTestPhone','qrTestName','qrTestYear','qrTestSource'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener('input', qrTestUpdatePreview);
+    if(el) el.addEventListener('change', qrTestUpdatePreview);
+  });
+  qrTestUpdatePreview();
+}
+
+function qrTestUpdatePreview(){
+  var name   = (document.getElementById('qrTestName')||{}).value||'...';
+  var year   = (document.getElementById('qrTestYear')||{}).value||'...';
+  var source = (document.getElementById('qrTestSource')||{}).value||'online_website';
+  var pre = document.getElementById('qrTestMsgPreview');
+  if(pre) pre.textContent = '姓名:'+name+'\\n年份:'+year+'\\nSource:'+source;
+}
+
+function qrTestSubmit(){
+  var phone  = ((document.getElementById('qrTestPhone')||{}).value||'').trim();
+  var name   = ((document.getElementById('qrTestName')||{}).value||'').trim();
+  var yearStr= ((document.getElementById('qrTestYear')||{}).value||'').trim();
+  var source = ((document.getElementById('qrTestSource')||{}).value||'online_website').trim();
+  var errEl  = document.getElementById('qrTestErr');
+
+  function showErr(msg){ errEl.textContent=msg; errEl.style.display='block'; }
+  errEl.style.display='none';
+
+  if(!/^\d{8}$/.test(phone)){ showErr('請輸入8位香港電話號碼'); return; }
+  if(!name || name.length<1){ showErr('請輸入姓名'); return; }
+  var year = parseInt(yearStr,10);
+  if(isNaN(year)||year<1920||year>2011){ showErr('請輸入有效出生年份（1920-2011）'); return; }
+
+  var btn = document.getElementById('qrTestBtn');
+  btn.disabled=true; btn.textContent='⏳ 測試中...';
+
+  var resultEl = document.getElementById('qrTestResult');
+  resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#6B7280;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><div style="margin-top:10px;font-size:13px;">正在模擬 WhatsApp 流程…</div></div>';
+
+  fetch('/api/admin/qr-test-webhook', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ phone: phone, name: name, year: year, source: source })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    btn.disabled=false; btn.textContent='🚀 模擬發送 & 測試登記流程';
+    if(d.ok){
+      var member = d.member;
+      var appUrl = d.app_link || '';
+      resultEl.innerHTML =
+        '<div style="text-align:center;margin-bottom:16px;">' +
+          '<div style="font-size:36px;margin-bottom:8px;">🎉</div>' +
+          '<div style="font-size:16px;font-weight:700;color:#065F46;">登記成功！</div>' +
+        '</div>' +
+        '<div style="background:#F0FDF4;border-radius:8px;border:1px solid #A7F3D0;padding:16px;font-size:13px;line-height:2;">' +
+          '<div><strong>會員號碼：</strong><span style="font-family:monospace;font-size:15px;font-weight:900;color:#1B4332;">'+escHtml(member.member_no)+'</span></div>' +
+          '<div><strong>姓名：</strong>'+escHtml(member.name_zh)+'</div>' +
+          '<div><strong>電話：</strong>'+escHtml(member.phone)+'</div>' +
+          '<div><strong>出生年份：</strong>'+escHtml(String(member.birth_year))+'</div>' +
+          '<div><strong>會員類型：</strong>'+(member.tier==='PRIMARY'?'主卡（55+）':'家庭卡')+'</div>' +
+          '<div><strong>來源渠道：</strong>'+escHtml(member.roadshow_source||'—')+'</div>' +
+        '</div>' +
+        (appUrl ? '<div style="margin-top:14px;background:#EFF6FF;border-radius:8px;padding:12px 14px;font-size:12px;color:#1E40AF;word-break:break-all;"><strong>📱 會員卡連結（24小時有效）：</strong><br><a href="'+escHtml(appUrl)+'" target="_blank" style="color:#2563EB;">'+escHtml(appUrl)+'</a></div>' : '') +
+        '<div style="margin-top:14px;padding:10px 14px;background:#FEF3C7;border-radius:6px;font-size:12px;color:#92400E;">' +
+          '⚠️ 這是測試記錄，請到<strong>會員系統</strong>搜尋「'+escHtml(name)+'」後刪除測試資料，或使用不真實的電話號碼測試。' +
+        '</div>';
+      // Refresh sources count
+      qrFillSourceSelects();
+    } else {
+      resultEl.innerHTML =
+        '<div style="text-align:center;padding:20px;">' +
+          '<div style="font-size:36px;margin-bottom:8px;">❌</div>' +
+          '<div style="font-size:14px;font-weight:700;color:#DC2626;margin-bottom:8px;">'+escHtml(d.error||'未知錯誤')+'</div>' +
+          (d.detail ? '<div style="font-size:12px;color:#6B7280;background:#F9FAFB;border-radius:6px;padding:8px 12px;text-align:left;">'+escHtml(d.detail)+'</div>' : '') +
+        '</div>';
+    }
+  })
+  .catch(function(e){
+    btn.disabled=false; btn.textContent='🚀 模擬發送 & 測試登記流程';
+    resultEl.innerHTML = '<div style="text-align:center;padding:20px;color:#DC2626;font-size:13px;">網絡錯誤：'+String(e)+'</div>';
+  });
+}
+
+// ── LEGACY COMPAT: qrSwitchTab → qrModTab (for any remaining old calls) ───────
+function qrSwitchTab(tab, btnEl){ qrModTab(tab, btnEl); }
+
+// ── fill source selects (logs + stats) ────────────────────────────────────────
+function qrFillSourceSelects(){
+  fetch('/api/admin/qr-sources', { credentials: 'include' })
+  .then(function(r){ return r.json(); }).then(function(d){
+    var sels = [document.getElementById('qrLogSource'), document.getElementById('qrStatsSelect')];
+    sels.forEach(function(sel){
+      if(!sel) return;
+      var prev = sel.value;
+      var baseOpt = sel.id==='qrLogSource' ? '<option value="">全部來源</option>' : '<option value="">── 請選擇 ──</option>';
+      sel.innerHTML = baseOpt;
+      (d.sources||[]).forEach(function(s){ sel.innerHTML+='<option value="'+escHtml(s.source_id)+'">'+escHtml(s.display_name)+'</option>'; });
+      if(prev) sel.value = prev;
+    });
+  });
+}
+
+// ── LOGS ───────────────────────────────────────────────────────────────────────
+function qrLoadLogs(){
+  var statusEl = document.getElementById('qrLogStatus');
+  var sourceEl = document.getElementById('qrLogSource');
+  var status = statusEl ? statusEl.value : '';
+  var source = sourceEl ? sourceEl.value : '';
+  var url='/api/admin/webhook-logs?page='+_qrLogPage;
+  if(status) url+='&status='+encodeURIComponent(status);
+  if(source) url+='&source='+encodeURIComponent(source);
+  fetch(url, { credentials: 'include' }).then(function(r){return r.json();}).then(function(d){
+    var rows = d.logs||[];
+    var statusMap={success:'成功',format_error:'格式錯誤',invalid_year:'年份無效',duplicate_phone:'重複電話',db_error:'系統錯誤',pending:'處理中',invalid_phone:'電話無效'};
+    var html='<table class="qrmod-log-table"><thead><tr><th>時間</th><th>電話</th><th>姓名</th><th>年份</th><th>來源</th><th>狀態</th><th>會員號</th></tr></thead><tbody>';
+    rows.forEach(function(l){
+      html+='<tr>'+
+        '<td style="white-space:nowrap;font-size:11px">'+((l.created_at||'').substring(0,16))+'</td>'+
+        '<td>'+qrMaskPhone(l.from_number||'')+'</td>'+
+        '<td>'+(l.parsed_name?escHtml(l.parsed_name):'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td>'+(l.parsed_year||'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td style="font-size:10px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(l.parsed_source||'')+'">'+(l.parsed_source?escHtml(l.parsed_source):'<span style="color:#ccc">—</span>')+'</td>'+
+        '<td><span class="lbadge lb-'+(l.validation_result||'pending')+'">'+(statusMap[l.validation_result]||l.validation_result||'處理中')+'</span></td>'+
+        '<td>'+(l.member_no?'<a href="/membership/card/'+escHtml(l.member_no)+'" target="_blank" style="color:#1B4332;font-weight:700">'+escHtml(l.member_no)+'</a>':'<span style="color:#ccc">—</span>')+'</td>'+
+      '</tr>';
+    });
+    html+='</tbody></table>';
+    document.getElementById('qrLogsTable').innerHTML = html;
+    document.getElementById('qrLogsPager').innerHTML =
+      '<button class="btn btn-secondary btn-sm" onclick="_qrLogPage=Math.max(1,_qrLogPage-1);qrLoadLogs()" '+(_qrLogPage<=1?'disabled':'')+'>上一頁</button>'+
+      '<span style="font-size:13px;color:#6B7280;padding:0 8px">第 '+_qrLogPage+' 頁 · 共 '+(d.total||0)+' 條</span>'+
+      '<button class="btn btn-secondary btn-sm" onclick="_qrLogPage++;qrLoadLogs()" '+((_qrLogPage*50>=(d.total||0))?'disabled':'')+'>下一頁</button>';
+  });
+}
+
+function qrMaskPhone(p){ if(p.length>=8) return p.substring(0,4)+'****'+p.substring(p.length-2); return p; }
+
+// ── STATS ──────────────────────────────────────────────────────────────────────
+function qrViewStats(sourceId){ qrModViewStats(sourceId); }
+
+function qrLoadStats(){
+  var sourceId = document.getElementById('qrStatsSelect').value;
+  if(!sourceId){ document.getElementById('qrStatsContent').innerHTML='<p style="color:#888;font-size:14px">請選擇一個 QR 來源以查看統計</p>'; return; }
+  fetch('/api/admin/qr-sources/'+encodeURIComponent(sourceId)+'/stats', { credentials: 'include' })
+  .then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ document.getElementById('qrStatsContent').innerHTML='<p style="color:#dc2626">查詢失敗</p>'; return; }
+    var gMap={M:'男',F:'女',Other:'其他','Prefer not to say':'不說','':'未填'};
+    var tMap={PRIMARY:'主卡（55+）',FAMILY:'家庭卡'};
+    var sMap={incomplete:'未完整',complete:'已完整'};
+    var currentYear = new Date().getFullYear();
+    var avgAge = d.avg_birth_year ? currentYear - d.avg_birth_year : null;
+    var html = '<div class="qrmod-stat-grid">' +
+      '<div class="qrmod-stat-box"><div class="qrmod-stat-num">'+d.total+'</div><div class="qrmod-stat-lbl">總登記人數</div></div>' +
+      (avgAge?'<div class="qrmod-stat-box"><div class="qrmod-stat-num">'+avgAge+'</div><div class="qrmod-stat-lbl">平均年齡</div></div>':'') +
+      (d.birth_year_range&&d.birth_year_range.min?'<div class="qrmod-stat-box"><div class="qrmod-stat-num" style="font-size:15px">'+d.birth_year_range.min+'–'+d.birth_year_range.max+'</div><div class="qrmod-stat-lbl">出生年份範圍</div></div>':'') +
+    '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:4px">';
+    html += '<div><h4 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">📊 會員類型</h4>';
+    (d.by_tier||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:13px"><span>'+(tMap[r.tier]||r.tier)+'</span><strong>'+r.cnt+'</strong></div>'; });
+    html += '</div>';
+    html += '<div><h4 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">⚧ 性別分佈</h4>';
+    (d.by_gender||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:13px"><span>'+(gMap[r.gender||'']||r.gender||'未填')+'</span><strong>'+r.cnt+'</strong></div>'; });
+    html += '</div>';
+    html += '<div><h4 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">✅ 完成率</h4>';
+    (d.by_status||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:13px"><span>'+(sMap[r.registration_status]||r.registration_status)+'</span><strong>'+r.cnt+'</strong></div>'; });
+    html += '</div>';
+    if((d.by_district||[]).length>0){
+      html += '<div><h4 style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">🗺 地區分佈 (Top 10)</h4>';
+      (d.by_district||[]).forEach(function(r){ html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0F0F0;font-size:13px"><span>'+(r.district||'未填')+'</span><strong>'+r.cnt+'</strong></div>'; });
+      html += '</div>';
+    }
+    html += '</div>';
+    document.getElementById('qrStatsContent').innerHTML = html;
+  });
+}
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- mod-testing: 產品測試計劃 管理面板 -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<div id="mod-testing" class="mod-page" style="display:none">
+<style>
+.tst-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+.tst-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s;}
+.tst-btn:disabled{opacity:.5;cursor:not-allowed;}
+.tst-btn-primary{background:#7c3aed;color:#fff;}
+.tst-btn-secondary{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;}
+.tst-btn-sm{padding:5px 10px;font-size:12px;border-radius:6px;}
+.tst-btn-danger{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;}
+.tst-btn-green{background:#f0fdf4;color:#166534;border:1px solid #86efac;}
+.tst-btn-orange{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;}
+.tst-tabs{display:flex;gap:4px;background:#f3f4f6;border-radius:10px;padding:4px;margin-bottom:20px;overflow-x:auto;}
+.tst-tab{flex:none;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;white-space:nowrap;border:none;background:transparent;}
+.tst-tab.active{background:#fff;color:#7c3aed;box-shadow:0 1px 4px rgba(0,0,0,0.1);}
+.tst-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+.tst-campaign-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.tst-campaign-title{font-size:15px;font-weight:800;color:#1f2937;margin-bottom:3px;}
+.tst-campaign-sub{font-size:13px;color:#6b7280;}
+.tst-status-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+.tst-status-draft{background:#f3f4f6;color:#374151;}
+.tst-status-pending_review{background:#fef3c7;color:#92400e;}
+.tst-status-approved{background:#dbeafe;color:#1e40af;}
+.tst-status-live{background:#d1fae5;color:#065f46;}
+.tst-status-completed{background:#ede9fe;color:#5b21b6;}
+.tst-status-archived{background:#f3f4f6;color:#9ca3af;}
+.tst-stats-row{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;}
+.tst-stat-item{text-align:center;background:#f9fafb;border-radius:8px;padding:8px 14px;}
+.tst-stat-num{font-size:20px;font-weight:900;color:#7c3aed;}
+.tst-stat-lbl{font-size:11px;color:#6b7280;margin-top:1px;}
+.tst-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
+.tst-panel{display:none;}
+.tst-panel.active{display:block;}
+.tst-detail-hd{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.tst-back-btn{background:#f3f4f6;border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#374151;}
+.tst-section{margin-bottom:20px;}
+.tst-section-title{font-size:13px;font-weight:800;color:#5b21b6;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #ede9fe;}
+.tst-field{margin-bottom:12px;}
+.tst-label{font-size:12px;font-weight:700;color:#6b7280;margin-bottom:4px;}
+.tst-value{font-size:14px;color:#111;}
+.tst-form-field{margin-bottom:14px;}
+.tst-form-label{display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:5px;}
+.tst-input{width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;background:#fafafa;}
+.tst-input:focus{border-color:#7c3aed;outline:none;background:#fff;}
+.tst-textarea{resize:vertical;min-height:70px;line-height:1.6;}
+.tst-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;}
+.tst-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.tst-table{width:100%;border-collapse:collapse;font-size:13px;}
+.tst-table th{background:#f9fafb;padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:#6b7280;border-bottom:1px solid #e5e7eb;}
+.tst-table td{padding:10px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle;}
+.tst-table tr:last-child td{border-bottom:none;}
+.tst-qr-code{font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:12px;}
+.tst-q-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;}
+.tst-q-num{background:#7c3aed;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;}
+.tst-q-body{flex:1;}
+.tst-q-title{font-size:14px;font-weight:700;color:#1f2937;margin-bottom:3px;}
+.tst-q-type{font-size:11px;color:#7c3aed;font-weight:600;}
+.tst-funnel{display:flex;flex-direction:column;gap:8px;}
+.tst-funnel-row{display:flex;align-items:center;gap:12px;}
+.tst-funnel-bar-wrap{flex:1;background:#f3f4f6;border-radius:6px;height:24px;overflow:hidden;}
+.tst-funnel-bar{height:100%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:6px;transition:width .5s;}
+.tst-funnel-lbl{font-size:12px;color:#374151;width:100px;text-align:right;}
+.tst-funnel-num{font-size:13px;font-weight:800;color:#7c3aed;width:30px;}
+.tst-review-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:13px;color:#92400e;line-height:1.6;}
+.tst-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.tst-modal{background:#fff;border-radius:16px;padding:28px 24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+.tst-modal-title{font-size:18px;font-weight:800;color:#1f2937;margin-bottom:18px;}
+.tst-modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
+</style>
+
+<!-- ── Panel: Campaign List ── -->
+<div id="tst-panel-list" class="tst-panel active">
+  <div class="tst-topbar">
+    <div style="font-size:15px;font-weight:800;color:#1f2937;">所有測試計劃</div>
+    <button class="tst-btn tst-btn-primary" onclick="tstOpenCreate()"><i class="fas fa-plus"></i> 新增計劃</button>
+  </div>
+  <div id="tstCampaignList">
+    <div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>
+  </div>
+</div>
+
+<!-- ── Panel: Campaign Detail ── -->
+<div id="tst-panel-detail" class="tst-panel">
+  <div class="tst-detail-hd">
+    <button class="tst-back-btn" onclick="tstShowList()">← 返回列表</button>
+    <div id="tstDetailTitle" style="font-size:16px;font-weight:800;color:#1f2937;flex:1;"></div>
+    <div id="tstDetailBadge"></div>
+  </div>
+  <div class="tst-tabs" id="tstDetailTabs">
+    <button class="tst-tab active" onclick="tstDetailTab('overview',this)">📋 概覽</button>
+    <button class="tst-tab" onclick="tstDetailTab('questions',this)">❓ 問卷題目</button>
+    <button class="tst-tab" onclick="tstDetailTab('qrcodes',this)">🔖 QR 碼</button>
+    <button class="tst-tab" onclick="tstDetailTab('participants',this)">👥 參與者</button>
+    <button class="tst-tab" onclick="tstDetailTab('report',this)">📊 報告</button>
+  </div>
+  <div id="tstDetailContent">
+    <div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>
+  </div>
+</div>
+
+<!-- ── Panel: Create/Edit Campaign ── -->
+<div id="tst-panel-form" class="tst-panel">
+  <div class="tst-detail-hd">
+    <button class="tst-back-btn" onclick="tstShowList()">← 返回列表</button>
+    <div id="tstFormTitle" style="font-size:16px;font-weight:800;color:#1f2937;flex:1;"></div>
+  </div>
+  <div id="tstFormMsg" style="display:none;padding:12px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:14px;"></div>
+  <div class="tst-card">
+    <div class="tst-section-title">基本資料</div>
+    <div class="tst-form-field">
+      <label class="tst-form-label">計劃名稱 <span style="color:#ef4444">*</span></label>
+      <input class="tst-input" id="tstFName" placeholder="例：XX 品牌護膚品測試計劃 2025">
+    </div>
+    <div class="tst-form-grid">
+      <div class="tst-form-field">
+        <label class="tst-form-label">品牌名稱 <span style="color:#ef4444">*</span></label>
+        <input class="tst-input" id="tstFBrand" placeholder="例：XX 護膚">
+      </div>
+      <div class="tst-form-field">
+        <label class="tst-form-label">產品名稱 <span style="color:#ef4444">*</span></label>
+        <input class="tst-input" id="tstFProduct" placeholder="例：深層保濕面霜">
+      </div>
+    </div>
+    <div class="tst-form-field">
+      <label class="tst-form-label">品牌標誌 URL</label>
+      <input class="tst-input" id="tstFLogo" placeholder="https://…">
+    </div>
+    <div class="tst-form-field">
+      <label class="tst-form-label">品牌描述</label>
+      <textarea class="tst-input tst-textarea" id="tstFDesc" rows="3" placeholder="品牌簡介…"></textarea>
+    </div>
+    <div class="tst-form-grid">
+      <div class="tst-form-field">
+        <label class="tst-form-label">測試天數</label>
+        <select class="tst-input tst-select" id="tstFDuration">
+          <option value="7">7 天</option>
+          <option value="14" selected>14 天</option>
+          <option value="21">21 天</option>
+          <option value="28">28 天</option>
+        </select>
+      </div>
+      <div class="tst-form-field">
+        <label class="tst-form-label">問卷截止日期</label>
+        <input class="tst-input" id="tstFDeadline" placeholder="YYYY-MM-DD">
+      </div>
+    </div>
+    <div class="tst-form-field">
+      <label class="tst-form-label">生成品牌填表連結</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="tst-input" id="tstFBrandToken" readonly style="flex:1;background:#f9fafb;font-size:12px;font-family:monospace;">
+        <button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstCopyBrandLink()" style="white-space:nowrap;">📋 複製</button>
+      </div>
+      <div style="font-size:11px;color:#6b7280;margin-top:4px;">儲存計劃後自動生成，有效期 30 天</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+    <button class="tst-btn tst-btn-secondary" onclick="tstShowList()">取消</button>
+    <button class="tst-btn tst-btn-primary" id="tstFormSaveBtn" onclick="tstSaveCampaign()"><i class="fas fa-save"></i> 儲存</button>
+  </div>
+</div>
+</div><!-- end mod-testing -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// TESTING MODULE JS
+// ══════════════════════════════════════════════════════════════════════════════
+var tstCurrentId = null;
+var tstCurrentData = null;
+
+var TST_STATUS_LABELS = {
+  draft:'草稿', pending_review:'待審核', approved:'已批准', live:'進行中', completed:'已完成', archived:'已封存'
+};
+var TST_Q_TYPE_LABELS = {
+  rating:'評分', yes_no:'是/否', single_choice:'單選', multi_choice:'多選', text:'文字'
+};
+var TST_PARTICIPANT_STATUS = {
+  registered:'已登記', sample_claimed:'已取樣品',
+  survey_started:'填寫中', survey_submitted:'已提交', reward_sent:'已發獎勵'
+};
+
+function tstEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function tstPanel(id){
+  document.querySelectorAll('#mod-testing .tst-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById(id).classList.add('active');
+}
+
+function tstShowList(){ tstPanel('tst-panel-list'); testingLoadCampaigns(); }
+
+function tstStatusBadge(status){
+  return '<span class="tst-status-badge tst-status-'+tstEsc(status)+'">'+(TST_STATUS_LABELS[status]||status)+'</span>';
+}
+
+// ── Load campaign list ──────────────────────────────────────────────────────
+function testingLoadCampaigns(){
+  var el = document.getElementById('tstCampaignList');
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>';
+  fetch('/api/admin/testing/campaigns',{credentials:'include'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok||!(d.campaigns||[]).length){
+      el.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;">尚未有測試計劃。點擊「新增計劃」開始。</div>';
+      return;
+    }
+    var html='';
+    d.campaigns.forEach(function(c){
+      html+='<div class="tst-card">'+
+        '<div class="tst-campaign-hd">'+
+          '<div style="flex:1;">'+
+            '<div class="tst-campaign-title">'+tstEsc(c.campaign_name)+'</div>'+
+            '<div class="tst-campaign-sub">'+tstEsc(c.brand_name)+' ／ '+tstEsc(c.product_name)+'</div>'+
+          '</div>'+
+          tstStatusBadge(c.status)+
+        '</div>'+
+        '<div class="tst-stats-row">'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.total_participants||0)+'</div><div class="tst-stat-lbl">參與者</div></div>'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.submitted_count||0)+'</div><div class="tst-stat-lbl">已提交</div></div>'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.qr_count||0)+'</div><div class="tst-stat-lbl">QR 碼</div></div>'+
+          '<div class="tst-stat-item"><div class="tst-stat-num">'+(c.testing_duration_days||14)+'天</div><div class="tst-stat-lbl">測試期</div></div>'+
+        '</div>'+
+        '<div class="tst-actions">'+
+          '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstViewDetail('+c.id+')"><i class="fas fa-eye"></i> 查看</button>'+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstOpenEdit('+c.id+')"><i class="fas fa-edit"></i> 編輯</button>':'')+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-orange tst-btn-sm" onclick="tstSubmitReview('+c.id+')">📤 提交審核</button>':'')+
+          (c.status==='pending_review'?'<button class="tst-btn tst-btn-green tst-btn-sm" onclick="tstApprove('+c.id+')">✅ 批准</button><button class="tst-btn tst-btn-danger tst-btn-sm" onclick="tstReject('+c.id+')">❌ 拒絕</button>':'')+
+          (c.status==='approved'?'<button class="tst-btn tst-btn-green tst-btn-sm" onclick="tstPublish('+c.id+')">🚀 發佈上線</button>':'')+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-danger tst-btn-sm" onclick="tstDeleteCampaign('+c.id+',this.dataset.name)" data-name="'+tstEsc(c.campaign_name)+'"><i class="fas fa-trash"></i></button>':'')+
+        '</div>'+
+      '</div>';
+    });
+    el.innerHTML=html;
+  }).catch(function(){ el.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444;">載入失敗</div>'; });
+}
+
+// ── Create / Edit ───────────────────────────────────────────────────────────
+function tstOpenCreate(){
+  tstCurrentId=null; tstCurrentData=null;
+  document.getElementById('tstFormTitle').textContent='新增測試計劃';
+  ['tstFName','tstFBrand','tstFProduct','tstFLogo','tstFDesc','tstFDeadline','tstFBrandToken'].forEach(function(id){
+    document.getElementById(id).value='';
+  });
+  document.getElementById('tstFDuration').value='14';
+  document.getElementById('tstFormMsg').style.display='none';
+  tstPanel('tst-panel-form');
+}
+
+function tstOpenEdit(id){
+  fetch('/api/admin/testing/campaigns/'+id,{credentials:'include'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok){alert('載入失敗');return;}
+    var c=d.campaign;
+    tstCurrentId=id; tstCurrentData=d;
+    document.getElementById('tstFormTitle').textContent='編輯計劃：'+c.campaign_name;
+    document.getElementById('tstFName').value=c.campaign_name||'';
+    document.getElementById('tstFBrand').value=c.brand_name||'';
+    document.getElementById('tstFProduct').value=c.product_name||'';
+    document.getElementById('tstFLogo').value=c.brand_logo_url||'';
+    document.getElementById('tstFDesc').value=c.brand_description||'';
+    document.getElementById('tstFDuration').value=String(c.testing_duration_days||14);
+    document.getElementById('tstFDeadline').value=c.survey_deadline||'';
+    if(c.brand_form_token){
+      document.getElementById('tstFBrandToken').value=location.origin+'/brand-form?token='+c.brand_form_token;
+    }
+    document.getElementById('tstFormMsg').style.display='none';
+    tstPanel('tst-panel-form');
+  });
+}
+
+function tstSaveCampaign(){
+  var name=document.getElementById('tstFName').value.trim();
+  var brand=document.getElementById('tstFBrand').value.trim();
+  var product=document.getElementById('tstFProduct').value.trim();
+  if(!name||!brand||!product){
+    tstShowFormMsg('請填寫計劃名稱、品牌名稱及產品名稱','#fef2f2','#991b1b');return;
+  }
+  var payload={
+    campaign_name:name, brand_name:brand, product_name:product,
+    brand_logo_url:document.getElementById('tstFLogo').value.trim()||null,
+    brand_description:document.getElementById('tstFDesc').value.trim(),
+    testing_duration_days:parseInt(document.getElementById('tstFDuration').value)||14,
+    survey_deadline:document.getElementById('tstFDeadline').value.trim()||null
+  };
+  var btn=document.getElementById('tstFormSaveBtn');
+  btn.disabled=true; btn.textContent='儲存中…';
+  var url=tstCurrentId?'/api/admin/testing/campaigns/'+tstCurrentId:'/api/admin/testing/campaigns';
+  var method=tstCurrentId?'PUT':'POST';
+  fetch(url,{method:method,credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> 儲存';
+    if(d.ok){
+      var cid=d.id||(d.campaign&&d.campaign.id)||tstCurrentId;
+      if(d.brand_form_token){
+        document.getElementById('tstFBrandToken').value=location.origin+'/brand-form?token='+d.brand_form_token;
+      }
+      tstShowFormMsg('儲存成功！','#f0fdf4','#166534');
+      if(!tstCurrentId && cid){ tstCurrentId=cid; }
+    } else {
+      tstShowFormMsg(d.error||'儲存失敗','#fef2f2','#991b1b');
+    }
+  }).catch(function(){
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> 儲存';
+    tstShowFormMsg('網絡錯誤，請重試','#fef2f2','#991b1b');
+  });
+}
+
+function tstShowFormMsg(text, bg, color){
+  var el=document.getElementById('tstFormMsg');
+  el.textContent=text; el.style.background=bg; el.style.color=color;
+  el.style.border='1px solid '+color; el.style.display='block';
+}
+
+function tstCopyBrandLink(){
+  var val=document.getElementById('tstFBrandToken').value;
+  if(!val){alert('請先儲存計劃以生成連結');return;}
+  navigator.clipboard.writeText(val).then(function(){alert('連結已複製！');}).catch(function(){
+    prompt('請手動複製連結：',val);
+  });
+}
+
+// ── Status actions ──────────────────────────────────────────────────────────
+function tstSubmitReview(id){
+  if(!confirm('確定提交此計劃供審核？')) return;
+  fetch('/api/admin/testing/campaigns/'+id+'/approve',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'submit_review'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'操作失敗');
+  });
+}
+
+function tstApprove(id){
+  if(!confirm('確定批准此計劃？')) return;
+  fetch('/api/admin/testing/campaigns/'+id+'/approve',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'approve'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'操作失敗');
+  });
+}
+
+function tstReject(id){
+  var comments=prompt('請輸入拒絕原因（選填）：','');
+  if(comments===null) return;
+  fetch('/api/admin/testing/campaigns/'+id+'/approve',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'reject',comments:comments})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'操作失敗');
+  });
+}
+
+function tstPublish(id){
+  if(!confirm('確定發佈此計劃上線？發佈後參與者可掃描 QR 碼加入。')) return;
+  fetch('/api/admin/testing/campaigns/'+id+'/publish',{
+    method:'POST',credentials:'include'
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'操作失敗');
+  });
+}
+
+function tstDeleteCampaign(id, nameOrEl){
+  var name = (nameOrEl && typeof nameOrEl === 'object') ? (nameOrEl.dataset&&nameOrEl.dataset.name)||'' : (nameOrEl||'');
+  if(!confirm('確定刪除計劃「'+name+'」？此操作不可撤銷。')) return;
+  fetch('/api/admin/testing/campaigns/'+id,{
+    method:'DELETE',credentials:'include'
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) testingLoadCampaigns(); else alert(d.error||'刪除失敗');
+  });
+}
+
+// ── Detail view ─────────────────────────────────────────────────────────────
+function tstViewDetail(id){
+  tstCurrentId=id;
+  tstPanel('tst-panel-detail');
+  document.getElementById('tstDetailContent').innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>';
+  tstLoadDetailData(id,'overview');
+}
+
+function tstDetailTab(tab, btn){
+  document.querySelectorAll('#tstDetailTabs .tst-tab').forEach(function(t){t.classList.remove('active');});
+  btn.classList.add('active');
+  tstLoadDetailData(tstCurrentId, tab);
+}
+
+function tstLoadDetailData(id, tab){
+  var el=document.getElementById('tstDetailContent');
+  el.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;">載入中…</div>';
+
+  if(tab==='overview'){
+    fetch('/api/admin/testing/campaigns/'+id,{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';return;}
+      var c=d.campaign;
+      tstCurrentData=d;
+      document.getElementById('tstDetailTitle').textContent=c.campaign_name;
+      document.getElementById('tstDetailBadge').innerHTML=tstStatusBadge(c.status);
+      var brandLink=c.brand_form_token?(location.origin+'/brand-form?token='+c.brand_form_token):'（尚未生成）';
+      var reviewHtml=c.review_comments?'<div class="tst-review-box">📝 審核備注：'+tstEsc(c.review_comments)+'</div>':'';
+      var html=''+
+        reviewHtml+
+        '<div class="tst-card">'+
+          '<div class="tst-section-title">基本資料</div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'+
+            '<div><div class="tst-label">品牌名稱</div><div class="tst-value">'+tstEsc(c.brand_name)+'</div></div>'+
+            '<div><div class="tst-label">產品名稱</div><div class="tst-value">'+tstEsc(c.product_name)+'</div></div>'+
+            '<div><div class="tst-label">測試天數</div><div class="tst-value">'+tstEsc(String(c.testing_duration_days||14))+' 天</div></div>'+
+            '<div><div class="tst-label">問卷截止</div><div class="tst-value">'+tstEsc(c.survey_deadline||'—')+'</div></div>'+
+          '</div>'+
+          (c.brand_description?'<div style="margin-top:10px;"><div class="tst-label">品牌描述</div><div class="tst-value" style="white-space:pre-wrap">'+tstEsc(c.brand_description)+'</div></div>':'')+
+        '</div>'+
+        '<div class="tst-card">'+
+          '<div class="tst-section-title">品牌填表連結</div>'+
+          '<div style="display:flex;align-items:center;gap:8px;">'+
+            '<input style="flex:1;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:monospace;background:#f9fafb;" readonly value="'+tstEsc(brandLink)+'">'+
+            (c.brand_form_token?'<button class="tst-btn tst-btn-secondary tst-btn-sm" data-url="'+tstEsc(brandLink)+'" onclick="navigator.clipboard.writeText(this.dataset.url).then(function(){alert(&apos;已複製！&apos;)})">📋</button>':'')+
+          '</div>'+
+          '<div style="font-size:11px;color:#6b7280;margin-top:4px;">品牌可使用此連結填寫詳細資料</div>'+
+        '</div>'+
+        '<div class="tst-card">'+
+          '<div class="tst-section-title">WhatsApp 範本</div>'+
+          ['welcome','reminder1','reminder2','complete'].map(function(k){
+            var labels={welcome:'歡迎訊息',reminder1:'第一次提醒',reminder2:'第二次提醒',complete:'完成感謝'};
+            var val=c['wa_template_'+k]||'';
+            return val?'<div style="margin-bottom:10px;"><div class="tst-label">'+labels[k]+'</div><div style="background:#f9fafb;border-radius:6px;padding:10px;font-size:13px;white-space:pre-wrap;color:#374151">'+tstEsc(val)+'</div></div>':'';
+          }).join('')+
+        '</div>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">'+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-secondary" onclick="tstOpenEdit('+id+')"><i class="fas fa-edit"></i> 編輯</button>':'')+
+          (c.status==='draft'?'<button class="tst-btn tst-btn-orange" onclick="tstSubmitReview('+id+')">📤 提交審核</button>':'')+
+          (c.status==='pending_review'?'<button class="tst-btn tst-btn-green" onclick="tstApprove('+id+')">✅ 批准</button><button class="tst-btn tst-btn-danger" onclick="tstReject('+id+')">❌ 拒絕</button>':'')+
+          (c.status==='approved'?'<button class="tst-btn tst-btn-primary" onclick="tstPublish('+id+')">🚀 發佈上線</button>':'')+
+        '</div>';
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+
+  else if(tab==='questions'){
+    fetch('/api/admin/testing/campaigns/'+id,{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var questions=d.questions||[];
+      var html='<div class="tst-card">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'+
+          '<div class="tst-section-title" style="margin:0">問卷題目（共 '+questions.length+' 題）</div>'+
+          '<button class="tst-btn tst-btn-primary tst-btn-sm" onclick="tstOpenAddQuestion('+id+')">＋ 新增題目</button>'+
+        '</div>';
+      if(!questions.length){
+        html+='<div style="text-align:center;padding:24px;color:#9ca3af;">尚未有題目</div>';
+      } else {
+        questions.sort(function(a,b){return a.question_order-b.question_order;});
+        // Group consecutive rating questions into one display item
+        var displayNum=1;
+        var qi=0;
+        while(qi<questions.length){
+          var q=questions[qi];
+          if(q.question_type==='rating'){
+            // Collect all consecutive rating questions
+            var ratingGroup=[];
+            while(qi<questions.length && questions[qi].question_type==='rating'){
+              ratingGroup.push(questions[qi]); qi++;
+            }
+            html+='<div class="tst-q-card">'+
+              '<div class="tst-q-num">'+displayNum+'</div>'+
+              '<div class="tst-q-body">'+
+                '<div class="tst-q-title">\u8acb\u70ba\u4ee5\u4e0b\u9805\u76ee\u8a55\u5206\uff1a<span style="font-size:12px;font-weight:400;color:#6b7280;">\uff081-5\u5206\uff09</span></div>'+
+                '<div class="tst-q-type">\u8a55\u5206\u8868\uff08'+ratingGroup.length+'\u9805\uff09&nbsp;&nbsp;<span style="color:#ef4444;font-size:11px;">\u5fc5\u586b</span></div>'+
+                '<div style="margin-top:6px;font-size:12px;color:#6b7280;">'+
+                  ratingGroup.map(function(rq,ri){ return (ri+1)+'. '+tstEsc(rq.title.replace(/^\u8a55\u5206[\uff1a:]\s*/,'')); }).join('&emsp;')+
+                '</div>'+
+              '</div>'+
+            '</div>';
+            displayNum++;
+          } else {
+            var optsHtml='';
+            if(q.options){
+              try{
+                var opts=JSON.parse(q.options);
+                if(opts.length) optsHtml='<div style="margin-top:6px;font-size:12px;color:#6b7280;">\u9078\u9805\uff1a'+opts.map(function(o){return tstEsc(o);}).join(' \uff0f ')+'</div>';
+              }catch(e){}
+            }
+            html+='<div class="tst-q-card">'+
+              '<div class="tst-q-num">'+displayNum+'</div>'+
+              '<div class="tst-q-body">'+
+                '<div class="tst-q-title">'+tstEsc(q.title)+(q.is_required?'  <span style="color:#ef4444;font-size:11px;">\u5fc5\u586b</span>':'')+'</div>'+
+                '<div class="tst-q-type">'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+'</div>'+
+                optsHtml+
+              '</div>'+
+              '<div style="display:flex;gap:6px;">'+
+                '<button class="tst-btn tst-btn-secondary tst-btn-sm" onclick="tstDeleteQuestion('+q.id+','+id+')"><i class="fas fa-trash" style="color:#ef4444"></i></button>'+
+              '</div>'+
+            '</div>';
+            displayNum++;
+            qi++;
+          }
+        }
+      }
+      html+='</div>';
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+
+  else if(tab==='qrcodes'){
+    fetch('/api/admin/testing/campaigns/'+id,{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var qrs=d.qr_codes||[];
+      var html='<div class="tst-card">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'+
+          '<div class="tst-section-title" style="margin:0">QR 碼（共 '+qrs.length+' 個）</div>'+
+          '<button class="tst-btn tst-btn-primary tst-btn-sm" onclick="tstAddQR('+id+')">＋ 新增 QR 碼</button>'+
+        '</div>'+
+        '<table class="tst-table">'+
+          '<thead><tr><th>標籤</th><th>追蹤碼</th><th>掃描次數</th><th>狀態</th><th>掃描連結</th></tr></thead>'+
+          '<tbody>';
+      if(!qrs.length){
+        html+='<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:20px;">尚未有 QR 碼</td></tr>';
+      } else {
+        qrs.forEach(function(q){
+          var scanUrl=location.origin+'/testing/scan/'+q.tracking_code;
+          html+='<tr>'+
+            '<td>'+tstEsc(q.label||'—')+'</td>'+
+            '<td><span class="tst-qr-code">'+tstEsc(q.tracking_code)+'</span></td>'+
+            '<td>'+tstEsc(String(q.scanned_count||0))+'</td>'+
+            '<td>'+(q.status==='active'?'<span style="color:#166534;font-weight:700;">✅ 啟用</span>':'<span style="color:#9ca3af;">停用</span>')+'</td>'+
+            '<td><a href="'+tstEsc(scanUrl)+'" target="_blank" style="font-size:11px;color:#7c3aed;word-break:break-all;">'+tstEsc(scanUrl)+'</a>'+
+              ' <button class="tst-btn tst-btn-secondary tst-btn-sm" data-url="'+tstEsc(scanUrl)+'" onclick="navigator.clipboard.writeText(this.dataset.url).then(function(){alert(&apos;已複製！&apos;)})">📋</button>'+
+            '</td>'+
+          '</tr>';
+        });
+      }
+      html+='</tbody></table></div>';
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+
+  else if(tab==='participants'){
+    fetch('/api/admin/testing/campaigns/'+id+'/participants',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var ps=d.participants||[];
+      var html='<div class="tst-card">'+
+        '<div class="tst-section-title">參與者列表（'+ps.length+' 人）</div>'+
+        '<table class="tst-table">'+
+          '<thead><tr><th>會員編號</th><th>姓名</th><th>狀態</th><th>登記時間</th><th>WA 操作</th></tr></thead>'+
+          '<tbody>';
+      if(!ps.length){
+        html+='<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:20px;">尚未有參與者</td></tr>';
+      } else {
+        ps.forEach(function(p){
+          var statusLabel=TST_PARTICIPANT_STATUS[p.status]||p.status;
+          var statusColor={'registered':'#374151','sample_claimed':'#c2410c','survey_started':'#1e40af','survey_submitted':'#166534','reward_sent':'#5b21b6'}[p.status]||'#374151';
+          html+='<tr>'+
+            '<td><span class="tst-qr-code">'+tstEsc(p.member_no)+'</span></td>'+
+            '<td>'+tstEsc(p.member_name||'—')+'</td>'+
+            '<td><span style="color:'+statusColor+';font-weight:700;">'+tstEsc(statusLabel)+'</span></td>'+
+            '<td style="font-size:12px;color:#6b7280;">'+tstEsc((p.registered_at||'').slice(0,16))+'</td>'+
+            '<td>'+
+              (p.status==='survey_submitted'?'<button class="tst-btn tst-btn-primary tst-btn-sm" data-pid="'+p.id+'" onclick="tstViewResponses(this.dataset.pid)">📋 查看答案</button> ':'')+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" data-pid="'+p.id+'" data-mt="welcome" onclick="tstSendWA(this.dataset.pid,this.dataset.mt)">歡迎</button> '+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" data-pid="'+p.id+'" data-mt="reminder1" onclick="tstSendWA(this.dataset.pid,this.dataset.mt)">提醒1</button> '+
+              '<button class="tst-btn tst-btn-secondary tst-btn-sm" data-pid="'+p.id+'" data-mt="complete" onclick="tstSendWA(this.dataset.pid,this.dataset.mt)">完成</button>'+
+            '</td>'+
+          '</tr>';
+        });
+      }
+      html+='</tbody></table></div>';
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+
+  else if(tab==='report'){
+    fetch('/api/admin/testing/campaigns/'+id+'/report',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';return;}
+      var r=d.report;
+      var funnel=r.funnel||{};
+      var total=funnel.registered||0;
+      function pct(n){ return total>0?Math.round(n/total*100):0; }
+      var html='<div class="tst-card">'+
+        '<div class="tst-section-title">參與漏斗</div>'+
+        '<div class="tst-funnel">'+
+          tstFunnelRow('已登記',funnel.registered||0,pct(funnel.registered||0))+
+          tstFunnelRow('已取樣品',funnel.sample_claimed||0,pct(funnel.sample_claimed||0))+
+          tstFunnelRow('填寫中',funnel.survey_started||0,pct(funnel.survey_started||0))+
+          tstFunnelRow('已提交',funnel.survey_submitted||0,pct(funnel.survey_submitted||0))+
+          tstFunnelRow('已發獎勵',funnel.reward_sent||0,pct(funnel.reward_sent||0))+
+        '</div>'+
+        (r.avg_completion_minutes?'<div style="margin-top:12px;font-size:13px;color:#6b7280;">平均完成時間：<strong>'+Math.round(r.avg_completion_minutes)+' 分鐘</strong></div>':'')+
+      '</div>';
+      // Per-question stats
+      var qs=r.question_stats||[];
+      qs.forEach(function(q){
+        html+='<div class="tst-card">'+
+          '<div class="tst-section-title">'+tstEsc(q.title)+'</div>'+
+          '<div style="font-size:12px;color:#7c3aed;margin-bottom:10px;">'+(TST_Q_TYPE_LABELS[q.question_type]||q.question_type)+' ／ 回答人數：'+(q.response_count||0)+'</div>';
+        if(q.question_type==='rating' && q.avg_rating){
+          var stars=Math.round(q.avg_rating);
+          html+='<div style="font-size:28px;margin-bottom:6px;">'+'★'.repeat(stars)+'☆'.repeat(5-stars)+'</div>'+
+            '<div style="font-size:20px;font-weight:900;color:#7c3aed;">'+parseFloat(q.avg_rating).toFixed(1)+' / 5</div>';
+        } else if(q.options_breakdown){
+          html+='<div>';
+          (q.options_breakdown||[]).forEach(function(opt){
+            html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+              '<div style="width:120px;font-size:13px;color:#374151;">'+tstEsc(opt.answer)+'</div>'+
+              '<div style="flex:1;background:#f3f4f6;border-radius:4px;height:16px;overflow:hidden;">'+
+                '<div style="height:100%;background:#7c3aed;width:'+opt.pct+'%;border-radius:4px;"></div>'+
+              '</div>'+
+              '<div style="font-size:13px;font-weight:700;color:#7c3aed;width:40px;">'+opt.count+'</div>'+
+            '</div>';
+          });
+          html+='</div>';
+        } else if(q.question_type==='text'){
+          html+='<div style="font-size:12px;color:#6b7280;">（文字回答，請查看個別參與者資料）</div>';
+        }
+        html+='</div>';
+      });
+      el.innerHTML=html;
+    }).catch(function(){el.innerHTML='<div style="color:#ef4444">載入失敗</div>';});
+  }
+}
+
+function tstFunnelRow(label, num, pct){
+  return '<div class="tst-funnel-row">'+
+    '<div class="tst-funnel-lbl">'+tstEsc(label)+'</div>'+
+    '<div class="tst-funnel-bar-wrap"><div class="tst-funnel-bar" style="width:'+pct+'%"></div></div>'+
+    '<div class="tst-funnel-num">'+num+'</div>'+
+  '</div>';
+}
+
+// ── View Participant Responses ───────────────────────────────────────────────
+function tstViewResponses(pid){
+  fetch('/api/admin/testing/participants/'+pid+'/responses',{credentials:'include'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.ok){alert(d.error||'載入失敗');return;}
+    var p=d.participant;
+    var qs=d.questions||[];
+    var TST_Q_LABELS={'rating':'\u8a55\u5206','single_choice':'\u55ae\u9078','multi_choice':'\u591a\u9078','text':'\u6587\u5b57','yes_no':'\u662f\u5426'};
+    var html='<div style="font-weight:800;font-size:16px;margin-bottom:4px;">'+tstEsc(p.member_name||p.member_no)+'</div>'+
+      '<div style="font-size:12px;color:#6b7280;margin-bottom:16px;">'+tstEsc(p.member_no)+' ／ \u63d0\u4ea4\u6642\u9593\uff1a'+tstEsc((p.survey_submitted_at||'').slice(0,16))+'</div>';
+    // Group consecutive rating questions into one table block
+    var displayNum=1;
+    var ri=0;
+    while(ri<qs.length){
+      var q=qs[ri];
+      if(q.question_type==='rating'){
+        var rGroup=[];
+        while(ri<qs.length && qs[ri].question_type==='rating'){ rGroup.push(qs[ri]); ri++; }
+        html+='<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f3f4f6;">'+
+          '<div style="font-size:12px;color:#7c3aed;font-weight:700;margin-bottom:8px;">Q'+displayNum+'. \u8acb\u70ba\u4ee5\u4e0b\u9805\u76ee\u8a55\u5206\uff1a</div>'+
+          '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+          '<thead><tr>'+
+            '<th style="text-align:left;padding:4px 8px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb;">\u9805\u76ee</th>'+
+            '<th style="text-align:center;padding:4px 8px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb;">\u5206\u6578</th>'+
+          '</tr></thead><tbody>';
+        rGroup.forEach(function(rq){
+          var label=rq.title.replace(/^\u8a55\u5206[\uff1a:]\s*/,'');
+          var ans=rq.answer||'';
+          var stars='';
+          if(ans){ for(var si=0;si<5;si++){ stars+=si<parseInt(ans)?'\u2605':'\u2606'; } }
+          html+='<tr style="border-bottom:1px solid #f9fafb;">'+
+            '<td style="padding:6px 8px;color:#374151;">'+tstEsc(label)+'</td>'+
+            '<td style="text-align:center;padding:6px 8px;">'+
+              (ans?'<span style="color:#7c3aed;font-weight:700;font-size:15px;">'+stars+' '+tstEsc(ans)+'</span>':'<span style="color:#d1d5db;">\u672a\u4f5c\u7b54</span>')+
+            '</td>'+
+          '</tr>';
+        });
+        html+='</tbody></table></div>';
+        displayNum++;
+      } else {
+        var ans2=q.answer||'';
+        var ansHtml2=ans2?('<span style="color:#1f2937;font-weight:700;">'+tstEsc(ans2)+'</span>'):'<span style="color:#d1d5db;">\u672a\u4f5c\u7b54</span>';
+        html+='<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f3f4f6;">'+
+          '<div style="font-size:12px;color:#7c3aed;font-weight:700;margin-bottom:3px;">Q'+displayNum+'. '+tstEsc(q.title)+'</div>'+
+          '<div style="font-size:14px;padding:8px 10px;background:#f9fafb;border-radius:8px;">'+ansHtml2+'</div>'+
+        '</div>';
+        displayNum++;
+        ri++;
+      }
+    }
+    var modal=document.createElement('div');
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'+
+      '<div style="padding:16px 18px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'+
+        '<div style="font-size:16px;font-weight:900;color:#1f2937;">\ud83d\udcdd \u554f\u5377\u56de\u7b54</div>'+
+        '<button id="tst-resp-modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;">\u00d7</button>'+
+      '</div>'+
+      '<div style="padding:16px 18px;overflow-y:auto;">'+html+'</div>'+
+    '</div>';
+    document.body.appendChild(modal);
+    modal.querySelector('#tst-resp-modal-close').addEventListener('click',function(){modal.remove();});
+    modal.addEventListener('click',function(e){if(e.target===modal)modal.remove();});
+  }).catch(function(){alert('\u8f09\u5165\u5931\u6557');});
+}
+
+// ── Add QR Code ─────────────────────────────────────────────────────────────
+function tstAddQR(cid){
+  var label=prompt('請輸入此 QR 碼的標籤（例：Exhibition A / 門市 B）：','');
+  if(label===null) return;
+  fetch('/api/admin/testing/campaigns/'+cid+'/qr-codes',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({label:label})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){ tstLoadDetailData(cid,'qrcodes'); }
+    else alert(d.error||'生成失敗');
+  });
+}
+
+// ── Add Question modal ───────────────────────────────────────────────────────
+function tstCloseQModal(){ var m=document.getElementById('tstQModal'); if(m) m.remove(); }
+function tstOpenAddQuestion(cid){
+  var html='<div class="tst-modal-overlay" id="tstQModal" onclick="if(event.target===this)this.remove()">'+
+    '<div class="tst-modal">'+
+      '<div class="tst-modal-title">新增問卷題目</div>'+
+      '<div class="tst-form-field"><label class="tst-form-label">題型</label>'+
+        '<select class="tst-input tst-select" id="tstQType" onchange="tstQTypeChange()">'+
+          '<option value="rating">評分（1-5 星）</option>'+
+          '<option value="yes_no">是 / 否</option>'+
+          '<option value="single_choice">單選題</option>'+
+          '<option value="multi_choice">多選題</option>'+
+          '<option value="text">文字回答</option>'+
+        '</select></div>'+
+      '<div class="tst-form-field"><label class="tst-form-label">題目內容 <span style="color:#ef4444">*</span></label>'+
+        '<input class="tst-input" id="tstQTitle" placeholder="例：您對產品的整體評分？"></div>'+
+      '<div id="tstQOptsWrap"></div>'+
+      '<div class="tst-modal-footer">'+
+        '<button class="tst-btn tst-btn-secondary" onclick="tstCloseQModal()">取消</button>'+
+        '<button class="tst-btn tst-btn-primary" onclick="tstSaveQuestion('+cid+')">新增</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function tstQTypeChange(){
+  var type=document.getElementById('tstQType').value;
+  var wrap=document.getElementById('tstQOptsWrap');
+  if(type==='single_choice'||type==='multi_choice'){
+    wrap.innerHTML='<div class="tst-form-field"><label class="tst-form-label">選項（每行一個）</label>'+
+      '<textarea class="tst-input tst-textarea" id="tstQOpts" placeholder="選項 1&#10;選項 2&#10;選項 3" rows="4"></textarea></div>';
+  } else {
+    wrap.innerHTML='';
+  }
+}
+
+function tstSaveQuestion(cid){
+  var type=document.getElementById('tstQType').value;
+  var title=document.getElementById('tstQTitle').value.trim();
+  if(!title){alert('請輸入題目內容');return;}
+  var options=[];
+  if((type==='single_choice'||type==='multi_choice') && document.getElementById('tstQOpts')){
+    options=document.getElementById('tstQOpts').value.split(String.fromCharCode(10)).map(function(s){return s.trim();}).filter(function(s){return s;});
+  }
+  fetch('/api/admin/testing/campaigns/'+cid+'/questions',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_type:type,title:title,options:options,is_required:1})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      var m=document.getElementById('tstQModal'); if(m) m.remove();
+      tstLoadDetailData(cid,'questions');
+    } else alert(d.error||'新增失敗');
+  });
+}
+
+function tstDeleteQuestion(qid, cid){
+  if(!confirm('確定刪除此題目？')) return;
+  fetch('/api/admin/testing/questions/'+qid,{method:'DELETE',credentials:'include'})
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.ok) tstLoadDetailData(cid,'questions'); else alert(d.error||'刪除失敗');
+  });
+}
+
+// ── Send WA ─────────────────────────────────────────────────────────────────
+function tstSendWA(participantId, type){
+  fetch('/api/admin/testing/send-whatsapp',{
+    method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({participant_id:participantId,message_type:type})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok && d.wa_url){
+      window.open(d.wa_url,'_blank');
+    } else {
+      alert(d.error||'無法生成 WhatsApp 連結');
+    }
+  });
+}
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- mod-benefits: 福利管理面板 -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<div id="mod-benefits" class="mod-page" style="display:none">
+<style>
+.bnf-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.bnf-cat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.bnf-cat-tab{padding:6px 14px;border-radius:20px;border:2px solid #e0e0e0;background:#fff;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;}
+.bnf-cat-tab.active{background:#1B4332;color:#fff;border-color:#1B4332;}
+.bnf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+.bnf-card{background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);overflow:hidden;border:1px solid #f0f0f0;transition:box-shadow .2s;}
+.bnf-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.13);}
+.bnf-card-img{width:100%;height:160px;object-fit:cover;display:block;background:#f5f5f5;}
+.bnf-card-img-placeholder{width:100%;height:100px;background:linear-gradient(135deg,#e8f5e9,#c8e6c9);display:flex;align-items:center;justify-content:center;font-size:36px;}
+.bnf-card-body{padding:14px 16px;}
+.bnf-card-cat{font-size:11px;font-weight:700;color:#388E3C;background:#E8F5E9;padding:2px 8px;border-radius:10px;display:inline-block;margin-bottom:6px;}
+.bnf-card-title{font-size:15px;font-weight:800;color:#1a1a1a;margin-bottom:6px;line-height:1.3;}
+.bnf-card-desc{font-size:12px;color:#555;line-height:1.5;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.bnf-card-meta{font-size:11px;color:#888;margin-bottom:10px;}
+.bnf-card-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.bnf-badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
+.bnf-badge-active{background:#E8F5E9;color:#2E7D32;}
+.bnf-badge-inactive{background:#FFF3E0;color:#E65100;}
+.bnf-badge-expired{background:#f5f5f5;color:#9e9e9e;}
+.bnf-form-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.bnf-form-box{background:#fff;border-radius:16px;max-width:680px;width:100%;max-height:90vh;overflow-y:auto;padding:28px;}
+.bnf-form-title{font-size:18px;font-weight:800;color:#1B4332;margin-bottom:20px;}
+.bnf-field{margin-bottom:16px;}
+.bnf-label{font-size:12px;font-weight:700;color:#555;margin-bottom:5px;display:block;}
+.bnf-input,.bnf-select,.bnf-textarea{width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;font-family:inherit;}
+.bnf-textarea{min-height:80px;resize:vertical;}
+.bnf-input:focus,.bnf-select:focus,.bnf-textarea:focus{outline:none;border-color:#1B4332;}
+.bnf-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.bnf-extra-field{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.bnf-extra-field input{flex:1;padding:8px 10px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;}
+.bnf-add-field-btn{display:flex;align-items:center;gap:6px;color:#1B4332;font-size:13px;font-weight:700;cursor:pointer;border:2px dashed #a5d6a7;border-radius:8px;padding:8px 14px;background:#f1f8e9;margin-top:4px;}
+.bnf-upload-area{border:2px dashed #c8e6c9;border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:#f9fdf9;transition:border-color .2s;}
+.bnf-upload-area:hover{border-color:#1B4332;}
+.bnf-upload-preview{max-width:100%;max-height:200px;border-radius:8px;margin-top:10px;}
+.bnf-claims-table{width:100%;border-collapse:collapse;font-size:13px;}
+.bnf-claims-table th{background:#f5f5f5;padding:8px 12px;text-align:left;font-weight:700;color:#444;}
+.bnf-claims-table td{padding:8px 12px;border-bottom:1px solid #f0f0f0;}
+.bnf-stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+.bnf-stat-box{background:#fff;border-radius:10px;padding:14px 18px;box-shadow:0 1px 6px rgba(0,0,0,.07);min-width:100px;text-align:center;}
+.bnf-stat-num{font-size:26px;font-weight:900;color:#1B4332;}
+.bnf-stat-lbl{font-size:11px;color:#888;margin-top:2px;}
+</style>
+<div class="bnf-toolbar">
+  <button class="btn btn-primary" onclick="bnfOpenCreate()"><i class="fas fa-plus"></i> 新增福利</button>
+  <button class="btn btn-secondary" onclick="bnfShowClaims()"><i class="fas fa-chart-bar"></i> 申領記錄</button>
+  <button class="btn btn-secondary" onclick="bnfLoadAll()"><i class="fas fa-sync"></i> 刷新</button>
+</div>
+<div class="bnf-cat-tabs" id="bnfCatTabs">
+  <div class="bnf-cat-tab active" data-cat="0" onclick="bnfFilterCat(0,this)">📋 全部</div>
+</div>
+<div id="bnfLoading" style="text-align:center;padding:40px;color:#888;font-size:14px;">載入中…</div>
+<div id="bnfGrid" class="bnf-grid" style="display:none"></div>
+<div id="bnfEmpty" style="display:none;text-align:center;padding:40px;color:#aaa;">
+  <div style="font-size:40px;margin-bottom:10px;">🎁</div>
+  <div style="font-size:15px;">此分類暫無福利，點擊「新增福利」開始新增</div>
+</div>
+<div id="bnfClaimsPanel" style="display:none;margin-top:8px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div style="font-size:16px;font-weight:800;color:#1B4332;">📊 申領記錄總覽</div>
+    <button class="btn btn-sm btn-secondary" onclick="bnfHideClaims()">✕ 關閉</button>
+  </div>
+  <div id="bnfClaimsSummary"></div>
+</div>
+</div><!-- end mod-benefits -->
+
+<!-- mod-hmvod: HMVod 申請管理 -->
+<div id="mod-hmvod" class="mod-page" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+    <div style="font-size:20px;font-weight:900;color:#B71C1C;">🎬 HMVod 免費會籍申請記錄</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="hmvodAdminLoad()" style="font-size:14px;padding:8px 16px;"><i class="fas fa-sync"></i> 重新整理</button>
+      <button class="btn btn-primary" onclick="hmvodExportExcel()" style="font-size:14px;padding:8px 16px;background:#1B5E20;border-color:#1B5E20;"><i class="fas fa-file-excel"></i> 下載 Excel</button>
+    </div>
+  </div>
+
+  <!-- WA Number Setting -->
+  <div style="background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+    <div style="font-size:15px;font-weight:800;color:#F57F17;margin-bottom:12px;">⚙️ 職員 WhatsApp 號碼設定</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <label style="font-size:13px;color:#555;font-weight:700;display:block;margin-bottom:4px;">接收申請的 WhatsApp 號碼（含國家號，如 85290001234）</label>
+        <input id="hmvodWaInput" type="tel" placeholder="85290001234" style="width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box;font-family:monospace;letter-spacing:1px;">
+      </div>
+      <button class="btn btn-primary" onclick="hmvodSaveWa()" style="padding:10px 20px;margin-top:20px;">儲存</button>
+    </div>
+    <div id="hmvodWaMsg" style="font-size:13px;margin-top:8px;display:none;"></div>
+  </div>
+
+  <!-- Stats bar -->
+  <div id="hmvodStats" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+  <!-- Applications table -->
+  <div style="background:#fff;border-radius:12px;border:1.5px solid #e0e0e0;overflow:hidden;">
+    <div id="hmvodTableWrap" style="overflow-x:auto;">
+      <div id="hmvodLoading" style="padding:40px;text-align:center;color:#888;">載入中…</div>
+      <table id="hmvodTable" style="width:100%;border-collapse:collapse;display:none;">
+        <thead>
+          <tr style="background:#B71C1C;color:#fff;font-size:13px;">
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">#</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">申請時間</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">姓名</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">電話</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">會員號</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">狀態</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">備註</th>
+            <th style="padding:12px 14px;text-align:left;white-space:nowrap;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="hmvodTbody"></tbody>
+      </table>
+      <div id="hmvodEmpty" style="padding:40px;text-align:center;color:#aaa;display:none;">暫無申請記錄</div>
+    </div>
+  </div>
+</div><!-- end mod-hmvod -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// BENEFITS MODULE JS
+// ══════════════════════════════════════════════════════════════════════════════
+var _bnfCats=[];
+var _bnfCurrentCat=0;
+var _bnfBenefits=[];
+var _bnfEditingId=null;
+var _bnfExtraFields=[];
+
+function bnfLoadAll(){
+  fetch('/api/admin/benefit-categories',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      _bnfCats=d.categories||[];
+      var tabs=document.getElementById('bnfCatTabs');
+      if(!tabs) return;
+      tabs.innerHTML='<div class="bnf-cat-tab active" data-cat="0" onclick="bnfFilterCat(0,this)">📋 全部</div>';
+      _bnfCats.forEach(function(cat){
+        tabs.innerHTML+='<div class="bnf-cat-tab" data-cat="'+cat.id+'" onclick="bnfFilterCat('+cat.id+',this)">'+cat.icon+' '+cat.name+'</div>';
+      });
+    });
+  bnfFetchBenefits(0);
+}
+
+function bnfFetchBenefits(catId){
+  var loading=document.getElementById('bnfLoading'),grid=document.getElementById('bnfGrid'),empty=document.getElementById('bnfEmpty');
+  if(loading) loading.style.display='block';
+  if(grid) grid.style.display='none';
+  if(empty) empty.style.display='none';
+  var url='/api/admin/benefits'+(catId?'?category_id='+catId:'');
+  fetch(url,{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(loading) loading.style.display='none';
+      if(!d.ok){
+        if(d.code==='AUTH_REQUIRED'||d.error==='Unauthorized'){
+          if(empty){empty.style.display='block';empty.textContent='請先登入管理後台';}
+        } else {
+          if(empty){empty.style.display='block';empty.textContent='載入失敗：'+(d.error||'未知錯誤');}
+        }
+        return;
+      }
+      _bnfBenefits=d.benefits||[];
+      if(!_bnfBenefits.length){if(empty)empty.style.display='block';return;}
+      if(grid){grid.style.display='grid';grid.innerHTML=_bnfBenefits.map(function(b){return bnfCardHtml(b);}).join('');}
+    })
+    .catch(function(e){if(loading)loading.style.display='none';if(empty){empty.style.display='block';empty.textContent='網路錯誤，請重試';} });
+}
+
+function bnfFilterCat(catId,el){
+  _bnfCurrentCat=catId;
+  document.querySelectorAll('#bnfCatTabs .bnf-cat-tab').forEach(function(t){t.classList.remove('active');});
+  if(el) el.classList.add('active');
+  document.getElementById('bnfClaimsPanel').style.display='none';
+  bnfFetchBenefits(catId);
+}
+
+function bnfCardHtml(b){
+  var statusBadge=b.status==='active'?'<span class="bnf-badge bnf-badge-active">啟用</span>':
+    b.status==='inactive'?'<span class="bnf-badge bnf-badge-inactive">停用</span>':
+    '<span class="bnf-badge bnf-badge-expired">已過期</span>';
+  var imgHtml=b.image_url
+    ?'<img class="bnf-card-img" src="'+bnfEsc(b.image_url)+'" alt="'+bnfEsc(b.title)+'">'
+    :'<div class="bnf-card-img-placeholder">'+bnfEsc(b.category_icon||'🎁')+'</div>';
+  var dateHtml=(b.start_date||b.end_date)?'<div>📅 '+(b.start_date||'—')+' ~ '+(b.end_date||'長期')+'</div>':'';
+  return '<div class="bnf-card">'+imgHtml+
+    '<div class="bnf-card-body">'+
+      '<div><span class="bnf-card-cat">'+(b.category_icon||'')+' '+(b.category_name||'')+'</span> '+statusBadge+
+        ' <span style="font-size:11px;color:#888;margin-left:6px;">👥 '+b.claim_count+' 人領取</span></div>'+
+      '<div class="bnf-card-title">'+bnfEsc(b.title)+'</div>'+
+      '<div class="bnf-card-desc">'+bnfEsc(b.description)+'</div>'+
+      '<div class="bnf-card-meta">'+dateHtml+'</div>'+
+      '<div class="bnf-card-actions">'+
+        '<button class="btn btn-sm btn-primary" data-bid="'+b.id+'" onclick="bnfOpenEdit(this.dataset.bid)">✏️ 編輯</button>'+
+        '<button class="btn btn-sm btn-secondary" data-bid="'+b.id+'" data-btitle="'+bnfEsc(b.title)+'" onclick="bnfViewClaims(this.dataset.bid,this.dataset.btitle)">👥 申領</button>'+
+        '<button class="btn btn-sm btn-danger" data-bid="'+b.id+'" data-btitle="'+bnfEsc(b.title)+'" onclick="bnfDelete(this.dataset.bid,this.dataset.btitle)">🗑️</button>'+
+      '</div>'+
+    '</div></div>';
+}
+
+function bnfEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function bnfClickFileInput(){var el=document.getElementById('bnfFileInput');if(el)el.click();}
+function bnfCloseForm(){var el=document.getElementById('bnfFormOverlay');if(el)el.remove();}
+function bnfCloseClaimsModal(){var el=document.getElementById('bnfClaimsModal');if(el)el.remove();}
+function bnfOpenCreate(){_bnfEditingId=null;_bnfExtraFields=[];bnfShowForm(null);}
+function bnfOpenEdit(id){
+  var b=_bnfBenefits.find(function(x){return x.id==id;});
+  if(!b){alert('找不到此福利');return;}
+  _bnfEditingId=id;_bnfExtraFields=[];
+  try{_bnfExtraFields=JSON.parse(b.extra_fields||'[]');}catch(e){}
+  bnfShowForm(b);
+}
+
+function bnfShowForm(b){
+  var old=document.getElementById('bnfFormOverlay');if(old)old.remove();
+  var catsOpts=_bnfCats.map(function(c){
+    var sel=(b&&b.category_id==c.id)?' selected':'';
+    return '<option value="'+c.id+'"'+sel+'>'+c.icon+' '+c.name+'</option>';
+  }).join('');
+  var extraHtml=_bnfExtraFields.map(function(f,i){
+    var parts=['<div class="bnf-extra-field">'];
+    parts.push('<input placeholder="欄位名稱" value="'+bnfEsc(f.label||'')+'" oninput="bnfEFUpdate('+i+',this,0)">');
+    parts.push('<input placeholder="內容" value="'+bnfEsc(f.value||'')+'" oninput="bnfEFUpdate('+i+',this,1)">');
+    parts.push('<button onclick="bnfEFRemove('+i+')" style="border:none;background:#ffebee;color:#c62828;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;">✕</button>');
+    parts.push('</div>');
+    return parts.join('');
+  }).join('');
+  var imgUrl=b&&b.image_url?b.image_url:'';
+  var imgPreviewHtml=imgUrl?'<img class="bnf-upload-preview" id="bnfImgPreview" src="'+bnfEsc(imgUrl)+'">':'<img class="bnf-upload-preview" id="bnfImgPreview" style="display:none">';
+  var formTitle=b?'✏️ 編輯福利':'➕ 新增福利';
+  var selActive=(!b||b.status==='active')?' selected':'';
+  var selInactive=(b&&b.status==='inactive')?' selected':'';
+  var parts=[];
+  parts.push('<div id="bnfFormOverlay" class="bnf-form-overlay"><div class="bnf-form-box">');
+  parts.push('<div class="bnf-form-title">'+formTitle+'</div>');
+  parts.push('<div class="bnf-row">');
+  parts.push('<div class="bnf-field"><label class="bnf-label">分類 *</label><select class="bnf-select" id="bnfFCat"><option value="">請選擇</option>'+catsOpts+'</select></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">狀態</label><select class="bnf-select" id="bnfFStatus"><option value="active"'+selActive+'>啟用</option><option value="inactive"'+selInactive+'>停用</option></select></div>');
+  parts.push('</div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">標題 *</label><input class="bnf-input" id="bnfFTitle" placeholder="福利標題" value="'+bnfEsc(b?b.title:'')+'"></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">簡介</label><textarea class="bnf-textarea" id="bnfFDesc" placeholder="簡短介紹">'+bnfEsc(b?b.description:'')+'</textarea></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">封面圖片</label>');
+  parts.push('<div class="bnf-upload-area" onclick="bnfClickFileInput()">');
+  parts.push('<div style="font-size:24px;margin-bottom:4px;">📷</div>');
+  parts.push('<div id="bnfUploadTxt" style="font-size:13px;color:#666;">點擊上傳圖片（自動上傳至 Cloudinary）</div>');
+  parts.push('<input type="file" id="bnfFileInput" accept="image/*" style="display:none" onchange="bnfUploadImage(this)">');
+  parts.push(imgPreviewHtml);
+  parts.push('</div>');
+  parts.push('<input class="bnf-input" id="bnfFImg" placeholder="或直接輸入圖片 URL" value="'+bnfEsc(imgUrl)+'" style="margin-top:8px;" oninput="bnfPreviewUrl(this.value)">');
+  parts.push('</div>');
+  parts.push('<div class="bnf-row">');
+  parts.push('<div class="bnf-field"><label class="bnf-label">開始日期</label><input class="bnf-input" type="date" id="bnfFStart" value="'+bnfEsc(b&&b.start_date?b.start_date:'')+'"></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">結束日期</label><input class="bnf-input" type="date" id="bnfFEnd" value="'+bnfEsc(b&&b.end_date?b.end_date:'')+'"></div>');
+  parts.push('</div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">福利內容詳情</label><textarea class="bnf-textarea" id="bnfFContent" placeholder="詳細說明福利條款、如何使用等" style="min-height:100px;">'+bnfEsc(b?b.benefit_content:'')+'</textarea></div>');
+  parts.push('<div class="bnf-row">');
+  parts.push('<div class="bnf-field"><label class="bnf-label">每人領取上限（0=不限）</label><input class="bnf-input" type="number" id="bnfFClaimLimit" min="0" value="'+(b?b.claim_limit:0)+'"></div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">總名額上限（0=不限）</label><input class="bnf-input" type="number" id="bnfFTotalQuota" min="0" value="'+(b?b.total_quota:0)+'"></div>');
+  parts.push('</div>');
+  parts.push('<div class="bnf-field"><label class="bnf-label">自訂欄位 <span style="font-weight:400;color:#999;">（可新增任意資訊欄位）</span></label>');
+  parts.push('<div id="bnfExtraFieldsList">'+extraHtml+'</div>');
+  parts.push('<div class="bnf-add-field-btn" onclick="bnfEFAdd()">＋ 新增欄位</div></div>');
+  parts.push('<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;">');
+  parts.push('<button class="btn btn-secondary" onclick="bnfCloseForm()">取消</button>');
+  parts.push('<button class="btn btn-primary" onclick="bnfSave()">💾 儲存</button>');
+  parts.push('</div></div></div>');
+  var html=parts.join('');
+  document.getElementById('mod-benefits').insertAdjacentHTML('beforeend',html);
+}
+
+function bnfPreviewUrl(url){
+  var img=document.getElementById('bnfImgPreview');
+  if(!img) return;
+  if(url){img.src=url;img.style.display='block';}else{img.style.display='none';}
+}
+function bnfUploadImage(input){
+  var file=input.files[0];if(!file) return;
+  var fd=new FormData();fd.append('file',file);
+  var txt=document.getElementById('bnfUploadTxt');if(txt) txt.textContent='上傳中…';
+  fetch('/api/admin/benefits/upload-image',{method:'POST',credentials:'include',body:fd})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(txt) txt.textContent='點擊上傳圖片（自動上傳至 Cloudinary）';
+      if(d.ok&&d.url){document.getElementById('bnfFImg').value=d.url;bnfPreviewUrl(d.url);}
+      else alert(d.error||'上傳失敗');
+    })
+    .catch(function(){if(txt)txt.textContent='點擊上傳圖片';alert('上傳失敗');});
+}
+function bnfEFAdd(){_bnfExtraFields.push({label:'',value:''});bnfRenderEF();}
+function bnfEFRemove(i){_bnfExtraFields.splice(i,1);bnfRenderEF();}
+function bnfEFUpdate(i,inputEl,keyIdx){
+  if(!_bnfExtraFields[i]) return;
+  if(keyIdx===0) _bnfExtraFields[i].label=inputEl.value;
+  else _bnfExtraFields[i].value=inputEl.value;
+}
+function bnfRenderEF(){
+  var wrap=document.getElementById('bnfExtraFieldsList');if(!wrap) return;
+  wrap.innerHTML=_bnfExtraFields.map(function(f,i){
+    return '<div class="bnf-extra-field">'+
+      '<input placeholder="欄位名稱" value="'+bnfEsc(f.label||'')+'" oninput="bnfEFUpdate('+i+',this,0)">'+
+      '<input placeholder="內容" value="'+bnfEsc(f.value||'')+'" oninput="bnfEFUpdate('+i+',this,1)">'+
+      '<button onclick="bnfEFRemove('+i+')" style="border:none;background:#ffebee;color:#c62828;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;">✕</button>'+
+    '</div>';
+  }).join('');
+}
+function bnfSave(){
+  var cat=document.getElementById('bnfFCat').value;
+  var title=(document.getElementById('bnfFTitle').value||'').trim();
+  if(!cat||!title){alert('請填寫分類及標題');return;}
+  var payload={
+    category_id:parseInt(cat),title:title,
+    description:(document.getElementById('bnfFDesc').value||'').trim(),
+    image_url:(document.getElementById('bnfFImg').value||'').trim(),
+    start_date:document.getElementById('bnfFStart').value||'',
+    end_date:document.getElementById('bnfFEnd').value||'',
+    benefit_content:(document.getElementById('bnfFContent').value||'').trim(),
+    claim_limit:parseInt(document.getElementById('bnfFClaimLimit').value)||0,
+    total_quota:parseInt(document.getElementById('bnfFTotalQuota').value)||0,
+    extra_fields:JSON.stringify(_bnfExtraFields.filter(function(f){return f.label;})),
+    status:document.getElementById('bnfFStatus').value||'active',sort_order:0
+  };
+  var url=_bnfEditingId?'/api/admin/benefits/'+_bnfEditingId:'/api/admin/benefits';
+  var method=_bnfEditingId?'PUT':'POST';
+  fetch(url,{method:method,credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){var ov=document.getElementById('bnfFormOverlay');if(ov)ov.remove();bnfFetchBenefits(_bnfCurrentCat);}
+      else alert(d.error||'儲存失敗');
+    });
+}
+function bnfDelete(id,titleStr){
+  if(!confirm('確定刪除福利「'+titleStr+'」？此操作不可撤銷。')) return;
+  fetch('/api/admin/benefits/'+id,{method:'DELETE',credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.ok)bnfFetchBenefits(_bnfCurrentCat);else alert(d.error||'刪除失敗');});
+}
+function bnfShowClaims(){
+  var panel=document.getElementById('bnfClaimsPanel');panel.style.display='block';
+  document.getElementById('bnfClaimsSummary').innerHTML='<div style="text-align:center;padding:30px;color:#888;">載入中…</div>';
+  fetch('/api/admin/benefits/claims/summary',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok){document.getElementById('bnfClaimsSummary').innerHTML='<p style="color:red;">載入失敗</p>';return;}
+      var rows=d.summary||[];
+      if(!rows.length){document.getElementById('bnfClaimsSummary').innerHTML='<p style="color:#aaa;text-align:center;">暫無申領記錄</p>';return;}
+      var total=rows.reduce(function(s,r){return s+(r.claim_count||0);},0);
+      var html='<div class="bnf-stat-row"><div class="bnf-stat-box"><div class="bnf-stat-num">'+rows.length+'</div><div class="bnf-stat-lbl">福利項目</div></div>'+
+        '<div class="bnf-stat-box"><div class="bnf-stat-num">'+total+'</div><div class="bnf-stat-lbl">總申領次數</div></div></div>';
+      html+='<table class="bnf-claims-table"><thead><tr><th>分類</th><th>福利名稱</th><th>申領人次</th><th>最新申領</th><th>操作</th></tr></thead><tbody>';
+      rows.forEach(function(r){
+        html+='<tr><td>'+(r.icon||'')+(r.category_name||'')+'</td>'+
+          '<td style="font-weight:700;">'+bnfEsc(r.title)+'</td>'+
+          '<td><strong style="color:#1B4332;font-size:16px;">'+r.claim_count+'</strong></td>'+
+          '<td style="font-size:11px;color:#888;">'+(r.last_claimed_at?(r.last_claimed_at+'').slice(0,16):'—')+'</td>'+
+          '<td><button class="btn btn-sm btn-secondary" data-bid="'+r.benefit_id+'" data-btitle="'+bnfEsc(r.title)+'" onclick="bnfViewClaims(this.dataset.bid,this.dataset.btitle)">查看</button></td></tr>';
+      });
+      html+='</tbody></table>';
+      document.getElementById('bnfClaimsSummary').innerHTML=html;
+    });
+}
+function bnfHideClaims(){document.getElementById('bnfClaimsPanel').style.display='none';}
+function bnfViewClaims(id,titleStr){
+  var old=document.getElementById('bnfClaimsModal');if(old)old.remove();
+  var modal='<div id="bnfClaimsModal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;">'+
+    '<div style="background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'+
+        '<div style="font-size:16px;font-weight:800;color:#1B4332;">👥 申領記錄：'+bnfEsc(titleStr)+'</div>'+
+        '<button onclick="bnfCloseClaimsModal()" style="border:none;background:#f5f5f5;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;">✕</button>'+
+      '</div><div id="bnfClaimsDetail" style="text-align:center;padding:20px;color:#888;">載入中…</div>'+
+    '</div></div>';
+  document.getElementById('mod-benefits').insertAdjacentHTML('beforeend',modal);
+  fetch('/api/admin/benefits/'+id+'/claims',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var el=document.getElementById('bnfClaimsDetail');if(!el) return;
+      if(!d.ok){el.innerHTML='<p style="color:red;">載入失敗</p>';return;}
+      var claims=d.claims||[];
+      if(!claims.length){el.innerHTML='<p style="color:#aaa;">暫無申領記錄</p>';return;}
+      var tbl='<table class="bnf-claims-table"><thead><tr><th>#</th><th>會員號碼</th><th>姓名</th><th>申領時間</th></tr></thead><tbody>';
+      claims.forEach(function(c,i){
+        tbl+='<tr><td style="color:#888;">'+(i+1)+'</td>'+
+          '<td style="font-family:monospace;font-weight:700;">'+bnfEsc(c.member_no)+'</td>'+
+          '<td>'+bnfEsc(c.name_zh||'—')+'</td>'+
+          '<td style="font-size:11px;color:#888;">'+(c.claimed_at+'').slice(0,16)+'</td></tr>';
+      });
+      tbl+='</tbody></table>';
+      el.innerHTML='<div style="margin-bottom:10px;font-size:13px;color:#555;">共 <strong>'+claims.length+'</strong> 位會員申領</div>'+tbl;
+    });
+}
+</script>
+
+<script>
+// ── Sidebar nav ──
+var _membershipFrameLoaded = false;
+function switchMod(id){
+  document.querySelectorAll('.mod-page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  document.getElementById(id).classList.add('active');
+  event.currentTarget.classList.add('active');
+  var titles = {'mod-membership':'會員系統','mod-roadshow':'Roadshow 管理','mod-products':'產品管理','mod-useful-links':'有用資訊管理','mod-jobs':'工作管理','mod-coworkery':'CoWorkery 人手管理','mod-revenue':'🌟 CoLeadery 申請審核','mod-colinkery-admin':'🤝 CoLinkery 申請審核','mod-qr':'🔖 QR 快速登記管理','mod-testing':'🧪 產品測試計劃','mod-benefits':'🎁 福利管理','mod-hmvod':'🎬 HMVod 申請管理'};
+  document.getElementById('topbar-title').textContent = titles[id]||id;
+  if(id==='mod-roadshow') loadRoadshows();
+  if(id==='mod-membership' && !_membershipFrameLoaded){
+    document.getElementById('membership-frame').src = '/membership/admin';
+    _membershipFrameLoaded = true;
+  }
+  document.querySelector('.page-area').style.padding = (id==='mod-membership') ? '10px' : '24px';
+  if(id==='mod-products'){ loadProductCategories(); loadProducts(); }
+  if(id==='mod-useful-links') loadUsefulLinks();
+  if(id==='mod-jobs') loadJobs();
+  if(id==='mod-coworkery') cwTab('cw-overview');
+  if(id==='mod-revenue') { loadRevApps('PENDING'); loadRevStats(); }
+  if(id==='mod-colinkery-admin') { loadCkAdminData(); }
+  if(id==='mod-qr') { qrLoadAll(); }
+  if(id==='mod-testing') { testingLoadCampaigns(); }
+  if(id==='mod-benefits') { bnfLoadAll(); }
+  if(id==='mod-hmvod') { hmvodAdminLoad(); }
+}
+function reloadMembershipFrame(){
+  var f = document.getElementById('membership-frame');
+  f.src = '/membership/admin';
+  _membershipFrameLoaded = true;
+}
+
+// ══════════════════════════════════════════════════════════
+// ── HMVod Admin Tab ──
+// ══════════════════════════════════════════════════════════
+var _hmvodAdminData = [];
+
+function hmvodAdminLoad(){
+  var loading=document.getElementById('hmvodLoading');
+  var table=document.getElementById('hmvodTable');
+  var empty=document.getElementById('hmvodEmpty');
+  if(loading) loading.style.display='block';
+  if(table) table.style.display='none';
+  if(empty) empty.style.display='none';
+  // Load WA setting + applications in parallel
+  Promise.all([
+    fetch('/api/admin/hmvod/applications',{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/hmvod/settings').then(function(r){return r.json();})
+  ]).then(function(results){
+    var appsData=results[0], settings=results[1];
+    if(loading) loading.style.display='none';
+    // Fill WA input
+    var waInput=document.getElementById('hmvodWaInput');
+    if(waInput&&settings.wa_number) waInput.value=settings.wa_number;
+    if(!appsData.ok){ if(empty){empty.textContent='載入失敗';empty.style.display='block';} return; }
+    _hmvodAdminData=appsData.applications||[];
+    hmvodRenderTable(_hmvodAdminData);
+    hmvodRenderStats(_hmvodAdminData);
+  }).catch(function(){
+    if(loading) loading.style.display='none';
+    if(empty){empty.textContent='網絡錯誤';empty.style.display='block';}
+  });
+}
+
+function hmvodRenderStats(apps){
+  var statsEl=document.getElementById('hmvodStats');
+  if(!statsEl) return;
+  var total=apps.length;
+  var done=apps.filter(function(a){return a.status==='DONE';}).length;
+  var pending=total-done;
+  var statItems=[
+    {label:'總申請',value:total,color:'#B71C1C',bg:'#FFEBEE'},
+    {label:'待處理',value:pending,color:'#F57F17',bg:'#FFF8E1'},
+    {label:'已完成',value:done,color:'#2E7D32',bg:'#E8F5E9'},
+    {label:'應收費用',value:'HK$ '+(total*10),color:'#1565C0',bg:'#E3F2FD'}
+  ];
+  statsEl.innerHTML=statItems.map(function(s){
+    return '<div style="background:'+s.bg+';border-radius:10px;padding:14px 20px;min-width:120px;text-align:center;">'
+      +'<div style="font-size:22px;font-weight:900;color:'+s.color+';">'+s.value+'</div>'
+      +'<div style="font-size:12px;color:#555;margin-top:2px;">'+s.label+'</div></div>';
+  }).join('');
+}
+
+function hmvodRenderTable(apps){
+  var table=document.getElementById('hmvodTable');
+  var tbody=document.getElementById('hmvodTbody');
+  var empty=document.getElementById('hmvodEmpty');
+  if(!tbody) return;
+  if(!apps.length){ if(empty)empty.style.display='block'; if(table)table.style.display='none'; return; }
+  if(table) table.style.display='table';
+  tbody.innerHTML=apps.map(function(a,i){
+    var isDone=a.status==='DONE';
+    var statusBadge=isDone
+      ? '<span style="background:#E8F5E9;color:#2E7D32;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;">✅ 已完成</span>'
+      : '<span style="background:#FFF8E1;color:#F57F17;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;">⏳ 待處理</span>';
+    var dt=a.created_at?a.created_at.replace('T',' ').slice(0,16):'';
+    var waUrl='https://wa.me/'+a.phone+'?text='+encodeURIComponent('你好 '+a.name_zh+'，你的 HMVod 驗証碼已準備好，請收看。');
+    return '<tr style="border-bottom:1px solid #f0f0f0;'+(i%2===0?'':'background:#fafafa')+';">'
+      +'<td style="padding:12px 14px;font-size:13px;color:#888;">'+(i+1)+'</td>'
+      +'<td style="padding:12px 14px;font-size:13px;white-space:nowrap;">'+escAdminHtml(dt)+'</td>'
+      +'<td style="padding:12px 14px;font-size:14px;font-weight:700;">'+escAdminHtml(a.name_zh||'')+'</td>'
+      +'<td style="padding:12px 14px;font-size:14px;"><a href="'+waUrl+'" target="_blank" style="color:#B71C1C;font-weight:700;text-decoration:none;">📱 '+escAdminHtml(a.phone||'')+'</a></td>'
+      +'<td style="padding:12px 14px;font-size:13px;font-family:monospace;">'+escAdminHtml(a.member_no||'')+'</td>'
+      +'<td style="padding:12px 14px;">'+statusBadge+'</td>'
+      +'<td style="padding:12px 14px;font-size:13px;color:#555;">'+escAdminHtml(a.notes||'')+'</td>'
+      +'<td style="padding:12px 14px;">'
+        +'<button onclick="hmvodMarkDone('+a.id+',this)" style="padding:6px 12px;border:0;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;'+(isDone?'background:#e0e0e0;color:#888;':'background:#2E7D32;color:#fff;')+'">'+(isDone?'已完成':'標記完成')+'</button>'
+      +'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function hmvodMarkDone(id, btn){
+  var notes=prompt('備註（可填驗証碼或其他）：')||'';
+  if(btn){btn.disabled=true;btn.textContent='處理中…';}
+  fetch('/api/admin/hmvod/applications/'+id,{
+    method:'PUT',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:'DONE',notes:notes})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) hmvodAdminLoad();
+    else{ if(btn){btn.disabled=false;btn.textContent='標記完成';} alert('失敗：'+d.error); }
+  }).catch(function(){ if(btn){btn.disabled=false;btn.textContent='標記完成';} });
+}
+
+function hmvodSaveWa(){
+  var val=(document.getElementById('hmvodWaInput')||{}).value||'';
+  var clean=val.replace(/\D/g,'');
+  var msgEl=document.getElementById('hmvodWaMsg');
+  if(!clean||clean.length<8){
+    if(msgEl){msgEl.textContent='請輸入有效電話號碼（如 85290001234）';msgEl.style.color='#C62828';msgEl.style.display='block';}
+    return;
+  }
+  fetch('/api/admin/hmvod/settings',{
+    method:'PUT',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({wa_number:clean})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      if(msgEl){msgEl.textContent='✅ 儲存成功！WhatsApp 號碼：'+d.wa_number;msgEl.style.color='#2E7D32';msgEl.style.display='block';}
+      if(document.getElementById('hmvodWaInput')) document.getElementById('hmvodWaInput').value=d.wa_number;
+    } else {
+      if(msgEl){msgEl.textContent='儲存失敗：'+d.error;msgEl.style.color='#C62828';msgEl.style.display='block';}
+    }
+  }).catch(function(){
+    if(msgEl){msgEl.textContent='網絡錯誤，請稍後再試';msgEl.style.color='#C62828';msgEl.style.display='block';}
+  });
+}
+
+function hmvodExportExcel(){
+  if(!_hmvodAdminData.length){ alert('暫無數據可下載'); return; }
+  var headers=['#','申請時間','姓名','電話','會員號','狀態','備註'];
+  var rows=_hmvodAdminData.map(function(a,i){
+    return [
+      i+1,
+      (a.created_at||'').replace('T',' ').slice(0,16),
+      a.name_zh||'',
+      a.phone||'',
+      a.member_no||'',
+      a.status==='DONE'?'已完成':'待處理',
+      a.notes||''
+    ];
+  });
+  // Build CSV (Excel-compatible UTF-8 with BOM)
+  var csvContent='\uFEFF'+[headers].concat(rows).map(function(r){
+    return r.map(function(cell){
+      var s=String(cell).replace(/"/g,'""');
+      var nl=String.fromCharCode(10);
+      return (s.indexOf(',')!==-1||s.indexOf('"')!==-1||s.indexOf(nl)!==-1)?'"'+s+'"':s;
+    }).join(',');
+  }).join(String.fromCharCode(13,10));
+  var blob=new Blob([csvContent],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  var today=new Date().toISOString().slice(0,10);
+  a.href=url; a.download='HMVod申請記錄_'+today+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function escAdminHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════════════════════
+// ── CoLinkery Admin Tab ──
+// ══════════════════════════════════════════════════════════
+var _ckAllData = { applications: [], pending_otps: [] };
+var _ckCurrentTab = 'pending';
+
+function ckSwitchTab(tab, btnEl) {
+  _ckCurrentTab = tab;
+  document.querySelectorAll('.ck-tab').forEach(function(t){ t.classList.remove('active'); });
+  if(btnEl) btnEl.classList.add('active');
+  ['pending','approved','rejected','otp'].forEach(function(p){
+    document.getElementById('ckPanel-'+p).style.display = p===tab ? '' : 'none';
+  });
+  if(tab==='approved') loadCkApproved();
+  if(tab==='rejected') loadCkRejected();
+}
+
+async function loadCkAdminData() {
+  // 載入待審批 + OTP
+  try {
+    var res = await fetch('/api/admin/colinkery/pending', {credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ document.getElementById('ckPendingList').innerHTML='<p style="color:#c00;">'+d.error+'</p>'; return; }
+    _ckAllData = d;
+    renderCkPending(d.applications||[]);
+    renderCkOtp(d.pending_otps||[]);
+    renderCkStats(d);
+  } catch(e) {
+    document.getElementById('ckPendingList').innerHTML='<p style="color:#c00;">網絡錯誤：'+e.message+'</p>';
+  }
+}
+
+function renderCkStats(d) {
+  var apps = d.applications||[];
+  var otps = d.pending_otps||[];
+  var grid = document.getElementById('ckStatGrid');
+  if(!grid) return;
+  grid.innerHTML =
+    '<div class="ck-stat-card"><div class="ck-stat-num">'+apps.length+'</div><div class="ck-stat-lbl">待審批申請</div></div>' +
+    '<div class="ck-stat-card"><div class="ck-stat-num" style="color:#065F46;">'+otps.length+'</div><div class="ck-stat-lbl">待發 OTP</div></div>' +
+    '<div class="ck-stat-card"><div class="ck-stat-num" id="ckStatApproved" style="color:#6B7280;">–</div><div class="ck-stat-lbl">已批准總數</div></div>';
+  // Lazy load approved count
+  fetch('/api/admin/colinkery/pending?status=APPROVED&count=1', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .catch(function(){ return null; })
+    .then(function(dd){
+      var el = document.getElementById('ckStatApproved');
+      if(el && dd && dd.total_approved !== undefined) el.textContent = dd.total_approved;
+    });
+}
+
+function renderCkPending(apps) {
+  var typeMap = {INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
+  var list = document.getElementById('ckPendingList');
+  if(!list) return;
+  if(apps.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;"><i class="fas fa-check-circle" style="font-size:32px;margin-bottom:12px;display:block;color:#6EE7B7;"></i>目前無待審批申請</div>'; return; }
+  list.innerHTML = apps.map(function(a){
+    var typeLabel = typeMap[a.applicant_type]||a.applicant_type||'–';
+    var dateStr = a.created_at ? a.created_at.slice(0,16) : '–';
+    return '<div class="ck-app-card">' +
+      '<div class="cka-top">' +
+        '<div>' +
+          '<div class="cka-name">'+escHtml(a.name_zh||'')+'</div>' +
+          '<div class="cka-meta">'+escHtml(a.member_no)+' ｜ 電話：'+escHtml(a.phone||'')+'</div>' +
+          '<div style="margin-top:6px;"><span class="ck-type-badge">'+typeLabel+'</span></div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:#9CA3AF;white-space:nowrap;">'+dateStr+'</div>' +
+      '</div>' +
+      (a.notes ? '<div class="cka-notes">'+escHtml(a.notes)+'</div>' : '') +
+      '<div class="ck-actions">' +
+        '<button class="btn-ck-approve" onclick="ckApproveApp('+a.id+')">✅ 批准</button>' +
+        '<button class="btn-ck-reject" onclick="ckRejectApp('+a.id+')">❌ 拒絕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderCkOtp(otps) {
+  var list = document.getElementById('ckOtpList');
+  if(!list) return;
+  if(otps.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;"><i class="fas fa-mobile-alt" style="font-size:32px;margin-bottom:12px;display:block;"></i>目前無待發 OTP</div>'; return; }
+  list.innerHTML = otps.map(function(o){
+    var phoneDigits = (o.phone||'').replace(/\D/g,'');
+    var fullPhone = phoneDigits.startsWith('852') ? phoneDigits : '852'+phoneDigits;
+    var msg = encodeURIComponent('你好'+o.name_zh+'！你的 CoLinkery 密碼重設碼為：'+o.otp_code+'，請於 10 分鐘內使用。');
+    var waLink = 'https://wa.me/'+fullPhone+'?text='+msg;
+    var expiryStr = o.expires_at ? o.expires_at.slice(0,16) : '–';
+    return '<div class="ck-otp-card">' +
+      '<div>' +
+        '<div style="font-size:15px;font-weight:700;color:#0C4A6E;">'+escHtml(o.name_zh||'')+'</div>' +
+        '<div style="font-size:13px;color:#6B7280;">'+escHtml(o.member_no)+' ｜ '+escHtml(o.phone||'')+'</div>' +
+        '<div class="ck-otp-code">'+escHtml(o.otp_code||'')+'</div>' +
+        '<div style="font-size:12px;color:#9CA3AF;">到期：'+expiryStr+'</div>' +
+      '</div>' +
+      '<a href="'+waLink+'" target="_blank" class="btn-ck-wa">💬 WhatsApp 發送</a>' +
+    '</div>';
+  }).join('');
+}
+
+async function loadCkApproved() {
+  var list = document.getElementById('ckApprovedList');
+  if(!list) return;
+  list.innerHTML='<div style="padding:20px;color:#6B7280;text-align:center;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
+  try {
+    var res = await fetch('/api/admin/colinkery/approved', {credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ list.innerHTML='<p style="color:#c00;">'+d.error+'</p>'; return; }
+    var holders = d.holders||[];
+    var typeMap = {INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
+    if(holders.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;">尚無已批准記錄</div>'; return; }
+    list.innerHTML = holders.map(function(h){
+      var typeLabel = typeMap[h.applicant_type]||h.applicant_type||'–';
+      var dateStr = h.approved_at ? h.approved_at.slice(0,10) : (h.updated_at ? h.updated_at.slice(0,10) : '–');
+      var phoneDigits = (h.phone||'').replace(/\D/g,'');
+      var fullPhone = phoneDigits.startsWith('852') ? phoneDigits : '852'+phoneDigits;
+      var waMsg = encodeURIComponent('你好'+h.name_zh+'！你的 CoLinkery 連結者帳戶已批准啟用，可用電話號碼 + 你設定的密碼登入 coeldery85.com/colinkery');
+      var waLink = 'https://wa.me/'+fullPhone+'?text='+waMsg;
+      return '<div class="ck-holder-card">' +
+        '<div>' +
+          '<div style="font-size:16px;font-weight:700;color:#065F46;">'+escHtml(h.name_zh||'')+' <span style="font-size:12px;background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:10px;font-weight:700;">'+escHtml(h.holder_no||'')+'</span></div>' +
+          '<div style="font-size:13px;color:#6B7280;margin-top:3px;">'+escHtml(h.member_no)+' ｜ '+escHtml(h.phone||'')+'</div>' +
+          '<div style="margin-top:4px;"><span class="ck-type-badge">'+typeLabel+'</span></div>' +
+          '<div style="font-size:12px;color:#9CA3AF;margin-top:4px;">批准：'+dateStr+'</div>' +
+        '</div>' +
+        '<a href="'+waLink+'" target="_blank" class="btn-ck-wa" style="font-size:13px;padding:7px 14px;">💬 WA</a>' +
+      '</div>';
+    }).join('');
+  } catch(e) { list.innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
+}
+
+async function loadCkRejected() {
+  var list = document.getElementById('ckRejectedList');
+  if(!list) return;
+  list.innerHTML='<div style="padding:20px;color:#6B7280;text-align:center;"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>';
+  try {
+    var res = await fetch('/api/admin/colinkery/rejected', {credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ list.innerHTML='<p style="color:#c00;">'+d.error+'</p>'; return; }
+    var apps = d.applications||[];
+    if(apps.length===0){ list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;">尚無已拒絕記錄</div>'; return; }
+    var typeMap = {INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司',ASSOCIATION:'協會'};
+    list.innerHTML = apps.map(function(a){
+      var typeLabel = typeMap[a.applicant_type]||a.applicant_type||'–';
+      var dateStr = a.updated_at ? a.updated_at.slice(0,10) : '–';
+      return '<div class="ck-app-card" style="border-color:#FCA5A5;opacity:0.9;">' +
+        '<div class="cka-top">' +
+          '<div>' +
+            '<div class="cka-name" style="color:#991B1B;">'+escHtml(a.name_zh||'')+'</div>' +
+            '<div class="cka-meta">'+escHtml(a.member_no)+' ｜ 電話：'+escHtml(a.phone||'')+'</div>' +
+            '<div style="margin-top:6px;"><span class="ck-type-badge" style="background:#FEE2E2;color:#991B1B;">'+typeLabel+'</span></div>' +
+          '</div>' +
+          '<div style="font-size:12px;color:#9CA3AF;white-space:nowrap;">拒絕：'+dateStr+'</div>' +
+        '</div>' +
+        (a.review_notes ? '<div class="cka-notes" style="background:#FFF1F2;">原因：'+escHtml(a.review_notes)+'</div>' : '') +
+      '</div>';
+    }).join('');
+  } catch(e) { list.innerHTML='<p style="color:#c00;">網絡錯誤</p>'; }
+}
+
+async function ckApproveApp(id) {
+  if(!confirm('確認批准此 CoLinkery 申請？審批後申請人可立即登入。')) return;
+  try {
+    var res = await fetch('/api/admin/colinkery/approve/'+id, {method:'POST',credentials:'include'});
+    var d = await res.json();
+    if(!d.ok){ alert('批准失敗：'+(d.error||'未知錯誤')); return; }
+    // 成功後顯示 WA 通知連結
+    var confirmed = confirm('✅ 已批准！CoLinkery 號碼：'+d.holder_no+'。點擊確定用 WhatsApp 通知申請人。');
+    if(confirmed) window.open(d.wa_notify_link,'_blank');
+    loadCkAdminData(); // 刷新列表
+  } catch(e) { alert('網絡錯誤：'+e.message); }
+}
+
+async function ckRejectApp(id) {
+  var reason = prompt('請輸入拒絕原因（會顯示給申請人）：');
+  if(reason===null) return; // 用戶取消
+  try {
+    var res = await fetch('/api/admin/colinkery/reject/'+id, {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({reason: reason})
+    });
+    var d = await res.json();
+    if(!d.ok){ alert('拒絕失敗：'+(d.error||'未知錯誤')); return; }
+    var confirmed = confirm('✅ 已拒絕。點擊確定用 WhatsApp 通知申請人。');
+    if(confirmed) window.open(d.wa_notify_link,'_blank');
+    loadCkAdminData();
+  } catch(e) { alert('網絡錯誤：'+e.message); }
+}
+
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Roadshow Tab ──
+function rsTab(name){
+  document.querySelectorAll('.rs-tab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('rs-tab-'+name).classList.add('active');
+  document.getElementById('rs-panel-roadshows').style.display = name==='roadshows'?'':'none';
+  document.getElementById('rs-panel-stores').style.display = name==='stores'?'':'none';
+  if(name==='stores') loadStores();
+}
+
+// ── Roadshow CRUD ──
+function loadRoadshows(){
+  var status = document.getElementById('rs-filter-status').value;
+  var url = '/api/admin/roadshows'+(status?'?status='+encodeURIComponent(status):'');
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    var list = document.getElementById('rs-list');
+    var label = document.getElementById('rs-count-label');
+    label.textContent = '共 '+d.roadshows.length+' 個 Roadshow';
+    if(!d.roadshows.length){
+      list.innerHTML='<div style="text-align:center;padding:40px;color:#9CA3AF;"><i class="fas fa-calendar-times" style="font-size:32px;margin-bottom:12px;display:block"></i>暫無 Roadshow 資料</div>';
+      return;
+    }
+    // Cache roadshow data by id to avoid inline JSON in onclick
+    rsCache = {};
+    d.roadshows.forEach(function(rs){ rsCache[rs.id] = rs; });
+    list.innerHTML = d.roadshows.map(function(rs){
+      var statusClass = rs.status==='active'?'status-active':rs.status==='ended'?'status-ended':'status-inactive';
+      var statusText = rs.status==='active'?'進行中':rs.status==='ended'?'已結束':'暫停';
+      var dateRange = '';
+      if(rs.start_date||rs.end_date) dateRange = (rs.start_date||'?')+' ~ '+(rs.end_date||'?');
+      return '<div class="rs-card">'+
+        '<div class="rs-card-header">'+
+          '<div>'+
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+              '<span class="rs-card-name">'+esc(rs.name)+'</span>'+
+              '<span class="rs-card-code">'+esc(rs.code)+'</span>'+
+              '<span class="status-badge '+statusClass+'">'+statusText+'</span>'+
+            '</div>'+
+            '<div class="rs-card-meta">'+
+              (rs.store_name?'<i class="fas fa-store" style="margin-right:4px"></i>'+esc(rs.store_name)+' · ':'')+
+              (rs.district?'<i class="fas fa-map-pin" style="margin-right:4px"></i>'+esc(rs.district)+' · ':'')+
+              '<i class="fas fa-users" style="margin-right:4px"></i>'+(rs.member_count||0)+' 位會員'+
+              (dateRange?' · <i class="fas fa-calendar" style="margin-right:4px"></i>'+dateRange:'')+
+            '</div>'+
+            (rs.notes?'<div style="font-size:12px;color:#6B7280;margin-top:4px">'+esc(rs.notes)+'</div>':'')+
+          '</div>'+
+          '<div style="display:flex;gap:6px;flex-shrink:0">'+
+            '<button class="btn btn-secondary btn-sm" onclick="openEditRsById('+rs.id+')"><i class="fas fa-edit"></i></button>'+
+            '<button class="btn btn-danger btn-sm" onclick="deleteRs('+rs.id+')"><i class="fas fa-trash"></i></button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }).catch(function(e){console.error('loadRoadshows',e);});
+}
+
+function openCreateRs(){
+  document.getElementById('new-rs-code').value='';
+  document.getElementById('new-rs-name').value='';
+  document.getElementById('new-rs-store').value='';
+  document.getElementById('new-rs-start').value='';
+  document.getElementById('new-rs-end').value='';
+  document.getElementById('new-rs-notes').value='';
+  document.getElementById('modal-err').style.display='none';
+  document.getElementById('modal-create-rs').classList.add('open');
+}
+
+function submitCreateRs(){
+  var code = document.getElementById('new-rs-code').value.trim();
+  var name = document.getElementById('new-rs-name').value.trim();
+  var store_code = document.getElementById('new-rs-store').value;
+  var start_date = document.getElementById('new-rs-start').value;
+  var end_date = document.getElementById('new-rs-end').value;
+  var notes = document.getElementById('new-rs-notes').value.trim();
+  var errEl = document.getElementById('modal-err');
+  if(!code){errEl.textContent='請填寫 Roadshow Code';errEl.style.display='';return;}
+  if(!name){errEl.textContent='請填寫活動名稱';errEl.style.display='';return;}
+  errEl.style.display='none';
+  fetch('/api/admin/roadshows',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code:code,name:name,store_code:store_code||'',start_date:start_date,end_date:end_date,notes:notes})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-create-rs');loadRoadshows();}
+      else{errEl.textContent=d.error||'建立失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
+
+var editingRsId = null;
+function openEditRsById(id){
+  var rs = rsCache[id];
+  if(!rs){alert('找不到資料，請重新整理');return;}
+  openEditRs(rs);
+}
+function openEditRs(rs){
+  editingRsId = rs.id;
+  document.getElementById('edit-rs-id').value = rs.id;
+  document.getElementById('edit-rs-name').value = rs.name||'';
+  document.getElementById('edit-rs-start').value = rs.start_date||'';
+  document.getElementById('edit-rs-end').value = rs.end_date||'';
+  document.getElementById('edit-rs-status').value = rs.status||'active';
+  document.getElementById('edit-rs-notes').value = rs.notes||'';
+  // Populate store dropdown
+  var sel = document.getElementById('edit-rs-store');
+  populateStoreDropdown(sel, rs.store_code);
+  document.getElementById('modal-edit-err').style.display='none';
+  document.getElementById('modal-edit-rs').classList.add('open');
+}
+
+function submitEditRs(){
+  var id = editingRsId;
+  var name = document.getElementById('edit-rs-name').value.trim();
+  var store_code = document.getElementById('edit-rs-store').value;
+  var start_date = document.getElementById('edit-rs-start').value;
+  var end_date = document.getElementById('edit-rs-end').value;
+  var status = document.getElementById('edit-rs-status').value;
+  var notes = document.getElementById('edit-rs-notes').value.trim();
+  var errEl = document.getElementById('modal-edit-err');
+  if(!name){errEl.textContent='請填寫活動名稱';errEl.style.display='';return;}
+  errEl.style.display='none';
+  fetch('/api/admin/roadshows/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,store_code:store_code,start_date:start_date,end_date:end_date,status:status,notes:notes})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-edit-rs');loadRoadshows();}
+      else{errEl.textContent=d.error||'更新失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
+
+function deleteRs(id){
+  var rs = rsCache[id];
+  var name = rs ? rs.name : 'ID '+id;
+  if(!confirm('確認刪除 Roadshow ['+name+'] ?  注意：已登記會員的 roadshow 欄位不受影響。')){return;}
+  fetch('/api/admin/roadshows/'+id,{method:'DELETE'})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.ok){loadRoadshows();}else{alert(d.error||'刪除失敗');}})
+    .catch(function(e){alert('網絡錯誤');});
+}
+
+// ── Stores ──
+function loadDistricts(){
+  fetch('/api/admin/roadshow/districts').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    allDistricts = d.districts;
+    var sel = document.getElementById('store-district-filter');
+    sel.innerHTML = '<option value="">全部地區</option>';
+    d.districts.forEach(function(dist){
+      sel.innerHTML += '<option value="'+esc(dist)+'">'+esc(dist)+'</option>';
+    });
+  });
+}
+
+function loadStoreDropdown(){
+  fetch('/api/admin/roadshow/stores').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    allStores = d.stores;
+  });
+}
+
+function populateStoreDropdown(sel, selectedCode){
+  sel.innerHTML = '<option value="">-- 不指定商店 --</option>';
+  allStores.forEach(function(s){
+    var opt = document.createElement('option');
+    opt.value = s.store_code;
+    opt.textContent = '['+s.district+'] '+s.name_zh+' ('+s.store_code+')';
+    if(s.store_code === selectedCode) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function loadStores(){
+  var search = document.getElementById('store-search').value.trim();
+  var district = document.getElementById('store-district-filter').value;
+  var params = new URLSearchParams();
+  if(search) params.set('search', search);
+  if(district) params.set('district', district);
+  fetch('/api/admin/roadshow/stores?'+params.toString())
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok) return;
+      var grid = document.getElementById('store-grid');
+      document.getElementById('store-count-label').textContent = '共 '+d.stores.length+' 間商店';
+      if(!d.stores.length){
+        grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:#9CA3AF"><i class="fas fa-search" style="font-size:28px;margin-bottom:10px;display:block"></i>沒有符合條件的商店</div>';
+        return;
+      }
+      grid.innerHTML = d.stores.map(function(s){
+        return '<div class="store-card">'+
+          '<div class="store-card-code">'+esc(s.store_code)+'</div>'+
+          '<div class="store-card-name">'+esc(s.name_zh)+'</div>'+
+          '<div class="store-card-dist"><i class="fas fa-map-pin" style="margin-right:4px;color:#9CA3AF"></i>'+esc(s.district)+'</div>'+
+          (s.address?'<div style="font-size:11px;color:#9CA3AF;margin-top:4px;line-height:1.4">'+esc(s.address)+'</div>':'')+
+        '</div>';
+      }).join('');
+    }).catch(function(e){console.error('loadStores',e);});
+}
+
+// ── Helpers ──
+function esc(s){
+  if(s==null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+}
+
+// Close modal on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(function(overlay){
+  overlay.addEventListener('click',function(e){
+    if(e.target===overlay) overlay.classList.remove('open');
+  });
+});
+
+// Populate store dropdowns when allStores is loaded
+var _origLoadStoreDropdown = loadStoreDropdown;
+window.addEventListener('load', function(){
+  // Populate new-rs-store dropdown
+  var createSel = document.getElementById('new-rs-store');
+  function refreshCreateDropdown(){
+    createSel.innerHTML = '<option value="">-- 不指定商店 --</option>';
+    allStores.forEach(function(s){
+      createSel.innerHTML += '<option value="'+esc(s.store_code)+'">['+esc(s.district)+'] '+esc(s.name_zh)+' ('+esc(s.store_code)+')</option>';
+    });
+  }
+  var origLoad = loadStoreDropdown;
+  window.loadStoreDropdown = function(){
+    fetch('/api/admin/roadshow/stores').then(function(r){return r.json();}).then(function(d){
+      if(!d.ok) return;
+      allStores = d.stores;
+      refreshCreateDropdown();
+    });
+  };
+  // Re-run if already authenticated
+  if(document.getElementById('app-shell').style.display !== 'none'){
+    window.loadStoreDropdown();
+  }
+});
+
+// ── Products (Batch 3) ──
+function loadProductCategories(){
+  fetch('/api/admin/products/categories').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    var sel = document.getElementById('prod-category-filter');
+    sel.innerHTML = '<option value="">全部分類</option>';
+    d.categories.forEach(function(cat){ sel.innerHTML += '<option value="'+esc(cat)+'">'+esc(cat)+'</option>'; });
+  });
+}
+function loadProducts(){
+  var params = new URLSearchParams();
+  var s = document.getElementById('prod-search').value.trim();
+  var cat = document.getElementById('prod-category-filter').value;
+  var st = document.getElementById('prod-status-filter').value;
+  if(s) params.set('search', s);
+  if(cat) params.set('category', cat);
+  if(st) params.set('status', st);
+  fetch('/api/admin/products?'+params.toString()).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    var grid = document.getElementById('prod-grid');
+    document.getElementById('prod-count-label').textContent = '共 '+d.products.length+' 件產品';
+    if(!d.products.length){
+      grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:#9CA3AF"><i class="fas fa-box-open" style="font-size:28px;margin-bottom:10px;display:block"></i>尚無產品，點右上角新增</div>';
+      return;
+    }
+    grid.innerHTML = d.products.map(function(p){
+      var img = p.photo_url
+        ? '<img src="'+esc(p.photo_url)+'" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px;" onerror="this.remove()">'
+        : '<div style="width:100%;height:120px;background:#F3F4F6;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;color:#D1D5DB;"><i class="fas fa-image" style="font-size:28px"></i></div>';
+      var inactive = p.active ? '' : '<span style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;">已停用</span>';
+      return '<div class="store-card" style="cursor:pointer" onclick="openEditProduct('+p.id+')">'+
+        img+
+        '<div class="store-card-name">'+esc(p.name_zh)+inactive+'</div>'+
+        '<div style="font-size:11px;color:#6B7280;margin-bottom:4px">'+esc(p.name_en||'')+'</div>'+
+        (p.brand?'<div class="store-card-dist"><i class="fas fa-tag" style="margin-right:4px;color:#9CA3AF"></i>'+esc(p.brand)+'</div>':'')+
+        '<div style="margin-top:6px;font-size:13px;"><span style="font-weight:700;color:var(--brand)">$'+(p.price||0)+'</span>'+
+        (p.cost?'<span style="font-size:11px;color:#9CA3AF;margin-left:6px">成本 $'+p.cost+'</span>':'')+'</div>'+
+      '</div>';
+    }).join('');
+  }).catch(function(e){console.error('loadProducts',e);});
+}
+function openCreateProduct(){
+  document.getElementById('prod-modal-title').innerHTML='<i class="fas fa-box" style="margin-right:8px;color:var(--brand)"></i>新增產品';
+  document.getElementById('prod-id').value='';
+  ['prod-name-zh','prod-name-en','prod-brand','prod-category','prod-sku','prod-unit','prod-cost','prod-price','prod-photo','prod-desc'].forEach(function(f){document.getElementById(f).value='';});
+  document.getElementById('prod-active-field').style.display='none';
+  document.getElementById('prod-modal-err').style.display='none';
+  document.getElementById('modal-product').classList.add('open');
+}
+function openEditProduct(id){
+  fetch('/api/admin/products/'+id).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){alert(d.error||'讀取失敗');return;}
+    var p = d.product;
+    document.getElementById('prod-modal-title').innerHTML='<i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯產品';
+    document.getElementById('prod-id').value=p.id;
+    document.getElementById('prod-name-zh').value=p.name_zh||'';
+    document.getElementById('prod-name-en').value=p.name_en||'';
+    document.getElementById('prod-brand').value=p.brand||'';
+    document.getElementById('prod-category').value=p.category||'';
+    document.getElementById('prod-sku').value=p.sku||'';
+    document.getElementById('prod-unit').value=p.unit||'';
+    document.getElementById('prod-cost').value=p.cost||'';
+    document.getElementById('prod-price').value=p.price||'';
+    document.getElementById('prod-photo').value=p.photo_url||'';
+    document.getElementById('prod-desc').value=p.description||'';
+    document.getElementById('prod-active').value=String(p.active);
+    document.getElementById('prod-active-field').style.display='';
+    document.getElementById('prod-modal-err').style.display='none';
+    document.getElementById('modal-product').classList.add('open');
+  });
+}
+function submitProduct(){
+  var id = document.getElementById('prod-id').value;
+  var body = {
+    name_zh: document.getElementById('prod-name-zh').value.trim(),
+    name_en: document.getElementById('prod-name-en').value.trim(),
+    brand: document.getElementById('prod-brand').value.trim(),
+    category: document.getElementById('prod-category').value.trim(),
+    sku: document.getElementById('prod-sku').value.trim(),
+    unit: document.getElementById('prod-unit').value.trim(),
+    cost: document.getElementById('prod-cost').value,
+    price: document.getElementById('prod-price').value,
+    photo_url: document.getElementById('prod-photo').value.trim(),
+    description: document.getElementById('prod-desc').value.trim()
+  };
+  var errEl = document.getElementById('prod-modal-err');
+  if(!body.name_zh || !body.name_en){errEl.textContent='中英文名稱必填';errEl.style.display='';return;}
+  if(id) body.active = document.getElementById('prod-active').value;
+  errEl.style.display='none';
+  var url = id ? '/api/admin/products/'+id : '/api/admin/products';
+  var method = id ? 'PATCH' : 'POST';
+  fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-product');loadProductCategories();loadProducts();}
+      else{errEl.textContent=d.error||'儲存失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
+
+// ── Useful Links ──
+function loadUsefulLinks(){
+  fetch('/api/admin/useful-links').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('ul-tbody').innerHTML='<tr><td colspan="6" style="padding:20px;text-align:center;color:#DC2626">讀取失敗</td></tr>';return;}
+    var links = d.links||[];
+    document.getElementById('ul-count-label').textContent='共 '+links.length+' 項';
+    if(!links.length){
+      document.getElementById('ul-tbody').innerHTML='<tr><td colspan="6" style="padding:30px;text-align:center;color:#9CA3AF">尚未有資訊，請新增</td></tr>';
+      return;
+    }
+    var typeLabel={'phone':'📞 電話','whatsapp':'💬 WhatsApp','url':'🔗 網址','text':'📝 文字'};
+    document.getElementById('ul-tbody').innerHTML=links.map(function(l){
+      return '<tr style="border-bottom:1px solid #F3F4F6">'+
+        '<td style="padding:10px 12px;font-weight:600">'+esc(l.title)+'</td>'+
+        '<td style="padding:10px 12px">'+esc(typeLabel[l.link_type]||l.link_type)+'</td>'+
+        '<td style="padding:10px 12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(l.content)+'</td>'+
+        '<td style="padding:10px 12px">'+l.sort_order+'</td>'+
+        '<td style="padding:10px 12px">'+
+          '<span style="padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;background:'+(l.is_active?'#D1FAE5':'#F3F4F6')+';color:'+(l.is_active?'#065F46':'#6B7280')+'">'+
+            (l.is_active?'顯示':'隱藏')+
+          '</span>'+
+        '</td>'+
+        '<td style="padding:10px 12px;white-space:nowrap">'+
+          '<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;margin-right:4px" onclick="openEditUsefulLink('+l.id+')"><i class="fas fa-edit"></i> 編輯</button>'+
+          '<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;margin-right:4px;background:'+(l.is_active?'#FEF3C7':'#D1FAE5')+';color:'+(l.is_active?'#92400E':'#065F46')+'" onclick="toggleUsefulLinkActive('+l.id+','+(l.is_active?0:1)+')">'+
+            (l.is_active?'隱藏':'顯示')+
+          '</button>'+
+          '<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;background:#FEE2E2;color:#DC2626" onclick="deleteUsefulLink('+l.id+')"><i class="fas fa-trash"></i></button>'+
+        '</td>'+
+      '</tr>';
+    }).join('');
+  }).catch(function(e){console.error('loadUsefulLinks',e);});
+}
+function openCreateUsefulLink(){
+  document.getElementById('ul-modal-title').innerHTML='<i class="fas fa-info-circle" style="margin-right:8px;color:var(--brand)"></i>新增有用資訊';
+  document.getElementById('ul-id').value='';
+  document.getElementById('ul-title').value='';
+  document.getElementById('ul-link-type').value='phone';
+  document.getElementById('ul-content').value='';
+  document.getElementById('ul-sort-order').value='0';
+  document.getElementById('ul-active-field').style.display='none';
+  document.getElementById('ul-modal-err').style.display='none';
+  document.getElementById('modal-useful-link').classList.add('open');
+}
+function openEditUsefulLink(id){
+  fetch('/api/admin/useful-links').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){alert(d.error||'讀取失敗');return;}
+    var l=(d.links||[]).find(function(x){return x.id===id;});
+    if(!l){alert('找不到此項目');return;}
+    document.getElementById('ul-modal-title').innerHTML='<i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯有用資訊';
+    document.getElementById('ul-id').value=l.id;
+    document.getElementById('ul-title').value=l.title||'';
+    document.getElementById('ul-link-type').value=l.link_type||'phone';
+    document.getElementById('ul-content').value=l.content||'';
+    document.getElementById('ul-sort-order').value=l.sort_order||0;
+    document.getElementById('ul-is-active').value=String(l.is_active);
+    document.getElementById('ul-active-field').style.display='';
+    document.getElementById('ul-modal-err').style.display='none';
+    document.getElementById('modal-useful-link').classList.add('open');
+  });
+}
+function submitUsefulLink(){
+  var id=document.getElementById('ul-id').value;
+  var body={
+    title:document.getElementById('ul-title').value.trim(),
+    link_type:document.getElementById('ul-link-type').value,
+    content:document.getElementById('ul-content').value.trim(),
+    sort_order:parseInt(document.getElementById('ul-sort-order').value)||0
+  };
+  var errEl=document.getElementById('ul-modal-err');
+  if(!body.title||!body.content){errEl.textContent='標題和內容必填';errEl.style.display='';return;}
+  if(id) body.is_active=parseInt(document.getElementById('ul-is-active').value);
+  errEl.style.display='none';
+  var url=id?'/api/admin/useful-links/'+id:'/api/admin/useful-links';
+  var method=id?'PUT':'POST';
+  fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-useful-link');loadUsefulLinks();}
+      else{errEl.textContent=d.error||'儲存失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
+function deleteUsefulLink(id){
+  if(!confirm('確定刪除？此操作不可還原。'))return;
+  fetch('/api/admin/useful-links/'+id,{method:'DELETE'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){loadUsefulLinks();}
+      else{alert(d.error||'刪除失敗');}
+    }).catch(function(){alert('網絡錯誤');});
+}
+function toggleUsefulLinkActive(id,newActive){
+  fetch('/api/admin/useful-links/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_active:newActive})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){loadUsefulLinks();}
+      else{alert(d.error||'更新失敗');}
+    }).catch(function(){alert('網絡錯誤');});
+}
+
+// ── Jobs ──
+function loadJobs(){
+  fetch('/api/admin/jobs').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('jobs-tbody').innerHTML='<tr><td colspan="7" style="padding:20px;text-align:center;color:#DC2626">讀取失敗</td></tr>';return;}
+    var jobs=d.jobs||[];
+    document.getElementById('jobs-count-label').textContent='共 '+jobs.length+' 份工作';
+    if(!jobs.length){
+      document.getElementById('jobs-tbody').innerHTML='<tr><td colspan="7" style="padding:30px;text-align:center;color:#9CA3AF">尚未有工作，請新增</td></tr>';
+      return;
+    }
+    document.getElementById('jobs-tbody').innerHTML=jobs.map(function(j){
+      var thumb=j.image_url?'<img src="'+esc(j.image_url)+'" style="width:60px;height:45px;object-fit:cover;border-radius:6px;border:1px solid #E5E7EB">':'<div style="width:60px;height:45px;background:#F3F4F6;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:11px">無圖</div>';
+      var statusBadge='<span style="padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;background:'+(j.status==='open'?'#D1FAE5':'#FEE2E2')+';color:'+(j.status==='open'?'#065F46':'#991B1B')+'">'+(j.status==='open'?'開放':'已截止')+'</span>';
+      return '<tr style="border-bottom:1px solid #F3F4F6">'+
+        '<td style="padding:8px 12px">'+thumb+'</td>'+
+        '<td style="padding:8px 12px;font-weight:600;max-width:160px">'+esc(j.title)+'</td>'+
+        '<td style="padding:8px 12px">'+esc(j.location||'—')+'</td>'+
+        '<td style="padding:8px 12px">'+esc(j.job_type||'—')+'</td>'+
+        '<td style="padding:8px 12px">'+j.sort_order+'</td>'+
+        '<td style="padding:8px 12px">'+statusBadge+'</td>'+
+        '<td style="padding:8px 12px;white-space:nowrap">'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px" onclick="openEditJob('+j.id+')"><i class="fas fa-edit"></i></button>'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px;background:'+(j.status==='open'?'#FEF3C7':'#D1FAE5')+';color:'+(j.status==='open'?'#92400E':'#065F46')+'" onclick="toggleJobStatus('+j.id+',' + (j.status==='open'?'"closed"':'"open"') + ')">'+
+            (j.status==='open'?'截止':'重開')+'</button>'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px" onclick="viewJobApplications('+j.id+')" ><i class="fas fa-users"></i> 申請</button>'+
+          '<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px;background:#FEE2E2;color:#DC2626" onclick="deleteJob('+j.id+')"><i class="fas fa-trash"></i></button>'+
+        '</td>'+
+      '</tr>';
+    }).join('');
+  }).catch(function(e){console.error('loadJobs',e);});
+}
+// ── Job image upload helpers ─────────────────────────────────────────────────
+function jobImgClear(){
+  document.getElementById('job-image-url').value='';
+  document.getElementById('jobImgPreviewWrap').style.display='none';
+  document.getElementById('jobImgPlaceholder').style.display='';
+  document.getElementById('jobImgFileInput').value='';
+  var dz=document.getElementById('jobImgDropZone');
+  dz.style.borderColor='#D1D5DB'; dz.style.background='#F9FAFB';
+}
+function jobImgSetPreview(url,name){
+  document.getElementById('job-image-url').value=url;
+  document.getElementById('jobImgPreview').src=url;
+  document.getElementById('jobImgPreviewName').textContent=name||'';
+  document.getElementById('jobImgPreviewWrap').style.display='';
+  document.getElementById('jobImgPlaceholder').style.display='none';
+  var dz=document.getElementById('jobImgDropZone');
+  dz.style.borderColor='var(--brand)'; dz.style.background='#f0fff0';
+}
+function jobImgHandleDrop(e){
+  e.preventDefault();
+  var dz=document.getElementById('jobImgDropZone');
+  dz.style.borderColor='#D1D5DB'; dz.style.background='#F9FAFB';
+  var file=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(file) jobImgHandleFile(file);
+}
+function jobImgHandleFile(file){
+  if(!file||!file.type.startsWith('image/')){ alert('請選擇圖片檔案'); return; }
+  var progress=document.getElementById('jobImgUploadProgress');
+  var placeholder=document.getElementById('jobImgPlaceholder');
+  var previewWrap=document.getElementById('jobImgPreviewWrap');
+  progress.style.display=''; placeholder.style.display='none'; previewWrap.style.display='none';
+  fetch('/api/admin/cloudinary-sign',{
+    method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+    body:JSON.stringify({folder:'jobs'})
+  }).then(function(r){return r.json();}).then(function(sig){
+    if(!sig.ok){progress.style.display='none';placeholder.style.display='';alert('無法取得上傳簽名：'+(sig.error||'未知錯誤'));return;}
+    var fd=new FormData();
+    fd.append('file',file); fd.append('api_key',sig.api_key);
+    fd.append('timestamp',sig.timestamp); fd.append('signature',sig.signature);
+    fd.append('folder',sig.folder);
+    return fetch('https://api.cloudinary.com/v1_1/'+sig.cloud_name+'/image/upload',{
+      method:'POST',body:fd
+    }).then(function(r2){return r2.json();}).then(function(res){
+      progress.style.display='none';
+      if(res.secure_url){ jobImgSetPreview(res.secure_url,file.name); }
+      else{ placeholder.style.display=''; alert('上傳失敗：'+(res.error&&res.error.message||'未知錯誤')); }
+    });
+  }).catch(function(e){progress.style.display='none';placeholder.style.display='';alert('上傳錯誤：'+String(e));});
+}
+
+function openCreateJob(){
+  document.getElementById('job-modal-title').innerHTML='<i class="fas fa-briefcase" style="margin-right:8px;color:var(--brand)"></i>新增工作';
+  document.getElementById('job-id').value='';
+  ['job-title','job-location','job-type','job-company','job-salary','job-description','job-requirement'].forEach(function(f){document.getElementById(f).value='';});
+  jobImgClear();
+  document.getElementById('job-sort-order').value='0';
+  document.getElementById('job-status-field').style.display='none';
+  document.getElementById('job-modal-err').style.display='none';
+  document.getElementById('modal-job').classList.add('open');
+}
+function openEditJob(id){
+  fetch('/api/admin/jobs').then(function(r){return r.json();}).then(function(d){
+    var j=(d.jobs||[]).find(function(x){return x.id===id;});
+    if(!j){alert('讀取失敗');return;}
+    document.getElementById('job-modal-title').innerHTML='<i class="fas fa-edit" style="margin-right:8px;color:var(--brand)"></i>編輯工作';
+    document.getElementById('job-id').value=j.id;
+    if(j.image_url){ jobImgSetPreview(j.image_url,''); } else { jobImgClear(); }
+    document.getElementById('job-title').value=j.title||'';
+    document.getElementById('job-location').value=j.location||'';
+    document.getElementById('job-type').value=j.job_type||'';
+    document.getElementById('job-company').value=j.company||'';
+    document.getElementById('job-salary').value=j.salary||'';
+    document.getElementById('job-description').value=j.description||'';
+    document.getElementById('job-requirement').value=j.requirement||'';
+    document.getElementById('job-sort-order').value=j.sort_order||0;
+    document.getElementById('job-status').value=j.status||'open';
+    document.getElementById('job-status-field').style.display='';
+    document.getElementById('job-modal-err').style.display='none';
+    document.getElementById('modal-job').classList.add('open');
+  });
+}
+function submitJob(){
+  var id=document.getElementById('job-id').value;
+  var body={
+    image_url:document.getElementById('job-image-url').value.trim()||null,
+    title:document.getElementById('job-title').value.trim(),
+    location:document.getElementById('job-location').value.trim(),
+    job_type:document.getElementById('job-type').value.trim(),
+    company:document.getElementById('job-company').value.trim(),
+    salary:document.getElementById('job-salary').value.trim(),
+    description:document.getElementById('job-description').value.trim(),
+    requirement:document.getElementById('job-requirement').value.trim(),
+    sort_order:parseInt(document.getElementById('job-sort-order').value)||0
+  };
+  var errEl=document.getElementById('job-modal-err');
+  if(!body.title){errEl.textContent='職位名稱必填';errEl.style.display='';return;}
+  if(id) body.status=document.getElementById('job-status').value;
+  errEl.style.display='none';
+  var url=id?'/api/admin/jobs/'+id:'/api/admin/jobs';
+  var method=id?'PUT':'POST';
+  fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){closeModal('modal-job');loadJobs();}
+      else{errEl.textContent=d.error||'儲存失敗';errEl.style.display='';}
+    }).catch(function(e){errEl.textContent='網絡錯誤';errEl.style.display='';});
+}
+function deleteJob(id){
+  if(!confirm('確定刪除此工作？相關申請紀錄亦會一併刪除，此操作不可還原。'))return;
+  fetch('/api/admin/jobs/'+id,{method:'DELETE'})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.ok){loadJobs();}else{alert(d.error||'刪除失敗');}})
+    .catch(function(){alert('網絡錯誤');});
+}
+function toggleJobStatus(id,newStatus){
+  fetch('/api/admin/jobs/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.ok){loadJobs();}else{alert(d.error||'更新失敗');}})
+    .catch(function(){alert('網絡錯誤');});
+}
+function viewJobApplications(jobId){
+  var jobTitle='';
+  // try to get title from the table row
+  document.getElementById('job-apps-title').innerHTML='<i class="fas fa-users" style="margin-right:8px;color:var(--brand)"></i>申請名單';
+  var content=document.getElementById('job-apps-content');
+  content.innerHTML='<div style="padding:20px;text-align:center;color:#6B7280">載入中...</div>';
+  document.getElementById('modal-job-apps').classList.add('open');
+  fetch('/api/admin/jobs/'+jobId+'/applications').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){content.innerHTML='<div style="padding:20px;text-align:center;color:#DC2626">讀取失敗</div>';return;}
+    var apps=d.applications||[];
+    if(!apps.length){content.innerHTML='<div style="padding:20px;text-align:center;color:#9CA3AF">未有人申請</div>';return;}
+    content.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px">'+
+      '<thead><tr style="background:#F3F4F6">'+
+        '<th style="padding:8px 12px;text-align:left">會員編號</th>'+
+        '<th style="padding:8px 12px;text-align:left">姓名</th>'+
+        '<th style="padding:8px 12px;text-align:left">申請時間</th>'+
+        '<th style="padding:8px 12px;text-align:left">狀態</th>'+
+        '<th style="padding:8px 12px;text-align:left">操作</th>'+
+      '</tr></thead>'+
+      '<tbody>'+apps.map(function(a){
+        var name=esc(a.name_zh||a.name_en||'—');
+        var isNew=a.handle_status==='new';
+        return '<tr style="border-bottom:1px solid #F3F4F6">'+
+          '<td style="padding:8px 12px;font-family:monospace">'+esc(a.member_no)+'</td>'+
+          '<td style="padding:8px 12px">'+name+'</td>'+
+          '<td style="padding:8px 12px;font-size:12px;color:#6B7280">'+esc((a.applied_at||'').replace('T',' ').substring(0,16))+'</td>'+
+          '<td style="padding:8px 12px"><span style="padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;background:'+(isNew?'#FEF3C7':'#D1FAE5')+';color:'+(isNew?'#92400E':'#065F46')+'">'+(isNew?'待處理':'已處理')+'</span></td>'+
+          '<td style="padding:8px 12px">'+
+            '<button class="btn btn-secondary" style="font-size:12px;padding:3px 10px;background:'+(isNew?'#D1FAE5':'#FEF3C7')+';color:'+(isNew?'#065F46':'#92400E')+'" onclick="toggleAppStatus('+a.id+',' + (isNew?'"handled"':'"new"') + ')">'+(isNew?'標記已處理':'還原待處理')+'</button>'+
+          '</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  });
+}
+function toggleAppStatus(appId,newStatus){
+  fetch('/api/admin/applications/'+appId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({handle_status:newStatus})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){
+        // 重新載入申請列表（需要知道 jobId，直接重抓）
+        var titleEl=document.getElementById('job-apps-title');
+        // 簡單方案：重關再手動提示
+        alert((newStatus==='handled'?'✅ 已標記處理':'已還原為待處理'));
+        closeModal('modal-job-apps');
+        loadJobs();
+      }else{alert(d.error||'更新失敗');}
+    }).catch(function(){alert('網絡錯誤');});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CoWorkery 後台 JS
+// ═══════════════════════════════════════════════════════════════════════════════
+var CW_API='/api/admin/coworkery';
+var _cwActs={};var _cwActIdx=0;
+function _cwa(fn){var k='_k'+(++_cwActIdx);_cwActs[k]=fn;return k;}
+function _cwRun(el){var k=el.getAttribute('data-cwk');if(k&&_cwActs[k])_cwActs[k]();}
+async function cwGet(url){var r=await fetch(url);return r.json();}
+async function cwSend(url,method,body){
+  var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  return r.json();
+}
+function cwEsc(s){return String(s??'').replace(/[&<>"']/g,function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];});}
+function cwCents(v){return '$'+((Number(v)||0)/100).toFixed(2);}
+function cwMin(v){var m=Number(v)||0;return Math.floor(m/60)+'h'+(m%60)+'m';}
+
+function cwTab(id){
+  document.querySelectorAll('.cw-panel').forEach(function(p){p.style.display='none';});
+  document.querySelectorAll('.cw-tab').forEach(function(t){t.classList.remove('active');});
+  var el=document.getElementById(id);if(el)el.style.display='block';
+  var tb=document.querySelector('.cw-tab[data-tab="'+id+'"]');if(tb)tb.classList.add('active');
+  if(id==='cw-overview') cwLoadList();
+  if(id==='cw-approval') cwLoadApproval();
+  if(id==='cw-sessions') cwLoadSessions();
+  if(id==='cw-assign')   cwLoadSessionOptions('cwAssignSession');
+  if(id==='cw-payroll')  cwLoadSessionOptions('cwPayrollSession');
+}
+
+async function cwLoadList(){
+  var q=encodeURIComponent(document.getElementById('cwSearch')?.value||'');
+  var d=await cwGet(CW_API+'/list?q='+q);
+  if(!d.ok){document.getElementById('cwListBox').innerHTML='\u8f09\u5165\u5931\u6557\uff1a'+cwEsc(d.error);return;}
+  var s=d.stat||{};
+  ['cwStatTotal','cwStatActive','cwStatPending','cwStatSusp'].forEach(function(id,i){
+    var el=document.getElementById(id);if(el)el.textContent=[s.total,s.active,s.pending,s.suspended][i]??0;
+  });
+  document.getElementById('cwListBox').innerHTML=cwBuildTable(d.list,false);
+}
+
+function cwBuildTable(list,approvalMode){
+  if(!list||!list.length)return '<p style="color:#888">\u6c92\u6709\u8cc7\u6599</p>';
+  var cols=['\u6703\u54e1\u7de8\u865f','\u59d3\u540d','\u96fb\u8a71','\u5730\u5340','\u9280\u884c','\u6236\u53e3\u865f\u78bc','\u9810\u8a2d\u6642\u85aa','\u72c0\u614b','\u64cd\u4f5c'];
+  var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6;text-align:left">';
+  cols.forEach(function(c){h+='<th style="padding:8px 10px;font-weight:600;color:#374151;border-bottom:1px solid #E5E7EB;white-space:nowrap">'+c+'</th>';});
+  h+='</tr></thead><tbody>';
+  list.forEach(function(r){
+    var bankCell=r.bank_name?cwEsc(r.bank_name):'<span style="color:#9ca3af">—</span>';
+    var bankNoCell=r.bank_account_no?'<span style="font-family:monospace">'+cwEsc(r.bank_account_no)+'</span>':'<span style="color:#9ca3af">—</span>';
+    h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+      '<td style="padding:8px 10px;font-family:monospace">'+cwEsc(r.cw_no)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(r.name_zh)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(r.phone)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(r.district||'')+'</td>'+
+      '<td style="padding:8px 10px">'+bankCell+'</td>'+
+      '<td style="padding:8px 10px">'+bankNoCell+'</td>'+
+      '<td style="padding:8px 10px">'+cwCents(r.default_hourly_rate)+'/h</td>'+
+      '<td style="padding:8px 10px">'+cwBadge(r.status)+'</td>'+
+      '<td style="padding:8px 10px">'+cwRowBtns(r,approvalMode)+'</td>'+
+      '</tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+function cwBadge(s){
+  var m={ACTIVE:'#16a34a',PENDING:'#d97706',REJECTED:'#dc2626',SUSPENDED:'#6b7280'};
+  return '<span style="padding:2px 8px;border-radius:10px;color:#fff;font-size:11px;background:'+(m[s]||'#999')+'">'+cwEsc(s)+'</span>';
+}
+function cwRowBtns(r,approvalMode){
+  if(approvalMode){
+    var k1=_cwa(function(){cwAction(r.cw_no,'APPROVE');});
+    var k2=_cwa(function(){cwReject(r.cw_no);});
+    return '<button class="btn btn-primary btn-sm" data-cwk="'+k1+'" onclick="_cwRun(this)">批准</button> '+
+           '<button class="btn btn-danger btn-sm" data-cwk="'+k2+'" onclick="_cwRun(this)">拒絕</button>';
+  }
+  var kb=_cwa(function(){cwEditRate(r.cw_no,r.default_hourly_rate||0);});
+  var b='<button class="btn btn-secondary btn-sm" data-cwk="'+kb+'" onclick="_cwRun(this)">改時薪</button>';
+  if(r.status==='ACTIVE'){var ks=_cwa(function(){cwAction(r.cw_no,'SUSPEND');});b+=' <button class="btn btn-secondary btn-sm" data-cwk="'+ks+'" onclick="_cwRun(this)">停牌</button>';}
+  if(r.status==='SUSPENDED'){var kr=_cwa(function(){cwAction(r.cw_no,'REACTIVATE');});b+=' <button class="btn btn-secondary btn-sm" data-cwk="'+kr+'" onclick="_cwRun(this)">復牌</button>';}
+  if(r.id_front_key){var kf=_cwa(function(){cwViewFile(r.id_front_key);});b+=' <button class="btn btn-secondary btn-sm" data-cwk="'+kf+'" onclick="_cwRun(this)">證件</button>';}
+  return b;
+}
+async function cwAction(cw_no,action){
+  if(!confirm('\u78ba\u5b9a '+action+'?')) return;
+  var d=await cwSend(CW_API+'/list','PATCH',{cw_no:cw_no,action:action});
+  if(d.ok){cwLoadList();cwLoadApproval();}else alert('\u5931\u6557\uff1a'+d.error);
+}
+async function cwReject(cw_no){
+  var reason=prompt('\u62d2\u7d55\u539f\u56e0?')||'';
+  var d=await cwSend(CW_API+'/list','PATCH',{cw_no:cw_no,action:'REJECT',reject_reason:reason});
+  if(d.ok){cwLoadList();cwLoadApproval();}else alert('\u5931\u6557\uff1a'+d.error);
+}
+async function cwEditRate(cw_no,cur){
+  var v=prompt('\u9810\u8a2d\u6642\u85aa(\u5143/\u5c0f\u6642):',((cur||0)/100).toFixed(2));
+  if(v===null)return;
+  var d=await cwSend(CW_API+'/list','PATCH',{cw_no:cw_no,default_hourly_rate:Math.round(parseFloat(v)*100)||0});
+  if(d.ok)cwLoadList();else alert('\u5931\u6557\uff1a'+d.error);
+}
+function cwViewFile(key){window.open(CW_API+'/files/'+key,'_blank');}
+
+async function cwLoadApproval(){
+  var d=await cwGet(CW_API+'/list?status=PENDING');
+  document.getElementById('cwApprovalBox').innerHTML=d.ok?cwBuildTable(d.list,true):'\u8f09\u5165\u5931\u6557';
+}
+
+// ── 開卡 Modal 控制 ─────────────────────────────────────────────────────────
+function cwOpenRegister(){
+  // 清空所有欄位
+  ['regMemberNo','regNameZh','regNameEn','regPhone','regDistrict','regHkid',
+   'regAddress','regBankName','regBankAcctName','regBankAcctNo','regRate'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.value='';
+  });
+  document.getElementById('regGender').value='';
+  document.getElementById('regIdFront').value='';
+  document.getElementById('regIdPreview').style.display='none';
+  document.getElementById('regMemberHint').textContent='';
+  document.getElementById('regMsg').textContent='';
+  document.getElementById('regSubmitBtn').disabled=false;
+  document.getElementById('cwRegModal').style.display='flex';
+}
+function cwCloseRegister(){ document.getElementById('cwRegModal').style.display='none'; }
+
+// 查會員（防重複開卡提示）
+async function cwCheckMember(){
+  var no=document.getElementById('regMemberNo').value.trim();
+  var hint=document.getElementById('regMemberHint');
+  if(!no){ hint.textContent=''; return; }
+  hint.style.color='#6b7280'; hint.textContent='\u67e5\u8a62\u4e2d\u2026';
+  try{
+    var d=await cwGet(CW_API+'/list?q='+encodeURIComponent(no));
+    var existed=(d.list||[]).find(function(x){ return x.member_no===no; });
+    if(existed){
+      hint.style.color='#dc2626';
+      hint.textContent='\u26a0 \u6b64\u6703\u54e1\u5df2\u6709 '+existed.cw_no;
+    }else{
+      hint.style.color='#16a34a';
+      hint.textContent='\u2713 \u672a\u958b\u904e\u5361\uff0c\u53ef\u7e7c\u7e8c\uff08\u63d0\u4ea4\u6642\u7cfb\u7d71\u6703\u518d\u9a57\u8b49\u6703\u54e1\u8cc7\u683c\uff09';
+    }
+  }catch(e){ hint.style.color='#dc2626'; hint.textContent='\u67e5\u8a62\u5931\u6557'; }
+}
+
+// 身份證預覽
+function cwPreviewId(){
+  var f=document.getElementById('regIdFront').files[0];
+  var img=document.getElementById('regIdPreview');
+  if(!f){ img.style.display='none'; return; }
+  img.src=URL.createObjectURL(f); img.style.display='block';
+}
+
+// 前端壓縮（≤1280px JPEG 0.8，與長者端同邏輯）
+async function cwCompressImg(file){
+  if(!file) return null;
+  return new Promise(function(res){
+    var img=new Image();
+    img.onload=function(){
+      var max=1280,w=img.width,h=img.height;
+      if(w>max||h>max){ var r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); }
+      var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      cv.toBlob(function(b){ res(b||file); },'image/jpeg',0.8);
+    };
+    img.onerror=function(){ res(file); };
+    img.src=URL.createObjectURL(file);
+  });
+}
+
+// 提交開卡（multipart/form-data，含身份證圖）
+async function cwSubmitRegister(){
+  var memberNo=document.getElementById('regMemberNo').value.trim();
+  var nameZh=document.getElementById('regNameZh').value.trim();
+  var phone=document.getElementById('regPhone').value.trim();
+  var msg=document.getElementById('regMsg');
+  if(!memberNo||!nameZh||!phone){
+    msg.style.color='#dc2626'; msg.textContent='\u8acb\u586b\u5beb\u6703\u54e1\u7de8\u865f\u3001\u4e2d\u6587\u59d3\u540d\u3001\u96fb\u8a71'; return;
+  }
+  var btn=document.getElementById('regSubmitBtn');
+  btn.disabled=true; msg.style.color='#6b7280'; msg.textContent='\u8655\u7406\u4e2d\u2026';
+  try{
+    var fd=new FormData();
+    fd.append('member_no',memberNo);
+    fd.append('name_zh',nameZh);
+    fd.append('name_en',document.getElementById('regNameEn').value.trim());
+    fd.append('phone',phone);
+    fd.append('gender',document.getElementById('regGender').value);
+    fd.append('district',document.getElementById('regDistrict').value.trim());
+    fd.append('hkid_prefix',document.getElementById('regHkid').value.trim());
+    fd.append('address',document.getElementById('regAddress').value.trim());
+    fd.append('bank_name',document.getElementById('regBankName').value.trim());
+    fd.append('bank_account_name',document.getElementById('regBankAcctName').value.trim());
+    fd.append('bank_account_no',document.getElementById('regBankAcctNo').value.trim());
+    var rate=parseFloat(document.getElementById('regRate').value)||0;
+    fd.append('default_hourly_rate',String(Math.round(rate*100)));
+    var idFile=document.getElementById('regIdFront').files[0];
+    if(idFile){
+      var compressed=await cwCompressImg(idFile);
+      if(compressed) fd.append('id_front',compressed,'id_front.jpg');
+    }
+    var r=await fetch(CW_API+'/register',{method:'POST',body:fd});
+    var d=await r.json();
+    if(d.ok){
+      msg.style.color='#16a34a'; msg.textContent='\u2705 \u958b\u5361\u6210\u529f\uff1a'+d.cw_no;
+      setTimeout(function(){ cwCloseRegister(); cwLoadList(); },1200);
+    }else{
+      msg.style.color='#dc2626'; msg.textContent='\u274c '+(d.error||'\u958b\u5361\u5931\u6557');
+      btn.disabled=false;
+    }
+  }catch(e){
+    msg.style.color='#dc2626'; msg.textContent='\u274c \u7db2\u7d61\u932f\u8aa4\uff1a'+e;
+    btn.disabled=false;
+  }
+}
+
+var _cwSessions=[];
+async function cwLoadSessionOptions(selId){
+  var d=await cwGet(CW_API+'/sessions');if(!d.ok)return;
+  _cwSessions=d.list||[];
+  var sel=document.getElementById(selId);if(!sel)return;
+  sel.innerHTML='<option value="">\u2014 \u9078\u64c7\u5834\u6b21 \u2014</option>'+
+    _cwSessions.map(function(s){
+      return '<option value="'+cwEsc(s.roadshow_code)+'">'+cwEsc(s.roadshow_code)+'\uff5c'+cwEsc(s.roadshow_name||'')+'</option>';
+    }).join('');
+}
+
+async function cwLoadSessions(){
+  var d=await cwGet(CW_API+'/sessions');
+  if(!d.ok){document.getElementById('cwSessionsBox').innerHTML='載入失敗';return;}
+  var cols=['場次碼','名稱','座標','半徑(m)','需求','時薪','車馬','膳食','品牌','操作'];
+  var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6;text-align:left">';
+  cols.forEach(function(c){h+='<th style="padding:8px 10px;font-weight:600;border-bottom:1px solid #E5E7EB;white-space:nowrap">'+c+'</th>';});
+  h+='</tr></thead><tbody>';
+  (d.list||[]).forEach(function(s){
+    var hasGeo=s.latitude!=null&&s.longitude!=null;
+    var ke=_cwa(function(){cwEditSession(s);});
+    h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+      '<td style="padding:8px 10px;font-family:monospace">'+cwEsc(s.roadshow_code)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(s.roadshow_name||'')+'</td>'+
+      '<td style="padding:8px 10px">'+(hasGeo?s.latitude.toFixed(4)+','+s.longitude.toFixed(4):'<span style="color:#dc2626">未設</span>')+'</td>'+
+      '<td style="padding:8px 10px">'+(s.geofence_radius||'-')+'</td>'+
+      '<td style="padding:8px 10px">'+(s.headcount_needed||0)+'</td>'+
+      '<td style="padding:8px 10px">'+cwCents(s.session_hourly_rate)+'</td>'+
+      '<td style="padding:8px 10px">'+cwCents(s.transport_allowance)+'</td>'+
+      '<td style="padding:8px 10px">'+cwCents(s.meal_allowance)+'</td>'+
+      '<td style="padding:8px 10px">'+cwEsc(s.brand_ref||'')+'</td>'+
+      '<td style="padding:8px 10px"><button class="btn btn-secondary btn-sm" data-cwk="'+ke+'" onclick="_cwRun(this)">設定</button></td>'+
+      '</tr>';
+  });
+  document.getElementById('cwSessionsBox').innerHTML=h+'</tbody></table></div>';
+}
+function cwEditSession(s){
+  var lat=prompt('\u7def\u5ea6 latitude:',s.latitude??'');if(lat===null)return;
+  var lng=prompt('\u7d93\u5ea6 longitude:',s.longitude??'');if(lng===null)return;
+  var radius=prompt('Geofence \u534a\u5f91(\u7c73):',s.geofence_radius??250);
+  var head=prompt('\u9700\u6c42\u4eba\u6578:',s.headcount_needed??0);
+  var rate=prompt('\u5834\u6b21\u6642\u85aa(\u5143/\u5c0f\u6642):',((s.session_hourly_rate||0)/100).toFixed(2));
+  var tr=prompt('\u8eca\u99ac\u8cbb(\u5143/\u6b21):',((s.transport_allowance||0)/100).toFixed(2));
+  var meal=prompt('\u81b3\u98df\u6d25\u8cbc(\u5143/\u6b21):',((s.meal_allowance||0)/100).toFixed(2));
+  var brand=prompt('\u54c1\u724c\u65b9\u6a19\u8a18:',s.brand_ref||'');
+  cwSend(CW_API+'/sessions','POST',{
+    roadshow_code:s.roadshow_code,
+    latitude:parseFloat(lat)||null,longitude:parseFloat(lng)||null,
+    geofence_radius:parseInt(radius)||250,headcount_needed:parseInt(head)||0,
+    session_hourly_rate:Math.round(parseFloat(rate)*100)||0,
+    transport_allowance:Math.round(parseFloat(tr)*100)||0,
+    meal_allowance:Math.round(parseFloat(meal)*100)||0,
+    brand_ref:brand||null
+  }).then(function(d){if(d.ok)cwLoadSessions();else alert('\u5931\u6557\uff1a'+d.error);});
+}
+
+async function cwLoadAssign(){
+  var code=(document.getElementById('cwAssignSession')||{}).value||'';
+  if(!code){document.getElementById('cwAssignBox').innerHTML='請先選擇場次';return;}
+  var d=await cwGet(CW_API+'/assign?roadshow_code='+encodeURIComponent(code));
+  if(!d.ok){document.getElementById('cwAssignBox').innerHTML='載入失敗';return;}
+  var h='<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">報名名單</h4>';
+  if(!d.applications||!d.applications.length)h+='<p style="color:#888;margin-bottom:12px">暫無報名</p>';
+  else{
+    h+='<div style="overflow-x:auto;margin-bottom:12px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6">';
+    ['報名名單 — CW編號','姓名','電話','地區','狀態','操作'].forEach(function(x){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB">'+x+'</th>';});
+    h+='</tr></thead><tbody>';
+    d.applications.forEach(function(a){
+      var ka=_cwa(function(){cwAssign(code,a.cw_no);});
+      h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+        '<td style="padding:7px 9px;font-family:monospace">'+cwEsc(a.cw_no)+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.name_zh)+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.phone)+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.district||'')+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.status)+'</td>'+
+        '<td style="padding:7px 9px"><button class="btn btn-primary btn-sm" data-cwk="'+ka+'" onclick="_cwRun(this)">派更</button></td>'+
+        '</tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  h+='<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">已派更</h4>';
+  if(!d.assignments||!d.assignments.length)h+='<p style="color:#888;margin-bottom:12px">暫無派更</p>';
+  else{
+    h+='<div style="overflow-x:auto;margin-bottom:12px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6">';
+    ['CW編號','姓名','特別時薪','操作'].forEach(function(x){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB">'+x+'</th>';});
+    h+='</tr></thead><tbody>';
+    d.assignments.forEach(function(a){
+      var ku=_cwa(function(){cwUnassign(code,a.cw_no);});
+      h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+        '<td style="padding:7px 9px;font-family:monospace">'+cwEsc(a.cw_no)+'</td>'+
+        '<td style="padding:7px 9px">'+cwEsc(a.name_zh)+'</td>'+
+        '<td style="padding:7px 9px">'+(a.assigned_hourly_rate?cwCents(a.assigned_hourly_rate)+'（特別）':'（沿用 fallback）')+'</td>'+
+        '<td style="padding:7px 9px"><button class="btn btn-danger btn-sm" data-cwk="'+ku+'" onclick="_cwRun(this)">取消</button></td>'+
+        '</tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  var km=_cwa(function(){cwManualAssign(code);});
+  h+='<button class="btn btn-secondary" data-cwk="'+km+'" onclick="_cwRun(this)">＋ 直接派更（輸入CW編號）</button>';
+  document.getElementById('cwAssignBox').innerHTML=h;
+}
+async function cwAssign(code,cw_no){
+  var v=prompt('\u7279\u5225\u6642\u85aa(\u5143/\u5c0f\u6642,\u7559\u7a7a=fallback):','');
+  var rate=(v===''||v===null)?0:Math.round(parseFloat(v)*100)||0;
+  var d=await cwSend(CW_API+'/assign','POST',{roadshow_code:code,cw_no:cw_no,assigned_hourly_rate:rate});
+  if(d.ok)cwLoadAssign();else alert('\u5931\u6557\uff1a'+d.error);
+}
+function cwManualAssign(code){var cw_no=prompt('CW\u7de8\u865f:');if(!cw_no)return;cwAssign(code,cw_no);}
+async function cwUnassign(code,cw_no){
+  if(!confirm('\u53d6\u6d88\u6b64\u6d3e\u66f4?'))return;
+  var d=await cwSend(CW_API+'/assign','POST',{roadshow_code:code,cw_no:cw_no,remove:true});
+  if(d.ok)cwLoadAssign();else alert('\u5931\u6557\uff1a'+d.error);
+}
+
+async function cwLoadPayroll(){
+  var code=(document.getElementById('cwPayrollSession')||{}).value||'';
+  var totEl=document.getElementById('cwPayrollTotals');
+  var boxEl=document.getElementById('cwPayrollBox');
+  if(!code){boxEl.innerHTML='請先選擇場次';totEl.textContent='';return;}
+  var d=await cwGet(CW_API+'/payroll?roadshow_code='+encodeURIComponent(code));
+  if(!d.ok){boxEl.innerHTML='載入失敗';return;}
+  var t=d.totals||{};
+  totEl.textContent='人數 '+(t.count||0)+'｜總工時 '+cwMin(t.total_minutes)+'｜總應付 '+cwCents(t.total_payable);
+  if(!d.list||!d.list.length){boxEl.innerHTML='<p style="color:#888">尚未計算出粮，按「計算出粮」</p>';return;}
+  var cols=['CW編號','姓名','工時','時薪','工資','車馬','膳食','總應付','狀態','操作'];
+  var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#F3F4F6">';
+  cols.forEach(function(c){h+='<th style="padding:7px 9px;font-weight:600;border-bottom:1px solid #E5E7EB;white-space:nowrap">'+c+'</th>';});
+  h+='</tr></thead><tbody>';
+  d.list.forEach(function(r){
+    var btn='';
+    if(r.status==='PENDING'){var kp=_cwa(function(){cwPayAction(code,r.cw_no,'APPROVE');});btn='<button class="btn btn-primary btn-sm" data-cwk="'+kp+'" onclick="_cwRun(this)">批准</button>';}
+    if(r.status==='APPROVED'){var kd=_cwa(function(){cwPayAction(code,r.cw_no,'PAID');});btn='<button class="btn btn-primary btn-sm" data-cwk="'+kd+'" onclick="_cwRun(this)">標記已付</button>';}
+    if(r.status==='PAID'){var kv=_cwa(function(){cwPayAction(code,r.cw_no,'REVERT');});btn='<button class="btn btn-secondary btn-sm" data-cwk="'+kv+'" onclick="_cwRun(this)">還原</button>';}
+    h+='<tr style="border-bottom:1px solid #F3F4F6">'+
+      '<td style="padding:7px 9px;font-family:monospace">'+cwEsc(r.cw_no)+'</td>'+
+      '<td style="padding:7px 9px">'+cwEsc(r.name_zh)+'</td>'+
+      '<td style="padding:7px 9px">'+cwMin(r.total_minutes)+'</td>'+
+      '<td style="padding:7px 9px">'+cwCents(r.hourly_rate)+'</td>'+
+      '<td style="padding:7px 9px">'+cwCents(r.wage_amount)+'</td>'+
+      '<td style="padding:7px 9px">'+cwCents(r.transport_total)+'</td>'+
+      '<td style="padding:7px 9px">'+cwCents(r.meal_total)+'</td>'+
+      '<td style="padding:7px 9px"><b>'+cwCents(r.total_payable)+'</b></td>'+
+      '<td style="padding:7px 9px">'+cwBadge(r.status)+'</td>'+
+      '<td style="padding:7px 9px">'+btn+'</td>'+
+      '</tr>';
+  });
+  boxEl.innerHTML=h+'</tbody></table></div>';
+}
+async function cwCalcPayroll(){
+  var code=(document.getElementById('cwPayrollSession')||{}).value||'';
+  if(!code){alert('\u8acb\u5148\u9078\u64c7\u5834\u6b21');return;}
+  if(!confirm('\u8a08\u7b97\u6b64\u5834\u6b21\u51fa\u7cae\uff1f\uff08\u53ea\u8a08\u5df2\u4e0b\u73ed\u6253\u5361\u8005\uff09'))return;
+  var d=await cwSend(CW_API+'/payroll/calculate','POST',{roadshow_code:code});
+  if(d.ok){alert('\u5df2\u7522\u751f '+d.generated+' \u5f35\u7cae\u55ae');cwLoadPayroll();}else alert('\u5931\u6557\uff1a'+d.error);
+}
+async function cwPayAction(code,cw_no,action){
+  var d=await cwSend(CW_API+'/payroll','PATCH',{roadshow_code:code,cw_no:cw_no,action:action});
+  if(d.ok)cwLoadPayroll();else alert('\u5931\u6557\uff1a'+d.error);
+}
+function cwExportPayroll(){
+  var code=(document.getElementById('cwPayrollSession')||{}).value||'';
+  location.href=CW_API+'/payroll?export=csv'+(code?'&roadshow_code='+encodeURIComponent(code):'');
+}
+
+// ── Revenue / Partner Applications ──────────────────────────────────────────
+var _revCurrentStatus = 'PENDING';
+
+function loadRevStats() {
+  fetch('/api/admin/rev/dashboard').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok) return;
+    var st = d.stats || {};
+    var el = document.getElementById('revStats');
+    if(!el) return;
+    el.innerHTML = [
+      {label:'待審批申請', val: st.pending_applications||0, color:'#92400e', bg:'#FFFBEB'},
+      {label:'已批准角色持有人', val: st.active_role_holders||0, color:'#065F46', bg:'#D1FAE5'},
+      {label:'累計分成記錄', val: st.total_wallet_entries||0, color:'#1e40af', bg:'#DBEAFE'}
+    ].map(function(s){
+      return '<div style="background:'+s.bg+';border-radius:8px;padding:12px;text-align:center;">' +
+        '<div style="font-size:24px;font-weight:900;color:'+s.color+'">'+s.val+'</div>' +
+        '<div style="font-size:12px;color:#6B7280;margin-top:3px;">'+s.label+'</div>' +
+      '</div>';
+    }).join('');
+  }).catch(function(){});
+}
+
+function loadRevApps(status, btnEl) {
+  _revCurrentStatus = status;
+  // Update filter buttons
+  document.querySelectorAll('.rev-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  if(btnEl) btnEl.classList.add('active');
+  
+  var list = document.getElementById('revAppList');
+  list.innerHTML = '<div style="padding:30px;text-align:center;color:#6B7280;">載入中…</div>';
+  
+  fetch('/api/admin/rev/applications?status=' + status).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok || !d.applications || !d.applications.length) {
+      list.innerHTML = '<div style="padding:30px;text-align:center;color:#6B7280;">暫無' + status + '申請</div>';
+      return;
+    }
+    var roleLabel = {COLEADERY:'🌟 CoLeadery 領航者', COLINKERY:'🤝 CoLinkery 連結者'};
+    var typeLabel = {INDIVIDUAL:'個人', GROUP:'小組', COMPANY:'公司'};
+    list.innerHTML = d.applications.map(function(a){
+      var roleClass = a.role === 'COLEADERY' ? 'CL' : 'CK';
+      var date = (a.created_at||'').slice(0,10);
+      return '<div class="app-card" onclick="openRevModal('+a.id+')">' +
+        '<div class="ac-top">' +
+          '<div class="ac-name">' + esc(a.name_zh||'') + (a.name_en ? ' / '+esc(a.name_en) : '') + '</div>' +
+          '<span class="ac-role '+roleClass+'">' + (roleLabel[a.role]||a.role) + '</span>' +
+        '</div>' +
+        '<div class="ac-meta">' +
+          '會員：' + esc(a.member_no) + ' (' + esc(a.member_name_zh||'') + ') &nbsp;｜&nbsp; ' +
+          '類型：' + (typeLabel[a.applicant_type]||a.applicant_type) + ' &nbsp;｜&nbsp; ' +
+          '申請日：' + date +
+          (a.phone ? ' &nbsp;｜&nbsp; 📞 ' + esc(a.phone) : '') +
+        '</div>' +
+        (a.status !== 'PENDING' ? '<div class="ac-meta" style="margin-top:4px;"><span class="status-badge status-'+a.status+'">' + a.status + '</span>' + (a.review_notes ? ' ' + esc(a.review_notes) : '') + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }).catch(function(){
+    list.innerHTML = '<div style="padding:20px;color:#DC2626;">載入失敗，請重試</div>';
+  });
+}
+
+var _revApps = {};
+function openRevModal(id) {
+  fetch('/api/admin/rev/applications?status='+_revCurrentStatus).then(function(r){return r.json();}).then(function(d){
+    var app = (d.applications||[]).find(function(a){return a.id===id;});
+    if(!app) return;
+    _revApps[id] = app;
+    var roleLabel = {COLEADERY:'🌟 CoLeadery 領航者', COLINKERY:'🤝 CoLinkery 連結者'};
+    var typeLabel = {INDIVIDUAL:'個人', GROUP:'小組', COMPANY:'公司'};
+    var rows = [
+      ['會員號碼', esc(app.member_no)],
+      ['老有卡會員', esc(app.member_name_zh||'')],
+      ['申請角色', roleLabel[app.role]||app.role],
+      ['申請人類型', typeLabel[app.applicant_type]||app.applicant_type],
+      ['中文姓名', esc(app.name_zh||'')],
+      ['英文姓名', esc(app.name_en||'—')],
+      ['聯絡電話', esc(app.phone||'—')],
+      ['地區/地址', esc(app.address||'—')],
+      ['身份證前7位', esc(app.id_prefix||'—')],
+      ['公司名稱', esc(app.company_name||'—')],
+      ['BR號碼', esc(app.company_br||'—')],
+      ['小組人數', app.team_size ? String(app.team_size) : '—'],
+      ['小組簡介', esc(app.team_notes||'—')],
+      ['行業背景', esc(app.industry_background||'—')],
+      ['銀行名稱', esc(app.bank_name||'—')],
+      ['銀行戶口', esc(app.bank_acc_no||'—')],
+      ['申請日期', (app.created_at||'').slice(0,16)],
+      ['狀態', '<span class="status-badge status-'+app.status+'">'+app.status+'</span>'],
+    ].filter(function(r){ return r[1] && r[1] !== '—'; });
+    
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">' +
+      rows.map(function(r){
+        return '<tr style="border-bottom:1px solid #F3F4F6;">' +
+          '<td style="padding:7px 10px;font-weight:700;color:#374151;width:40%;vertical-align:top;">'+r[0]+'</td>' +
+          '<td style="padding:7px 10px;color:#111;word-break:break-all;">'+r[1]+'</td>' +
+        '</tr>';
+      }).join('') +
+    '</table>';
+    
+    if(app.id_doc_r2_key) {
+      html += '<a class="doc-link" href="/api/partner/doc/'+encodeURIComponent(app.id_doc_r2_key)+'" target="_blank">📎 查看上傳文件</a>';
+    }
+    
+    if(app.status === 'PENDING') {
+      html += '<div style="margin-top:16px;border-top:1.5px solid #E5E7EB;padding-top:14px;">' +
+        '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:6px;">審核備注（可選）</div>' +
+        '<textarea id="revNotes" class="review-notes" placeholder="審核備注（批准/拒絕原因，選填）" rows="2"></textarea>' +
+        '<div class="review-actions">' +
+          '<button class="btn-approve" data-rev-id="'+id+'" data-rev-action="APPROVED">✅ 批准</button>' +
+          '<button class="btn-reject" data-rev-id="'+id+'" data-rev-action="REJECTED">❌ 拒絕</button>' +
+        '</div>' +
+        '<div id="revActionErr" style="color:#DC2626;font-size:13px;margin-top:8px;display:none;"></div>' +
+      '</div>';
+    }
+    
+    document.getElementById('revModalBody').innerHTML = html;
+    document.getElementById('revModal').style.display = '';
+  });
+}
+
+function closeRevModal() {
+  document.getElementById('revModal').style.display = 'none';
+}
+
+// Event delegation for approve/reject buttons (avoids inline onclick quote issues)
+document.getElementById('revModal').addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-rev-action]');
+  if (!btn) return;
+  var id = parseInt(btn.getAttribute('data-rev-id'));
+  var action = btn.getAttribute('data-rev-action');
+  if (id && action) doRevAction(id, action);
+});
+
+function doRevAction(id, action) {
+  var notes = (document.getElementById('revNotes')||{}).value||'';
+  var errEl = document.getElementById('revActionErr');
+  errEl.style.display='none';
+  var btn = action==='APPROVED' ? document.querySelector('.btn-approve') : document.querySelector('.btn-reject');
+  if(btn){ btn.disabled=true; btn.textContent='處理中…'; }
+  fetch('/api/admin/rev/applications/'+id+'/review', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:action, review_notes:notes})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){
+      errEl.textContent = d.error||'操作失敗';
+      errEl.style.display='';
+      if(btn){ btn.disabled=false; btn.textContent=action==='APPROVED'?'✅ 批准':'❌ 拒絕'; }
+      return;
+    }
+    closeRevModal();
+    loadRevApps(_revCurrentStatus);
+    loadRevStats();
+    loadRevHolders(); // 批准後同步刷新「已認證持有人」列表
+    alert(action==='APPROVED' ? '✅ 已批准！角色持有人記錄已建立。' : '申請已拒絕。');
+  }).catch(function(){
+    errEl.textContent='網絡錯誤，請重試';
+    errEl.style.display='';
+    if(btn){ btn.disabled=false; btn.textContent=action==='APPROVED'?'✅ 批准':'❌ 拒絕'; }
+  });
+}
+// ── Rev Tab Switch ────────────────────────────────────────────────────────────
+function revTabSwitch(tabId, btn) {
+  document.querySelectorAll('.rev-tab-panel').forEach(function(p){ p.style.display='none'; });
+  document.querySelectorAll('.rev-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById(tabId).style.display='';
+  btn.classList.add('active');
+  if(tabId==='tab-holders') loadRevHolders();
+  if(tabId==='tab-projects') loadProjects();
+}
+
+// ── Holders Tab ───────────────────────────────────────────────────────────────
+function loadRevHolders() {
+  fetch('/api/admin/rev/holders').then(function(r){return r.json();}).then(function(d){
+    var el = document.getElementById('revHolderList');
+    if(!d.ok || !d.holders.length){ el.innerHTML='<div style="color:#9CA3AF;text-align:center;padding:30px;">尚無已認證持有人</div>'; return; }
+    el.innerHTML = d.holders.map(function(h){
+      var roleLabel = h.role==='COLEADERY' ? '🌟 CoLeadery' : '🤝 CoLinkery';
+      var roleColor = h.role==='COLEADERY' ? '#92400e' : '#0369a1';
+      var roleBg = h.role==='COLEADERY' ? '#FFF3CD' : '#E0F2FE';
+      var typeLabel = {INDIVIDUAL:'個人',GROUP:'小組',COMPANY:'公司'}[h.applicant_type] || h.applicant_type;
+      var hasHkid  = h.id_prefix && h.id_prefix.length >= 3;
+      var hasBank  = h.bank_name && h.bank_acc_no;
+      var hasPhone = h.member_phone || h.app_phone;
+      var kycOk    = hasHkid && hasBank;
+      var kycStatus = kycOk
+        ? '<span style="color:#065F46;font-weight:700;font-size:12px;">✅ KYC完成</span>'
+        : '<span style="color:#DC2626;font-weight:700;font-size:12px;">⚠️ KYC不完整</span>';
+      var missing = [];
+      if(!hasHkid)  missing.push('HKID前7位');
+      if(!hasBank)  missing.push('銀行資料');
+      if(!hasPhone) missing.push('電話');
+      var missingHtml = missing.length ? '<div style="font-size:12px;color:#DC2626;margin-top:3px;">缺：'+missing.join('、')+'</div>' : '';
+      var infoHtml =
+        '<span style="font-size:12px;background:#F3F4F6;padding:2px 7px;border-radius:5px;color:#374151;margin-right:4px;">'+typeLabel+'</span>'+
+        (hasPhone ? '<span style="font-size:12px;background:#F3F4F6;padding:2px 7px;border-radius:5px;color:#374151;margin-right:4px;">📞 '+esc(hasPhone)+'</span>' : '')+
+        (hasHkid  ? '<span style="font-size:12px;background:#F3F4F6;padding:2px 7px;border-radius:5px;color:#374151;margin-right:4px;">ID: '+esc(h.id_prefix)+'</span>' : '')+
+        (hasBank  ? '<span style="font-size:12px;background:#F3F4F6;padding:2px 7px;border-radius:5px;color:#374151;margin-right:4px;">🏦 '+esc(h.bank_name)+' '+esc(h.bank_acc_no)+'</span>' : '')+
+        (h.project_count > 0 ? '<span style="font-size:12px;background:#DBEAFE;padding:2px 7px;border-radius:5px;color:#1e40af;margin-right:4px;">📂 '+h.project_count+' 項目</span>' : '');
+      return '<div class="proj-card holder-detail-card" data-holder-no="'+esc(h.holder_no)+'" style="cursor:pointer;">'+
+        '<div class="proj-card-top">'+
+          '<div>'+
+            '<span style="font-size:16px;font-weight:700;color:#111;">'+esc(h.name_zh)+'</span>'+
+            '<span style="font-size:12px;font-family:monospace;background:#F3F4F6;padding:2px 8px;border-radius:4px;color:#6B7280;margin-left:8px;">'+h.holder_no+'</span>'+
+          '</div>'+
+          '<div style="display:flex;gap:8px;align-items:center;">'+
+            kycStatus+
+            '<span style="padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:'+roleBg+';color:'+roleColor+';">'+roleLabel+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px;">'+infoHtml+'</div>'+
+        missingHtml+
+        '<div style="font-size:12px;color:#9CA3AF;margin-top:4px;">會員：'+h.member_no+' · 申請：'+h.created_at.slice(0,10)+
+          ' · 狀態：<span style="font-weight:700;color:'+(h.status==='ACTIVE'?'#065F46':'#991B1B')+';">'+h.status+'</span></div>'+
+      '</div>';
+    }).join('');
+  }).catch(function(){ document.getElementById('revHolderList').innerHTML='<div style="color:#DC2626;padding:20px;">載入失敗</div>'; });
+}
+
+// Event delegation for holder detail cards (avoids onclick with string params)
+document.getElementById('revHolderList').addEventListener('click', function(e) {
+  var card = e.target.closest('.holder-detail-card');
+  if (!card) return;
+  var holderNo = card.getAttribute('data-holder-no');
+  if (holderNo) openHolderDetail(holderNo);
+});
+
+// 持有人詳情（項目參與）
+function openHolderDetail(holderNo) {
+  var modal = document.getElementById('holderDetailModal');
+  var body  = document.getElementById('holderDetailBody');
+  var titleEl = document.getElementById('holderDetailTitle');
+  if(!modal) return;
+  modal.style.display='';
+  titleEl.textContent='載入中…';
+  body.innerHTML='<div style="text-align:center;padding:30px;color:#9CA3AF;">載入中…</div>';
+  fetch('/api/admin/rev/holder/'+encodeURIComponent(holderNo)+'/projects')
+    .then(function(r){return r.json();}).then(function(d){
+      titleEl.textContent='📂 '+holderNo+' 項目參與';
+      if(!d.ok){ body.innerHTML='<div style="color:#DC2626;">'+esc(d.error||'載入失敗')+'</div>'; return; }
+      var projects = d.projects||[];
+      var teamMembers = d.team_members||[];
+      var html = '';
+      // GROUP team members
+      if(teamMembers.length){
+        html += '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px;">👥 團隊成員（GROUP申請）</div>'+
+          '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">'+
+          '<thead><tr style="background:#F9FAFB;">'+
+            '<th style="padding:7px 8px;text-align:left;font-weight:700;">姓名</th>'+
+            '<th style="padding:7px 8px;text-align:left;font-weight:700;">電話</th>'+
+            '<th style="padding:7px 8px;text-align:center;font-weight:700;">分成%</th>'+
+            '<th style="padding:7px 8px;text-align:center;font-weight:700;">確認狀態</th>'+
+          '</tr></thead><tbody>'+
+          teamMembers.map(function(tm){
+            var confirmed = tm.confirmed
+              ? '<span style="color:#065F46;font-weight:700;">✅ 已確認</span>'
+              : '<span style="color:#D97706;">⏳ 待確認</span>';
+            return '<tr style="border-bottom:1px solid #F3F4F6;">'+
+              '<td style="padding:7px 8px;">'+esc(tm.name_zh)+'</td>'+
+              '<td style="padding:7px 8px;font-family:monospace;">'+esc(tm.phone||'—')+'</td>'+
+              '<td style="padding:7px 8px;text-align:center;font-weight:700;color:#8B0000;">'+tm.share_pct+'%</td>'+
+              '<td style="padding:7px 8px;text-align:center;">'+confirmed+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table>';
+      }
+      // Projects
+      if(!projects.length){
+        html += '<div style="color:#9CA3AF;text-align:center;padding:20px;">尚未參與任何項目</div>';
+      } else {
+        var stLbl = {DRAFT:'草稿',ACTIVE:'進行中',SETTLING:'結算中',SETTLED:'已結算',CLOSED:'已關閉'};
+        var stColor = {DRAFT:'#9CA3AF',ACTIVE:'#065F46',SETTLING:'#D97706',SETTLED:'#1565C0',CLOSED:'#6B7280'};
+        var stBg    = {DRAFT:'#F3F4F6',ACTIVE:'#D1FAE5',SETTLING:'#FEF3C7',SETTLED:'#DBEAFE',CLOSED:'#F3F4F6'};
+        html += '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px;">📊 項目參與記錄</div>'+
+          projects.map(function(proj){
+            var share = Math.round((proj.team_share_bps||0)/100);
+            var earned = 'HK$'+Math.round((proj.earned_cents||0)/100).toLocaleString();
+            var st = proj.project_status||'DRAFT';
+            return '<div style="background:#F9FAFB;border-radius:8px;padding:10px 12px;margin-bottom:8px;border-left:3px solid '+(stColor[st]||'#9CA3AF')+';">'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'+
+                '<span style="font-weight:700;color:#1B5E20;">'+esc(proj.project_name)+'</span>'+
+                '<span style="font-size:12px;background:'+(stBg[st]||'#F3F4F6')+';color:'+(stColor[st]||'#6B7280')+';padding:2px 8px;border-radius:6px;">'+(stLbl[st]||st)+'</span>'+
+              '</div>'+
+              '<div style="font-size:12px;color:#6B7280;">'+
+                esc(proj.project_code)+' · '+esc(proj.scenario)+
+                ' · 角色：<b>'+proj.role+'</b>'+
+                ' · 團隊分帳：<b style="color:#8B0000;">'+share+'%</b>'+
+                ' · 已結算：<b style="color:#065F46;">'+earned+'</b>'+
+              '</div>'+
+            '</div>';
+          }).join('');
+      }
+      body.innerHTML = html;
+    }).catch(function(e){ body.innerHTML='<div style="color:#DC2626;">載入失敗：'+(e.message||'')+'</div>'; });
+}
+
+// ── Projects Tab ──────────────────────────────────────────────────────────────
+function loadProjects() {
+  fetch('/api/admin/rev/projects').then(function(r){return r.json();}).then(function(d){
+    var el = document.getElementById('projList');
+    if(!d.ok || !d.projects.length){ el.innerHTML='<div style="color:#9CA3AF;text-align:center;padding:30px;">尚無項目，點擊「新增項目」開始</div>'; return; }
+    el.innerHTML = d.projects.map(function(p){
+      var stCls = 'proj-status-'+p.status;
+      var stLabel = {DRAFT:'草稿',ACTIVE:'進行中',SETTLING:'結算中',SETTLED:'已結算',CLOSED:'已關閉'}[p.status]||p.status;
+      return '<div class="proj-card" onclick="openProjModal('+p.id+')" style="cursor:pointer;">'+
+        '<div class="proj-card-top">'+
+          '<div>'+
+            '<span class="proj-code">'+p.project_code+'</span>'+
+            '<span class="proj-name" style="margin-left:8px;">'+p.name+'</span>'+
+          '</div>'+
+          '<span class="status-badge '+stCls+'" style="font-size:12px;padding:3px 10px;border-radius:12px;">'+stLabel+'</span>'+
+        '</div>'+
+        '<div style="font-size:13px;color:#6B7280;margin-top:4px;">'+p.scenario+' · '+(p.business_type||'—')+' · 建立：'+p.created_at.slice(0,10)+'</div>'+
+      '</div>';
+    }).join('');
+  }).catch(function(){ document.getElementById('projList').innerHTML='<div style="color:#DC2626;padding:20px;">載入失敗</div>'; });
+}
+
+function openCreateProject() { document.getElementById('createProjModal').style.display=''; }
+function closeCreateProjModal() { document.getElementById('createProjModal').style.display='none'; }
+
+function submitCreateProject() {
+  var name = document.getElementById('cpName').value.trim();
+  var scenario = document.getElementById('cpScenario').value;
+  var bizType = document.getElementById('cpBizType').value.trim();
+  var notes = document.getElementById('cpNotes').value.trim();
+  var errEl = document.getElementById('cpErr');
+  if(!name){ errEl.textContent='請填寫項目名稱'; errEl.style.display=''; return; }
+  errEl.style.display='none';
+  fetch('/api/admin/rev/project', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name:name, scenario:scenario, business_type:bizType, notes:notes})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ errEl.textContent=d.error||'建立失敗'; errEl.style.display=''; return; }
+    closeCreateProjModal();
+    loadProjects();
+    alert('✅ 項目 '+d.project_code+' 已建立！');
+  }).catch(function(){ errEl.textContent='網絡錯誤'; errEl.style.display=''; });
+}
+
+function closeProjModal() { document.getElementById('projModal').style.display='none'; }
+
+function openProjModal(projId) {
+  document.getElementById('projModal').style.display='';
+  document.getElementById('projModalTitle').textContent='載入中…';
+  document.getElementById('projModalBody').innerHTML='<div style="text-align:center;padding:30px;color:#9CA3AF;">載入中…</div>';
+  fetch('/api/admin/rev/project/'+projId+'/statement').then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ document.getElementById('projModalBody').innerHTML='<div style="color:#DC2626;">'+d.error+'</div>'; return; }
+    var p = d.project, s = d.shares||{}, sum = d.summary||{};
+    document.getElementById('projModalTitle').textContent='📊 '+p.name;
+    var stLabel = {DRAFT:'草稿',ACTIVE:'進行中',SETTLING:'結算中',SETTLED:'已結算',CLOSED:'已關閉'}[p.status]||p.status;
+    var html = '';
+    // 基本資料 + 狀態控制
+    html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">'+
+      '<span class="proj-code">'+p.project_code+'</span>'+
+      '<span class="status-badge proj-status-'+p.status+'">'+stLabel+'</span>'+
+      '<span style="font-size:12px;color:#6B7280;">'+p.scenario+'</span>'+
+    '</div>';
+    // 分成比例（互助基金15%和平台費15%為固定，其他可調整）
+    if(s && s.pct_coleadery!=null){
+      var canEdit = (p.status === 'DRAFT' || p.status === 'ACTIVE');
+      var shareEditHtml = canEdit
+        ? '<div style="margin-top:10px;background:#FFFBEB;border:1.5px solid #FEF08A;border-radius:8px;padding:12px;">'+
+            '<div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:10px;">✏️ 調整分成比例（互助基金15%、平台費15%固定不可改）</div>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
+              shareInputRow('🌟 CoLeadery %', 'adjCL', Math.round(s.pct_coleadery/100))+
+              shareInputRow('🤝 CoLinkery %', 'adjCK', Math.round(s.pct_colinkery/100))+
+              shareInputRow('🏠 CoOwnery池 %', 'adjCO', Math.round(s.pct_coownery/100))+
+              shareInputRow('🛠 CoSupportery池 %', 'adjCS', Math.round(s.pct_cosupportery/100))+
+              shareInputRow('🏦 特別帳戶 %', 'adjSA', Math.round(s.pct_special_account/100))+
+            '</div>'+
+            '<div style="font-size:12px;color:#6B7280;margin:6px 0;">互助基金：<b>15%</b>（固定）&nbsp;·&nbsp; 平台費：<b>15%</b>（固定）&nbsp;·&nbsp; 七方合計必須 = 100%</div>'+
+            '<div id="adjShareMsg" style="font-size:13px;margin:4px 0;display:none;"></div>'+
+            '<button class="btn btn-secondary btn-sm" onclick="submitShareAdj('+projId+')">💾 更新比例</button>'+
+          '</div>'
+        : '';
+      html += '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:6px;">分成比例</div>'+
+        '<div class="share-grid">'+
+          shareRow('🌟 CoLeadery',s.pct_coleadery)+shareRow('🤝 CoLinkery',s.pct_colinkery)+
+          shareRow('🏠 CoOwnery池',s.pct_coownery)+shareRow('🛠 CoSupportery池',s.pct_cosupportery)+
+          shareRow('❤️ 互助基金',s.pct_mutual_fund)+shareRow('💼 平台費',s.pct_platform_fee)+
+          shareRow('🏦 特別帳戶',s.pct_special_account)+
+        '</div>'+
+        shareEditHtml;
+    }
+    // 參與者（含 GROUP 成員展開）
+    if(d.participants && d.participants.length){
+      html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:12px 0 6px;">參與者</div>'+
+        '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">'+
+        '<thead><tr style="background:#F9FAFB;">'+
+          '<th style="padding:6px 8px;text-align:left;">角色</th>'+
+          '<th style="padding:6px 8px;text-align:left;">姓名</th>'+
+          '<th style="padding:6px 8px;text-align:left;">持有人編號</th>'+
+          '<th style="padding:6px 8px;text-align:center;">整體分帳%</th>'+
+          '<th style="padding:6px 8px;text-align:center;">狀態</th>'+
+        '</tr></thead><tbody>'+
+        d.participants.map(function(pp){
+          var roleEmoji = pp.holder_role==='COLEADERY'?'🌟 CoLeadery':'🤝 CoLinkery';
+          var share = Math.round((pp.team_share_bps||0)/100);
+          var cs = pp.confirm_status==='CONFIRMED'?'<span style="color:#065F46;font-weight:700;">✅</span>':'<span style="color:#D97706;">⏳</span>';
+          var typeTag = pp.applicant_type==='GROUP'
+            ? '<span style="font-size:10px;background:#DBEAFE;color:#1e40af;padding:1px 5px;border-radius:4px;margin-left:4px;">小組</span>'
+            : (pp.applicant_type==='COMPANY'?'<span style="font-size:10px;background:#FEF3C7;color:#92400e;padding:1px 5px;border-radius:4px;margin-left:4px;">公司</span>':'');
+          var rows = '<tr style="border-bottom:1px solid #E5E7EB;background:#F9FAFB;">'+
+            '<td style="padding:6px 8px;">'+roleEmoji+'</td>'+
+            '<td style="padding:6px 8px;font-weight:600;">'+esc(pp.name_zh)+typeTag+'</td>'+
+            '<td style="padding:6px 8px;font-family:monospace;font-size:12px;">'+esc(pp.holder_no)+'</td>'+
+            '<td style="padding:6px 8px;text-align:center;font-weight:700;color:#8B0000;">'+share+'%</td>'+
+            '<td style="padding:6px 8px;text-align:center;">'+cs+'</td>'+
+          '</tr>';
+          // 如為 GROUP，展開每個成員行
+          if(pp.applicant_type==='GROUP' && pp.team_members && pp.team_members.length){
+            pp.team_members.forEach(function(tm){
+              var tmConfirm = tm.confirmed
+                ? '<span style="color:#065F46;">✅</span>'
+                : '<span style="color:#D97706;">⏳待確認</span>';
+              rows += '<tr style="border-bottom:1px solid #F3F4F6;background:#fff;">'+
+                '<td style="padding:4px 8px 4px 24px;color:#9CA3AF;font-size:12px;">└ 成員</td>'+
+                '<td style="padding:4px 8px;font-size:12px;">'+esc(tm.name_zh)+'<span style="font-size:11px;color:#9CA3AF;margin-left:4px;">'+esc(tm.phone||'')+'</span></td>'+
+                '<td style="padding:4px 8px;font-size:11px;color:#9CA3AF;">'+esc(tm.member_no||'—')+'</td>'+
+                '<td style="padding:4px 8px;text-align:center;font-size:12px;font-weight:700;color:#1e40af;">'+tm.share_pct+'%</td>'+
+                '<td style="padding:4px 8px;text-align:center;font-size:12px;">'+tmConfirm+'</td>'+
+              '</tr>';
+            });
+          }
+          return rows;
+        }).join('')+
+        '</tbody></table>';
+    }
+    // 損益彙總
+    html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:14px 0 8px;">💰 損益彙總</div>'+
+      '<div style="background:#F9FAFB;border-radius:8px;padding:12px;">'+
+      '<div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;"><span>收入合計</span><span class="ledger-INCOME">HK$'+Math.round((sum.income||0)/100).toLocaleString()+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;"><span>支出合計</span><span class="ledger-cost">HK$'+Math.round((sum.costs||0)/100).toLocaleString()+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;border-top:1px solid #E5E7EB;padding-top:8px;margin-top:4px;"><span>淨利潤</span><span style="color:'+(sum.net_profit>=0?'#065F46':'#991B1B')+';">HK$'+Math.round((sum.net_profit||0)/100).toLocaleString()+'</span></div>'+
+      '</div>';
+    // 錄入賬目
+    html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:14px 0 8px;">📝 錄入賬目</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'+
+        '<select id="ledType" style="padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+          '<option value="INCOME">收入 INCOME</option>'+
+          '<option value="DIRECT_COST">支出 DIRECT_COST</option>'+
+          '<option value="FIXED_DEDUCTION">固定扣除 FIXED_DEDUCTION</option>'+
+        '</select>'+
+        '<input id="ledAmt" type="number" placeholder="金額（港元）" style="padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+      '</div>'+
+      '<input id="ledDesc" type="text" placeholder="描述（如：葵青場銷售收入 7月）" style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;margin-bottom:8px;">'+
+      '<button class="btn btn-primary btn-sm" onclick="submitLedger('+projId+')">➕ 錄入賬目</button>';
+    // 賬目明細
+    if(d.ledger && d.ledger.length){
+      html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:14px 0 6px;">📄 賬目明細</div>'+
+        d.ledger.map(function(l){
+          var isIncome = l.entry_type==='INCOME';
+          var amtStr = (isIncome?'+':'-')+'HK$'+Math.round(l.amount_cents/100).toLocaleString();
+          return '<div class="ledger-row"><span>'+l.entry_type+'<br><span style="color:#9CA3AF;font-size:11px;">'+l.description+'</span></span>'+
+            '<span class="'+(isIncome?'ledger-INCOME':'ledger-cost')+'">'+amtStr+'</span></div>';
+        }).join('');
+    }
+    // 添加參與者
+    html += '<div style="font-size:14px;font-weight:700;color:#374151;margin:14px 0 8px;">👤 綁定參與者</div>'+
+      '<div style="font-size:12px;color:#6B7280;margin-bottom:8px;background:#F9FAFB;padding:6px 10px;border-radius:6px;">'+
+        '📌 每個項目只能綁定 <b>1 個 CoLeadery</b>（領航者，1:1）；CoLinkery 可綁定多個（連結者，1:N）'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;">'+
+        '<input id="ppHolderNo" type="text" placeholder="持有人編號 CL000001 / CK000001" style="padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+        '<select id="ppRole" style="padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+          '<option value="COLEADERY">🌟 CoLeadery（唯一）</option><option value="COLINKERY">🤝 CoLinkery（可多個）</option>'+
+        '</select>'+
+        '<button class="btn btn-secondary btn-sm" onclick="submitParticipant('+projId+')">綁定</button>'+
+      '</div>'+
+      '<div id="ppMsg" style="font-size:12px;margin-top:4px;"></div>';
+    // 結算按鈕
+    if(p.status==='ACTIVE'){
+      html += '<div style="margin-top:16px;border-top:1.5px solid #E5E7EB;padding-top:14px;">'+
+        '<button class="btn btn-primary" onclick="triggerSettle('+projId+')" style="background:#065F46;">💰 觸發結算</button>'+
+        '<div style="font-size:12px;color:#6B7280;margin-top:6px;">結算後將按比例計算各方分潤並記入錢包</div>'+
+      '</div>';
+    }
+    document.getElementById('projModalBody').innerHTML = html;
+  }).catch(function(e){ document.getElementById('projModalBody').innerHTML='<div style="color:#DC2626;">載入失敗：'+e.message+'</div>'; });
+}
+
+function shareRow(label, bps){ return '<div class="share-row"><span>'+label+'</span><span style="font-weight:700;">'+Math.round((bps||0)/100)+'%</span></div>'; }
+
+function shareInputRow(label, id, val) {
+  return '<div>'+
+    '<label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px;">'+label+'</label>'+
+    '<input id="'+id+'" type="number" min="0" max="100" step="1" value="'+val+'" style="width:100%;padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:7px;font-size:13px;">'+
+  '</div>';
+}
+
+function submitShareAdj(projId) {
+  var cl = parseFloat(document.getElementById('adjCL').value)||0;
+  var ck = parseFloat(document.getElementById('adjCK').value)||0;
+  var co = parseFloat(document.getElementById('adjCO').value)||0;
+  var cs = parseFloat(document.getElementById('adjCS').value)||0;
+  var sa = parseFloat(document.getElementById('adjSA').value)||0;
+  var total = cl+ck+co+cs+sa+15+15;  // +互助基金15% +平台費15%
+  var msgEl = document.getElementById('adjShareMsg');
+  msgEl.style.display='';
+  if(Math.abs(total-100)>0.01){
+    msgEl.style.color='#DC2626';
+    msgEl.textContent='合計目前：'+total+'%，必須剛好等於 100%（已含互助基金15%+平台費15%）';
+    return;
+  }
+  msgEl.style.color='#888';
+  msgEl.textContent='更新中…';
+  fetch('/api/admin/rev/project/'+projId+'/shares',{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pct_coleadery:cl,pct_colinkery:ck,pct_coownery:co,pct_cosupportery:cs,pct_special_account:sa})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ msgEl.style.color='#DC2626'; msgEl.textContent=d.error||'更新失敗'; return; }
+    msgEl.style.color='#065F46'; msgEl.textContent='✅ 分成比例已更新！';
+    setTimeout(function(){ openProjModal(projId); }, 800);
+  }).catch(function(){ msgEl.style.color='#DC2626'; msgEl.textContent='網絡錯誤'; });
+}
+
+function submitLedger(projId) {
+  var type = document.getElementById('ledType').value;
+  var amt = parseFloat(document.getElementById('ledAmt').value)||0;
+  var desc = document.getElementById('ledDesc').value.trim();
+  if(!amt){ alert('請填寫金額'); return; }
+  fetch('/api/admin/rev/ledger',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({project_id:projId,entry_type:type,description:desc,amount_cents:Math.round(amt*100)})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ alert(d.error||'錄入失敗'); return; }
+    openProjModal(projId); // 重新載入
+  }).catch(function(){ alert('網絡錯誤'); });
+}
+
+function submitParticipant(projId) {
+  var holderNo = document.getElementById('ppHolderNo').value.trim();
+  var role = document.getElementById('ppRole').value;
+  var msgEl = document.getElementById('ppMsg');
+  if(!holderNo){ msgEl.style.color='#DC2626'; msgEl.textContent='請填寫持有人編號'; return; }
+  fetch('/api/admin/rev/project/'+projId+'/participants',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({holder_no:holderNo,role:role,team_share_bps:10000})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ msgEl.style.color='#DC2626'; msgEl.textContent=d.error||'綁定失敗'; return; }
+    msgEl.style.color='#065F46'; msgEl.textContent='✅ 已綁定'+(d.warning?' · '+d.warning:'');
+    openProjModal(projId);
+  }).catch(function(){ msgEl.style.color='#DC2626'; msgEl.textContent='網絡錯誤'; });
+}
+
+function triggerSettle(projId) {
+  if(!confirm('確認觸發結算？此操作將計算各方分潤並記入錢包，且會將項目狀態改為「結算中」。')) return;
+  fetch('/api/admin/rev/project/'+projId+'/settle',{method:'POST'})
+    .then(function(r){return r.json();}).then(function(d){
+      if(!d.ok){ alert(d.error||'結算失敗'); return; }
+      alert('✅ 結算完成！淨利潤：HK$'+Math.round(d.net_profit/100)+' · 共 '+d.entries_created+' 筆分潤記錄已建立');
+      openProjModal(projId);
+    }).catch(function(){ alert('網絡錯誤'); });
+}
+// ── End Revenue ──────────────────────────────────────────────────────────────
+</script>
+</body>
+</html>`
+}
