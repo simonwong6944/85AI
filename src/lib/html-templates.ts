@@ -8692,3 +8692,991 @@ async function shareCardToWA() {
 </script>
 </body></html>`
 }
+
+export function adminHtml() {
+  const srcLabels: Record<string,string> = {
+    'walk-in':'Walk-in','roadshow':'Roadshow','referral':'會員介紹',
+    'whatsapp':'WhatsApp','social':'社交媒體','institution':'機構轉介','online':'網上登記'
+  }
+  return htmlHead('會員後台管理', `<style>
+*{box-sizing:border-box}
+body{background:#f2f3f5;padding:0;font-size:14px;}
+/* topbar */
+.topbar{background:var(--forest-deep);color:#fff;padding:0 24px;display:flex;align-items:center;height:52px;gap:0;}
+.topbar .logo{font-family:"Noto Serif TC",serif;font-size:17px;font-weight:700;letter-spacing:2px;margin-right:32px;}
+.topbar .logo em{color:var(--ferrari);font-style:normal;}
+.nav-tabs{display:flex;height:100%;}
+.nav-tab{padding:0 18px;cursor:pointer;font-size:13px;display:flex;align-items:center;opacity:0.65;border-bottom:3px solid transparent;letter-spacing:1px;color:#fff;}
+.nav-tab.active{opacity:1;border-bottom-color:var(--ferrari);}
+.topbar-right{margin-left:auto;font-size:11px;opacity:0.5;}
+/* layout */
+.wrap{max-width:100%;margin:0 auto;padding:16px 24px;}
+.page{display:none}.page.active{display:block}
+/* stat cards */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+@media(max-width:900px){.stats-grid{grid-template-columns:1fr 1fr;}}
+.stat-card{background:#fff;padding:18px 20px;border-radius:6px;border-top:3px solid var(--forest);box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.stat-card.red{border-top-color:var(--ferrari);}
+.stat-card.blue{border-top-color:#1565C0;}
+.stat-card.amber{border-top-color:#E65100;}
+.stat-card .n{font-family:"Space Grotesk",sans-serif;font-size:32px;font-weight:700;color:var(--forest-deep);}
+.stat-card.red .n{color:var(--ferrari-deep);}
+.stat-card.blue .n{color:#1565C0;}
+.stat-card.amber .n{color:#E65100;}
+.stat-card .lbl{font-size:11px;color:#888;letter-spacing:2px;margin-top:4px;text-transform:uppercase;}
+.stat-card .sub{font-size:11px;color:#aaa;margin-top:2px;}
+/* charts row */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;}
+@media(max-width:768px){.charts-row{grid-template-columns:1fr;}}
+.chart-card{background:#fff;border-radius:6px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.chart-title{font-size:12px;font-weight:700;letter-spacing:2px;color:#555;text-transform:uppercase;margin-bottom:14px;}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;}
+.bar-label{width:80px;color:#666;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bar-track{flex:1;background:#f0f0f0;border-radius:3px;height:16px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;background:var(--forest);transition:width 0.4s;}
+.bar-fill.red{background:var(--ferrari);}
+.bar-val{width:30px;font-family:"Space Grotesk",sans-serif;font-weight:700;color:var(--forest-deep);}
+/* filters */
+.filter-bar{background:#fff;border-radius:6px;padding:14px 18px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.filter-bar input,.filter-bar select{padding:7px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;font-family:inherit;color:var(--ink);background:#fff;}
+.filter-bar input{flex:1;min-width:180px;}
+.btn{padding:7px 16px;border:0;border-radius:4px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:700;letter-spacing:0.5px;}
+.btn-green{background:var(--forest);color:#fff;}
+.btn-grey{background:#e0e0e0;color:#555;}
+.btn-red{background:var(--ferrari);color:#fff;}
+.btn-blue{background:#1565C0;color:#fff;}
+.btn-amber{background:#E65100;color:#fff;}
+/* table */
+.table-wrap{background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.table-meta{padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;}
+.table-meta .count{font-size:12px;color:#888;}
+.table-actions{display:flex;gap:8px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{background:#fafafa;color:#555;padding:9px 12px;text-align:left;font-size:11px;letter-spacing:1px;text-transform:uppercase;border-bottom:2px solid #eee;white-space:nowrap;}
+td{padding:10px 12px;border-bottom:1px solid #f5f5f5;color:#333;white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#f9fffe;}
+tr.inactive td{opacity:0.45;}
+/* badges */
+.badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:0.5px;}
+.badge-primary{background:#E8F5E9;color:#1B5E20;}
+.badge-family{background:#FFEBEE;color:#B71C1C;}
+.badge-active{background:#E8F5E9;color:#2E7D32;}
+.badge-inactive{background:#FFF3E0;color:#E65100;}
+.badge-deleted{background:#F5F5F5;color:#9E9E9E;}
+.badge-done{background:#E8F5E9;color:#2E7D32;}
+.badge-pending{background:#FFFDE7;color:#F57F17;}
+/* action buttons in table */
+.act-btn{padding:3px 8px;border:1px solid;border-radius:3px;font-size:11px;cursor:pointer;font-weight:700;background:#fff;margin-right:3px;}
+.act-edit{border-color:var(--forest);color:var(--forest);}
+.act-kyc{border-color:#1565C0;color:#1565C0;}
+.act-deact{border-color:var(--ferrari);color:var(--ferrari);}
+.act-react{border-color:#2E7D32;color:#2E7D32;}
+/* pagination */
+.pagination{padding:12px 16px;display:flex;gap:6px;justify-content:center;border-top:1px solid #f0f0f0;}
+.pagination button{padding:5px 12px;border:1px solid #ddd;background:#fff;cursor:pointer;font-family:inherit;font-size:12px;border-radius:3px;}
+.pagination button.active{background:var(--forest);color:#fff;border-color:var(--forest);}
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:none;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal{background:#fff;border-radius:8px;padding:28px 28px 20px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.2);}
+.modal h3{font-family:"Noto Serif TC",serif;font-size:18px;color:var(--forest-deep);margin-bottom:20px;font-weight:700;}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.modal-field{display:flex;flex-direction:column;gap:5px;}
+.modal-field.full{grid-column:1/-1;}
+.modal-field label{font-size:11px;font-weight:700;color:#888;letter-spacing:1px;text-transform:uppercase;}
+.modal-field input,.modal-field select,.modal-field textarea{padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;font-family:inherit;}
+.modal-field textarea{height:70px;resize:vertical;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;}
+/* QR generator */
+.qr-layout{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start;}
+@media(max-width:900px){.qr-layout{grid-template-columns:1fr;}}
+.qr-form-card{background:#fff;border-radius:8px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.qr-form-card h3{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;color:var(--forest-deep);margin-bottom:18px;}
+.qr-field{margin-bottom:14px;}
+.qr-field label{display:block;font-size:11px;font-weight:700;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;}
+.qr-field input,.qr-field select{width:100%;padding:9px 11px;border:1.5px solid #ddd;border-radius:5px;font-size:13px;font-family:inherit;color:var(--ink);transition:border-color 0.2s;}
+.qr-field input:focus,.qr-field select:focus{outline:none;border-color:var(--forest);}
+.qr-field .hint{font-size:11px;color:#aaa;margin-top:3px;}
+.qr-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.qr-type-btn{padding:10px 8px;border:2px solid #e0e0e0;border-radius:6px;background:#fff;cursor:pointer;text-align:center;font-family:inherit;font-size:12px;font-weight:700;color:#888;transition:all 0.2s;line-height:1.4;}
+.qr-type-btn.active{border-color:var(--forest);background:#f0f7f0;color:var(--forest-deep);}
+.qr-type-btn .icon{font-size:20px;display:block;margin-bottom:3px;}
+.qr-preview-card{background:#fff;border-radius:8px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06);position:sticky;top:24px;}
+.qr-preview-card h3{font-family:"Noto Serif TC",serif;font-size:16px;font-weight:700;color:var(--forest-deep);margin-bottom:16px;}
+.qr-canvas-wrap{background:#f9f9f9;border:1.5px solid #e8e8e8;border-radius:8px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:14px;min-height:200px;}
+.qr-canvas-wrap canvas{width:200px;height:200px;image-rendering:pixelated;}
+.qr-label-text{font-size:11px;font-weight:700;letter-spacing:2px;color:#555;text-align:center;text-transform:uppercase;}
+.qr-url-box{background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:8px 10px;font-size:11px;font-family:monospace;color:#444;word-break:break-all;margin-bottom:12px;line-height:1.5;}
+.qr-actions{display:flex;flex-direction:column;gap:8px;}
+.qr-action-btn{width:100%;padding:10px;border:none;border-radius:5px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:0.5px;}
+.qr-action-btn.dl-png{background:var(--forest);color:#fff;}
+.qr-action-btn.cp-url{background:#e8f5e9;color:var(--forest-deep);border:1.5px solid var(--forest);}
+.qr-action-btn.cp-url.copied{background:var(--forest-deep);color:#fff;}
+/* saved links table */
+.links-table-wrap{background:#fff;border-radius:8px;margin-top:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06);overflow:hidden;}
+.links-table-wrap .ltitle{padding:14px 18px;font-size:12px;font-weight:700;letter-spacing:2px;color:#555;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase;}
+.links-table-wrap table{width:100%;border-collapse:collapse;font-size:12px;}
+.links-table-wrap th{background:#fafafa;color:#888;padding:8px 14px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #eee;}
+.links-table-wrap td{padding:10px 14px;border-bottom:1px solid #f8f8f8;vertical-align:middle;}
+.links-table-wrap tr:last-child td{border-bottom:none;}
+.links-table-wrap tr:hover td{background:#f9fffe;}
+.link-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.5px;}
+.link-tag.roadshow{background:#E8F5E9;color:#1B5E20;}
+.link-tag.institution{background:#E3F2FD;color:#0D47A1;}
+.link-tag.referral{background:#FFF3E0;color:#E65100;}
+.link-tag.online{background:#F3E5F5;color:#4A148C;}
+.link-tag.walkin{background:#F5F5F5;color:#616161;}
+</style>`) + `
+<body>
+<div class="topbar">
+  <div class="logo">CoEldery <em>85</em></div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="switchTab('dashboard',this)">📊 Dashboard</div>
+    <div class="nav-tab" onclick="switchTab('members',this)">👥 會員管理</div>
+    <div class="nav-tab" onclick="switchTab('medical',this)">🏥 醫健卡申請</div>
+    <div class="nav-tab" onclick="switchTab('contents',this)">📢 內容管理</div>
+    <div class="nav-tab" id="navFeedback" onclick="switchTab('feedback',this)">💬 心聲意見</div>
+    <div class="nav-tab" onclick="switchTab('qrgen',this)">🔗 QR 連結</div>
+    <div class="nav-tab" onclick="switchTab('settings',this)">⚙️ 設定</div>
+  </div>
+  <div class="topbar-right">coeldery85.com/membership/admin</div>
+</div>
+
+<div class="wrap">
+
+  <!-- ── DASHBOARD PAGE ── -->
+  <div class="page active" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="n" id="sTotal">—</div><div class="lbl">總會員數</div><div class="sub" id="sActive">活躍：— / 停用：—</div></div>
+      <div class="stat-card"><div class="n" id="sPrimary">—</div><div class="lbl">主卡</div></div>
+      <div class="stat-card"><div class="n" id="sFamily">—</div><div class="lbl">家庭同行卡</div></div>
+      <div class="stat-card red"><div class="n" id="sPending">—</div><div class="lbl">待 KYC</div></div>
+      <div class="stat-card blue"><div class="n" id="sToday">—</div><div class="lbl">今日新增</div></div>
+      <div class="stat-card amber"><div class="n" id="sMonth">—</div><div class="lbl">本月新增</div></div>
+      <div class="stat-card blue"><div class="n" id="sMedPending">—</div><div class="lbl">醫健卡待送 NGO</div></div>
+      <div class="stat-card"><div class="n" id="sMedIssued">—</div><div class="lbl">醫健卡已發出</div></div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">📍 來源渠道分析</div>
+        <div id="chartSource"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🗺️ 地區分佈 Top 10</div>
+        <div id="chartDistrict"></div>
+      </div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">⚧ 性別分佈</div>
+        <div id="chartGender"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🏥 醫健卡申請狀態</div>
+        <div id="chartMedical"></div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:24px;">
+      <div class="chart-title">📈 每月新增會員趨勢（近12個月）</div>
+      <div id="chartMonth" style="display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:8px;"></div>
+    </div>
+
+    <!-- Roadshow / Source breakdown -->
+    <div class="chart-card" style="margin-bottom:24px;">
+      <div class="chart-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>🏪 Roadshow &amp; 機構場次登記摘要</span>
+        <span style="font-size:10px;font-weight:400;color:#aaa;letter-spacing:0;text-transform:none;">點擊場次可跳至會員列表篩選</span>
+      </div>
+      <div id="chartRoadshow">
+        <div style="color:#ccc;font-size:12px;padding:12px 0;">載入中…</div>
+      </div>
+    </div>
+
+    <!-- Referrer leaderboard -->
+    <div class="chart-card" style="margin-bottom:24px;">
+      <div class="chart-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>👤 介紹人排行榜 Top 15</span>
+        <span style="font-size:10px;font-weight:400;color:#aaa;letter-spacing:0;text-transform:none;">點擊介紹人可跳至會員列表篩選</span>
+      </div>
+      <div id="chartReferrer">
+        <div style="color:#ccc;font-size:12px;padding:12px 0;">載入中…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MEMBERS PAGE ── -->
+  <div class="page" id="page-members">
+    <div class="filter-bar">
+      <input id="search" type="text" placeholder="搜尋姓名 / 會員編號 / 電話…">
+      <select id="filterTier">
+        <option value="">全部類型</option>
+        <option value="PRIMARY">主卡</option>
+        <option value="FAMILY">家庭同行</option>
+      </select>
+      <select id="filterStatus">
+        <option value="">全部狀態</option>
+        <option value="ACTIVE">Active</option>
+        <option value="INACTIVE">Inactive</option>
+      </select>
+      <select id="filterSource">
+        <option value="">全部來源</option>
+        <option value="walk-in">Walk-in</option>
+        <option value="roadshow">Roadshow</option>
+        <option value="referral">會員介紹</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="social">社交媒體</option>
+        <option value="institution">機構轉介</option>
+        <option value="online">網上登記</option>
+      </select>
+      <select id="filterGroup">
+        <option value="">— 所有群組 —</option>
+        <option value="none">未分配群組</option>
+      </select>
+      <button class="btn btn-green" onclick="loadMembers(1)">🔍 搜尋</button>
+      <button class="btn btn-grey" onclick="clearFilters()">清除</button>
+      <button class="btn btn-blue" onclick="exportCsv()" title="匯出 CSV">⬇ CSV</button>
+      <input type="hidden" id="filterRoadshow" value="">
+      <span id="roadshowFilterBadge" style="display:none;background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:4px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;" onclick="clearRoadshowFilter()" title="點擊清除 Roadshow 篩選"></span>
+    </div>
+    <div class="table-wrap">
+      <div class="table-meta">
+        <span class="count" id="searchCount">載入中…</span>
+      </div>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr>
+          <th>會員編號</th><th>狀態</th><th>類型</th><th>中文姓名</th><th>英文姓名</th>
+          <th>電話</th><th>性別</th><th>出生年</th><th>HKID頭4位</th>
+          <th>地區</th><th>角色</th><th>KYC</th><th>WA狀態</th><th>群組</th><th>主卡/家庭卡</th>
+          <th>來源</th><th>介紹人</th><th>有效日期</th><th>登記時間</th><th>操作</th>
+        </tr></thead>
+        <tbody id="membersTbody"></tbody>
+      </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+
+  <!-- ── MEDICAL CARD PAGE ── -->
+  <div class="page" id="page-medical">
+    <div class="filter-bar">
+      <select id="medFilterStatus" onchange="loadMedical()">
+        <option value="">全部狀態</option>
+        <option value="PENDING">待傳送</option>
+        <option value="SENT">已傳送 NGO</option>
+        <option value="ISSUED">已發卡</option>
+        <option value="DECLINED">已拒絕</option>
+      </select>
+      <button class="btn btn-green" onclick="loadMedical()">🔍 重新整理</button>
+      <a class="btn btn-blue" href="/api/admin/medical?export=csv" target="_blank">⬇ CSV 匯出</a>
+    </div>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr>
+        <th>ID</th><th>會員編號</th><th>中文全名</th><th>英文全名</th>
+        <th>HKID頭4位</th><th>電話</th><th>狀態</th><th>申請日期</th><th>操作</th>
+      </tr></thead>
+      <tbody id="medicalTbody"></tbody>
+    </table>
+    </div>
+    <div id="medicalCount" style="padding:8px 0;font-size:12px;color:#888;"></div>
+  </div>
+
+  <!-- ── QR GENERATOR PAGE ── -->
+  <div class="page" id="page-qrgen">
+    <div class="qr-layout">
+
+      <!-- LEFT: form -->
+      <div>
+        <div class="qr-form-card">
+          <h3>🔗 生成登記連結 &amp; QR Code</h3>
+
+          <!-- type selector -->
+          <div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#888;letter-spacing:1px;text-transform:uppercase;">登記來源類型</div>
+          <div class="qr-type-grid">
+            <button class="qr-type-btn active" id="qtype-roadshow" onclick="setQrType('roadshow')"><span class="icon">🏪</span>Roadshow 攤位</button>
+            <button class="qr-type-btn" id="qtype-institution" onclick="setQrType('institution')"><span class="icon">🏢</span>機構 / 合作夥伴</button>
+            <button class="qr-type-btn" id="qtype-referral" onclick="setQrType('referral')"><span class="icon">👤</span>會員個人介紹</button>
+            <button class="qr-type-btn" id="qtype-online" onclick="setQrType('online')"><span class="icon">🌐</span>網上 / 社媒推廣</button>
+          </div>
+
+          <!-- ROADSHOW fields -->
+          <div id="qfields-roadshow">
+            <div class="qr-field">
+              <label>Roadshow 場次代碼 <span style="color:var(--ferrari)">*</span></label>
+              <input id="qRsCode" type="text" placeholder="例：cwb_2025_07_01" oninput="updateQr()" style="font-family:monospace;letter-spacing:1px;">
+              <div class="hint">只用英文小寫、數字、底線。建議格式：地區_年份_月份_場次</div>
+            </div>
+            <div class="qr-field">
+              <label>活動名稱 / 地點（顯示用）</label>
+              <input id="qRsLabel" type="text" placeholder="例：銅鑼灣時代廣場 7月份攤位" oninput="updateQr()">
+              <div class="hint">此名稱會記錄在 roadshow_location 欄位</div>
+            </div>
+          </div>
+
+          <!-- INSTITUTION fields -->
+          <div id="qfields-institution" style="display:none;">
+            <div class="qr-field">
+              <label>機構名稱 <span style="color:var(--ferrari)">*</span></label>
+              <input id="qInstName" type="text" placeholder="例：基督教家庭服務中心 荃灣" oninput="updateQr()">
+              <div class="hint">會記錄在 roadshow_location 欄位</div>
+            </div>
+            <div class="qr-field">
+              <label>機構代碼（選填）</label>
+              <input id="qInstCode" type="text" placeholder="例：cfsc_tw" oninput="updateQr()" style="font-family:monospace;letter-spacing:1px;">
+              <div class="hint">只用英文小寫、數字、底線。留空則用機構名稱縮寫</div>
+            </div>
+          </div>
+
+          <!-- REFERRAL fields -->
+          <div id="qfields-referral" style="display:none;">
+            <div class="qr-field">
+              <label>介紹人會員編號 <span style="color:var(--ferrari)">*</span></label>
+              <input id="qRefNo" type="text" placeholder="例：CE85-000012" oninput="updateQr()" style="font-family:monospace;letter-spacing:2px;font-weight:700;">
+              <div class="hint">掃碼後自動填入 referrer_no 欄位，系統會驗證編號是否有效</div>
+            </div>
+            <div class="qr-field">
+              <label>介紹人姓名（選填，顯示用）</label>
+              <input id="qRefName" type="text" placeholder="例：陳大文" oninput="updateQr()">
+            </div>
+          </div>
+
+          <!-- ONLINE fields -->
+          <div id="qfields-online" style="display:none;">
+            <div class="qr-field">
+              <label>推廣渠道 <span style="color:var(--ferrari)">*</span></label>
+              <select id="qOnlineCh" onchange="updateQr()">
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="website">官方網站</option>
+                <option value="email">電子郵件</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+            <div class="qr-field">
+              <label>推廣活動標籤（選填）</label>
+              <input id="qOnlineTag" type="text" placeholder="例：july_promo" oninput="updateQr()" style="font-family:monospace;letter-spacing:1px;">
+              <div class="hint">用於區分同一渠道不同時期的推廣</div>
+            </div>
+          </div>
+
+          <!-- common: target form -->
+          <div class="qr-field" style="margin-top:6px;">
+            <label>目標登記頁面</label>
+            <select id="qTarget" onchange="updateQr()">
+              <option value="primary">主卡登記（長者用）</option>
+              <option value="family">家庭同行卡（家人用）</option>
+              <option value="both">登記頁主頁（有 Login/Register tab）</option>
+            </select>
+          </div>
+
+          <button class="btn btn-green" style="width:100%;margin-top:8px;padding:12px;" onclick="saveQrLink()">💾 儲存至連結記錄</button>
+        </div>
+
+        <!-- saved links table -->
+        <div class="links-table-wrap">
+          <div class="ltitle">
+            <span>📋 已儲存的連結</span>
+            <button class="btn btn-grey" style="font-size:11px;padding:4px 10px;" onclick="loadQrLinks()">重新整理</button>
+          </div>
+          <table>
+            <thead><tr>
+              <th>類型</th><th>標籤</th><th>代碼 / 介紹人</th><th>目標頁</th><th>建立日期</th><th>操作</th>
+            </tr></thead>
+            <tbody id="qrLinksTbody"><tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px 0;">載入中…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RIGHT: live preview -->
+      <div>
+        <div class="qr-preview-card">
+          <h3>📱 即時預覽</h3>
+          <div class="qr-canvas-wrap" id="qrCanvasWrap">
+            <div style="color:#ccc;font-size:13px;text-align:center;padding:30px 0;">填寫左方資料<br>即時生成 QR Code</div>
+          </div>
+          <div class="qr-label-text" id="qrLabelText" style="margin-bottom:10px;"></div>
+          <div class="qr-url-box" id="qrUrlBox" style="display:none;"></div>
+          <div class="qr-actions" id="qrActionBtns" style="display:none;">
+            <button class="qr-action-btn dl-png" onclick="downloadQr()">⬇ 下載 QR Code (PNG)</button>
+            <button class="qr-action-btn cp-url" id="cpUrlBtn" onclick="copyUrl()">📋 複製連結</button>
+          </div>
+          <div style="margin-top:16px;padding:12px;background:#fffde7;border-radius:5px;font-size:11px;color:#795548;line-height:1.6;" id="qrTips">
+            <strong>💡 使用提示</strong><br>
+            • 下載 PNG 後可直接列印或發送<br>
+            • 掃碼者登記時，來源渠道自動記錄<br>
+            • 可儲存連結以便日後重用
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── SETTINGS PAGE ── -->
+  <div class="page" id="page-settings">
+    <div style="max-width:560px;margin:0 auto;">
+      <div style="background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,0.07);padding:28px 24px;margin-bottom:24px;">
+        <h2 style="font-size:16px;font-weight:700;margin:0 0 20px;color:#222;letter-spacing:1px;">⚙️ 系統設定</h2>
+
+        <!-- WhatsApp Admin Number -->
+        <div style="margin-bottom:24px;">
+          <label style="display:block;font-size:12px;font-weight:700;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">
+            📱 WhatsApp 管理員號碼
+          </label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="settingWaNum" type="tel" maxlength="15" placeholder="例：85254429749"
+              style="flex:1;border:1px solid #ddd;border-radius:5px;padding:10px 12px;font-size:14px;font-family:monospace;letter-spacing:1px;"
+              oninput="settingsDirty()">
+            <button onclick="saveWaNum()" id="saveWaBtn"
+              style="background:#25D366;color:#fff;border:0;border-radius:5px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">
+              儲存
+            </button>
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:6px;line-height:1.6;">
+            包含國家碼，例如香港號碼 54429749 填入 <strong>85254429749</strong><br>
+            會員登記成功後，WhatsApp 驗證按鈕會連到這個號碼。
+          </div>
+          <div id="settingWaStatus" style="margin-top:8px;font-size:12px;font-weight:700;display:none;"></div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #f0f0f0;margin:20px 0;">
+
+        <!-- Preview -->
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">👁 預覽驗證訊息</div>
+          <div style="background:#f5f5f5;border-radius:6px;padding:12px 14px;font-size:13px;color:#333;line-height:1.7;" id="settingPreview">
+            —
+          </div>
+          <div style="margin-top:10px;">
+            <a id="settingTestLink" href="#" target="_blank" rel="noopener"
+              style="display:block;background:#25D366;color:#fff;padding:11px 10px;border-radius:6px;font-size:13px;font-weight:700;text-align:center;text-decoration:none;">
+              📲 測試：開啟 WhatsApp
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 群組管理 -->
+      <div style="background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,0.07);padding:28px 24px;margin-bottom:24px;">
+        <h2 style="font-size:16px;font-weight:700;margin:0 0 4px;color:#222;letter-spacing:1px;">🏷️ 會員群組管理</h2>
+        <p style="font-size:12px;color:#888;margin:0 0 20px;">建立自訂群組，在會員管理頁分配給會員。</p>
+
+        <!-- New group form -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <input id="newGroupName" type="text" placeholder="群組名稱（如：VIP、葵青社區）" maxlength="30"
+            style="flex:1;min-width:160px;border:1px solid #ddd;border-radius:5px;padding:9px 12px;font-size:13px;"
+            onkeydown="if(event.key==='Enter')addGroup()">
+          <input id="newGroupDesc" type="text" placeholder="說明（選填）" maxlength="60"
+            style="flex:1;min-width:120px;border:1px solid #ddd;border-radius:5px;padding:9px 12px;font-size:13px;">
+          <input id="newGroupColor" type="color" value="#4caf50" title="群組顏色"
+            style="width:40px;height:38px;border:1px solid #ddd;border-radius:5px;cursor:pointer;padding:2px;">
+          <button onclick="addGroup()"
+            style="background:var(--forest);color:#fff;border:0;border-radius:5px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            ＋ 新增群組
+          </button>
+        </div>
+        <div id="groupsStatus" style="font-size:12px;font-weight:700;margin-bottom:12px;display:none;"></div>
+
+        <!-- Groups list -->
+        <div id="groupsList" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="color:#aaa;font-size:13px;text-align:center;padding:20px;">載入中…</div>
+        </div>
+      </div>
+
+      <!-- 來源統計 -->
+      <div style="background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,0.07);padding:28px 24px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div>
+            <h2 style="font-size:16px;font-weight:700;margin:0 0 4px;color:#222;letter-spacing:1px;">📊 QR / 來源登記統計</h2>
+            <p style="font-size:12px;color:#888;margin:0;">每個 QR Code 來源的登記人數</p>
+          </div>
+          <button onclick="loadSourceStats()" style="background:#f5f5f5;border:1px solid #ddd;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer;">🔄 重新整理</button>
+        </div>
+        <div id="sourceStatsList">
+          <div style="color:#aaa;font-size:13px;text-align:center;padding:20px;">載入中…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 內容管理 PAGE ── -->
+  <div class="page" id="page-contents">
+    <div style="max-width:700px;margin:0 auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <h2 style="font-size:16px;font-weight:700;color:#222;margin:0;">📢 內容管理（購物 / 消息）</h2>
+        <div style="display:flex;gap:8px;">
+          <select id="cFilterSection" onchange="loadContents()" style="border:1px solid #ddd;border-radius:5px;padding:6px 10px;font-size:13px;background:#fff;">
+            <option value="">全部</option>
+            <option value="shopping">購物</option>
+            <option value="news">消息</option>
+          </select>
+          <button class="btn btn-green" onclick="openAddContent()" style="font-size:13px;padding:7px 14px;">＋ 新增</button>
+        </div>
+      </div>
+      <div id="contentsList" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="text-align:center;padding:40px;color:#aaa;font-size:13px;">載入中…</div>
+      </div>
+    </div>
+
+    <!-- 新增/編輯 表單 (inline, 預設隱藏) -->
+    <div id="contentFormWrap" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:2000;display:none;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:520px;max-height:90vh;overflow-y:auto;">
+        <h3 id="cFormHeading" style="margin:0 0 18px;font-size:15px;font-weight:700;">＋ 新增內容</h3>
+        <input type="hidden" id="cFormId">
+        <input type="hidden" id="cFormImageUrl">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">類別 *</label>
+            <select id="cFormSection" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;">
+              <option value="shopping">購物</option>
+              <option value="news">消息</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">標題 *</label>
+            <input id="cFormTitleInput" type="text" maxlength="100" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;" placeholder="例：限時特惠套餐">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">內容 *</label>
+            <textarea id="cFormBody" rows="5" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;resize:vertical;" placeholder="可多行，Roadshow 詳情、套餐說明等"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">地址（選填，購物 Roadshow 用）</label>
+            <input id="cFormAddress" type="text" maxlength="200" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;" placeholder="例：九龍灣德福廣場 L1 大堂">
+          </div>
+          <!-- ── 圖片上傳 (Cloudinary) ── -->
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">圖片（選填）</label>
+            <div id="cImgDropZone"
+              ondragover="event.preventDefault();this.style.borderColor='#228B22';this.style.background='#f0fff0';"
+              ondragleave="this.style.borderColor='#ccc';this.style.background='#fafafa';"
+              ondrop="cImgHandleDrop(event)"
+              onclick="document.getElementById('cImgFileInput').click()"
+              style="border:2px dashed #ccc;border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:#fafafa;transition:all 0.2s;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+              <div id="cImgPreviewWrap" style="display:none;">
+                <img id="cImgPreview" src="" alt="preview" style="max-width:100%;max-height:160px;border-radius:6px;display:block;margin:0 auto 8px;">
+                <div style="display:flex;gap:6px;justify-content:center;">
+                  <span id="cImgPreviewName" style="font-size:11px;color:#555;"></span>
+                  <button type="button" onclick="event.stopPropagation();cImgClear()" style="font-size:11px;color:#e53935;background:none;border:none;cursor:pointer;padding:0;">✕ 移除</button>
+                </div>
+              </div>
+              <div id="cImgPlaceholder">
+                <div style="font-size:28px;margin-bottom:4px;">🖼️</div>
+                <div style="font-size:13px;color:#888;">拖放圖片至此，或點擊選擇</div>
+                <div style="font-size:11px;color:#bbb;margin-top:2px;">JPG / PNG / WEBP，建議寬度 800px 以上</div>
+              </div>
+              <div id="cImgUploadProgress" style="display:none;font-size:12px;color:#228B22;">
+                <i class="fas fa-spinner fa-spin"></i> 上傳中…
+              </div>
+            </div>
+            <input id="cImgFileInput" type="file" accept="image/*" style="display:none;" onchange="cImgHandleFile(this.files[0])">
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;">
+              <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">排序（數字越小越前）</label>
+              <input id="cFormSort" type="number" value="0" min="0" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px;">狀態</label>
+              <select id="cFormStatus" style="width:100%;border:1px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;">
+                <option value="OPEN">顯示 OPEN</option>
+                <option value="HIDDEN">隱藏 HIDDEN</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+            <button onclick="closeContentForm()" style="padding:9px 18px;background:#f5f5f5;border:1px solid #ddd;border-radius:5px;font-size:13px;cursor:pointer;">取消</button>
+            <button onclick="saveContent()" id="cFormSaveBtn" style="padding:9px 18px;background:#228B22;color:#fff;border:0;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;">儲存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 心聲意見 PAGE ── -->
+  <div class="page" id="page-feedback">
+    <div style="max-width:700px;margin:0 auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <h2 style="font-size:16px;font-weight:700;color:#222;margin:0;">💬 心聲意見（會員一對一）</h2>
+        <button class="btn btn-green" onclick="loadAdminFeedback()" style="font-size:13px;padding:7px 14px;">🔄 重新整理</button>
+      </div>
+
+      <!-- Thread list -->
+      <div id="adminFeedbackList" style="display:flex;flex-direction:column;gap:10px;"></div>
+
+      <!-- Thread detail (hidden by default) -->
+      <div id="adminFeedbackDetail" style="display:none;">
+        <button onclick="closeAdminFeedbackDetail()" style="margin-bottom:12px;background:none;border:none;font-size:14px;color:#1565C0;cursor:pointer;">← 返回列表</button>
+        <div id="adminFeedbackInfo" style="background:#f5f5f5;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;"></div>
+        <div id="adminFeedbackMsgs" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
+        <div style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;">
+          <textarea id="adminReplyText" rows="3" style="width:100%;border:1.5px solid #ddd;border-radius:5px;padding:9px 10px;font-size:13px;resize:vertical;" placeholder="輸入回覆內容…"></textarea>
+          <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end;">
+            <button onclick="adminCloseFeedback()" style="padding:9px 14px;background:#fff;border:1.5px solid #888;border-radius:5px;font-size:13px;cursor:pointer;">🔒 標記已關閉</button>
+            <button onclick="adminReplyFeedback()" style="padding:9px 18px;background:#228B22;color:#fff;border:0;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;">📤 發送回覆</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── EDIT MODAL ── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>✏️ 編輯會員資料</h3>
+    <input type="hidden" id="editNo">
+    <div class="modal-grid">
+      <div class="modal-field"><label>中文姓名</label><input id="eNameZh"></div>
+      <div class="modal-field"><label>英文姓名</label><input id="eNameEn"></div>
+      <div class="modal-field"><label>電話</label><input id="ePhone"></div>
+      <div class="modal-field"><label>性別</label>
+        <select id="eGender"><option value="">—</option><option value="M">男 M</option><option value="F">女 F</option><option value="X">其他 X</option></select>
+      </div>
+      <div class="modal-field"><label>出生年份</label><input id="eBirthYear" type="number" placeholder="例：1950" min="1920" max="2010"></div>
+      <div class="modal-field"><label>身份證頭4位</label><input id="eIdPrefix" placeholder="例：K608" maxlength="4" style="text-transform:uppercase;letter-spacing:4px;font-size:16px;font-weight:700;"></div>
+      <div class="modal-field"><label>地區</label><input id="eDistrict"></div>
+      <div class="modal-field"><label>角色</label>
+        <select id="eRole">
+          <option value="CoExplorery">CoExplorery 探索者</option>
+          <option value="CoSupportery">CoSupportery 支持者</option>
+          <option value="CoOwnery">CoOwnery 同行者</option>
+          <option value="CoLeadery">CoLeadery 領航者</option>
+          <option value="CoLinkery">CoLinkery 連結者</option>
+        </select>
+      </div>
+      <div class="modal-field"><label>KYC 狀態</label>
+        <select id="eKyc"><option value="PENDING">PENDING</option><option value="DONE">DONE</option></select>
+      </div>
+      <div class="modal-field"><label>狀態</label>
+        <select id="eStatus"><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select>
+      </div>
+      <div class="modal-field"><label>來源渠道</label>
+        <select id="eSource">
+          <option value="walk-in">Walk-in</option>
+          <option value="roadshow">Roadshow</option>
+          <option value="referral">會員介紹</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="social">社交媒體</option>
+          <option value="institution">機構轉介</option>
+          <option value="online">網上登記</option>
+        </select>
+      </div>
+      <div class="modal-field"><label>介紹人會員編號</label><input id="eReferrer" placeholder="CE85-XXXXXX"></div>
+      <div class="modal-field" id="eParentField" style="display:none;"><label>主卡會員編號（唯讀）</label><input id="eParentNo" readonly style="background:#f5f5f5;color:#888;"></div>
+      <div class="modal-field"><label>有效日期</label><input id="eExpires" type="date"></div>
+      <div class="modal-field"><label>Roadshow 地點</label><input id="eRoadshowLoc"></div>
+      <div class="modal-field full"><label>會員備註（會員可見）</label><textarea id="eNotes"></textarea></div>
+      <div class="modal-field full"><label>內部備註（僅管理員）</label><textarea id="eAdminNotes"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-grey" onclick="closeModal()">取消</button>
+      <button class="btn btn-green" onclick="saveEdit()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/admin.js"></script>
+<script>
+// ── 內容管理 (Contents) ──────────────────────────────────────────────────────
+var _contentsData = [];
+
+function loadContents() {
+  var section = document.getElementById('cFilterSection') ? document.getElementById('cFilterSection').value : '';
+  var url = '/api/admin/contents' + (section ? '?section=' + section : '');
+  document.getElementById('contentsList').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:13px;">載入中…</div>';
+  fetch(url, { credentials: 'include' }).then(function(r){ return r.json(); }).then(function(d) {
+    _contentsData = d.items || [];
+    if (!_contentsData.length) {
+      document.getElementById('contentsList').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:13px;">暫無內容</div>';
+      return;
+    }
+    document.getElementById('contentsList').innerHTML = _contentsData.map(function(item, i) {
+      var sectionLabel = item.section === 'shopping' ? '🛒 購物' : '📢 消息';
+      var statusBadge = item.status === 'OPEN'
+        ? '<span style="background:#e8f5e9;color:#2E7D32;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;">顯示</span>'
+        : '<span style="background:#fafafa;color:#999;border:1px solid #ddd;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;">隱藏</span>';
+      return '<div style="background:#fff;border-radius:8px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            '<span style="font-size:11px;color:#666;">'+sectionLabel+'</span>' +
+            statusBadge +
+            '<span style="font-size:11px;color:#999;">排序:'+item.sort_order+'</span>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px;">' +
+            '<button onclick="openEditContent('+i+')" style="padding:5px 12px;background:#1565C0;color:#fff;border:0;border-radius:4px;font-size:12px;cursor:pointer;">✏️ 編輯</button>' +
+            '<button onclick="toggleContentStatus('+i+')" style="padding:5px 10px;background:#f5f5f5;border:1px solid #ddd;border-radius:4px;font-size:12px;cursor:pointer;">'+(item.status==='OPEN'?'隱藏':'顯示')+'</button>' +
+            '<button onclick="deleteContent('+i+')" style="padding:5px 10px;background:#fff;border:1px solid #e53935;color:#e53935;border-radius:4px;font-size:12px;cursor:pointer;">刪除</button>' +
+          '</div>' +
+        '</div>' +
+        (item.image_url ? '<img src="'+escHtml(item.image_url)+'" alt="" style="width:100%;max-height:140px;object-fit:cover;border-radius:6px;margin-bottom:8px;">' : '') +
+        '<div style="font-size:14px;font-weight:700;color:#222;margin-bottom:4px;">'+escHtml(item.title)+'</div>' +
+        (item.address ? '<div style="font-size:12px;color:#555;margin-bottom:4px;">📍 '+escHtml(item.address)+'</div>' : '') +
+        '<div style="font-size:12px;color:#444;white-space:pre-wrap;line-height:1.6;">'+escHtml(item.body)+'</div>' +
+      '</div>';
+    }).join('');
+  }).catch(function(){ document.getElementById('contentsList').innerHTML = '<div style="text-align:center;padding:40px;color:#e53935;font-size:13px;">載入失敗</div>'; });
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Content form image helpers ────────────────────────────────────────────────
+function cImgClear() {
+  document.getElementById('cFormImageUrl').value = '';
+  document.getElementById('cImgPreviewWrap').style.display = 'none';
+  document.getElementById('cImgPlaceholder').style.display = '';
+  document.getElementById('cImgFileInput').value = '';
+  var dz = document.getElementById('cImgDropZone');
+  dz.style.borderColor = '#ccc';
+  dz.style.background = '#fafafa';
+}
+
+function cImgSetPreview(url, name) {
+  document.getElementById('cFormImageUrl').value = url;
+  document.getElementById('cImgPreview').src = url;
+  document.getElementById('cImgPreviewName').textContent = name || '';
+  document.getElementById('cImgPreviewWrap').style.display = '';
+  document.getElementById('cImgPlaceholder').style.display = 'none';
+  var dz = document.getElementById('cImgDropZone');
+  dz.style.borderColor = '#228B22';
+  dz.style.background = '#f0fff0';
+}
+
+function cImgHandleDrop(e) {
+  e.preventDefault();
+  var dz = document.getElementById('cImgDropZone');
+  dz.style.borderColor = '#ccc'; dz.style.background = '#fafafa';
+  var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (file) cImgHandleFile(file);
+}
+
+function cImgHandleFile(file) {
+  if (!file || !file.type.startsWith('image/')) { alert('請選擇圖片檔案'); return; }
+  var progress = document.getElementById('cImgUploadProgress');
+  var placeholder = document.getElementById('cImgPlaceholder');
+  var previewWrap = document.getElementById('cImgPreviewWrap');
+  progress.style.display = '';
+  placeholder.style.display = 'none';
+  previewWrap.style.display = 'none';
+  fetch('/api/admin/cloudinary-sign', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    credentials: 'include',
+    body: JSON.stringify({ folder: 'app_contents' })
+  }).then(function(r){ return r.json(); }).then(function(sig){
+    if (!sig.ok) { progress.style.display='none'; placeholder.style.display=''; alert('無法取得上傳簽名：'+(sig.error||'未知錯誤')); return; }
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('api_key', sig.api_key);
+    fd.append('timestamp', sig.timestamp);
+    fd.append('signature', sig.signature);
+    fd.append('folder', sig.folder);
+    return fetch('https://api.cloudinary.com/v1_1/'+sig.cloud_name+'/image/upload', {
+      method: 'POST', body: fd
+    }).then(function(r2){ return r2.json(); }).then(function(res){
+      progress.style.display = 'none';
+      if (res.secure_url) {
+        cImgSetPreview(res.secure_url, file.name);
+      } else {
+        placeholder.style.display = '';
+        alert('上傳失敗：'+(res.error&&res.error.message||'未知錯誤'));
+      }
+    });
+  }).catch(function(e){
+    progress.style.display='none'; placeholder.style.display='';
+    alert('上傳錯誤：'+String(e));
+  });
+}
+
+function openAddContent() {
+  document.getElementById('cFormId').value = '';
+  var heading = document.getElementById('cFormHeading'); if (heading) heading.textContent = '＋ 新增內容';
+  document.getElementById('cFormTitleInput').value = '';
+  document.getElementById('cFormBody').value = '';
+  document.getElementById('cFormAddress').value = '';
+  document.getElementById('cFormSort').value = '0';
+  document.getElementById('cFormStatus').value = 'OPEN';
+  cImgClear();
+  var wrap = document.getElementById('contentFormWrap');
+  wrap.style.display = 'flex';
+}
+
+function openEditContent(i) {
+  var item = _contentsData[i];
+  if (!item) return;
+  document.getElementById('cFormId').value = item.id;
+  document.getElementById('cFormSection').value = item.section;
+  var heading = document.getElementById('cFormHeading'); if (heading) heading.textContent = '✏️ 編輯內容';
+  document.getElementById('cFormTitleInput').value = item.title;
+  document.getElementById('cFormBody').value = item.body;
+  document.getElementById('cFormAddress').value = item.address || '';
+  document.getElementById('cFormSort').value = item.sort_order;
+  document.getElementById('cFormStatus').value = item.status;
+  // Restore image if already set
+  if (item.image_url) {
+    cImgSetPreview(item.image_url, '');
+  } else {
+    cImgClear();
+  }
+  document.getElementById('contentFormWrap').style.display = 'flex';
+}
+
+function closeContentForm() {
+  document.getElementById('contentFormWrap').style.display = 'none';
+  cImgClear();
+}
+
+function saveContent() {
+  var id = document.getElementById('cFormId').value;
+  var imageUrl = document.getElementById('cFormImageUrl').value.trim() || null;
+  var payload = {
+    section: document.getElementById('cFormSection').value,
+    title: document.getElementById('cFormTitleInput').value.trim(),
+    body: document.getElementById('cFormBody').value,
+    address: document.getElementById('cFormAddress').value.trim() || null,
+    sort_order: parseInt(document.getElementById('cFormSort').value) || 0,
+    status: document.getElementById('cFormStatus').value,
+    image_url: imageUrl
+  };
+  if (!payload.title) { alert('請填寫標題'); return; }
+  var btn = document.getElementById('cFormSaveBtn');
+  btn.disabled = true; btn.textContent = '儲存中…';
+  var url = id ? '/api/admin/contents/'+id : '/api/admin/contents';
+  var method = id ? 'PUT' : 'POST';
+  fetch(url, { method: method, headers: {'Content-Type':'application/json'}, credentials: 'include', body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      btn.disabled = false; btn.textContent = '儲存';
+      if (d.ok) { closeContentForm(); loadContents(); }
+      else { alert('儲存失敗：'+(d.error||'未知錯誤')); }
+    }).catch(function(e){ btn.disabled=false; btn.textContent='儲存'; alert('網絡錯誤: '+String(e)); });
+}
+
+function toggleContentStatus(i) {
+  var item = _contentsData[i];
+  if (!item) return;
+  var newStatus = item.status === 'OPEN' ? 'HIDDEN' : 'OPEN';
+  fetch('/api/admin/contents/'+item.id, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials: 'include', body:JSON.stringify({status:newStatus}) })
+    .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) loadContents(); });
+}
+
+function deleteContent(i) {
+  var item = _contentsData[i];
+  if (!item) return;
+  if (!confirm('確認刪除「'+item.title+'」？')) return;
+  fetch('/api/admin/contents/'+item.id, { method:'DELETE', credentials: 'include' })
+    .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) loadContents(); });
+}
+
+// ── 心聲管理 (Admin Feedback) ─────────────────────────────────────────────────
+var _adminFeedbackThreads = [];
+var _adminCurrentThreadId = null;
+
+function loadAdminFeedback() {
+  document.getElementById('adminFeedbackList').innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;font-size:13px;">載入中…</div>';
+  document.getElementById('adminFeedbackDetail').style.display = 'none';
+  document.getElementById('adminFeedbackList').style.display = 'flex';
+  document.getElementById('adminFeedbackList').style.flexDirection = 'column';
+  fetch('/api/admin/feedback', { credentials: 'include' }).then(function(r){ return r.json(); }).then(function(d) {
+    _adminFeedbackThreads = d.threads || [];
+    if (!_adminFeedbackThreads.length) {
+      document.getElementById('adminFeedbackList').innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;font-size:13px;">暫無意見</div>';
+      var nav = document.getElementById('navFeedback');
+      if (nav) nav.textContent = '💬 心聲意見';
+      return;
+    }
+    var unread = _adminFeedbackThreads.filter(function(t){ return t.status === 'new'; }).length;
+    var nav = document.getElementById('navFeedback');
+    if (nav) nav.textContent = unread > 0 ? '💬 心聲意見 (' + unread + ')' : '💬 心聲意見';
+    document.getElementById('adminFeedbackList').innerHTML = _adminFeedbackThreads.map(function(t, i) {
+      var statusColor = t.status === 'new' ? '#e53935' : t.status === 'replied' ? '#1565C0' : '#888';
+      var statusLabel = t.status === 'new' ? '🆕 新' : t.status === 'replied' ? '✅ 已回覆' : '🔒 已關閉';
+      var dt = t.updated_at ? t.updated_at.slice(0,16).replace('T',' ') : '';
+      return '<div onclick="openAdminFeedbackThread(' + i + ')" style="background:#fff;border-radius:8px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);cursor:pointer;border-left:4px solid ' + statusColor + ';">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">' +
+          '<div style="font-size:14px;font-weight:700;color:#222;">' + escHtml(t.subject) + '</div>' +
+          '<span style="font-size:11px;font-weight:700;color:' + statusColor + ';">' + statusLabel + '</span>' +
+        '</div>' +
+        '<div style="font-size:12px;color:#666;margin-top:4px;">' + escHtml(t.member_no) + ' ' + escHtml(t.member_name) + '</div>' +
+        '<div style="font-size:11px;color:#aaa;margin-top:4px;">' + dt + '</div>' +
+      '</div>';
+    }).join('');
+  }).catch(function(){ document.getElementById('adminFeedbackList').innerHTML = '<div style="color:#e53935;padding:20px;font-size:13px;">載入失敗</div>'; });
+}
+
+function openAdminFeedbackThread(i) {
+  var t = _adminFeedbackThreads[i];
+  if (!t) return;
+  _adminCurrentThreadId = t.id;
+  document.getElementById('adminFeedbackList').style.display = 'none';
+  document.getElementById('adminFeedbackDetail').style.display = 'block';
+  document.getElementById('adminFeedbackInfo').innerHTML =
+    '<strong>主題：</strong>' + escHtml(t.subject) + '<br>' +
+    '<strong>會員：</strong>' + escHtml(t.member_no) + ' ' + escHtml(t.member_name) + '<br>' +
+    '<strong>狀態：</strong>' + t.status;
+  document.getElementById('adminFeedbackMsgs').innerHTML = '<div style="color:#aaa;font-size:13px;">載入中…</div>';
+  fetch('/api/admin/feedback/' + t.id, { credentials: 'include' }).then(function(r){ return r.json(); }).then(function(d) {
+    if (!d.ok) { document.getElementById('adminFeedbackMsgs').innerHTML = '<div style="color:#e53935;">載入失敗</div>'; return; }
+    document.getElementById('adminFeedbackMsgs').innerHTML = (d.messages || []).map(function(msg) {
+      var isAdmin = msg.sender === 'admin';
+      var dt = msg.created_at ? msg.created_at.slice(0,16).replace('T',' ') : '';
+      return '<div style="display:flex;flex-direction:column;align-items:' + (isAdmin ? 'flex-end' : 'flex-start') + ';gap:2px;">' +
+        '<div style="max-width:85%;background:' + (isAdmin ? '#e3f2fd' : '#f5f5f5') + ';border-radius:10px;padding:10px 14px;">' +
+          '<div style="font-size:11px;font-weight:700;color:' + (isAdmin ? '#1565C0' : '#555') + ';margin-bottom:4px;">' + (isAdmin ? '🔧 管理員' : '👤 會員') + ' ' + dt + '</div>' +
+          '<div style="font-size:13px;color:#222;white-space:pre-wrap;">' + escHtml(msg.content) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  });
+}
+
+function closeAdminFeedbackDetail() {
+  document.getElementById('adminFeedbackDetail').style.display = 'none';
+  document.getElementById('adminFeedbackList').style.display = 'flex';
+  document.getElementById('adminFeedbackList').style.flexDirection = 'column';
+  document.getElementById('adminReplyText').value = '';
+  _adminCurrentThreadId = null;
+  loadAdminFeedback();
+}
+
+function adminReplyFeedback() {
+  if (!_adminCurrentThreadId) return;
+  var content = document.getElementById('adminReplyText').value.trim();
+  if (!content) { alert('請輸入回覆內容'); return; }
+  fetch('/api/admin/feedback/' + _adminCurrentThreadId + '/reply', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'include', body: JSON.stringify({content: content})
+  }).then(function(r){ return r.json(); }).then(function(d) {
+    if (d.ok) {
+      document.getElementById('adminReplyText').value = '';
+      var idx = _adminFeedbackThreads.findIndex(function(t){ return t.id === _adminCurrentThreadId; });
+      openAdminFeedbackThread(idx);
+    } else { alert('回覆失敗：' + (d.error || '')); }
+  });
+}
+
+function adminCloseFeedback() {
+  if (!_adminCurrentThreadId) return;
+  if (!confirm('確認將此對話標記為已關閉？')) return;
+  fetch('/api/admin/feedback/' + _adminCurrentThreadId + '/status', {
+    method: 'PATCH', headers: {'Content-Type':'application/json'}, credentials: 'include', body: JSON.stringify({status: 'closed'})
+  }).then(function(r){ return r.json(); }).then(function(d) {
+    if (d.ok) closeAdminFeedbackDetail();
+  });
+}
+
+// ── switchTab hook for contents & feedback ───────────────────────────────────
+var _origAdminSwitch = switchTab;
+switchTab = function(name, el) {
+  _origAdminSwitch(name, el);
+  if (name === 'contents') loadContents();
+  if (name === 'feedback') loadAdminFeedback();
+};
+</script>
+</body></html>`
+}
