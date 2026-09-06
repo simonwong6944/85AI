@@ -3372,3 +3372,1341 @@ function ceLogout() {
 </script>
 </body></html>`
 }
+
+export function colinkerypwaHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CoLinkery">
+<meta name="theme-color" content="#1B5E20">
+<title>CoLinkery 連結者</title>
+<link rel="manifest" href="/colinkery-manifest.json">
+<link rel="apple-touch-icon" href="/static/cl-icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{--green:#1B5E20;--green2:#228B22;--green3:#2E7D32;--pale:#E8F5E9;--red:#C62828;--warm:#FAF8F3;--text:#1A1A1A;--muted:#6B7280;--border:#E5E7EB;--chip:#F0FDF4;--chip-border:#BBF7D0;}
+html,body{height:100%;background:var(--warm);font-family:'Noto Sans TC',sans-serif;color:var(--text);font-size:18px;line-height:1.6;overscroll-behavior:none;}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+/* Nav */
+.cl-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--green);color:#fff;position:sticky;top:0;z-index:100;min-height:56px;}
+.cl-nav-title{font-size:18px;font-weight:700;}
+.cl-nav-back{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;padding:4px 8px;min-width:44px;min-height:44px;display:flex;align-items:center;}
+/* Page containers */
+.page{display:none;flex-direction:column;flex:1;padding-bottom:80px;}
+.page.active{display:flex;}
+/* Bottom nav */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:flex;z-index:99;padding-bottom:env(safe-area-inset-bottom);}
+.bottom-nav button{flex:1;border:none;background:none;padding:8px 4px;font-size:11px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:56px;font-family:inherit;}
+.bottom-nav button.active{color:var(--green);}
+.bottom-nav button .icon{font-size:22px;}
+/* Cards */
+.cl-card{background:#fff;border-radius:16px;padding:20px;margin:12px 16px;box-shadow:0 2px 12px rgba(0,0,0,.08);}
+/* Buttons */
+.btn-primary{display:block;width:100%;min-height:56px;background:var(--green);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;padding:0 20px;line-height:1.4;}
+.btn-primary:active{opacity:.85;}
+.btn-secondary{display:block;width:100%;min-height:56px;background:#fff;color:var(--green);border:2px solid var(--green);border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;padding:0 20px;line-height:1.4;}
+.btn-outline{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;background:#fff;cursor:pointer;font-family:inherit;gap:6px;}
+/* Form */
+.form-group{margin-bottom:18px;}
+.form-label{display:block;font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.form-input{width:100%;min-height:52px;border:2px solid var(--border);border-radius:12px;padding:12px 16px;font-size:18px;font-family:inherit;background:#fff;color:var(--text);transition:border .2s;outline:none;}
+.form-input:focus{border-color:var(--green);}
+.form-hint{font-size:14px;color:var(--muted);margin-top:4px;}
+select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='%236B7280' viewBox='0 0 20 20'%3E%3Cpath d='M5 7l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+/* Alert */
+.alert{padding:14px 16px;border-radius:12px;font-size:16px;margin:0 16px 12px;}
+.alert-red{background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;}
+.alert-green{background:var(--pale);border:1px solid #86EFAC;color:var(--green);}
+.alert-yellow{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;}
+/* Stats */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px 16px;}
+.stat-card{background:#fff;border-radius:14px;padding:14px 10px;text-align:center;box-shadow:0 1px 8px rgba(0,0,0,.06);}
+.stat-num{font-size:26px;font-weight:900;color:var(--green);}
+.stat-lbl{font-size:13px;color:var(--muted);margin-top:2px;}
+/* Card chip */
+.card-chip{background:var(--chip);border:1px solid var(--chip-border);border-radius:10px;padding:12px 14px;margin:0 16px 10px;}
+/* Loading */
+.spinner{display:inline-block;width:36px;height:36px;border:4px solid #E5E7EB;border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px;font-size:16px;color:var(--muted);}
+/* Camera */
+.camera-wrap{position:relative;width:100%;border-radius:12px;overflow:hidden;background:#111;touch-action:none;}
+#camera-preview{width:100%;max-height:62vh;object-fit:cover;display:block;cursor:pointer;}
+#camera-canvas{display:none;}
+#camera-focus-ring{
+  position:absolute;width:72px;height:72px;
+  border:3px solid #fff;border-radius:50%;
+  box-shadow:0 0 0 1px rgba(0,0,0,.5);
+  pointer-events:none;display:none;
+  transform:translate(-50%,-50%);
+  transition:opacity .3s;
+}
+#camera-tap-hint{
+  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.55);color:#fff;border-radius:20px;
+  padding:6px 16px;font-size:13px;pointer-events:none;
+  white-space:nowrap;
+}
+/* Onboarding overlay */
+.onboard-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center;}
+.onboard-box{background:#fff;border-radius:20px;padding:28px 20px;margin:20px;max-width:400px;width:100%;text-align:center;}
+.onboard-icon{font-size:56px;margin-bottom:12px;}
+.onboard-title{font-size:20px;font-weight:700;color:var(--green);margin-bottom:10px;}
+.onboard-desc{font-size:16px;color:var(--muted);line-height:1.6;margin-bottom:20px;}
+/* Share link box */
+.share-box{background:var(--pale);border-radius:12px;padding:14px;font-size:15px;color:var(--green3);word-break:break-all;border:1px solid #A7F3D0;margin-bottom:14px;}
+/* Commission item */
+.comm-item{padding:14px 0;border-bottom:1px solid var(--border);}
+.comm-item:last-child{border-bottom:none;}
+/* Responsive tweaks */
+@media(min-width:480px){
+  .page{max-width:480px;margin:0 auto;}
+  .bottom-nav{max-width:480px;left:50%;transform:translateX(-50%);}
+}
+/* Onboard step dots */
+.step-dots{display:flex;gap:6px;justify-content:center;margin-top:16px;}
+.step-dot{width:8px;height:8px;border-radius:50%;background:#E5E7EB;}
+.step-dot.active{background:var(--green);}
+/* Role badge */
+.role-badge{display:inline-block;background:var(--green);color:#fff;font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;}
+/* Industry tag */
+.ind-tag{display:inline-block;background:#F3F4F6;border-radius:8px;padding:3px 10px;font-size:14px;color:var(--muted);margin:2px;}
+/* PWA install banner */
+.pwa-banner{background:var(--green3);color:#fff;padding:12px 16px;font-size:15px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.pwa-banner button{background:#fff;color:var(--green);border:none;border-radius:8px;padding:6px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Loading overlay -->
+  <div class="loading-overlay" id="loading-overlay" style="display:none">
+    <div class="spinner"></div>
+    <span id="loading-text">載入中…</span>
+  </div>
+
+  <!-- Onboarding overlay -->
+  <div class="onboard-overlay" id="onboard-overlay" style="display:none">
+    <div class="onboard-box">
+      <div class="onboard-icon" id="ob-icon">👋</div>
+      <div class="onboard-title" id="ob-title">歡迎加入 CoLinkery！</div>
+      <div class="onboard-desc" id="ob-desc">你係老有聯盟 85 的連結者，用你的人脈連結企業採購，讓長者社群受惠。</div>
+      <button class="btn-primary" id="ob-next-btn" onclick="onboardNext()">繼續</button>
+      <div class="step-dots" id="ob-dots"></div>
+    </div>
+  </div>
+
+  <!-- PWA install banner (Android) -->
+  <div class="pwa-banner" id="pwa-banner" style="display:none">
+    <span>💡 加至主畫面，下次更快開啟</span>
+    <button onclick="triggerInstall()">加入</button>
+  </div>
+
+  <!-- ① 登入頁 -->
+  <div class="page active" id="page-login">
+    <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:16px 20px 32px;color:#fff;text-align:center;">
+      <div style="text-align:left;margin-bottom:12px;">
+        <a href="/app" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:20px;padding:6px 14px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;">
+          ← 老有卡 App
+        </a>
+      </div>
+      <div style="font-size:48px;margin-bottom:8px;">🤝</div>
+      <div style="font-size:24px;font-weight:900;">CoLinkery</div>
+      <div style="font-size:16px;opacity:.85;margin-top:4px;">老有聯盟 85 · 連結者工具</div>
+    </div>
+    <div style="padding:24px 16px;">
+      <div class="form-group">
+        <label class="form-label">電話號碼</label>
+        <input type="tel" class="form-input" id="login-phone" placeholder="例：52345678" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">密碼</label>
+        <input type="password" class="form-input" id="login-pw" placeholder="請輸入密碼" autocomplete="current-password">
+      </div>
+      <div id="login-err" class="alert alert-red" style="display:none;margin:0 0 14px;"></div>
+      <button class="btn-primary" onclick="doLogin()" style="margin-bottom:14px;">登入</button>
+      <button class="btn-secondary" onclick="window.location.href='/app/partner-apply?role=COLINKERY'" style="margin-bottom:14px;">申請成為 CoLinkery 連結者</button>
+      <button class="btn-outline" style="width:100%;margin-bottom:14px;" onclick="showPage('page-forgot')">忘記密碼？</button>
+      <p style="text-align:center;font-size:14px;color:var(--muted);">申請後 3-5 工作天審核，批准後可登入</p>
+    </div>
+  </div>
+
+  <!-- ② 申請頁 (展示后由 showPage 觸發 redirect，不在此處直接執行) -->
+  <div class="page" id="page-apply">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-login')">←</button>
+      <div class="cl-nav-title">申請成為 CoLinkery</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:32px 16px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:16px;">🤝</div>
+      <div style="font-size:17px;font-weight:700;color:var(--green);margin-bottom:8px;">正在跳轉至申請頁面…</div>
+      <div style="font-size:14px;color:var(--muted);margin-bottom:24px;">如未自動跳轉，請點擊下方按鈕</div>
+      <button class="btn-primary" onclick="window.location.href='/app/partner-apply?role=COLINKERY'">前往申請表格</button>
+    </div>
+  </div>
+
+  <!-- ③ 申請狀態頁（未登入時查閱）-->
+  <div class="page" id="page-status-check">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-login')">←</button>
+      <div class="cl-nav-title">申請狀態</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:16px;">
+      <div class="form-group">
+        <label class="form-label">電話號碼</label>
+        <input type="tel" class="form-input" id="status-phone" placeholder="請輸入電話查詢申請狀態">
+      </div>
+      <button class="btn-primary" onclick="checkStatus()">查詢</button>
+      <div id="status-result" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- ④ 忘記密碼 -->
+  <div class="page" id="page-forgot">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-login')">←</button>
+      <div class="cl-nav-title">重設密碼</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:16px;">
+      <div id="forgot-step1" >
+        <div class="cl-card" style="margin:0 0 16px;">
+          <p style="font-size:16px;color:var(--muted);line-height:1.6;">輸入你的電話號碼，職員會以 WhatsApp 發送 6 位重設碼給你（約 15 分鐘內）。</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">電話號碼</label>
+          <input type="tel" class="form-input" id="forgot-phone" placeholder="例：52345678">
+        </div>
+        <div id="forgot-err" class="alert alert-red" style="display:none;"></div>
+        <button class="btn-primary" onclick="doForgotStep1()">申請重設碼</button>
+      </div>
+      <div id="forgot-step2" style="display:none;">
+        <div class="alert alert-green" style="margin:0 0 16px;">✅ 重設碼申請已收到！職員將以 WhatsApp 發送 6 位數字給你，請稍候（約 15 分鐘內）。</div>
+        <div class="form-group">
+          <label class="form-label">6 位重設碼</label>
+          <input type="text" class="form-input" id="forgot-otp" placeholder="輸入 WhatsApp 收到的重設碼" maxlength="6" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label class="form-label">新密碼</label>
+          <input type="password" class="form-input" id="forgot-newpw" placeholder="最少 8 位">
+        </div>
+        <div class="form-group">
+          <label class="form-label">確認新密碼</label>
+          <input type="password" class="form-input" id="forgot-newpw2" placeholder="再輸入一次">
+        </div>
+        <div id="forgot-err2" class="alert alert-red" style="display:none;"></div>
+        <button class="btn-primary" onclick="doForgotStep2()">確認重設密碼</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ Dashboard -->
+  <div class="page" id="page-dashboard">
+    <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:16px 16px 20px;color:#fff;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <a href="/app" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border:none;border-radius:20px;padding:6px 14px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;-webkit-tap-highlight-color:transparent;">
+          ← 老有卡 App
+        </a>
+        <div style="font-size:13px;opacity:.7;">CoLinkery</div>
+      </div>
+      <div style="font-size:15px;opacity:.8;">歡迎回來</div>
+      <div style="font-size:22px;font-weight:900;margin:4px 0;" id="dash-name">—</div>
+      <div class="role-badge" style="margin-top:6px;">🤝 CoLinkery 連結者</div>
+    </div>
+    <div id="dash-stats" class="stat-row" style="margin-top:16px;">
+      <div class="stat-card"><div class="stat-num" id="stat-leads">-</div><div class="stat-lbl">名片引薦</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-won">-</div><div class="stat-lbl">促成交易</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-comm">-</div><div class="stat-lbl">固定佣金(元)</div></div>
+    </div>
+    <div style="padding:0 16px 16px;">
+      <button class="btn-primary" onclick="showPage('page-camera')" style="font-size:20px;min-height:64px;margin-bottom:12px;">📷 影名片開始</button>
+      <button class="btn-secondary" onclick="showPage('page-cards')" style="margin-bottom:10px;">📋 名片庫</button>
+      <button class="btn-secondary" onclick="showPage('page-share')" style="margin-bottom:10px;">🔗 分享我的引薦連結</button>
+    </div>
+    <!-- PWA install prompt (shown after login if not already installed) -->
+    <div id="pwa-install-card" style="display:none;margin:0 16px 16px;">
+      <div style="background:linear-gradient(135deg,#1a6b1a,#2d9e2d);border-radius:14px;padding:18px 16px;color:#fff;position:relative;">
+        <button onclick="document.getElementById('pwa-install-card').style.display='none';localStorage.setItem('cl_pwa_dismissed','1');"
+          style="position:absolute;top:10px;right:12px;background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;">✕</button>
+        <div style="font-size:22px;margin-bottom:8px;">📲 安裝 CoLinkery App</div>
+        <div style="font-size:15px;opacity:.9;margin-bottom:14px;line-height:1.5;">安裝後可離線使用，並從主畫面直接開啟，體驗更流暢！</div>
+        <!-- Android install button (shown when beforeinstallprompt fires) -->
+        <button id="pwa-install-android-btn" onclick="triggerInstall()" style="display:none;width:100%;background:#fff;color:#1a6b1a;border:none;border-radius:10px;padding:14px;font-size:17px;font-weight:900;cursor:pointer;margin-bottom:8px;">
+          ⬇️ 立即安裝到主畫面
+        </button>
+        <!-- iOS Safari instructions -->
+        <div id="pwa-install-ios" style="display:none;background:rgba(255,255,255,.15);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:8px;">iPhone / iPad 步驟：</div>
+          <div style="font-size:14px;line-height:1.8;">
+            1️⃣ 點擊 Safari 底部 <strong>分享</strong> 按鈕 <span style="font-size:18px;">⬆️</span><br>
+            2️⃣ 向下滾動，選「<strong>加入主畫面</strong>」<br>
+            3️⃣ 點「<strong>新增</strong>」完成
+          </div>
+        </div>
+        <!-- Fallback for other browsers -->
+        <div id="pwa-install-other" style="display:none;font-size:14px;opacity:.85;line-height:1.6;">
+          在瀏覽器選單中選擇「<strong>加至主畫面</strong>」或「<strong>安裝應用程式</strong>」即可。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑥ 影名片 / OCR -->
+  <div class="page" id="page-camera">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-dashboard')">←</button>
+      <div class="cl-nav-title">📷 影名片</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:16px;overflow-y:auto;">
+      <div id="camera-area">
+        <div class="camera-wrap" id="camera-wrap" onclick="onCameraTap(event)">
+          <video id="camera-preview" autoplay playsinline muted></video>
+          <canvas id="camera-canvas"></canvas>
+          <div id="camera-focus-ring"></div>
+          <div id="camera-tap-hint">👆 點擊對焦並自動拍攝</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:12px;">
+          <button class="btn-primary" onclick="capturePhoto()" style="flex:1;">📸 立即拍攝</button>
+          <label class="btn-secondary" style="flex:1;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:56px;font-size:18px;font-weight:700;">
+            🖼 選相片<input type="file" accept="image/*" id="file-input" style="display:none;" onchange="handleFileSelect(event)">
+          </label>
+        </div>
+        <p style="font-size:13px;color:var(--muted);text-align:center;margin-top:8px;">📌 名片橫放效果最佳 · 確保文字清晰不反光</p>
+      </div>
+      <div id="ocr-loading" style="display:none;text-align:center;padding:30px 0;">
+        <div class="spinner" style="margin:0 auto 12px;"></div>
+        <div style="font-size:16px;color:var(--muted);">AI 讀取名片資料中…</div>
+      </div>
+      <div id="card-form" style="display:none;">
+        <div class="alert alert-green" id="ocr-ok-msg" style="display:none;">✅ AI 已自動讀取，請確認資料</div>
+        <div class="alert alert-yellow" id="ocr-fail-msg" style="display:none;">⚠️ AI 未能讀取，請手動填入名片資料</div>
+        <div id="ocr-debug-msg" style="display:none;font-size:12px;color:#999;padding:4px 0;word-break:break-all;"></div>
+        <div class="cl-card" style="margin:0 0 12px;">
+          <img id="captured-preview" style="width:100%;border-radius:8px;margin-bottom:12px;max-height:200px;object-fit:contain;" src="" alt="名片預覽">
+        </div>
+        <!-- === 姓名 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:4px 0 8px;padding-top:4px;border-top:1px solid #eee;">👤 姓名</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">中文姓名</label><input type="text" class="form-input" id="cf-name-zh" placeholder="例：陳大文"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">英文姓名</label><input type="text" class="form-input" id="cf-name-en" placeholder="e.g. David Chan"></div>
+        </div>
+        <!-- === 公司 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">🏢 公司 <span style="color:var(--red)">*</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">公司（中文）</label><input type="text" class="form-input" id="cf-company-zh" placeholder="例：大中華有限公司"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Company (EN)</label><input type="text" class="form-input" id="cf-company-en" placeholder="e.g. Greater China Ltd"></div>
+        </div>
+        <!-- === 部門 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">🗂 部門</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">部門（中文）</label><input type="text" class="form-input" id="cf-dept-zh" placeholder="例：市場部"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Department (EN)</label><input type="text" class="form-input" id="cf-dept-en" placeholder="e.g. Marketing Dept"></div>
+        </div>
+        <!-- === 職銜 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">💼 職銜</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">職銜（中文）</label><input type="text" class="form-input" id="cf-title-zh" placeholder="例：總經理"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Title (EN)</label><input type="text" class="form-input" id="cf-title-en" placeholder="e.g. General Manager"></div>
+        </div>
+        <!-- === 聯絡方式 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">📞 聯絡方式</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">公司電話</label><input type="tel" class="form-input" id="cf-phone" placeholder="例：+852 2345 6789"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">手機</label><input type="tel" class="form-input" id="cf-mobile" placeholder="例：+852 9123 4567"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">傳真 Fax</label><input type="tel" class="form-input" id="cf-fax" placeholder="例：+852 2345 6780"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">WhatsApp</label><input type="tel" class="form-input" id="cf-whatsapp" placeholder="例：+852 9123 4567"></div>
+        </div>
+        <div class="form-group"><label class="form-label">電郵 Email</label><input type="email" class="form-input" id="cf-email" placeholder="例：info@company.com"></div>
+        <div class="form-group"><label class="form-label">網站 Website</label><input type="url" class="form-input" id="cf-website" placeholder="例：www.company.com"></div>
+        <!-- === 社交媒體 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">📱 社交媒體</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">WeChat 微信</label><input type="text" class="form-input" id="cf-wechat" placeholder="WeChat ID"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">LinkedIn</label><input type="text" class="form-input" id="cf-linkedin" placeholder="linkedin.com/in/..."></div>
+          <div class="form-group" style="margin:0 0 0;grid-column:1/-1;"><label class="form-label">Telegram</label><input type="text" class="form-input" id="cf-telegram" placeholder="@username"></div>
+        </div>
+        <!-- === 地址 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">📍 地址</div>
+        <div class="form-group"><label class="form-label">地址（中文）</label><input type="text" class="form-input" id="cf-address-zh" placeholder="例：香港九龍旺角彌敦道XXX號"></div>
+        <div class="form-group"><label class="form-label">Address (EN)</label><input type="text" class="form-input" id="cf-address-en" placeholder="e.g. XXX Nathan Rd, Mong Kok, Kowloon, HK"></div>
+        <!-- === 行業 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">🏭 行業</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;"><label class="form-label">行業（中文）</label><input type="text" class="form-input" id="cf-industry-zh" placeholder="例：零售、飲食、製造"></div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Industry (EN)</label><input type="text" class="form-input" id="cf-industry-en" placeholder="e.g. Retail, F&B, Mfg"></div>
+        </div>
+        <!-- === 備註 === -->
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-top:4px;border-top:1px solid #eee;">📝 備註</div>
+        <div class="form-group"><label class="form-label">備註 Notes</label><textarea class="form-input" id="cf-notes" placeholder="任何補充備註…" rows="3" style="resize:vertical;"></textarea></div>
+        <div id="card-save-err" class="alert alert-red" style="display:none;"></div>
+        <button class="btn-primary" onclick="saveCardAndHandover()">確認 → 交棒給 CoEldery 85</button>
+        <button class="btn-outline" onclick="saveCardOnly()" style="width:100%;margin-top:10px;">只儲存名片</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑦ 名片庫 -->
+  <div class="page" id="page-cards">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-dashboard')">←</button>
+      <div class="cl-nav-title">📋 名片庫</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:12px 16px;">
+      <input type="text" class="form-input" id="cards-search" placeholder="🔍 搜尋姓名、公司、電話…" oninput="searchCards()" style="margin-bottom:12px;">
+    </div>
+    <div id="cards-list" style="padding:0 16px;"></div>
+    <div id="card-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto;">
+      <div style="background:#fff;margin:20px 12px;border-radius:16px;padding:20px;padding-bottom:28px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="font-size:18px;font-weight:700;" id="detail-title">名片詳情</h3>
+          <button class="btn-outline" onclick="closeCardDetail()" style="min-height:36px;padding:0 12px;font-size:14px;">關閉</button>
+        </div>
+        <div id="detail-body"></div>
+        <!-- WA action buttons -->
+        <div id="detail-wa-btns" style="display:none;gap:8px;margin-top:14px;">
+          <button id="detail-wa-link-btn" style="flex:1;background:#25D366;color:#fff;border:none;border-radius:10px;padding:12px 8px;font-size:14px;font-weight:700;cursor:pointer;">💬+🔗 發目錄 + WA</button>
+          <button id="detail-wa-only-btn" style="flex:1;background:#128C7E;color:#fff;border:none;border-radius:10px;padding:12px 8px;font-size:14px;font-weight:700;cursor:pointer;">💬 只發 WA 訊息</button>
+        </div>
+        <button class="btn-primary" id="detail-handover-btn" onclick="handoverFromDetail()" style="margin-top:10px;">🤝 請 CoEldery 85 安排對接</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑧ 交棒完成頁 -->
+  <div class="page" id="page-handover">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-dashboard')">←</button>
+      <div class="cl-nav-title">🤝 交棒成功</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:20px 16px;text-align:center;">
+      <div style="font-size:64px;margin-bottom:16px;">🎉</div>
+      <div style="font-size:20px;font-weight:700;color:var(--green);margin-bottom:8px;">交棒成功！</div>
+      <div style="font-size:16px;color:var(--muted);margin-bottom:20px;" id="handover-buyer">系統已為買家生成專屬目錄連結</div>
+      <div class="share-box" id="handover-url" style="text-align:left;"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn-primary" onclick="copyHandoverUrl()">📋 複製連結</button>
+        <button class="btn-primary" onclick="waHandoverUrl()" style="background:#25D366;">💬 WhatsApp 發給買家</button>
+        <button class="btn-outline" onclick="emailHandoverUrl()" style="width:100%;">📧 Email 發給買家</button>
+      </div>
+      <div class="alert alert-green" style="margin:16px 0 0;text-align:left;">
+        ✅ 接下來由 CoEldery 85 系統跟進：<br>
+        • 買家在目錄揀選有興趣產品<br>
+        • 系統自動生成報價單並發給買家<br>
+        • 成交後固定佣金計回你的帳戶
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑨ 分享引薦連結 -->
+  <div class="page" id="page-share">
+    <div class="cl-nav">
+      <button class="cl-nav-back" onclick="showPage('page-dashboard')">←</button>
+      <div class="cl-nav-title">🔗 分享引薦連結</div>
+      <div style="width:44px"></div>
+    </div>
+    <div style="padding:16px;">
+      <div class="cl-card" style="margin:0 0 16px;">
+        <p style="font-size:16px;color:var(--text);margin-bottom:10px;">將以下連結分享給有意了解 CoEldery 85 企業採購平台的聯絡人：</p>
+        <div class="share-box" id="share-link-box"></div>
+        <div style="font-size:14px;color:var(--muted);margin-bottom:12px;">連結帶有你的引薦 ID，方便系統追蹤。</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button class="btn-primary" onclick="copyShareLink()">📋 複製連結</button>
+          <button class="btn-primary" onclick="waShareLink()" style="background:#25D366;">💬 WhatsApp 分享</button>
+          <button class="btn-outline" onclick="emailShareLink()" style="width:100%;">📧 Email 分享</button>
+        </div>
+      </div>
+      <div class="cl-card" style="margin:0;background:var(--pale);">
+        <p style="font-size:15px;font-weight:600;color:var(--green);margin-bottom:6px;">📋 預載分享文案</p>
+        <div id="share-text-preview" style="font-size:14px;color:var(--text);line-height:1.6;white-space:pre-wrap;background:#fff;border-radius:8px;padding:12px;"></div>
+        <button class="btn-outline" onclick="copyShareText()" style="width:100%;margin-top:10px;">📋 複製文案</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑩ 成績 -->
+  <div class="page" id="page-results">
+    <div class="cl-nav">
+      <div style="width:44px"></div>
+      <div class="cl-nav-title">📊 我的成績</div>
+      <div style="width:44px"></div>
+    </div>
+    <div id="results-content" style="padding:16px;"></div>
+  </div>
+
+  <!-- Bottom Nav（登入後顯示）-->
+  <nav class="bottom-nav" id="bottom-nav" style="display:none;">
+    <button onclick="showPage('page-dashboard')" id="nav-home" class="active"><span class="icon">🏠</span>主頁</button>
+    <button onclick="showPage('page-camera')" id="nav-camera"><span class="icon">📷</span>影名片</button>
+    <button onclick="showPage('page-cards')" id="nav-cards"><span class="icon">📋</span>名片庫</button>
+    <button onclick="showPage('page-results')" id="nav-results"><span class="icon">📊</span>成績</button>
+  </nav>
+</div>
+
+<script>
+// ── 狀態 ──────────────────────────────────────────────────────────────────────
+var STATE = {
+  memberNo: null, nameZh: null,
+  currentCard: null,       // 剛拍攝/選取的名片圖片 R2 key
+  lastHandoverUrl: null, lastHandoverBuyer: null,
+  cameraStream: null,
+  focusTimer: null,        // tap-to-focus auto-capture timer
+  allCards: [],
+  deferredPrompt: null
+};
+
+// ── 工具 ──────────────────────────────────────────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showLoading(txt){ document.getElementById('loading-overlay').style.display='flex'; document.getElementById('loading-text').textContent=txt||'載入中…'; }
+function hideLoading(){ document.getElementById('loading-overlay').style.display='none'; }
+function goApply(){ window.location.href='/app/partner-apply?role=COLINKERY'; }
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  var el = document.getElementById(id);
+  if(el) el.classList.add('active');
+  // Update bottom nav active state
+  var navMap = {
+    'page-dashboard':'nav-home','page-camera':'nav-camera',
+    'page-cards':'nav-cards','page-results':'nav-results'
+  };
+  document.querySelectorAll('.bottom-nav button').forEach(function(b){ b.classList.remove('active'); });
+  var navId = navMap[id];
+  if(navId){ var nb = document.getElementById(navId); if(nb) nb.classList.add('active'); }
+  // Stop camera if leaving camera page
+  if(id !== 'page-camera') stopCamera();
+  // Auto-init pages
+  if(id==='page-camera') resetAndInitCamera();
+  if(id==='page-cards') loadCards();
+  if(id==='page-results') loadResults();
+  if(id==='page-share') initSharePage();
+  if(id==='page-dashboard') loadStats();
+  if(id==='page-apply') { window.location.href='/app/partner-apply?role=COLINKERY'; return; }
+  window.scrollTo(0,0);
+}
+
+function showAlert(id, msg, type){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = msg;
+  el.className = 'alert alert-'+(type||'red');
+  el.style.display = 'block';
+}
+function hideAlert(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
+
+// ── 初始化：檢查登入狀態 ────────────────────────────────────────────────────
+(function init(){
+  // 1. Try localStorage persistent session (survives tab close & PWA restart)
+  var saved = localStorage.getItem('cl_member');
+  // 2. Fallback: legacy sessionStorage (old sessions before this update)
+  if(!saved) saved = sessionStorage.getItem('cl_member');
+  if(saved){
+    try{
+      var d = JSON.parse(saved);
+      STATE.memberNo = d.member_no;
+      STATE.nameZh = d.name_zh;
+      // Migrate to localStorage if still in sessionStorage
+      localStorage.setItem('cl_member', JSON.stringify(d));
+      sessionStorage.removeItem('cl_member');
+      afterLogin();
+    } catch(e){
+      localStorage.removeItem('cl_member');
+      sessionStorage.removeItem('cl_member');
+    }
+  } else {
+    // 從會員卡跳過來：?action=apply&phone=xxxxxxxx → 直接跳轉新申請頁
+    var params = new URLSearchParams(window.location.search);
+    var action = params.get('action');
+    var prefillPhone = params.get('phone') || '';
+    if(action === 'apply'){
+      var applyUrl = '/app/partner-apply?role=COLINKERY';
+      if(prefillPhone) applyUrl += '&phone=' + encodeURIComponent(prefillPhone);
+      window.location.href = applyUrl;
+    } else {
+      // Pre-fill phone: URL param takes priority, then saved phone
+      var savedPhone = localStorage.getItem('cl_saved_phone') || '';
+      var loginPhoneEl = document.getElementById('login-phone');
+      if(prefillPhone){
+        if(loginPhoneEl) loginPhoneEl.value = prefillPhone;
+      } else if(savedPhone && loginPhoneEl){
+        loginPhoneEl.value = savedPhone;
+      }
+      if(prefillPhone || savedPhone){
+        var loginPwEl = document.getElementById('login-pw');
+        if(loginPwEl) loginPwEl.focus();
+      }
+    }
+  }
+  // Register service worker
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/colinkery-sw.js').catch(function(){});
+  }
+  // PWA install prompt (Android)
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    STATE.deferredPrompt = e;
+    // If user already logged in and card is waiting for prompt, show it now
+    if(STATE.showInstallCardWhenReady){
+      STATE.showInstallCardWhenReady = false;
+      var card = document.getElementById('pwa-install-card');
+      if(card && !localStorage.getItem('cl_pwa_dismissed')){
+        document.getElementById('pwa-install-android-btn').style.display = 'block';
+        card.style.display = 'block';
+      }
+    }
+  });
+})();
+
+function triggerInstall(){
+  if(STATE.deferredPrompt){
+    STATE.deferredPrompt.prompt();
+    STATE.deferredPrompt.userChoice.then(function(r){
+      STATE.deferredPrompt = null;
+      // Hide install card after user responds
+      var card = document.getElementById('pwa-install-card');
+      if(card) card.style.display = 'none';
+      if(r.outcome === 'accepted'){
+        localStorage.setItem('cl_pwa_dismissed','1');
+      }
+    });
+  }
+}
+
+// ── 登出 ──────────────────────────────────────────────────────────────────────
+async function doClLogout(){
+  if(!confirm('確認登出？')) return;
+  // Clear local state
+  localStorage.removeItem('cl_member');
+  sessionStorage.removeItem('cl_member');
+  STATE.memberNo = null;
+  STATE.nameZh = null;
+  // Call server to invalidate cookie
+  try{ await fetch('/api/colinkery/logout',{method:'POST',credentials:'include'}); } catch(e){}
+  // Reset UI
+  document.getElementById('bottom-nav').style.display = 'none';
+  showPage('page-login');
+  // Keep phone pre-filled for convenience
+  var savedPhone = localStorage.getItem('cl_saved_phone') || '';
+  if(savedPhone){
+    var el = document.getElementById('login-phone');
+    if(el) el.value = savedPhone;
+    var pwEl = document.getElementById('login-pw');
+    if(pwEl){ pwEl.value=''; pwEl.focus(); }
+  }
+}
+
+// ── 登入 ──────────────────────────────────────────────────────────────────────
+async function doLogin(){
+  var phone = document.getElementById('login-phone').value.trim();
+  var pw = document.getElementById('login-pw').value;
+  if(!phone||!pw){ showAlert('login-err','請填寫電話及密碼'); return; }
+  hideAlert('login-err');
+  showLoading('登入中…');
+  try{
+    var res = await fetch('/api/colinkery/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:phone,password:pw})});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('login-err', d.error||'登入失敗'); return; }
+    STATE.memberNo = d.member_no;
+    STATE.nameZh = d.name_zh;
+    // Persist session in localStorage (survives tab close & PWA restart)
+    localStorage.setItem('cl_member', JSON.stringify({member_no:d.member_no,name_zh:d.name_zh}));
+    // Remember phone for next login
+    localStorage.setItem('cl_saved_phone', phone);
+    afterLogin();
+  } catch(e){ hideLoading(); showAlert('login-err','網絡錯誤，請稍後再試'); }
+}
+
+function afterLogin(){
+  document.getElementById('dash-name').textContent = STATE.nameZh || STATE.memberNo;
+  document.getElementById('bottom-nav').style.display = 'flex';
+  showPage('page-dashboard');
+  // Check if first-time onboarding
+  if(!localStorage.getItem('cl_onboarded_'+STATE.memberNo)){
+    startOnboarding();
+  }
+  // PWA install prompt — show after login if not dismissed and not already installed
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if(!localStorage.getItem('cl_pwa_dismissed') && !isStandalone){
+    setTimeout(function(){
+      var card = document.getElementById('pwa-install-card');
+      if(!card) return;
+      var ua = navigator.userAgent;
+      var isIos = /iphone|ipad|ipod/i.test(ua);
+      var isAndroid = /android/i.test(ua);
+      // Reset sub-sections
+      document.getElementById('pwa-install-ios').style.display = 'none';
+      document.getElementById('pwa-install-android-btn').style.display = 'none';
+      document.getElementById('pwa-install-other').style.display = 'none';
+      if(isIos){
+        document.getElementById('pwa-install-ios').style.display = 'block';
+      } else if(isAndroid && STATE.deferredPrompt){
+        document.getElementById('pwa-install-android-btn').style.display = 'block';
+      } else if(isAndroid){
+        // Android but beforeinstallprompt not yet fired — mark flag so it shows when prompt fires
+        STATE.showInstallCardWhenReady = true;
+        return; // wait for beforeinstallprompt
+      } else {
+        document.getElementById('pwa-install-other').style.display = 'block';
+      }
+      card.style.display = 'block';
+    }, 2000);
+  }
+}
+
+// ── Onboarding ────────────────────────────────────────────────────────────────
+var OB_STEPS = [
+  {icon:'👋',title:'歡迎加入 CoLinkery！',desc:'你係老有聯盟 85 的連結者，用你的人脈連結企業採購，讓長者社群受惠。'},
+  {icon:'📷',title:'第一步：影名片',desc:'遇到企業採購決策人？立即影低佢的名片，AI 自動讀取聯絡資料。'},
+  {icon:'🤝',title:'第二步：交棒',desc:'一撳「交棒」，系統為買家生成專屬報價目錄連結，由你轉發給對方。'},
+  {icon:'🎉',title:'第三步：系統跟進',desc:'其後嘅報價、跟單、物流全由 CoEldery 85 處理。成交後固定佣金直接計入你的帳戶。'},
+  {icon:'📱',title:'加至主畫面',desc:'點擊「加至主畫面」，下次開啟更方便，使用體驗更像 App！'}
+];
+var obStep = 0;
+function startOnboarding(){
+  obStep = 0;
+  renderOnboardStep();
+  document.getElementById('onboard-overlay').style.display='flex';
+}
+function renderOnboardStep(){
+  var s = OB_STEPS[obStep];
+  document.getElementById('ob-icon').textContent = s.icon;
+  document.getElementById('ob-title').textContent = s.title;
+  document.getElementById('ob-desc').textContent = s.desc;
+  document.getElementById('ob-next-btn').textContent = obStep < OB_STEPS.length-1 ? '繼續' : '開始影名片！';
+  var dots = document.getElementById('ob-dots');
+  dots.innerHTML = OB_STEPS.map(function(_,i){ return '<div class="step-dot'+(i===obStep?' active':'')+'"></div>'; }).join('');
+}
+function onboardNext(){
+  obStep++;
+  if(obStep >= OB_STEPS.length){
+    document.getElementById('onboard-overlay').style.display='none';
+    localStorage.setItem('cl_onboarded_'+STATE.memberNo,'1');
+    showPage('page-camera');
+    return;
+  }
+  renderOnboardStep();
+}
+
+// ── 申請 ──────────────────────────────────────────────────────────────────────
+async function doApply(){
+  var phone = document.getElementById('apply-phone').value.trim();
+  var name = document.getElementById('apply-name').value.trim();
+  var type = document.getElementById('apply-type').value;
+  var bank = document.getElementById('apply-bank').value.trim();
+  var docFile = document.getElementById('apply-doc').files[0];
+  var pw = document.getElementById('apply-pw').value;
+  var pw2 = document.getElementById('apply-pw2').value;
+  var agree = document.getElementById('apply-agree').checked;
+  hideAlert('apply-err'); hideAlert('apply-ok');
+  if(!phone||!name||!type||!pw){ showAlert('apply-err','請填寫所有必填欄位'); return; }
+  if(pw !== pw2){ showAlert('apply-err','兩次密碼不一致'); return; }
+  if(pw.length < 8){ showAlert('apply-err','密碼最少 8 位'); return; }
+  if(!agree){ showAlert('apply-err','請同意合作條款'); return; }
+  if((type==='COMPANY'||type==='ASSOCIATION') && !docFile){ showAlert('apply-err','公司/協會身份需要上傳登記文件'); return; }
+  showLoading('提交申請中…');
+  try{
+    var fd = new FormData();
+    fd.append('phone',phone); fd.append('name_zh',name); fd.append('applicant_type',type);
+    fd.append('bank_info',bank); fd.append('password',pw); fd.append('agree_terms','on');
+    if(docFile) fd.append('doc_file',docFile);
+    var res = await fetch('/api/colinkery/apply',{method:'POST',body:fd});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('apply-err',d.error||'申請失敗'); return; }
+    showAlert('apply-ok', d.message || '申請已提交！審核約需 3-5 個工作天。', 'green');
+    // Clear form
+    document.getElementById('apply-phone').value=''; document.getElementById('apply-name').value='';
+    document.getElementById('apply-pw').value=''; document.getElementById('apply-pw2').value='';
+  } catch(e){ hideLoading(); showAlert('apply-err','網絡錯誤，請稍後再試'); }
+}
+
+// ── 狀態查詢 ──────────────────────────────────────────────────────────────────
+async function checkStatus(){
+  var phone = document.getElementById('status-phone').value.trim();
+  if(!phone) return;
+  showLoading('查詢中…');
+  try{
+    var res = await fetch('/api/colinkery/my-status?phone='+encodeURIComponent(phone));
+    var d = await res.json();
+    hideLoading();
+    var html = '';
+    if(!d.ok){ html='<div class="alert alert-red">'+esc(d.error)+'</div>'; }
+    else {
+      var stMap={'none':'未申請','password_pending':'審核中（3-5 工作天）','active':'已啟用','suspended':'已暫停'};
+      html = '<div class="cl-card"><div style="font-size:16px;font-weight:700;margin-bottom:8px;">'+esc(d.name_zh)+'</div>';
+      html += '<div>帳戶狀態：<strong>'+(stMap[d.colinkery_account_status]||d.colinkery_account_status)+'</strong></div>';
+      if(d.application){
+        html += '<div style="margin-top:8px;font-size:14px;color:var(--muted);">申請身份：'+esc(d.application.applicant_type)+'</div>';
+        if(d.application.status==='REJECTED'&&d.application.review_notes){
+          html += '<div class="alert alert-red" style="margin-top:8px;">拒絕原因：'+esc(d.application.review_notes)+'</div>';
+          html += '<button class="btn-secondary" onclick="goApply()" style="margin-top:8px;">重新申請</button>';
+        }
+      }
+      html += '</div>';
+    }
+    document.getElementById('status-result').innerHTML = html;
+  } catch(e){ hideLoading(); document.getElementById('status-result').innerHTML='<div class="alert alert-red">網絡錯誤</div>'; }
+}
+
+// ── 忘記密碼 ──────────────────────────────────────────────────────────────────
+var forgotPhone = '';
+async function doForgotStep1(){
+  forgotPhone = document.getElementById('forgot-phone').value.trim();
+  if(!forgotPhone){ showAlert('forgot-err','請輸入電話'); return; }
+  hideAlert('forgot-err');
+  showLoading('申請重設碼…');
+  try{
+    var res = await fetch('/api/colinkery/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:forgotPhone})});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('forgot-err',d.error||'申請失敗'); return; }
+    document.getElementById('forgot-step1').style.display='none';
+    document.getElementById('forgot-step2').style.display='block';
+  } catch(e){ hideLoading(); showAlert('forgot-err','網絡錯誤'); }
+}
+async function doForgotStep2(){
+  var otp = document.getElementById('forgot-otp').value.trim();
+  var pw = document.getElementById('forgot-newpw').value;
+  var pw2 = document.getElementById('forgot-newpw2').value;
+  hideAlert('forgot-err2');
+  if(!otp||!pw){ showAlert('forgot-err2','請填寫所有欄位'); return; }
+  if(pw!==pw2){ showAlert('forgot-err2','兩次密碼不一致'); return; }
+  if(pw.length<8){ showAlert('forgot-err2','密碼最少 8 位'); return; }
+  showLoading('重設密碼中…');
+  try{
+    var res = await fetch('/api/colinkery/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:forgotPhone,otp_code:otp,new_password:pw})});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('forgot-err2',d.error||'重設失敗'); return; }
+    alert('✅ 密碼已更新！請用新密碼登入。');
+    showPage('page-login');
+  } catch(e){ hideLoading(); showAlert('forgot-err2','網絡錯誤'); }
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+async function loadStats(){
+  if(!STATE.memberNo) return;
+  try{
+    var res = await fetch('/api/colinkery/stats', { credentials: 'include' });
+    var d = await res.json();
+    if(d.ok){
+      document.getElementById('stat-leads').textContent = d.total_leads;
+      document.getElementById('stat-won').textContent = d.won_count;
+      var comm = Math.round((d.paid_cents + d.accrued_cents)/100);
+      document.getElementById('stat-comm').textContent = comm.toLocaleString();
+    }
+  } catch(e){}
+}
+
+// ── Camera ────────────────────────────────────────────────────────────────────
+// Reset camera page UI and (re)start camera stream
+function resetAndInitCamera(){
+  // Always show camera-area, hide card-form and ocr-loading
+  var camArea = document.getElementById('camera-area');
+  if(camArea) camArea.style.display='';
+  var cardForm = document.getElementById('card-form');
+  if(cardForm) cardForm.style.display='none';
+  var ocrLoad = document.getElementById('ocr-loading');
+  if(ocrLoad) ocrLoad.style.display='none';
+  // Show hint again
+  var hint = document.getElementById('camera-tap-hint');
+  if(hint){ hint.style.display='block'; hint.style.opacity='1'; }
+  // Restart stream if needed
+  if(!STATE.cameraStream) initCamera();
+}
+
+async function initCamera(){
+  if(STATE.cameraStream) return;
+  try{
+    // Request rear camera, high res for OCR
+    var stream = await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1920}, height:{ideal:1080},
+        focusMode:{ideal:'continuous'}
+      }
+    });
+    STATE.cameraStream = stream;
+    var video = document.getElementById('camera-preview');
+    video.srcObject = stream;
+    video.play();
+    // Show hint briefly then fade
+    var hint = document.getElementById('camera-tap-hint');
+    if(hint){ setTimeout(function(){ hint.style.opacity='0'; setTimeout(function(){ hint.style.display='none'; },600); }, 3000); }
+  } catch(e){
+    // Camera not available — show file picker only
+    document.getElementById('camera-area').innerHTML =
+      '<p style="color:var(--muted);text-align:center;padding:20px;">相機不可用，請選擇相片</p>' +
+      '<label class="btn-primary" style="display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:56px;">🖼 選擇名片相片' +
+      '<input type="file" accept="image/*" id="file-input" style="display:none;" onchange="handleFileSelect(event)"></label>';
+  }
+}
+function stopCamera(){
+  if(STATE.cameraStream){
+    STATE.cameraStream.getTracks().forEach(function(t){ t.stop(); });
+    STATE.cameraStream = null;
+  }
+  // Clear any pending auto-capture timer
+  if(STATE.focusTimer){ clearTimeout(STATE.focusTimer); STATE.focusTimer = null; }
+}
+
+// Tap-to-focus: show focus ring, attempt hardware focus, then auto-capture after 0.8s
+function onCameraTap(e){
+  var wrap = document.getElementById('camera-wrap');
+  var ring = document.getElementById('camera-focus-ring');
+  var video = document.getElementById('camera-preview');
+  if(!wrap||!ring||!video||!STATE.cameraStream) return;
+
+  var rect = wrap.getBoundingClientRect();
+  var x = (e.clientX||e.touches&&e.touches[0].clientX||rect.width/2) - rect.left;
+  var y = (e.clientY||e.touches&&e.touches[0].clientY||rect.height/2) - rect.top;
+
+  // Show focus ring at tap position
+  ring.style.left = x+'px';
+  ring.style.top  = y+'px';
+  ring.style.display='block';
+  ring.style.opacity='1';
+  ring.style.transform='translate(-50%,-50%) scale(1.3)';
+  setTimeout(function(){ ring.style.transform='translate(-50%,-50%) scale(1)'; },150);
+
+  // Try hardware focus via constraint
+  try{
+    var track = STATE.cameraStream.getVideoTracks()[0];
+    var relX = x/rect.width;
+    var relY = y/rect.height;
+    track.applyConstraints({advanced:[{pointsOfInterest:[{x:relX,y:relY}],focusMode:'manual'}]}).catch(function(){
+      // Not supported on this device — silent fail, still auto-capture
+    });
+  } catch(_){}
+
+  // Cancel previous timer, set new auto-capture after 0.8s
+  if(STATE.focusTimer) clearTimeout(STATE.focusTimer);
+  STATE.focusTimer = setTimeout(function(){
+    // Fade out ring before capture
+    ring.style.opacity='0';
+    setTimeout(function(){ ring.style.display='none'; },300);
+    capturePhoto();
+  }, 800);
+}
+
+// Resize image to max 900px before sending to OCR (reduces timeout risk significantly)
+function resizeAndProcess(blob, name){
+  var MAX = 900;
+  var img = new Image();
+  var url = URL.createObjectURL(blob);
+  img.onload = function(){
+    URL.revokeObjectURL(url);
+    var w = img.naturalWidth, h = img.naturalHeight;
+    if(w <= MAX && h <= MAX){
+      // Already small enough
+      processImageBlob(blob, name, 'image/jpeg');
+      return;
+    }
+    var scale = Math.min(MAX/w, MAX/h);
+    var rw = Math.round(w*scale), rh = Math.round(h*scale);
+    var c = document.createElement('canvas');
+    c.width = rw; c.height = rh;
+    c.getContext('2d').drawImage(img, 0, 0, rw, rh);
+    c.toBlob(function(resized){
+      processImageBlob(resized, name, 'image/jpeg');
+    }, 'image/jpeg', 0.88);
+  };
+  img.onerror = function(){ URL.revokeObjectURL(url); processImageBlob(blob, name, 'image/jpeg'); };
+  img.src = url;
+}
+function capturePhoto(){
+  var video = document.getElementById('camera-preview');
+  var canvas = document.getElementById('camera-canvas');
+  if(!video.videoWidth) return; // not ready
+  var MAX = 900;
+  var w = video.videoWidth, h = video.videoHeight;
+  var scale = (w > MAX || h > MAX) ? Math.min(MAX/w, MAX/h) : 1;
+  canvas.width = Math.round(w*scale);
+  canvas.height = Math.round(h*scale);
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob(function(blob){ processImageBlob(blob, 'photo.jpg', 'image/jpeg'); }, 'image/jpeg', 0.88);
+}
+function handleFileSelect(e){
+  var file = e.target.files[0];
+  if(!file) return;
+  resizeAndProcess(file, 'card.jpg');
+}
+async function processImageBlob(blob, name, type){
+  document.getElementById('ocr-loading').style.display='block';
+  document.getElementById('card-form').style.display='none';
+  document.getElementById('camera-area').style.display='none';
+  hideAlert('ocr-ok-msg'); hideAlert('ocr-fail-msg');
+
+  // Show preview
+  var url = URL.createObjectURL(blob);
+  document.getElementById('captured-preview').src = url;
+
+  var fd = new FormData();
+  fd.append('image', blob, name);
+  var r2Key = '';
+  var parsed = {};
+  try{
+    var res = await fetch('/api/colinkery/cards/ocr',{method:'POST',body:fd,credentials:'include'});
+    var d = await res.json();
+    if(d.ok){
+      r2Key = d.r2_key || '';
+      parsed = d.parsed || {};
+      if(!d.ocr_failed && Object.keys(parsed).length > 0){
+        document.getElementById('ocr-ok-msg').style.display='block';
+      } else {
+        document.getElementById('ocr-fail-msg').style.display='block';
+        // Show debug info if available (helps diagnose API issues)
+        if(d.debug && d.debug.length){
+          var dbgEl = document.getElementById('ocr-debug-msg');
+          if(dbgEl){ dbgEl.textContent = d.debug.join(' | '); dbgEl.style.display='block'; }
+        }
+      }
+    } else {
+      document.getElementById('ocr-fail-msg').style.display='block';
+    }
+  } catch(e){ document.getElementById('ocr-fail-msg').style.display='block'; }
+
+  STATE.currentCard = {r2_key: r2Key, blob: blob};
+  // Fill form — support both new bilingual fields and legacy single-lang fallbacks
+  var s = function(id, val){ var el = document.getElementById(id); if(el) el.value = val || ''; };
+  s('cf-name-zh', parsed.name_zh);
+  s('cf-name-en', parsed.name_en);
+  s('cf-company-zh', parsed.company_zh || parsed.company);
+  s('cf-company-en', parsed.company_en || parsed.company);
+  s('cf-dept-zh', parsed.department_zh);
+  s('cf-dept-en', parsed.department_en);
+  s('cf-title-zh', parsed.title_zh || parsed.title);
+  s('cf-title-en', parsed.title_en || parsed.title);
+  s('cf-phone', parsed.phone);
+  s('cf-mobile', parsed.mobile);
+  s('cf-fax', parsed.fax);
+  s('cf-whatsapp', parsed.whatsapp);
+  s('cf-email', parsed.email);
+  s('cf-website', parsed.website);
+  s('cf-wechat', parsed.wechat);
+  s('cf-linkedin', parsed.linkedin);
+  s('cf-telegram', parsed.telegram);
+  s('cf-address-zh', parsed.address_zh || parsed.address);
+  s('cf-address-en', parsed.address_en || parsed.address);
+  s('cf-industry-zh', parsed.industry_zh || parsed.industry);
+  s('cf-industry-en', parsed.industry_en || parsed.industry);
+  s('cf-notes', '');
+
+  document.getElementById('ocr-loading').style.display='none';
+  document.getElementById('card-form').style.display='block';
+}
+function getCardFormData(){
+  var g = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  var czh = g('cf-company-zh'), cen = g('cf-company-en');
+  var tzh = g('cf-title-zh'), ten = g('cf-title-en');
+  var azh = g('cf-address-zh'), aen = g('cf-address-en');
+  var izh = g('cf-industry-zh'), ien = g('cf-industry-en');
+  return {
+    image_r2_key: STATE.currentCard ? STATE.currentCard.r2_key : '',
+    name_zh: g('cf-name-zh'),
+    name_en: g('cf-name-en'),
+    company_zh: czh, company_en: cen,
+    company: czh || cen,
+    department_zh: g('cf-dept-zh'), department_en: g('cf-dept-en'),
+    title_zh: tzh, title_en: ten,
+    title: tzh || ten,
+    phone: g('cf-phone'), mobile: g('cf-mobile'), fax: g('cf-fax'),
+    whatsapp: g('cf-whatsapp'), email: g('cf-email'), website: g('cf-website'),
+    wechat: g('cf-wechat'), linkedin: g('cf-linkedin'), telegram: g('cf-telegram'),
+    address_zh: azh, address_en: aen,
+    address: azh || aen,
+    industry_zh: izh, industry_en: ien,
+    industry: izh || ien,
+    notes: g('cf-notes')
+  };
+}
+async function saveCardOnly(){
+  var data = getCardFormData();
+  if(!data.company_zh && !data.company_en){ showAlert('card-save-err','請填寫公司名稱（中文或英文）'); return; }
+  showLoading('儲存名片中…');
+  try{
+    var res = await fetch('/api/colinkery/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'include'});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ showAlert('card-save-err',d.error||'儲存失敗'); return; }
+    alert('✅ 名片已儲存！');
+    showPage('page-dashboard');
+  } catch(e){ hideLoading(); showAlert('card-save-err','網絡錯誤'); }
+}
+async function saveCardAndHandover(){
+  var data = getCardFormData();
+  if(!data.company_zh && !data.company_en){ showAlert('card-save-err','請填寫公司名稱（中文或英文）'); return; }
+  showLoading('儲存並交棒中…');
+  try{
+    // 先存名片
+    var r1 = await fetch('/api/colinkery/cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'include'});
+    var d1 = await r1.json();
+    if(!d1.ok){ hideLoading(); showAlert('card-save-err',d1.error||'儲存失敗'); return; }
+    // 交棒
+    var r2 = await fetch('/api/colinkery/handover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:d1.card_id}),credentials:'include'});
+    var d2 = await r2.json();
+    hideLoading();
+    if(!d2.ok){ showAlert('card-save-err',d2.error||'交棒失敗'); return; }
+    STATE.lastHandoverUrl = d2.catalog_url;
+    STATE.lastHandoverBuyer = d2.buyer_name ? d2.buyer_name + (d2.buyer_company ? '（'+d2.buyer_company+'）' : '') : d2.buyer_company;
+    document.getElementById('handover-buyer').textContent = '買家：' + (STATE.lastHandoverBuyer||'—');
+    document.getElementById('handover-url').textContent = d2.catalog_url;
+    showPage('page-handover');
+  } catch(e){ hideLoading(); showAlert('card-save-err','網絡錯誤'); }
+}
+
+// ── 名片庫 ────────────────────────────────────────────────────────────────────
+async function loadCards(){
+  var q = (document.getElementById('cards-search')||{}).value || '';
+  showLoading('載入名片庫…');
+  try{
+    var url = '/api/colinkery/cards' + (q ? '?q='+encodeURIComponent(q) : '');
+    var res = await fetch(url, { credentials: 'include' });
+    var d = await res.json();
+    hideLoading();
+    STATE.allCards = d.cards || [];
+    renderCards(STATE.allCards);
+  } catch(e){ hideLoading(); }
+}
+function searchCards(){
+  var q = document.getElementById('cards-search').value.toLowerCase();
+  var filtered = STATE.allCards.filter(function(c){
+    return (c.name_zh||'').toLowerCase().includes(q) || (c.name_en||'').toLowerCase().includes(q) ||
+           (c.company_zh||'').toLowerCase().includes(q) || (c.company_en||'').toLowerCase().includes(q) ||
+           (c.company||'').toLowerCase().includes(q) || (c.phone||'').includes(q) ||
+           (c.mobile||'').includes(q) || (c.whatsapp||'').includes(q) ||
+           (c.email||'').toLowerCase().includes(q);
+  });
+  renderCards(filtered);
+}
+function renderCards(cards){
+  var list = document.getElementById('cards-list');
+  if(!cards||!cards.length){ list.innerHTML='<div style="text-align:center;padding:40px 0;color:var(--muted);">暫無名片，影名片開始！</div>'; return; }
+  list.innerHTML = cards.map(function(c){
+    var companyZh = c.company_zh || c.company || '';
+    var companyEn = c.company_en || (c.company_zh ? '' : c.company) || '';
+    var nameZh = c.name_zh || '';
+    var nameEn = c.name_en || '';
+    var titleLine = c.title_zh || c.title_en || c.title || '';
+    // Contact for WA buttons
+    var waNum = c.whatsapp || c.mobile || c.phone || '';
+    var displayName = nameZh || nameEn || companyZh || companyEn || '—';
+    return '<div class="card-chip" style="padding:14px 16px;margin-bottom:10px;border-radius:14px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08);border:1px solid #f0f0f0;">' +
+      // Top: company names
+      '<div style="font-size:15px;font-weight:800;color:#1B5E20;margin-bottom:2px;">' +
+        (companyZh ? esc(companyZh) : '') +
+        (companyZh && companyEn ? '<span style="color:#ccc;margin:0 5px;">|</span>' : '') +
+        (companyEn ? '<span style="font-size:14px;font-weight:700;color:#2E7D32;">'+esc(companyEn)+'</span>' : '') +
+      '</div>' +
+      // Name row
+      '<div style="font-size:16px;font-weight:700;color:#111;margin:4px 0 2px;">' +
+        (nameZh ? esc(nameZh) : '') +
+        (nameZh && nameEn ? '<span style="color:#ccc;margin:0 6px;">·</span>' : '') +
+        (nameEn ? '<span style="font-size:15px;">'+esc(nameEn)+'</span>' : '') +
+        (!nameZh && !nameEn ? '<span style="color:var(--muted);">—</span>' : '') +
+      '</div>' +
+      // Title row
+      (titleLine ? '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">'+esc(titleLine)+'</div>' : '<div style="margin-bottom:8px;"></div>') +
+      // Action buttons row — use data-* to avoid inline quote escaping issues
+      '<div style="display:flex;gap:8px;">' +
+        (waNum ?
+          '<button class="wa-link-btn" data-wa="'+esc(waNum)+'" data-name="'+esc(displayName)+'" style="flex:1;background:#25D366;color:#fff;border:none;border-radius:10px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer;">💬+🔗 發目錄</button>' +
+          '<button class="wa-only-btn" data-wa="'+esc(waNum)+'" style="flex:1;background:#128C7E;color:#fff;border:none;border-radius:10px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer;">💬 WA 訊息</button>' +
+          '<button class="card-detail-btn" data-cid="'+esc(c.card_id)+'" style="flex:0 0 44px;background:#f5f5f5;color:#444;border:none;border-radius:10px;padding:10px 6px;font-size:18px;cursor:pointer;">⋯</button>'
+        :
+          '<button class="card-detail-btn" data-cid="'+esc(c.card_id)+'" style="flex:1;background:#f5f5f5;color:#444;border:none;border-radius:10px;padding:10px 6px;font-size:14px;font-weight:700;cursor:pointer;">詳情 ⋯</button>'
+        ) +
+      '</div>' +
+    '</div>';
+  }).join('');
+  // Event delegation — replace onclick handler each render
+  var list2 = document.getElementById('cards-list');
+  list2.onclick = function(ev){
+    var t = ev.target;
+    if(!t) return;
+    if(t.classList.contains('wa-link-btn')){ ev.stopPropagation(); waSendWithLink(t.dataset.wa, t.dataset.name||''); }
+    else if(t.classList.contains('wa-only-btn')){ ev.stopPropagation(); waSendOnly(t.dataset.wa); }
+    else if(t.classList.contains('card-detail-btn')){ openCardDetail(t.dataset.cid); }
+  };
+}
+
+// WA Button 1: Send catalog link + greeting message
+function waSendWithLink(waNum, displayName){
+  var memberNo = STATE.memberNo || '';
+  var catalogUrl = 'https://coeldery85.com/b2b?ref=' + encodeURIComponent(memberNo);
+  var msg = '你好' + (displayName ? ' ' + displayName : '') + '！\\n\\n我係老有聯盟 85 的連結者，呢個係 CoEldery 85 為你準備的企業採購目錄，裡面有竹漿環保紙巾等優質產品：\\n\\n' + catalogUrl + '\\n\\n如有興趣，歡迎點擊了解更多，或直接聯絡我！';
+  var phone = waNum.replace(/[^0-9+]/g,'');
+  if(!phone.startsWith('+')) phone = '+852' + phone;
+  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var url = isIos ? 'whatsapp://send?phone='+encodeURIComponent(phone)+'&text='+encodeURIComponent(msg) : 'https://wa.me/'+phone.replace('+','')+'?text='+encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
+// WA Button 2: Send WA message only (no link)
+function waSendOnly(waNum){
+  var memberNo = STATE.memberNo || '';
+  var nameZh = STATE.nameZh || '';
+  var msg = '你好！我係老有聯盟 85 的連結者' + (nameZh ? ' ' + nameZh : '') + '，想了解一下貴公司的採購需求，有唔有方便嘅時間傾下？\uD83D\uDE0A';
+  var phone = waNum.replace(/[^0-9+]/g,'');
+  if(!phone.startsWith('+')) phone = '+852' + phone;
+  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var url = isIos ? 'whatsapp://send?phone='+encodeURIComponent(phone)+'&text='+encodeURIComponent(msg) : 'https://wa.me/'+phone.replace('+','')+'?text='+encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
+function openCardDetail(cardId){
+  var card = STATE.allCards.find(function(c){ return c.card_id===cardId; });
+  if(!card) return;
+  var rows = [];
+  var addRow = function(label, val){ if(val && val.trim()) rows.push('<div style="margin-bottom:10px;"><div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">'+label+'</div><div style="font-size:15px;font-weight:600;color:#111;">'+esc(val)+'</div></div>'); };
+  var addPair = function(labelZh, valZh, labelEn, valEn){
+    if(valZh||valEn){
+      rows.push('<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">' +
+        (valZh ? '<div><div style="font-size:12px;font-weight:700;color:var(--muted);">'+labelZh+'</div><div style="font-size:15px;font-weight:600;">'+esc(valZh)+'</div></div>' : '<div></div>') +
+        (valEn ? '<div><div style="font-size:12px;font-weight:700;color:var(--muted);">'+labelEn+'</div><div style="font-size:15px;font-weight:600;">'+esc(valEn)+'</div></div>' : '<div></div>') +
+        '</div>');
+    }
+  };
+  var sep = function(label){ rows.push('<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:8px 0 4px;border-top:1px solid #eee;margin-top:4px;">'+label+'</div>'); };
+
+  sep('👤 姓名');
+  addPair('中文姓名', card.name_zh, 'EN Name', card.name_en);
+  sep('🏢 公司');
+  addPair('公司（中）', card.company_zh||card.company, 'Company (EN)', card.company_en||(card.company_zh?'':card.company) );
+  sep('🗂 部門 / 職銜');
+  addPair('部門（中）', card.department_zh, 'Department (EN)', card.department_en);
+  addPair('職銜（中）', card.title_zh||card.title, 'Title (EN)', card.title_en||(card.title_zh?'':card.title));
+  sep('📞 聯絡方式');
+  addRow('公司電話', card.phone);
+  addRow('手機', card.mobile);
+  addRow('傳真 Fax', card.fax);
+  addRow('WhatsApp', card.whatsapp);
+  addRow('電郵 Email', card.email);
+  addRow('網站 Website', card.website);
+  sep('📱 社交媒體');
+  addRow('WeChat 微信', card.wechat);
+  addRow('LinkedIn', card.linkedin);
+  addRow('Telegram', card.telegram);
+  sep('📍 地址');
+  addRow('地址（中文）', card.address_zh||(!card.address_en ? card.address : ''));
+  addRow('Address (EN)', card.address_en||(!card.address_zh ? card.address : ''));
+  sep('🏭 行業');
+  addPair('行業（中）', card.industry_zh||card.industry, 'Industry (EN)', card.industry_en||(card.industry_zh?'':card.industry));
+  if(card.notes){ sep('📝 備註'); addRow('Notes', card.notes); }
+
+  var displayName = card.name_zh || card.name_en || '';
+  document.getElementById('detail-title').textContent = displayName || (card.company_zh||card.company||'名片詳情');
+  document.getElementById('detail-body').innerHTML = rows.join('');
+
+  // WA buttons in modal
+  var waNum = card.whatsapp || card.mobile || card.phone || '';
+  var waBtns = document.getElementById('detail-wa-btns');
+  if(waBtns){
+    if(waNum){
+      waBtns.style.display='flex';
+      var btn1 = document.getElementById('detail-wa-link-btn');
+      var btn2 = document.getElementById('detail-wa-only-btn');
+      if(btn1) btn1.onclick = function(){ waSendWithLink(waNum, displayName); };
+      if(btn2) btn2.onclick = function(){ waSendOnly(waNum); };
+    } else {
+      waBtns.style.display='none';
+    }
+  }
+  document.getElementById('detail-handover-btn').dataset.cardId = cardId;
+  document.getElementById('card-detail-modal').style.display = 'block';
+}
+function closeCardDetail(){ document.getElementById('card-detail-modal').style.display='none'; }
+async function handoverFromDetail(){
+  var cardId = document.getElementById('detail-handover-btn').dataset.cardId;
+  closeCardDetail();
+  showLoading('交棒中…');
+  try{
+    var res = await fetch('/api/colinkery/handover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_id:cardId}),credentials:'include'});
+    var d = await res.json();
+    hideLoading();
+    if(!d.ok){ alert(d.error||'交棒失敗'); return; }
+    STATE.lastHandoverUrl = d.catalog_url;
+    STATE.lastHandoverBuyer = d.buyer_name ? d.buyer_name + (d.buyer_company?' ('+d.buyer_company+')':'') : d.buyer_company;
+    document.getElementById('handover-buyer').textContent = '買家：' + (STATE.lastHandoverBuyer||'—');
+    document.getElementById('handover-url').textContent = d.catalog_url;
+    showPage('page-handover');
+  } catch(e){ hideLoading(); alert('網絡錯誤'); }
+}
+
+// ── 交棒完成 ──────────────────────────────────────────────────────────────────
+function copyHandoverUrl(){ if(STATE.lastHandoverUrl){ navigator.clipboard.writeText(STATE.lastHandoverUrl).then(function(){ alert('✅ 連結已複製'); }).catch(function(){ prompt('複製連結：',STATE.lastHandoverUrl); }); } }
+function waHandoverUrl(){
+  if(!STATE.lastHandoverUrl) return;
+  var msg = '你好！這是 CoEldery 85 為你準備的企業採購目錄，請點擊查閱及選擇有興趣的產品：\\n'+STATE.lastHandoverUrl;
+  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var url = isIos ? 'whatsapp://send?text='+encodeURIComponent(msg) : 'https://wa.me/?text='+encodeURIComponent(msg);
+  window.open(url,'_blank');
+}
+function emailHandoverUrl(){
+  if(!STATE.lastHandoverUrl) return;
+  var sub = encodeURIComponent('CoEldery 85 企業採購目錄');
+  var body = encodeURIComponent('你好，\\n\\n特此發上 CoEldery 85 為你準備的企業採購目錄連結：\\n'+STATE.lastHandoverUrl+'\\n\\n如有查詢，歡迎聯絡。');
+  window.open('mailto:?subject='+sub+'&body='+body);
+}
+
+// ── 分享頁 ────────────────────────────────────────────────────────────────────
+function initSharePage(){
+  var link = 'https://coeldery85.com/b2b?ref='+encodeURIComponent(STATE.memberNo||'');
+  document.getElementById('share-link-box').textContent = link;
+  var text = '你好！我係老有聯盟 85 的連結者，我哋係一個由退休長者組成的企業採購平台。\\n\\n如果你有企業採購需要，歡迎了解更多：\\n'+link;
+  document.getElementById('share-text-preview').textContent = text;
+}
+function copyShareLink(){ var t=document.getElementById('share-link-box').textContent; navigator.clipboard.writeText(t).then(function(){ alert('✅ 連結已複製'); }).catch(function(){ prompt('複製連結：',t); }); }
+function waShareLink(){ var t='你好！我係老有聯盟 85 的連結者，我哋係一個由退休長者組成的企業採購平台。如果你有企業採購需要，歡迎了解更多：\\n'+(document.getElementById('share-link-box').textContent||''); var isIos=/iphone|ipad|ipod/i.test(navigator.userAgent); window.open(isIos?'whatsapp://send?text='+encodeURIComponent(t):'https://wa.me/?text='+encodeURIComponent(t),'_blank'); }
+function emailShareLink(){ var sub=encodeURIComponent('老有聯盟 85 企業採購平台'); var body=encodeURIComponent(document.getElementById('share-text-preview').textContent||''); window.open('mailto:?subject='+sub+'&body='+body); }
+function copyShareText(){ var t=document.getElementById('share-text-preview').textContent; navigator.clipboard.writeText(t).then(function(){ alert('✅ 文案已複製'); }).catch(function(){ prompt('複製文案：',t); }); }
+
+// ── 成績頁 ────────────────────────────────────────────────────────────────────
+async function loadResults(){
+  if(!STATE.memberNo) return;
+  var cont = document.getElementById('results-content');
+  cont.innerHTML = '<div style="text-align:center;padding:40px 0;"><div class="spinner"></div></div>';
+  try{
+    var res = await fetch('/api/colinkery/stats', { credentials: 'include' });
+    var d = await res.json();
+    if(!d.ok){ cont.innerHTML='<div class="alert alert-red">載入失敗</div>'; return; }
+    var paid = Math.round((d.paid_cents||0)/100);
+    var accrued = Math.round((d.accrued_cents||0)/100);
+    var html = '<div class="stat-row" style="padding:0 0 16px;">' +
+      '<div class="stat-card"><div class="stat-num">'+d.total_leads+'</div><div class="stat-lbl">名片引薦</div></div>' +
+      '<div class="stat-card"><div class="stat-num">'+d.won_count+'</div><div class="stat-lbl">促成交易</div></div>' +
+      '<div class="stat-card"><div class="stat-num">'+paid.toLocaleString()+'</div><div class="stat-lbl">已收固定佣金(元)</div></div>' +
+    '</div>';
+    if(accrued > 0){
+      html += '<div class="alert alert-yellow" style="margin:0 0 16px;">💰 待發固定佣金：HK$'+accrued.toLocaleString()+'（成交已確認，待付款）</div>';
+    }
+    html += '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">最近成交記錄</h3>';
+    if(!d.recent_won||!d.recent_won.length){
+      html += '<div style="text-align:center;color:var(--muted);padding:20px 0;">尚無成交記錄</div>';
+    } else {
+      html += d.recent_won.map(function(w){
+        var comm = Math.round((w.commission_amount_cents||0)/100);
+        var stLabel = w.commission_status==='paid'?'✅ 已付':'⏳ 待付';
+        return '<div class="comm-item"><div style="font-weight:700;">'+esc(w.buyer_name||w.buyer_company||'—')+'</div>' +
+               '<div style="font-size:14px;color:var(--muted);">'+esc(w.buyer_company||'')+'</div>' +
+               '<div style="font-size:15px;color:var(--green);font-weight:700;margin-top:4px;">固定佣金：HK$'+comm.toLocaleString()+'　'+stLabel+'</div>' +
+               '</div>';
+      }).join('');
+    }
+    cont.innerHTML = html;
+  } catch(e){ cont.innerHTML='<div class="alert alert-red">網絡錯誤</div>'; }
+}
+</script>
+</body>
+</html>`
+}
