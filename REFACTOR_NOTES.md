@@ -6,17 +6,20 @@
 
 ---
 
-## [NOTE-001] nextMemberNo — `?? 1` 靜默 fallback，存在撞號風險
+## [NOTE-001] nextMemberNo — `?? 1` 靜默 fallback【✅ RESOLVED — commit `cfefc57`】
 
 | 欄目 | 內容 |
 |------|------|
 | **發現於** | Wave 2 batch，commit `4880b15`（extract nextMemberNo from index.tsx） |
+| **解決於** | Wave 4，commit `cfefc57`（2026-09-06） |
 | **涉及函數** | `nextMemberNo(db: D1Database)` → `src/lib/members.ts` |
-| **現行程式碼** | `const n = row?.next_val ?? 1` |
-| **問題描述** | `UPDATE counter SET next_val = next_val + 1 WHERE id = 1 RETURNING next_val` 若 `counter` 表內無 `id = 1` 的 row（例如表未初始化、row 被誤刪），`db.prepare(...).first()` 回傳 `null`，此時 `row?.next_val ?? 1` 靜默 fallback 到 `1`，函數成功回傳 `'CE85-000001'`，不拋出任何錯誤。若多次觸發此情況，多個會員將獲得相同編號 `CE85-000001`，違反唯一性。 |
-| **不一致之處** | 同樣模式的 `nextCwNo` 有明確 guard：`if (!row \|\| typeof row.next_val !== 'number') { throw new Error(...) }`，行為完全不同。 |
-| **已照搬不改** | ✅ 搬遷時維持原邏輯，未作任何修改。 |
-| **建議後續行動** | 在 refactor 完成後，為 `nextMemberNo` 補上與 `nextCwNo` 一致的 null guard，改為 throw error 而非靜默 fallback。同時確認 `counter` 表的初始化 migration 是否有保障 seed row 存在。 |
+| **原始問題** | `const n = row?.next_val ?? 1`：counter row 消失時靜默 fallback 到 `CE85-000001`，不拋錯，UNIQUE constraint 托底但行為不一致。 |
+| **Code 結論** | 🟢 `nextMemberNo` 用 `UPDATE counter SET next_val = next_val + 1 WHERE id = 1 RETURNING next_val` 原子自增，SQLite 單寫者序列化，**無 race condition**。`?? 1` silent fallback 已改為 throw（見下），與 `nextCwNo` pattern 對齊。 |
+| **修復內容** | `?? 1` 兩行替換為 `if (!row \|\| typeof row.next_val !== 'number') { throw new Error('nextMemberNo: counter row missing (id=1) — refusing to fall back to 1') }`；`UPDATE … RETURNING` 自增邏輯一字不動。 |
+| **對齊參考** | `nextCwNo`（`src/lib/coworkery-utils.ts`）早已使用相同 guard pattern，本次令兩者行為一致。 |
+| **Production 數據結論** | 🟢 **107 members，零撞號**（`HAVING c > 1` 返 0 rows，`rows_read: 107` 全表掃）；counter row 存在（`id=1, next_val=106`）；序列同步，下次生成 `CE85-000107`；`?? 1` fallback 從未在 production 被觸發。詳見 NOTE-012（離群號記錄）。 |
+| **commit** | `cfefc57` — `fix: nextMemberNo throws on missing counter row instead of silent fallback to 1 (NOTE-001, defensive — aligns with nextCwNo pattern in coworkery-utils.ts)` |
+| **diff 統計** | `src/lib/members.ts \| 6 ++++--`（1 file changed, 4 insertions(+), 2 deletions(−)）；bundle 1,220.95 → 1,221.05 kB（+0.10 kB = throw message 字串） |
 
 ---
 
@@ -324,6 +327,21 @@
 ### Wave 3 完成宣告
 
 Wave 3（HTML template 模組化）全部完成。`src/lib/html-templates.ts` 現為 22 個 exported functions 的獨立模組，`src/index.tsx` 已清空所有 template 定義，僅保留路由 handler、middleware、業務邏輯及 lib 函數。
+
+---
+
+## [NOTE-012] 離群 member_no CE85-396333（非 nextMemberNo 生成，早期手動/測試數據）
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 4，NOTE-001 production 數據查詢（2026-09-06，唯讀 `--remote`） |
+| **涉及範圍** | `members` table，production 數據庫 `coeldery85-db`（`222f9afc-4312-47a0-8d91-585443cd35c0`） |
+| **記錄** | `member_no: CE85-396333`，`tier: PRIMARY`，`name_zh: 陳大明`，`source: whatsapp_qr`，`created_at: 2026-08-09 08:35:22`（無時區後綴，與正常 ISO 格式不同） |
+| **性質判定** | 號碼 `396333` 遠超 counter 序列（當時序列約在 000001–000050 範圍），`created_at` 格式異常，確認為**非 `nextMemberNo()` 生成的手動 INSERT 或早期 QR 測試數據**，不在 counter 自增軌跡內。 |
+| **影響評估** | 🟢 **無影響**：① `member_no TEXT UNIQUE NOT NULL` 約束完整，該號唯一無撞；② counter `next_val` 完全不受影響（counter 自增序列獨立）；③ 日後 `nextMemberNo()` 正常自增，不會撞上此號（需自增至 396333 才可能衝突，以目前速度預計數十年後） |
+| **需注意場景** | ① **數據遷移**：如全量匯出 / 匯入時，此號格式合法但號碼跳躍，腳本若按數字序驗證會有警報，預留例外；② **報表 / 統計**：若有「最大會員號」或「會員序號差距」的業務報表，此號會令 `MAX(member_no)` 失真（字串排序 `CE85-396333` > `CE85-000106`）；③ **member_no 格式校驗**：若日後新增格式檢查（如限制數字部分 ≤ 某值），此號需豁免或先行清理。 |
+| **建議後續行動** | 無緊急處理需要。若業務上確認此筆為廢棄測試數據，可於適當時機由有權限人員手動刪除或標記 `status=INACTIVE`；若屬真實會員，保留現狀並記錄成因即可。不需要修改 counter 或現有序列。 |
+| **狀態** | 🟡 已記錄在案，無需即時行動 |
 
 ---
 
