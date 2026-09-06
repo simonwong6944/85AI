@@ -165,4 +165,63 @@
 
 ---
 
+## [NOTE-005] walletHtml Stage 標籤誤植
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 3，commit `b5bca2a` 事後核查 |
+| **涉及函數** | `walletHtml` → `src/lib/html-templates.ts` |
+| **問題描述** | commit `b5bca2a` 的 message 及 tombstone 均寫 `Wave3/Stage1`，實為 `Stage2`（函數含 inline script）。純標籤誤植，code 內容無誤，搬遷邏輯正確。 |
+| **已照搬不改** | ✅ 純標籤誤植，無需改動 code。 |
+| **建議後續行動** | 可於 refactor 全完成後在 commit history 作備注，或直接忽略（不影響正確性）。 |
+
+---
+
+## [NOTE-006] Stage 4 dead code 清單（zero caller 模板照搬記錄）
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 3 Stage 4，搬遷前置審查 |
+| **涉及函數** | `sopHtml`、`posterHtml`、`loginHtml`、`homeHtml` |
+| **問題描述** | 四個模板函數在搬遷時確認為零呼叫點（dead code）：① `sopHtml` — `/sop` 路由改為 `c.redirect('/', 301)`，未呼叫此函數；② `posterHtml` — `/poster` 路由改為 `c.redirect('/', 301)`，未呼叫此函數；③ `loginHtml` — `/membership/login` 路由呼叫 `signupMainHtml()`，非此函數；④ `homeHtml` — 全檔無任何路由呼叫此函數。 |
+| **已照搬不改** | ✅ 依純機械照搬原則，四個函數已搬入 `html-templates.ts`（commits `c3b708d`、`84e8292`、`7f2e6ec`、`068ecfd`），行為未變，dead code 狀態保留。 |
+| **建議後續行動** | 待 Wave 3 全部搬遷完成後，獨立評估是否刪除。刪除前須確認無隱藏動態呼叫點（例如字串拼接呼叫）。 |
+
+---
+
+## [NOTE-007] homeHtml 硬編碼地區陣列與 HK_DISTRICTS 平行維護
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 3 Stage 4，`homeHtml` 搬遷前置審查（commit `068ecfd`） |
+| **涉及函數** | `homeHtml` → `src/lib/html-templates.ts` |
+| **問題描述** | `homeHtml` 函數體內含一份硬編碼 18 地區陣列 `['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','葵青','荃灣','屯門','元朗','北區','大埔','沙田','西貢','離島']`（以 `${[...].map(d=>...)}` 形式嵌入 template literal）。此陣列與 `src/lib/constants.ts` 的 `HK_DISTRICTS` 內容完全重複，屬平行維護，存在潛在資料不一致風險（若 `HK_DISTRICTS` 更新而 `homeHtml` 未同步）。 |
+| **已照搬不改** | ✅ 搬遷時維持原硬編碼陣列，未替換為 `HK_DISTRICTS` 引用（純機械搬遷原則）。 |
+| **建議後續行動** | 待 Wave 3 完成後，考慮將 `homeHtml` 內的硬編碼陣列替換為 `import { HK_DISTRICTS } from './constants'` 引用，消除 DRY 違規。 |
+
+---
+
+## [NOTE-008] signupMainHtml 搬遷 import 行事故（27d173a）
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 3 Stage 4，commit `27d173a`（`signupMainHtml` 搬遷）事後審查 |
+| **涉及範圍** | `src/index.tsx` 第 14 行 import 行 |
+| **問題描述** | Python surgery script 的舊 import append 邏輯（以 `.rstrip('}')` 切除閉括號後砌回）在處理行尾有 trailing space 的情況下產生 broken 語法：`} from './lib/html-templates' , signupMainHtml } from './lib/html-templates'`（雙重 `from`）。隨即以第二個 Python script 手動重寫整條 import 行（手寫死 19 symbol string）覆蓋修正。事後核實：19 symbol 齊全、每個在 `html-templates.ts` 均有對應唯一 `export function`、`from` 只出現一次，最終結果正確。 |
+| **修正措施** | 於 commit `e4d7645`（`adminHtml` 搬遷）改用安全 regex insert 邏輯：`re.sub(r'\s*(} from \'./lib/html-templates\')', ' , adminHtml \1', line)`，連續兩個 commit（`27d173a` 事後核實 + `e4d7645` 實際使用）驗證正確。 |
+| **遺留格式問題** | 手寫覆蓋雖未改動 symbol 1–18 的間距，但累積自 Stage 3–4 append 的格式漂移（symbol 13–19 使用 ` , symbol` 前後 space 風格，與 symbol 1–12 的 `symbol, ` 標準風格不一致）已於本次 chore commit normalize 統一。 |
+
+---
+
+## [NOTE-009] html-templates import 行格式漂移（已於本 commit 修正）
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 3 Stage 4 收尾審查 |
+| **涉及範圍** | `src/index.tsx` 第 14 行 `import { ... } from './lib/html-templates'` |
+| **問題描述** | Symbol 1–12（`dashboardHtml` 至 `partnerApplyHtml`）使用 `symbol, nextSymbol` 風格（逗號後一空格，逗號前無空格）；symbol 13–19（`qrCompleteHtml` 至 `adminHtml`）因歷次 append script 格式漂移，使用 ` , symbol` 風格（逗號前後各一空格）。兩種風格混雜同一行。 |
+| **已修正** | ✅ 本 chore commit 以程式化 normalize（split by comma → strip → join with `', '`）統一全部 20 個 symbol 為 `symbol, symbol` 標準風格，零 symbol 內容改動。 |
+
+---
+
 <!-- 以後所有搬遷時發現的可疑邏輯，照此格式新增條目 -->

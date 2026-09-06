@@ -11,7 +11,7 @@ import { sha256hex, appendHashChain } from './lib/revenue-utils'
 import { verifyColinkerySess, requireColinkery } from './lib/colinkery-auth'
 import { htmlHead } from './lib/html-shared'
 import { HK_DISTRICTS } from './lib/constants'
-import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml , qrCompleteHtml , sopHtml , posterHtml , loginHtml , homeHtml , signupSubHtml , signupMainHtml , adminHtml } from './lib/html-templates'
+import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml, qrCompleteHtml, sopHtml, posterHtml, loginHtml, homeHtml, signupSubHtml, signupMainHtml, adminHtml } from './lib/html-templates'
 
 type Bindings = {
   DB: D1Database
