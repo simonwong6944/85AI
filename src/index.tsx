@@ -6750,7 +6750,6 @@ app.get('/api/benefits/:id/my-claim', async (c) => {
 // GET /api/admin/benefits — list all
 app.get('/api/admin/benefits', async (c) => {
   const db = (c.env as any).DB as D1Database
-  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
   const catId = c.req.query('category_id') || ''
   let sql = `SELECT b.*,bc.name AS category_name,bc.icon AS category_icon,
                (SELECT COUNT(*) FROM benefit_claims WHERE benefit_id=b.id) AS claim_count
@@ -6764,7 +6763,6 @@ app.get('/api/admin/benefits', async (c) => {
 // POST /api/admin/benefits — create
 app.post('/api/admin/benefits', async (c) => {
   const db = (c.env as any).DB as D1Database
-  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
   const body = await c.req.json() as any
   const { category_id, title, description='', image_url='', start_date='', end_date='',
           benefit_content='', claim_limit=0, total_quota=0, extra_fields='[]', status='active', sort_order=0 } = body
@@ -6780,7 +6778,6 @@ app.post('/api/admin/benefits', async (c) => {
 // PUT /api/admin/benefits/:id — update
 app.put('/api/admin/benefits/:id', async (c) => {
   const db = (c.env as any).DB as D1Database
-  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
   const id = parseInt(c.req.param('id'))
   const body = await c.req.json() as any
   const { category_id, title, description='', image_url, start_date, end_date,
@@ -6798,7 +6795,6 @@ app.put('/api/admin/benefits/:id', async (c) => {
 // DELETE /api/admin/benefits/:id
 app.delete('/api/admin/benefits/:id', async (c) => {
   const db = (c.env as any).DB as D1Database
-  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
   await db.prepare(`DELETE FROM benefits WHERE id=?`).bind(parseInt(c.req.param('id'))).run()
   return c.json({ ok: true })
 })
@@ -6806,7 +6802,6 @@ app.delete('/api/admin/benefits/:id', async (c) => {
 // GET /api/admin/benefits/:id/claims — claim records with member info
 app.get('/api/admin/benefits/:id/claims', async (c) => {
   const db = (c.env as any).DB as D1Database
-  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
   const { results } = await db.prepare(
     `SELECT bc.id,bc.member_no,bc.claimed_at,bc.notes,
        m.name_zh,m.phone
@@ -6819,7 +6814,6 @@ app.get('/api/admin/benefits/:id/claims', async (c) => {
 // GET /api/admin/benefits/claims/summary — all claims summary
 app.get('/api/admin/benefits/claims/summary', async (c) => {
   const db = (c.env as any).DB as D1Database
-  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
   const { results } = await db.prepare(
     `SELECT b.id AS benefit_id,b.title,bc_cat.name AS category_name,bc_cat.icon,
        COUNT(bc.id) AS claim_count,
@@ -6834,8 +6828,6 @@ app.get('/api/admin/benefits/claims/summary', async (c) => {
 
 // POST /api/admin/benefits/upload-image — Cloudinary upload
 app.post('/api/admin/benefits/upload-image', async (c) => {
-  const db = (c.env as any).DB as D1Database
-  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
   const env = c.env as any
   const cloudName = env.CLOUDINARY_CLOUD_NAME
   const apiKey    = env.CLOUDINARY_API_KEY
@@ -6881,7 +6873,6 @@ app.post('/api/admin/benefits/upload-image', async (c) => {
 // GET /api/admin/benefit-categories — manage categories
 app.get('/api/admin/benefit-categories', async (c) => {
   const db = (c.env as any).DB as D1Database
-  if (!await verifySession(c, db)) return c.json({ ok: false, error: 'Unauthorized' }, 401)
   const { results } = await db.prepare(`SELECT * FROM benefit_categories ORDER BY sort_order`).all()
   return c.json({ ok: true, categories: results })
 })
