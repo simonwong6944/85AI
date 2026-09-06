@@ -6987,3 +6987,748 @@ async function shareCardToWA(){
 </script>
 </body></html>`
 }
+
+export function signupSubHtml() {
+  return htmlHead('申請家庭同行卡', `<style>
+body{background:#F0EBD8;min-height:100vh;padding:20px 16px;font-size:20px;line-height:1.6;}
+.container{max-width:420px;margin:0 auto;}
+.brand-strip{display:flex;align-items:center;gap:12px;margin-bottom:24px;}
+.brand-strip .mark{width:44px;height:44px;background:var(--ferrari-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Noto Serif TC",serif;font-weight:900;font-size:18px;border-radius:6px;}
+.brand-strip .name .zh{font-family:"Noto Serif TC",serif;font-size:20px;color:var(--ferrari-deep);font-weight:700;letter-spacing:2px;line-height:1;}
+.brand-strip .name .en{font-size:18px;color:var(--grey-2);letter-spacing:2px;margin-top:4px;}
+.header-card{background:linear-gradient(135deg,var(--ferrari-deep) 0%,var(--ferrari) 100%);color:#fff;padding:24px 22px;border-radius:4px;margin-bottom:20px;position:relative;overflow:hidden;}
+.header-card::before{content:"家";position:absolute;right:-10px;bottom:-40px;font-family:"Noto Serif TC",serif;font-size:180px;font-weight:900;color:rgba(255,255,255,0.1);line-height:1;}
+.header-card .tag{display:inline-block;background:rgba(255,255,255,0.2);color:#fff;padding:3px 10px;font-size:18px;letter-spacing:3px;font-weight:700;margin-bottom:12px;position:relative;z-index:2;}
+.header-card h1{font-family:"Noto Serif TC",serif;font-size:28px;font-weight:900;letter-spacing:3px;line-height:1.2;margin-bottom:8px;position:relative;z-index:2;}
+.header-card p{font-size:20px;opacity:0.9;line-height:1.6;position:relative;z-index:2;}
+.form-card{background:#fff;padding:24px 22px;border-radius:4px;margin-bottom:16px;}
+.field{margin-bottom:18px;}
+.field .label-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.field label{font-family:"Noto Serif TC",serif;font-size:22px;color:var(--ferrari-deep);font-weight:700;letter-spacing:1px;}
+.field .req{color:var(--ferrari);font-size:18px;font-weight:700;}
+.field input,.field select{width:100%;padding:14px;border:2px solid var(--line);border-radius:4px;font-size:20px;font-family:inherit;color:var(--ink);background:#fff;transition:border 0.2s;min-height:55px;}
+.field input:focus,.field select:focus{outline:0;border-color:var(--ferrari);}
+.field .hint{font-size:18px;color:var(--grey-3);margin-top:4px;line-height:1.5;}
+.consent{padding:14px;background:var(--ferrari-pale);border-radius:4px;font-size:18px;color:var(--grey-1);line-height:1.7;margin-bottom:20px;}
+.consent label{display:flex;gap:10px;cursor:pointer;}
+.consent input{width:20px;height:20px;margin-top:2px;flex-shrink:0;accent-color:var(--ferrari);}
+.submit-btn{width:100%;padding:18px;background:var(--ferrari);color:#fff;border:0;border-radius:4px;font-size:18px;font-family:"Noto Serif TC",sans-serif;font-weight:700;letter-spacing:4px;cursor:pointer;box-shadow:0 4px 0 var(--ferrari-deep);transition:all 0.1s;}
+.submit-btn:disabled{background:var(--grey-3);box-shadow:0 4px 0 var(--grey-2);cursor:not-allowed;}
+.footer-links{text-align:center;margin-top:20px;font-size:18px;color:var(--grey-3);line-height:1.8;}
+.footer-links a{color:var(--ferrari);text-decoration:none;}
+.success{display:none;text-align:center;}
+.success.show{display:block;}
+.success-icon{width:80px;height:80px;background:var(--ferrari);color:#fff;border-radius:50%;margin:20px auto 24px;display:flex;align-items:center;justify-content:center;font-size:44px;animation:pop 0.4s cubic-bezier(0.34,1.56,0.64,1);}
+@keyframes pop{0%{transform:scale(0);}100%{transform:scale(1);}}
+.success h1{font-family:"Noto Serif TC",serif;font-size:28px;color:var(--ferrari-deep);margin-bottom:6px;letter-spacing:3px;}
+.gen-card{width:340px;height:232px;margin:0 auto 20px;background:linear-gradient(150deg,#FFF5F5 0%,#FFE8E8 100%);border:1px solid #F5C6C6;border-radius:12px;position:relative;overflow:hidden;color:var(--ferrari-deep);box-shadow:0 12px 30px rgba(0,0,0,0.18);text-align:left;}
+.gen-card::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--ferrari) 0%,var(--ferrari-deep) 100%);}
+.gc-brand{position:absolute;top:16px;left:18px;display:flex;align-items:center;gap:8px;}
+.gc-cardname{font-family:"Noto Serif TC",serif;font-size:13px;color:var(--ferrari-deep);letter-spacing:2px;font-weight:900;border-left:2px solid var(--ferrari);padding-left:8px;line-height:1.2;}
+.gc-family-badge{position:absolute;top:16px;right:18px;background:var(--ferrari-pale);border:1px solid var(--ferrari);padding:4px 9px;font-family:"Noto Serif TC",serif;font-size:11px;color:var(--ferrari-deep);letter-spacing:1.5px;font-weight:700;border-radius:2px;}
+.gc-name-block{position:absolute;left:18px;right:18px;bottom:62px;}
+.gc-prefix{font-family:"Noto Serif TC",serif;font-size:12px;color:var(--grey-2);letter-spacing:4px;margin-bottom:8px;font-weight:500;}
+.gc-zh{font-family:"Noto Serif TC",serif;font-size:44px;font-weight:900;color:var(--ferrari-deep);letter-spacing:5px;line-height:1;}
+.gc-en{font-family:"Noto Serif TC",serif;font-size:15px;font-weight:700;color:var(--ferrari-deep);letter-spacing:2px;margin-top:8px;display:block;line-height:1.2;}
+.gc-footer{position:absolute;bottom:16px;left:18px;right:18px;display:flex;justify-content:space-between;align-items:flex-end;}
+.gc-num{font-family:"Space Grotesk",monospace;font-size:17px;color:var(--ferrari-deep);letter-spacing:1.5px;font-weight:700;}
+.gc-num .k{font-family:"Noto Serif TC",serif;font-size:10px;color:var(--grey-2);letter-spacing:2.5px;margin-bottom:4px;display:block;font-weight:500;}
+.gc-qr{width:46px;height:46px;background:#fff;padding:3px;border:1.5px solid var(--ferrari);border-radius:3px;flex-shrink:0;}
+.gc-qr canvas{width:100%;height:100%;}
+.wa-link{display:block;width:100%;padding:16px;background:var(--ferrari);color:#fff;text-align:center;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700;letter-spacing:3px;border-radius:4px;text-decoration:none;margin-bottom:12px;min-height:55px;}
+.err-msg{background:var(--ferrari-pale);border:1px solid var(--ferrari);color:var(--ferrari-deep);padding:12px 16px;border-radius:4px;font-size:20px;font-weight:700;margin-bottom:16px;display:none;}
+.err-msg.show{display:block;}
+</style>`) + `
+<body>
+<div class="container">
+  <div style="margin-bottom:12px;">
+    <button type="button" onclick="history.length>1?history.back():window.location.href='/membership/join'" style="display:inline-flex;align-items:center;gap:6px;padding:14px 20px;min-height:55px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;border-radius:6px;cursor:pointer;letter-spacing:1px;">← 返回</button>
+  </div>
+  <div class="brand-strip">
+    <div class="mark">家</div>
+    <div class="name">
+      <div class="zh">CoEldery 85 家庭同行卡</div>
+      <div class="en">FAMILY COMPANION CARD</div>
+    </div>
+  </div>
+
+  <div id="formSection">
+    <div class="header-card">
+      <div class="tag">◆ 家庭同行</div>
+      <h1>老有卡<br>家庭同行</h1>
+      <p>支援屋企長輩的家人 · 消費即支持長者<br>須有主卡會員方可申請附屬卡</p>
+    </div>
+
+    <div class="err-msg" id="errMsg"></div>
+
+    <form id="signupForm" onsubmit="return false;">
+      <div class="form-card">
+        <div class="field">
+          <div class="label-row"><label for="nameZh">姓名／稱呼</label><span class="req">✽ 必填</span></div>
+          <input id="nameZh" type="text" placeholder="填佢嘅名或稱呼（中英文都得）">
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="phone">你的 WhatsApp 電話</label><span class="req">✽ 必填</span></div>
+          <input id="phone" type="tel" placeholder="例：91234567" inputmode="numeric" maxlength="8">
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="birthYear">出生年份</label><span class="req">✽ 必填</span></div>
+          <select id="birthYear">
+            <option value="">— 請選擇 —</option>
+            ${(()=>{const opts=[];for(let y=2010;y>=1930;y--){opts.push(`<option value="${y}">${y}</option>`);}return opts.join('');})()}
+          </select>
+          <div class="hint">出生年份 ≤ 1971（55歲或以上）將自動升為主卡級別</div>
+        </div>
+        <div class="field">
+          <div class="label-row"><label>性別</label><span class="req">✽ 必填</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <button type="button" class="g-btn" id="gBtnM" data-v="M" onclick="setFamilyGender('M',this)">男 M</button>
+            <button type="button" class="g-btn" id="gBtnF" data-v="F" onclick="setFamilyGender('F',this)">女 F</button>
+          </div>
+        </div>
+        <div class="field" id="parentLinkedField" style="display:none;">
+          <div class="label-row"><label>已連結主卡</label></div>
+          <div id="parentLinkedInfo" style="padding:12px 14px;background:#f0f7f0;border:2px solid #4caf50;border-radius:4px;font-size:18px;font-weight:700;color:#2e7d32;">✅ 已連結</div>
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="relation">你與長輩的關係</label><span style="color:var(--grey-3);font-size:18px;">選填</span></div>
+          <select id="relation">
+            <option value="">— 請選擇 —</option>
+            <option>子女</option><option>配偶</option><option>孫</option>
+            <option>外孫</option><option>兄弟姊妹</option><option>其他</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="consent">
+        <label>
+          <input type="checkbox" id="consent" required>
+          <span>本人同意 85 AI Technology Limited 根據私隱政策收集及使用以上個人資料，用於家庭同行卡登記。</span>
+        </label>
+      </div>
+
+      <button type="button" class="submit-btn" id="submitBtn" onclick="submitForm()">
+        申請家庭同行卡
+      </button>
+
+      <div class="footer-links">
+        <a href="/membership/join">← 我係長者，申請主卡</a>
+      </div>
+    </form>
+    <input type="hidden" id="linkedParentNo" value="">
+  </div>
+
+  <div class="success" id="successSection">
+    <div class="success-icon">✓</div>
+    <h1>申請成功！</h1>
+    <p style="font-size:18px;color:var(--grey-2);margin-bottom:24px;">家庭同行卡已發出</p>
+
+    <!-- Live CSS card (hidden after image renders) -->
+    <div class="gen-card" id="genCard">
+      <div class="gc-brand"><div class="gc-cardname">老有卡 家庭同行</div></div>
+      <div class="gc-family-badge">FAMILY</div>
+      <div class="gc-name-block">
+        <div class="gc-prefix">MEMBER NAME · 姓名</div>
+        <div class="gc-zh" id="cardZh"></div>
+        <div class="gc-en" id="cardEn"></div>
+      </div>
+      <div class="gc-footer">
+        <div class="gc-num"><span class="k">MEMBER NO.</span><span id="cardNo"></span></div>
+        <div class="gc-qr"><canvas id="cardQr"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Rendered JPEG preview — with pending watermark overlay -->
+    <div id="cardImgWrap" style="display:none;margin:0 auto 0;max-width:340px;position:relative;">
+      <img id="cardImg" style="width:100%;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,0.18);" alt="家庭同行卡">
+      <!-- Pending verification watermark overlay -->
+      <div id="pendingWatermark" style="position:absolute;inset:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.38);pointer-events:none;">
+        <div style="color:#fff;font-size:18px;font-weight:900;letter-spacing:2px;text-shadow:0 2px 8px rgba(0,0,0,0.7);background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:6px;border:2px solid rgba(255,255,255,0.6);">⏳ 待驗證</div>
+        <div style="color:#ffe082;font-size:18px;font-weight:700;margin-top:6px;text-shadow:0 1px 4px rgba(0,0,0,0.8);">點擊下方按鈕完成驗證</div>
+      </div>
+    </div>
+
+    <!-- WA Verification block — shown directly below card -->
+    <div id="waVerifyBlock" style="display:none;margin:10px 0 14px;background:#f0faf3;border:1.5px solid #25D366;border-radius:8px;padding:14px;">
+      <div style="font-size:20px;font-weight:700;color:#1a5c2a;margin-bottom:10px;text-align:center;">📲 發 WhatsApp 完成身份驗證</div>
+      <div id="waVerifyMsgPreview" style="background:#fff;border:1px solid #ddd;border-radius:5px;padding:9px 11px;font-size:18px;color:#333;margin-bottom:12px;line-height:1.6;"></div>
+      <!-- Button 1: Normal WhatsApp — real flow -->
+      <button id="waVerifyBtn" onclick="openWA()"
+        style="display:block;width:100%;box-sizing:border-box;background:#25D366;color:#fff;font-size:20px;font-weight:700;padding:16px 8px;border-radius:8px;border:none;cursor:pointer;text-align:center;margin-bottom:8px;min-height:55px;">
+        💬 我有 WhatsApp — 發送驗證訊息
+      </button>
+      <!-- Button 2: WA Business — fake 2.5s flow -->
+      <button id="waBizBtn" onclick="openWABiz()"
+        style="display:block;width:100%;box-sizing:border-box;background:#fff;color:#1a5c2a;font-size:18px;font-weight:700;padding:14px 8px;border-radius:8px;border:1.5px solid #25D366;cursor:pointer;text-align:center;min-height:55px;">
+        📱 我用 WhatsApp Business
+      </button>
+      <div id="waSendingMsg" style="display:none;text-align:center;margin-top:10px;font-size:18px;color:#388E3C;font-weight:600;">📤 正在提交驗證...</div>
+    </div>
+
+    <!-- Banner A: normal WA sent — watermark stays -->
+    <div id="waSentBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#2E7D32;">📤 驗證訊息已發出！</div>
+      <div style="font-size:18px;color:#388E3C;margin-top:4px;">請在 WhatsApp 中發送訊息給我們，Admin 確認後會籍即生效。</div>
+    </div>
+    <!-- Banner B: WA Biz fake complete — watermark hidden -->
+    <div id="verifiedBanner" style="display:none;margin:0 0 14px;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:8px;padding:12px 14px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#2E7D32;">✅ 驗證訊息已發送！</div>
+      <div style="font-size:18px;color:#388E3C;margin-top:4px;">Admin 收到後將確認你的會籍，感謝你！</div>
+    </div>
+
+    <!-- ══ Master Card Linking Section ══ -->
+    <!-- Only shown when family card was registered without a pre-linked parent -->
+    <div id="masterCardSection" style="display:none;margin:0 0 16px;border:2px solid #b71c1c;border-radius:10px;overflow:hidden;">
+      <div style="background:#b71c1c;color:#fff;padding:12px 16px;font-size:19px;font-weight:700;text-align:center;">
+        🔗 連結長輩主卡
+      </div>
+      <div style="padding:14px 16px;background:#fff8f8;">
+        <p style="font-size:16px;color:#555;margin:0 0 14px;line-height:1.6;">家庭同行卡需連結長輩主卡方可完整使用。請選擇以下方式：</p>
+
+        <!-- Tab buttons -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+          <button id="tabLinkBtn" onclick="showMasterTab('link')"
+            style="padding:12px 6px;background:#b71c1c;color:#fff;border:2px solid #b71c1c;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">
+            📱 連結已有主卡
+          </button>
+          <button id="tabAddBtn" onclick="showMasterTab('add')"
+            style="padding:12px 6px;background:#fff;color:#b71c1c;border:2px solid #b71c1c;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;">
+            ➕ 為長輩申請主卡
+          </button>
+        </div>
+
+        <!-- Tab A: Link existing primary card by phone -->
+        <div id="tabLinkPanel" style="display:block;">
+          <p style="font-size:15px;color:#444;margin:0 0 8px;">輸入長輩的香港電話號碼，系統會自動找到其主卡並連結。</p>
+          <input id="linkParentPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="長輩電話（8位）"
+            style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:18px;border:1.5px solid #ccc;border-radius:6px;margin-bottom:10px;"/>
+          <div id="linkParentErr" style="display:none;color:#c62828;font-size:15px;font-weight:600;margin-bottom:8px;"></div>
+          <div id="linkParentSuccess" style="display:none;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:6px;padding:10px 12px;font-size:16px;color:#2E7D32;font-weight:700;margin-bottom:10px;"></div>
+          <button onclick="doLinkParent()"
+            style="width:100%;padding:14px;background:#b71c1c;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;min-height:52px;">
+            🔗 確認連結主卡
+          </button>
+        </div>
+
+        <!-- Tab B: Register new primary card for elder -->
+        <div id="tabAddPanel" style="display:none;">
+          <p style="font-size:15px;color:#444;margin:0 0 10px;">為長輩登記新主卡（需年滿55歲），完成後自動連結到此家庭卡。</p>
+          <input id="addParentName" type="text" placeholder="長輩中文姓名"
+            style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:18px;border:1.5px solid #ccc;border-radius:6px;margin-bottom:10px;"/>
+          <input id="addParentPhone" type="tel" inputmode="numeric" maxlength="8" placeholder="長輩電話（8位）"
+            style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:18px;border:1.5px solid #ccc;border-radius:6px;margin-bottom:10px;"/>
+          <select id="addParentYear"
+            style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:18px;border:1.5px solid #ccc;border-radius:6px;margin-bottom:10px;background:#fff;">
+            <option value="">長輩出生年份</option>
+          </select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <button id="addGenderM" onclick="setAddGender('M',this)"
+              style="padding:13px;background:#fff;border:2px solid #ccc;border-radius:6px;font-size:17px;font-weight:700;cursor:pointer;">男 M</button>
+            <button id="addGenderF" onclick="setAddGender('F',this)"
+              style="padding:13px;background:#fff;border:2px solid #ccc;border-radius:6px;font-size:17px;font-weight:700;cursor:pointer;">女 F</button>
+          </div>
+          <div id="addParentErr" style="display:none;color:#c62828;font-size:15px;font-weight:600;margin-bottom:8px;"></div>
+          <div id="addParentSuccess" style="display:none;background:#e8f5e9;border:1.5px solid #4caf50;border-radius:6px;padding:10px 12px;font-size:16px;color:#2E7D32;font-weight:700;margin-bottom:10px;"></div>
+          <button onclick="doAddParent()"
+            style="width:100%;padding:14px;background:#b71c1c;color:#fff;border:0;border-radius:6px;font-size:18px;font-weight:700;cursor:pointer;min-height:52px;">
+            ➕ 為長輩申請主卡並連結
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- ══ End Master Card Linking Section ══ -->
+
+    <div class="action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;cursor:pointer;border-radius:4px;min-height:55px;" onclick="saveCardImage()">💾 儲存卡圖</button>
+      <button class="action-btn" style="padding:14px 8px;background:#fff;border:2px solid var(--ferrari);color:var(--ferrari-deep);font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;cursor:pointer;border-radius:4px;min-height:55px;" onclick="window.location.href='/membership/join'">← 返回主卡</button>
+    </div>
+
+    <button class="wa-link" onclick="shareCardToWA()" style="width:100%;border:0;cursor:pointer;">📱 WhatsApp 分享會員卡圖片</button>
+
+    <div class="footer-links">
+      <a id="mySubPageLink" href="#" style="color:var(--ferrari-deep);font-weight:700;display:none;">🪪 查看我的會員頁</a>
+      <span id="mySubPageSep" style="display:none;"> &middot; </span>
+      <a href="/membership/join">← 返回主卡登記</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── PWA install prompt storage ──
+window._deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  window._deferredInstallPrompt = e;
+  // If install banner is already showing (user already clicked WA), activate install button
+  if(window._installBannerPending) {
+    window._installBannerPending = false;
+    var btn = document.getElementById('pwaInstallBtn');
+    var fb = document.getElementById('pwaInstallFallback');
+    if(btn) { btn.style.display = ''; }
+    if(fb) { fb.style.display = 'none'; }
+  }
+});
+// Auto-fill parent info from ?parent=CE85-XXXXXX URL param
+(function(){
+  var params = new URLSearchParams(location.search);
+  var parentMemberNo = params.get('parent');
+  if (!parentMemberNo) return;
+  fetch('/api/members/' + encodeURIComponent(parentMemberNo))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok || !d.member) return;
+      var m = d.member;
+      document.getElementById('linkedParentNo').value = m.member_no;
+      document.getElementById('parentLinkedInfo').textContent = '✅ ' + m.name_zh + '　' + m.member_no + (m.phone ? '　📱 ' + m.phone : '');
+      document.getElementById('parentLinkedField').style.display = 'block';
+    })
+    .catch(function(e){ console.warn('parent lookup failed', e); });
+})();
+
+var _familyGender='';
+function setFamilyGender(v,btn){
+  _familyGender=v;
+  document.querySelectorAll('#signupForm .g-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+}
+function showErr(msg){var el=document.getElementById('errMsg');el.textContent=msg;el.classList.add('show');el.scrollIntoView({behavior:'smooth'});}
+function validateHKPhone(p){
+  if(p.length!==8)return '請填寫正確的 8 位香港電話號碼';
+  if(!/^[2-9]/.test(p))return '電話號碼格式不正確（香港號碼以 2–9 開頭，1 除外）';
+  if(new Set(p.split('')).size===1)return '請填寫真實的電話號碼';
+  if(p==='12345678'||p==='87654321'||p==='11223344')return '請填寫真實的電話號碼';
+  return null;
+}
+async function submitForm(){
+  document.getElementById('errMsg').classList.remove('show');
+  var nameZh=document.getElementById('nameZh').value.trim();
+  var phone=document.getElementById('phone').value.replace(/[^0-9]/g,'');
+  var birthYear=document.getElementById('birthYear').value;
+  var linkedParentNo=document.getElementById('linkedParentNo').value.trim();
+  if(!nameZh){showErr('請填寫姓名／稱呼');return;}
+  if(!birthYear){showErr('請選擇出生年份');return;}
+  if(!_familyGender){showErr('請選擇性別');return;}
+  var phoneErr=validateHKPhone(phone);
+  if(phoneErr){showErr(phoneErr);return;}
+  // parentPhone is now optional — linking happens after registration via masterCardSection
+  if(!document.getElementById('consent').checked){showErr('請同意私隱政策');return;}
+  var btn=document.getElementById('submitBtn');
+  btn.disabled=true;btn.textContent='處理中…';
+  var params=new URLSearchParams(location.search);
+  var payload={tier:'FAMILY',nameZh,phone,birthYear:birthYear,gender:_familyGender,relation:document.getElementById('relation').value,roadshow:params.get('rs')||'walk-in',source:params.get('src')||(params.get('rs')?'roadshow':params.get('ref')?'referral':'walk-in'),referrerNo:params.get('ref')||'',roadshowLocation:params.get('loc')||''};
+  if(linkedParentNo){payload.parentNo=linkedParentNo;}
+  try{
+    var res=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var data=await res.json();
+    if(!data.ok){showErr(data.error||'申請失敗，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';return;}
+    // ── Registration success: redirect to card page which has full WA verify + master-card linking UI ──
+    document.getElementById('formSection').style.display='none';
+    var ss=document.getElementById('successSection');
+    ss.innerHTML='<div style="padding:40px 20px;text-align:center;">'
+      +'<div style="font-size:60px;margin-bottom:16px;">\u2705</div>'
+      +'<div style="font-size:26px;font-weight:900;color:#8B0000;margin-bottom:10px;">\u7533\u8acb\u6210\u529f\uff01</div>'
+      +'<div style="font-size:20px;color:#444;margin-bottom:8px;">\u6703\u54e1\u7de8\u865f\uff1a<strong style="color:#C62828;">'+data.memberNo+'</strong></div>'
+      +'<div style="font-size:18px;color:#666;margin-bottom:24px;">\u6b63\u5728\u8df3\u8f49\u5230\u4f60\u7684\u6703\u54e1\u5361\u9801\u9762\u2026</div>'
+      +'<div style="font-size:15px;color:#999;">\uff08\u5982\u672a\u81ea\u52d5\u8df3\u8f49\uff0c\u8acb<a href="/membership/card/'+data.memberNo+'" style="color:#C62828;font-weight:700;">\u9ede\u6b64\u9032\u5165</a>\uff09</div>'
+      +'</div>';
+    ss.classList.add('show');
+    window.scrollTo(0,0);
+    // Redirect to card page after 2s
+    setTimeout(function(){
+      window.location.href='/membership/card/'+data.memberNo;
+    },2000);
+  }catch(e){showErr('網絡錯誤，請再試一次');btn.disabled=false;btn.textContent='申請家庭同行卡';}
+}
+
+// ══ Master Card Linking JS ══
+var _addParentGender='';
+
+function showMasterTab(tab){
+  var linkPanel=document.getElementById('tabLinkPanel');
+  var addPanel=document.getElementById('tabAddPanel');
+  var linkBtn=document.getElementById('tabLinkBtn');
+  var addBtn=document.getElementById('tabAddBtn');
+  if(tab==='link'){
+    linkPanel.style.display='block'; addPanel.style.display='none';
+    linkBtn.style.background='#b71c1c'; linkBtn.style.color='#fff';
+    addBtn.style.background='#fff'; addBtn.style.color='#b71c1c';
+  } else {
+    linkPanel.style.display='none'; addPanel.style.display='block';
+    addBtn.style.background='#b71c1c'; addBtn.style.color='#fff';
+    linkBtn.style.background='#fff'; linkBtn.style.color='#b71c1c';
+  }
+}
+
+function initAddParentYearDropdown(){
+  var sel=document.getElementById('addParentYear');
+  if(!sel||sel.options.length>1)return;
+  var curYear=new Date().getFullYear();
+  // Primary card must be 55+ so max birth year = curYear - 55
+  for(var y=curYear-55;y>=1930;y--){
+    var opt=document.createElement('option');
+    opt.value=y; opt.textContent=y+'年';
+    sel.appendChild(opt);
+  }
+}
+
+function setAddGender(v,btn){
+  _addParentGender=v;
+  document.getElementById('addGenderM').style.background='#fff';
+  document.getElementById('addGenderM').style.borderColor='#ccc';
+  document.getElementById('addGenderM').style.color='#333';
+  document.getElementById('addGenderF').style.background='#fff';
+  document.getElementById('addGenderF').style.borderColor='#ccc';
+  document.getElementById('addGenderF').style.color='#333';
+  btn.style.background='#b71c1c'; btn.style.borderColor='#b71c1c'; btn.style.color='#fff';
+}
+
+async function doLinkParent(){
+  var no=window._verifyMemberNo;
+  if(!no)return;
+  var phone=document.getElementById('linkParentPhone').value.replace(/[^0-9]/g,'');
+  var errEl=document.getElementById('linkParentErr');
+  var sucEl=document.getElementById('linkParentSuccess');
+  errEl.style.display='none'; sucEl.style.display='none';
+  if(phone.length!==8){errEl.textContent='請輸入正確的8位電話號碼';errEl.style.display='block';return;}
+  try{
+    var res=await fetch('/api/members/'+encodeURIComponent(no)+'/link-parent',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({parentPhone:phone})
+    });
+    var d=await res.json();
+    if(!d.ok){errEl.textContent=d.error||'連結失敗，請確認電話號碼';errEl.style.display='block';return;}
+    sucEl.textContent='✅ 成功連結主卡：'+d.parent_no+(d.parent_name?' （'+d.parent_name+'）':'');
+    sucEl.style.display='block';
+    // Hide the section after 3s
+    setTimeout(function(){
+      var mcs=document.getElementById('masterCardSection');
+      if(mcs)mcs.style.display='none';
+    },3000);
+  }catch(e){errEl.textContent='網絡錯誤，請再試一次';errEl.style.display='block';}
+}
+
+async function doAddParent(){
+  var no=window._verifyMemberNo;
+  if(!no)return;
+  var nameZh=document.getElementById('addParentName').value.trim();
+  var phone=document.getElementById('addParentPhone').value.replace(/[^0-9]/g,'');
+  var birthYear=document.getElementById('addParentYear').value;
+  var errEl=document.getElementById('addParentErr');
+  var sucEl=document.getElementById('addParentSuccess');
+  errEl.style.display='none'; sucEl.style.display='none';
+  if(!nameZh){errEl.textContent='請填寫長輩中文姓名';errEl.style.display='block';return;}
+  if(phone.length!==8){errEl.textContent='請輸入正確的8位電話號碼';errEl.style.display='block';return;}
+  if(!birthYear){errEl.textContent='請選擇長輩出生年份';errEl.style.display='block';return;}
+  if(!_addParentGender){errEl.textContent='請選擇長輩性別';errEl.style.display='block';return;}
+  try{
+    var res=await fetch('/api/members/'+encodeURIComponent(no)+'/add-parent',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nameZh:nameZh,phone:phone,birthYear:birthYear,gender:_addParentGender})
+    });
+    var d=await res.json();
+    if(!d.ok){errEl.textContent=d.error||'申請失敗，請再試一次';errEl.style.display='block';return;}
+    sucEl.textContent='✅ 長輩主卡已申請：'+d.parent_no+'，已自動連結到此家庭卡！';
+    sucEl.style.display='block';
+    // Hide the section after 3s
+    setTimeout(function(){
+      var mcs=document.getElementById('masterCardSection');
+      if(mcs)mcs.style.display='none';
+    },3000);
+  }catch(e){errEl.textContent='網絡錯誤，請再試一次';errEl.style.display='block';}
+}
+// ══ End Master Card Linking JS ══
+
+// ── Button 1: Normal WhatsApp — open WA, visibilitychange/pageshow triggers markWASent on return ──
+function openWA(){
+  if(!window._waUrl)return;
+  if(window._waSent)return;
+  window._waSent=true;
+  var btn=document.getElementById('waVerifyBtn');
+  var bizBtn=document.getElementById('waBizBtn');
+  if(btn){btn.disabled=true;btn.textContent='📤 正在開啟 WhatsApp...';btn.style.background='#a5d6a7';}
+  if(bizBtn){bizBtn.disabled=true;bizBtn.style.opacity='0.4';}
+  sessionStorage.setItem('waVerifyPending','1');
+  window.location.href=window._waUrl;
+  document.addEventListener('visibilitychange',function onVis(){
+    if(document.visibilityState==='visible'){
+      document.removeEventListener('visibilitychange',onVis);
+      markWASent();
+    }
+  });
+  window.addEventListener('pageshow',function onPS(){
+    window.removeEventListener('pageshow',onPS);
+    markWASent();
+  });
+}
+
+// Called when user returns after normal WA — watermark gone, verified_at set
+function markWASent(){
+  if(window._waSentDone)return;
+  window._waSentDone=true;
+  sessionStorage.removeItem('waVerifyPending');
+  var wm=document.getElementById('pendingWatermark');
+  var block=document.getElementById('waVerifyBlock');
+  var banner=document.getElementById('verifiedBanner');
+  if(wm)wm.style.display='none';
+  if(block)block.style.display='none';
+  if(banner)banner.style.display='block';
+  var no=window._verifyMemberNo;
+  if(no)fetch('/api/members/'+encodeURIComponent(no)+'/verify',{method:'POST'}).catch(function(){});
+  // Show PWA install prompt immediately after WA click
+  showInstallPrompt();
+}
+
+// ── Button 2: WA Business — fake 2.5s flow, records wa_clicked_at, hides watermark ──
+function openWABiz(){
+  if(window._waBizSent)return;
+  window._waBizSent=true;
+  var bizBtn=document.getElementById('waBizBtn');
+  var waBtn=document.getElementById('waVerifyBtn');
+  var sendingMsg=document.getElementById('waSendingMsg');
+  if(bizBtn){bizBtn.disabled=true;bizBtn.textContent='📤 發送中...';bizBtn.style.background='#c8e6c9';bizBtn.style.color='#2E7D32';}
+  if(waBtn){waBtn.disabled=true;waBtn.style.opacity='0.4';}
+  if(sendingMsg)sendingMsg.style.display='block';
+  var no=window._verifyMemberNo;
+  if(no)fetch('/api/members/'+encodeURIComponent(no)+'/wa-click',{method:'POST'}).catch(function(){});
+  // Show PWA install prompt immediately on WA Biz click
+  showInstallPrompt();
+  setTimeout(markVerified,2500);
+}
+
+// Called after WA Biz fake flow — hides watermark, shows verified banner
+function markVerified(){
+  if(window._verifyDone)return;
+  window._verifyDone=true;
+  var wm=document.getElementById('pendingWatermark');
+  var block=document.getElementById('waVerifyBlock');
+  var sendingMsg=document.getElementById('waSendingMsg');
+  var banner=document.getElementById('verifiedBanner');
+  if(wm)wm.style.display='none';
+  if(block)block.style.display='none';
+  if(sendingMsg)sendingMsg.style.display='none';
+  if(banner)banner.style.display='block';
+  // Do NOT call /verify — admin must manually confirm via admin panel
+}
+
+// ── PWA Install Prompt (shown after WA click on join-family page) ──
+function showInstallPrompt() {
+  if(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return;
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPhone|iPad|iPod/.test(ua);
+  var isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|mercury/.test(ua);
+  var isInApp = new RegExp('FBAN|FBAV|Instagram|WhatsApp|Line').test(ua);
+  var existing = document.getElementById('pwaInstallBanner');
+  if(existing) return;
+  var banner = document.createElement('div');
+  banner.id = 'pwaInstallBanner';
+  banner.style.cssText = 'margin:20px 0;background:#e8f5e9;border:2px solid #a5d6a7;border-radius:14px;padding:20px 18px;';
+  var content = '';
+  if(isInApp) {
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><p style="font-size:16px;color:#333;margin-bottom:12px;">\u8acb\u8907\u88fd\u7db2\u5740\uff0c\u55ba Safari \u6216 Chrome \u958b\u555f\u5f8c\u52a0\u5165\u4e3b\u756b\u9762\u3002</p><button onclick="copyAppUrl()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">\ud83d\udccb \u8907\u88fd\u8001\u6709\u5361\u7db2\u5740</button>';
+  } else if(isIOS && isSafari) {
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><div style="background:#fff;border-radius:10px;padding:14px;"><div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">1</span><span style="font-size:16px;">\u64b3 Safari \u4e0b\u9762\u5605 <strong>\u300c\u5171\u4eab\u300d\u63a3</strong> \ud83d\udd17</span></div><div style="display:flex;gap:10px;margin-bottom:8px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">2</span><span style="font-size:16px;">\u63c0 <strong>\u300c\u52a0\u81f3\u4e3b\u756b\u9762\u300d</strong> \uff0b</span></div><div style="display:flex;gap:10px;"><span style="background:#228B22;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">3</span><span style="font-size:16px;">\u64b3\u53f3\u4e0a\u89d2 <strong>\u300c\u65b0\u589e\u300d</strong> \u5b8c\u6210\uff01</span></div></div>';
+  } else {
+    // Android Chrome (or other) — show install button; fallback instructions if beforeinstallprompt not yet fired
+    content = '<h3 style="font-size:20px;font-weight:900;color:#1a5c2a;margin-bottom:10px;">\ud83d\udcf1 \u5c07\u8001\u6709\u5361\u52a0\u843d\u4e3b\u756b\u9762</h3><p style="font-size:16px;color:#333;margin-bottom:12px;">\u5b89\u88dd\u5f8c\u53ef\u4ee5\u55ba\u4e3b\u756b\u9762\u76f4\u63a5\u958b\u555f\uff0c\u5524\u4f7f\u8a18\u4f4f\u7db2\u5740\uff01</p><button id="pwaInstallBtn" onclick="doInstallApp()" style="display:block;width:100%;padding:14px;background:#228B22;color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;">\u2b07\ufe0f \u5b89\u88dd\u5230\u4e3b\u756b\u9762</button><div id="pwaInstallFallback" style="display:none;margin-top:12px;background:#fff;border-radius:8px;padding:12px;"><p style="font-size:14px;color:#555;margin-bottom:8px;">\u55ba Chrome \u9078\u55ae\uff08\u22ee\uff09\u63c0\u300c\u52a0\u81f3\u4e3b\u87a2\u5e55\u300d\u5373\u53ef\u5b89\u88dd\u3002</p><div style="font-size:14px;font-weight:700;color:#228B22;word-break:break-all;margin-bottom:8px;">' + location.origin + '/app</div><button onclick="copyAppUrl()" style="width:100%;padding:10px;background:#fff;color:#228B22;border:2px solid #228B22;border-radius:8px;font-size:15px;font-weight:900;cursor:pointer;">\ud83d\udccb \u8907\u88fd\u7db2\u5740</button></div>';
+  }
+  banner.innerHTML = content;
+  var anchor = document.getElementById('verifiedBanner') || document.getElementById('waSentBanner') || document.getElementById('successSection');
+  if(anchor && anchor.parentNode) { anchor.parentNode.insertBefore(banner, anchor.nextSibling); }
+  else { document.body.appendChild(banner); }
+  banner.scrollIntoView({behavior:'smooth', block:'center'});
+  // Flag for beforeinstallprompt to activate install button if banner is showing
+  if(!isInApp && !isIOS) {
+    window._installBannerPending = true;
+  }
+}
+function copyAppUrl() {
+  var url = location.origin + '/app';
+  if(navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function(){ alert('\u5df2\u8907\u88fd\uff01\u8acb\u55ba Safari \u6216 Chrome \u958b\u555f\uff1a' + url); });
+  } else { prompt('\u8acb\u8907\u88fd\u4ee5\u4e0b\u7db2\u5740\uff1a', url); }
+}
+function doInstallApp() {
+  if(window._deferredInstallPrompt) {
+    window._deferredInstallPrompt.prompt();
+    window._deferredInstallPrompt.userChoice.then(function(r) {
+      window._deferredInstallPrompt = null;
+      var b = document.getElementById('pwaInstallBanner');
+      if(b && r.outcome === 'accepted') b.style.display = 'none';
+    });
+  } else {
+    // Prompt not ready — show fallback instructions
+    var fb = document.getElementById('pwaInstallFallback');
+    if(fb) fb.style.display = '';
+    var btn = document.getElementById('pwaInstallBtn');
+    if(btn) btn.style.display = 'none';
+  }
+}
+
+// Restore success page after WA redirect (family card — full page reload fallback)
+document.addEventListener('DOMContentLoaded',function(){
+  if(location.pathname==='/membership/join-family'){
+    var saved=sessionStorage.getItem('successData');
+    var waVerifyPending=sessionStorage.getItem('waVerifyPending');
+    var tier=sessionStorage.getItem('successTier');
+    if(saved&&waVerifyPending&&tier==='FAMILY'){
+      try{
+        var data=JSON.parse(saved);
+        sessionStorage.removeItem('waVerifyPending');
+        document.getElementById('formSection').style.display='none';
+        document.getElementById('cardZh').textContent=data.nameZh;
+        document.getElementById('cardEn').textContent=data.nameEn||'';
+        document.getElementById('cardNo').textContent=data.memberNo;
+        var cardUrl=location.origin+'/membership/card/'+data.memberNo;
+        try{QRCode.toCanvas(document.getElementById('cardQr'),cardUrl,{width:40,margin:0,color:{dark:'#a80000',light:'#ffffff'},errorCorrectionLevel:'H'});}catch(e){}
+        document.getElementById('successSection').classList.add('show');
+        var mySubLink=document.getElementById('mySubPageLink');
+        var mySubSep=document.getElementById('mySubPageSep');
+        if(mySubLink){mySubLink.href='/membership/card/'+data.memberNo;mySubLink.style.display='inline';}
+        if(mySubSep){mySubSep.style.display='inline';}
+        window._verifyMemberNo=data.memberNo;
+        window.scrollTo(0,0);
+        setTimeout(function(){renderCardImage(data,'FAMILY');},100);
+        // Show master card linking section if no parent linked
+        if(!data.parentNo){
+          var mcs=document.getElementById('masterCardSection');
+          if(mcs){mcs.style.display='block';}
+          initAddParentYearDropdown();
+        }
+        // Full reload after normal WA: watermark gone, verified_at set
+        setTimeout(function(){
+          var wm=document.getElementById('pendingWatermark');
+          var block=document.getElementById('waVerifyBlock');
+          var banner=document.getElementById('verifiedBanner');
+          if(wm)wm.style.display='none';
+          if(block)block.style.display='none';
+          if(banner)banner.style.display='block';
+          var no=window._verifyMemberNo;
+          if(no)fetch('/api/members/'+encodeURIComponent(no)+'/verify',{method:'POST'}).catch(function(){});
+        },600);
+      }catch(e){}
+    }
+  }
+});
+
+function renderCardImage(data, tier) {
+  var logoImg=new Image();
+  logoImg.onload=function(){
+  // Canvas: 1360×860 @2x (displays as 680×430, credit-card ratio)
+  var W=1360, H=860;
+  var canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  var ctx=canvas.getContext('2d');
+  var isPrimary=(tier!=='FAMILY');
+  var forestDeep='#0d3e12',forest='#2E7D32',forestPale='#E8F5E9';
+  var ferrari='#C62828',ferrariDeep='#8B0000',ferrariPale='#FFEBEE';
+  var accentDark=isPrimary?forestDeep:ferrariDeep;
+  var accentMid=isPrimary?forest:ferrari;
+  var qrDark=isPrimary?forestDeep:'#a80000';
+  // ── Background gradient
+  var bg=ctx.createLinearGradient(0,0,W,H);
+  if(isPrimary){bg.addColorStop(0,'#FDFAF3');bg.addColorStop(1,'#F0EBD8');}
+  else{bg.addColorStop(0,'#FFF8F8');bg.addColorStop(1,'#FFE8E8');}
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+  // ── Watermark "85" — centred-right, large, faint — Montserrat Bold
+  ctx.save(); ctx.globalAlpha=0.07; ctx.fillStyle=accentDark;
+  ctx.font='bold 700px "Montserrat",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('85',W*0.72,H*0.56); ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.restore();
+  // ── Top colour stripe (green left | red right)
+  var stripeH=16;
+  ctx.fillStyle=forest; ctx.fillRect(0,0,W*0.45,stripeH);
+  ctx.fillStyle=ferrari; ctx.fillRect(W*0.45,0,W*0.55,stripeH);
+  // ── Logo (top-left) — no divider line below
+  var logoX=40,logoY=stripeH+20,logoW=330,logoH=132;
+  ctx.drawImage(logoImg,logoX,logoY,logoW,logoH);
+  // Vertical divider after logo
+  ctx.strokeStyle=accentDark; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(logoX+logoW+24,logoY+10); ctx.lineTo(logoX+logoW+24,logoY+logoH-10); ctx.stroke();
+  // Card type label (老有卡 / 家庭同行)
+  var cardNameX=logoX+logoW+44;
+  ctx.fillStyle=accentDark;
+  if(isPrimary){ctx.font='bold 51px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2+18);}
+  else{ctx.font='bold 42px "Noto Serif TC",serif';ctx.fillText('老有卡',cardNameX,logoY+logoH/2-9);ctx.fillText('家庭同行',cardNameX,logoY+logoH/2+44);}
+  // ── Badge (top-right)
+  var badgeW=462,badgeH=75,badgeX=W-badgeW-48,badgeY=stripeH+26;
+  ctx.fillStyle=isPrimary?forestPale:ferrariPale; ctx.strokeStyle=accentMid; ctx.lineWidth=3;
+  ctx.beginPath(); roundRect(ctx,badgeX,badgeY,badgeW,badgeH,8); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=ferrari; ctx.font='bold 29px sans-serif'; ctx.fillText('◆',badgeX+18,badgeY+50);
+  ctx.fillStyle=accentDark; ctx.font='bold 35px "Noto Serif TC",serif'; ctx.fillText('CoExplorery 探索者',badgeX+54,badgeY+50);
+  // Tier label (right-aligned, below badge)
+  ctx.fillStyle=ferrari; ctx.font='bold 33px "Noto Serif TC",serif'; ctx.textAlign='right';
+  ctx.fillText(isPrimary?'主卡 · PRIMARY':'附屬 · FAMILY',W-48,badgeY+badgeH+42); ctx.textAlign='left';
+  // ── Name area — pushed up, starting right after header zone
+  var nameAreaY=stripeH+340;
+  ctx.fillStyle='#999'; ctx.font='26px "Noto Serif TC",serif';
+  var lbl='會員姓名',lx=48;
+  for(var i=0;i<lbl.length;i++){ctx.fillText(lbl[i],lx,nameAreaY);lx+=ctx.measureText(lbl[i]).width+10;}
+  ctx.fillStyle=accentDark;
+  var zh=data.nameZh||'';
+  var zhSz=zh.length<=2?200:zh.length<=3?178:zh.length<=4?148:112;
+  ctx.font='bold '+zhSz+'px "Noto Serif TC",serif'; ctx.fillText(zh,48,nameAreaY+zhSz+10);
+  var enY=nameAreaY+zhSz+10;
+  if(data.nameEn&&data.nameEn.trim()){
+    ctx.fillStyle=accentDark; ctx.font='bold 46px "Noto Serif TC",serif'; enY+=60;
+    ctx.fillText(data.nameEn.trim(),48,enY);
+  }
+  if(!isPrimary&&data.parentNo){
+    ctx.fillStyle=ferrari; ctx.font='26px "Noto Serif TC",serif';
+    ctx.fillText('◆ 綁定主卡：'+data.parentNo+(data.parentName?' （'+data.parentName+'）':''),48,enY+48);
+  }
+  // ── QR code — bottom-right corner, pixel-perfect fill (no white gap)
+  var footY=H-36;
+  var qrSz=192,qrX=W-qrSz-40,qrY2=H-qrSz-40;
+  ctx.fillStyle='#fff'; ctx.fillRect(qrX-8,qrY2-8,qrSz+16,qrSz+16);
+  ctx.strokeStyle=accentMid; ctx.lineWidth=4; ctx.strokeRect(qrX-8,qrY2-8,qrSz+16,qrSz+16);
+  try{
+    var qr=qrcode(0,'M');
+    qr.addData(location.origin+'/membership/card/'+(data.memberNo||''));
+    qr.make();
+    var mc=qr.getModuleCount();
+    // Use exact cell size so modules fill entire qrSz — no fractional gap
+    var cell=qrSz/mc;
+    ctx.fillStyle=qrDark;
+    for(var row=0;row<mc;row++){for(var col=0;col<mc;col++){
+      if(qr.isDark(row,col)) ctx.fillRect(qrX+col*cell,qrY2+row*cell,cell,cell);
+    }}
+  }catch(e){console.warn('QR err',e);}
+  // ── Footer — no background box, clean transparent
+  ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif'; ctx.fillText('會員編號',48,footY-72);
+  ctx.fillStyle=accentDark; ctx.font='bold 56px "Space Grotesk",monospace'; ctx.fillText(data.memberNo||'',48,footY-8);
+  if(data.expiresAt){
+    var expStr=data.expiresAt.slice(0,7).replace('-','/');
+    var expDisp=expStr.slice(5)+' / '+expStr.slice(0,4);
+    ctx.fillStyle='#aaa'; ctx.font='28px "Noto Serif TC",serif'; ctx.fillText('有效期至',560,footY-72);
+    ctx.fillStyle=accentDark; ctx.font='bold 56px "Space Grotesk",monospace'; ctx.fillText(expDisp,560,footY-8);
+  }
+  // ── Convert → JPEG blob
+  canvas.toBlob(function(blob){
+    if(!blob)return;
+    window._cardBlob=blob; window._cardFileName='CoEldery85_'+(data.memberNo||'card')+'.jpg';
+    var url=URL.createObjectURL(blob);
+    var img=document.getElementById('cardImg'); if(img)img.src=url;
+    var wrap=document.getElementById('cardImgWrap'); if(wrap)wrap.style.display='block';
+    var cssCard=document.getElementById('genCard'); if(cssCard)cssCard.style.display='none';
+  },'image/jpeg',0.95);
+  }; // end logoImg.onload
+  logoImg.src='/static/logo.png';
+}
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
+function saveCardImage(){
+  if(!window._cardBlob){alert('圖片未準備好，請稍候再試');return;}
+  var a=document.createElement('a');a.href=URL.createObjectURL(window._cardBlob);a.download=window._cardFileName||'coeldery85-card.jpg';a.click();
+}
+
+async function shareCardToWA(){
+  if(!window._cardBlob){alert('圖片未準備好，請稍候再試');return;}
+  var file=new File([window._cardBlob],window._cardFileName||'coeldery85-card.jpg',{type:'image/jpeg'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:'CoEldery 85 老有卡',text:'我已成功申請 CoEldery 85 家庭同行卡！'});return;}
+    catch(e){if(e.name!=='AbortError')console.warn('share error',e);}
+  }
+  saveCardImage();
+  alert('請在相簿選取剛下載的會員卡圖片，貼入 WhatsApp 傳送。');
+}
+</script>
+</body></html>`
+}
