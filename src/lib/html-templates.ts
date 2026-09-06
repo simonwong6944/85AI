@@ -1,3 +1,4 @@
+import { HK_DISTRICTS } from './constants'
 export function dashboardHtml() {
   const modules = [
     { path: '/membership/join', icon: '🪪', en: 'Membership', zh: '會員系統', status: 'live', desc: '會員登記、會員卡、資料管理' },
@@ -6076,6 +6077,158 @@ function showErr(id, msg) {
 }
 function clearErrors() {
   document.querySelectorAll('.err-box').forEach(function(e) { e.classList.remove('show'); });
+}
+</script>
+</body>
+</html>`
+}
+
+export function qrCompleteHtml() {
+  const districtOptions = HK_DISTRICTS.map(d => `<option value="${d}">${d}</option>`).join('')
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>完成會員登記 — CoEldery 85</title>
+<meta name="theme-color" content="#1a6b1a">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:linear-gradient(160deg,#1a6b1a 0%,#388e3c 45%,#2e7d32 100%);min-height:100vh;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:#fff;border-radius:24px;padding:36px 28px 32px;max-width:420px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+h1{font-size:22px;font-weight:900;color:#1a6b1a;margin-bottom:6px;}
+.sub{font-size:14px;color:#666;margin-bottom:24px;line-height:1.5;}
+.info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:15px;}
+.info-row .lbl{color:#888;font-weight:600;}
+.info-row .val{font-weight:700;color:#111;}
+.check-icon{color:#22c55e;margin-right:4px;}
+.section{margin:22px 0 4px;font-size:16px;font-weight:700;color:#1a6b1a;}
+.field{margin-bottom:18px;}
+.field label{display:block;font-size:14px;font-weight:700;color:#222;margin-bottom:8px;}
+.field label span{color:#c62828;}
+.field select{width:100%;padding:13px 16px;font-size:16px;border:2px solid #388e3c;
+  border-radius:10px;font-family:inherit;color:#111;background:#fff;outline:none;}
+.btn{width:100%;padding:15px;font-size:17px;font-weight:900;color:#fff;
+  background:linear-gradient(135deg,#1a6b1a,#388e3c);border:none;border-radius:12px;
+  cursor:pointer;letter-spacing:1px;transition:opacity 0.2s;}
+.btn:active{opacity:0.85;}
+.error-box{background:#FEE2E2;border:1.5px solid #EF4444;border-radius:10px;
+  padding:12px 16px;font-size:14px;color:#B91C1C;margin-bottom:16px;display:none;}
+.success-box{display:none;text-align:center;padding:20px 0;}
+.success-box .big-check{font-size:64px;margin-bottom:12px;}
+.success-box h2{font-size:22px;font-weight:900;color:#1a6b1a;margin-bottom:8px;}
+.success-box p{font-size:15px;color:#555;margin-bottom:20px;line-height:1.6;}
+.go-app-btn{display:block;width:100%;padding:15px;font-size:17px;font-weight:900;
+  color:#fff;background:#1a6b1a;border:none;border-radius:12px;
+  text-decoration:none;text-align:center;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="card" id="mainCard">
+  <h1>🎉 完成你的會員資訊</h1>
+  <p class="sub">你已成功加入！請補充以下資訊以完成會員登記。</p>
+
+  <div id="memberInfo">
+    <!-- filled by JS -->
+  </div>
+
+  <p class="section">請補充以下資訊：</p>
+
+  <div id="errorBox" class="error-box"></div>
+
+  <div class="field">
+    <label>性別 <span>✽</span></label>
+    <select id="fieldGender">
+      <option value="">── 請選擇 ──</option>
+      <option value="M">男</option>
+      <option value="F">女</option>
+      <option value="Other">其他</option>
+      <option value="Prefer not to say">寧願不說</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>居住地區 <span>✽</span></label>
+    <select id="fieldDistrict">
+      <option value="">── 請選擇 ──</option>
+      ${districtOptions}
+    </select>
+  </div>
+
+  <button class="btn" id="submitBtn" onclick="doComplete()">保存並查看會員卡</button>
+</div>
+
+<div class="success-box" id="successBox">
+  <div class="big-check">✅</div>
+  <h2>會員登記完成！</h2>
+  <p>你的 CoEldery 85 會員資料已完整<br>立即進入老有卡 App 查看你的會員卡</p>
+  <a class="go-app-btn" id="goAppBtn" href="/app">📱 進入老有卡 App</a>
+</div>
+
+<script>
+var memberNo = '';
+var memberData = null;
+
+// Get member info from sessionStorage (set by /app after token login)
+try {
+  var stored = sessionStorage.getItem('wa_member');
+  if (stored) memberData = JSON.parse(stored);
+} catch(_) {}
+
+if (memberData) {
+  memberNo = memberData.member_no || '';
+  var currentYear = new Date().getFullYear();
+  var age = memberData.birth_year ? currentYear - memberData.birth_year : null;
+  var tierLabel = memberData.tier === 'PRIMARY' ? '主卡（55+）' : '家庭卡';
+  document.getElementById('memberInfo').innerHTML =
+    '<div class="info-row"><span class="lbl">姓名</span><span class="val"><span class="check-icon">✓</span>' + (memberData.name_zh||'') + '</span></div>' +
+    '<div class="info-row"><span class="lbl">出生年份</span><span class="val"><span class="check-icon">✓</span>' + (memberData.birth_year||'') + '</span></div>' +
+    '<div class="info-row"><span class="lbl">會員類型</span><span class="val"><span class="check-icon">✓</span>' + tierLabel + '</span></div>' +
+    '<div class="info-row"><span class="lbl">會員號碼</span><span class="val"><span class="check-icon">✓</span>' + memberNo + '</span></div>';
+}
+
+function showError(msg){ var b=document.getElementById('errorBox'); b.textContent=msg; b.style.display='block'; }
+function hideError(){ document.getElementById('errorBox').style.display='none'; }
+
+function doComplete(){
+  hideError();
+  var gender   = document.getElementById('fieldGender').value;
+  var district = document.getElementById('fieldDistrict').value;
+  if (!gender)   { showError('請選擇性別'); return; }
+  if (!district) { showError('請選擇居住地區'); return; }
+  if (!memberNo) { showError('找不到會員資料，請重新掃描QR碼'); return; }
+
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '⏳ 儲存中...';
+
+  fetch('/api/member/complete-profile', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ member_no: memberNo, gender: gender, district: district })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok){
+      document.getElementById('mainCard').style.display = 'none';
+      document.getElementById('successBox').style.display = 'block';
+      // Update stored member data
+      if (memberData){
+        memberData.gender = gender; memberData.district = district;
+        memberData.registration_status = 'complete';
+        try { sessionStorage.setItem('wa_member', JSON.stringify(memberData)); } catch(_){}
+      }
+    } else {
+      showError(d.error || '儲存失敗，請重試');
+      btn.disabled=false; btn.textContent='保存並查看會員卡';
+    }
+  })
+  .catch(function(){
+    showError('網絡錯誤，請重試');
+    btn.disabled=false; btn.textContent='保存並查看會員卡';
+  });
 }
 </script>
 </body>
