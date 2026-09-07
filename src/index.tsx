@@ -11,7 +11,7 @@ import { sha256hex, appendHashChain } from './lib/revenue-utils'
 import { verifyColinkerySess, requireColinkery } from './lib/colinkery-auth'
 import { htmlHead } from './lib/html-shared'
 import { HK_DISTRICTS } from './lib/constants'
-import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml, qrCompleteHtml, sopHtml, posterHtml, loginHtml, homeHtml, signupSubHtml, signupMainHtml, adminHtml, pwaAppHtml, newAdminShellHtml } from './lib/html-templates'
+import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml, qrCompleteHtml, signupSubHtml, signupMainHtml, adminHtml, pwaAppHtml, newAdminShellHtml } from './lib/html-templates'
 
 type Bindings = {
   DB: D1Database
@@ -3653,20 +3653,8 @@ renderQuestions();
 // ─── Admin HTML ───────────────────────────────────────────────────────────────
 // [MOVED to src/lib/html-templates.ts @ Wave3/Stage4] adminHtml — pure mechanical move
 
-// ─── Poster HTML ──────────────────────────────────────────────────────────────
-// [MOVED to src/lib/html-templates.ts @ Wave3/Stage4] posterHtml — pure mechanical move
-
-// ─── SOP HTML (simplified) ────────────────────────────────────────────────────
-// [MOVED to src/lib/html-templates.ts @ Wave3/Stage4] sopHtml — pure mechanical move
-
 // ─── Member Profile HTML ──────────────────────────────────────────────────────
 // [MOVED to src/lib/html-templates.ts @ Wave3/Stage2] memberProfileHtml — pure mechanical move
-
-// ─── Home HTML (統一登入/登記入口) ───────────────────────────────────────────────
-// [MOVED to src/lib/html-templates.ts @ Wave3/Stage4] homeHtml — pure mechanical move
-
-// ─── Login HTML ───────────────────────────────────────────────────────────────
-// [MOVED to src/lib/html-templates.ts @ Wave3/Stage4] loginHtml — pure mechanical move
 
 // ─── New /admin Shell (Login-protected) ──────────────────────────────────────
 // [MOVED to src/lib/html-templates.ts @ Wave3/Stage5] newAdminShellHtml — pure mechanical move (final template, 5 script blocks)
