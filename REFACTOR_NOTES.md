@@ -345,4 +345,53 @@ Wave 3（HTML template 模組化）全部完成。`src/lib/html-templates.ts` �
 
 ---
 
+## [NOTE-013] registerRevenueRoutes — Wave 2 遺留收尾項勘查【✅ COMPLETE — 無需修改】
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 2 遺留，NOTE-004 Stage 4 預告「待另行討論後執行」 |
+| **結案於** | Wave 4，2026-09-07（唯讀勘查，零 code 改動） |
+| **涉及範圍** | `registerRevenueRoutes(app: Hono<...>)` — `src/index.tsx` 定義第 **3785** 行，呼叫第 **5191** 行 |
+| **Wire 狀態** | ✅ **已正確 wire** — `registerRevenueRoutes(app)` 在主流程中正常呼叫，非「漏接」亦非「廢棄」 |
+| **路由規模** | 共 **34 條** — 20 條 admin 後台（`/api/admin/rev/*` + `/api/admin/doc/:key`）+ 14 條 partner/public 前台（`/api/partner/*`、`/api/member/lookup`、`/api/team-invite`、`/api/team-confirm`、`/verify/:token`、`/impact`） |
+
+### 鑑權架構結論
+
+| 路由類型 | 鑑權方式 | 無 cookie 實測結果 |
+|---------|---------|:-:|
+| 20 條 `/api/admin/*`（rev + doc） | Line 58 `app.use('/api/admin/*')` middleware 集中保護 | **全部 21 條一致 401** `AUTH_REQUIRED` ✅ |
+| 14 條 partner/public 前台 | 設計上不設 auth（code comment 已說明：「角色申請（前台，無需 admin auth）」） | 正確業務回應（200 / 400 / 404）✅ |
+
+- `registerRevenueRoutes` 內部 **零 `verifySession()` 呼叫** — 屬設計決策，非疏漏
+- 集中式 middleware 鑑權架構，與 NOTE-002 Option B 收斂方向一致（handler 不重複鑑權）
+- 🟢 **無任何 admin/rev 路由可在無 cookie 下繞過 401，零安全破口**
+
+### 功能結論
+
+| 測試類別 | 路由 | 結果 |
+|---------|------|------|
+| Admin GET（有 cookie） | `/api/admin/rev/applications`、`/partners`、`/projects`、`/dashboard`、`/cards`、`/holders` | **200** ✅ |
+| Admin GET（有 cookie） | `/api/admin/doc/test.pdf` | **404**（sandbox 無 R2 數據，業務邏輯正確）✅ |
+| Admin GET（有 cookie） | `/api/admin/rev/holder/:holderNo/projects` | **200** ✅ |
+| Admin POST（有 cookie，欄位驗證） | `review`、`partner`、`project`、`ledger`、`wallet/status` | **400**（欄位驗證正常，已過鑑權層）✅ |
+| Admin POST（有 cookie） | `/api/admin/rev/card/:id/revoke` | **200** ✅ |
+| Public GET（無 cookie） | `/api/partner/my-status`、`/api/member/lookup`、`/impact`、`/verify/:token` | **200** ✅ |
+| Public POST/GET（無 cookie，欄位/業務驗證） | `/api/partner/apply`、`/api/team-confirm`、`/api/team-invite?token=...` | **400 / 404**（業務層正常）✅ |
+| 未逐條實測（同組確認） | `/api/partner/statement`、`/api/partner/wallet`、`/api/partner/withdraw`、`/api/partner/project/:id`、`/api/partner/card`、`/api/partner/team` | 同一 wire 路徑，懸念已坐實，列「未逐條但同組確認」 |
+
+### 與 NOTE-002 對比
+
+| 項目 | NOTE-002（benefits 系列）| NOTE-013（revenue 系列）|
+|------|:---:|:---:|
+| handler 內有問題 verifySession | ✅ 有（`verifySession(c, db)` 引數倒序）| ❌ 無（零 verifySession call）|
+| admin 路由 middleware 保護 | ✅ 完整 | ✅ 完整 |
+| 有 cookie admin 路由狀態 | 修前 500（TypeError），修後 200 | 直接 200，從無問題 |
+| 需要修復 | ✅ 需要（Option B 刪除 9 行）| ❌ **無需任何改動** |
+
+### 最終判決
+
+**已 wire 且全部 work — Wave 2 遺留收尾項正式關閉，無需 code 改動。**
+
+---
+
 <!-- 以後所有搬遷時發現的可疑邏輯，照此格式新增條目 -->
