@@ -260,13 +260,51 @@
 | 欄目 | 內容 |
 |------|------|
 | **發現於** | Wave 3 Stage 5 QA，pwaAppHtml（commit `41f232f`）及 newAdminShellHtml（commit `ecf3856`）搬遷後驗証 |
+| **勘查於** | Wave 4，2026-09-07（唯讀，零 code 改動） |
 | **涉及頁面** | `GET /app`（pwaAppHtml）、`GET /admin`（newAdminShellHtml） |
-| **問題描述** | PlaywrightConsoleCapture 在真實瀏覽器環境（HTTPS 公開 URL）對 `/app` 及 `/admin` 均捕獲 1×`Failed to load resource: the server responded with a status of 404 ()`，console error 各一條。所有靜態資源（`/manifest.webmanifest`、`/icon-192.png`、`/static/logo-coeldery85-white.png`、`/shared.css`、`/sw.js`、`/static/mc-sample.png`）curl 驗証全部返回 200。Python headless Playwright（`--disable-features=ServiceWorker`）捕獲不到該 404——說明 404 由 Service Worker 生命週期（install/activate/fetch 攔截）觸發，非 page JS 直接 fetch。 |
+| **問題描述** | PlaywrightConsoleCapture 在真實瀏覽器環境（HTTPS 公開 URL）對 `/app` 及 `/admin` 均捕獲 1×`Failed to load resource: the server responded with a status of 404 ()`，console error 各一條。Python headless Playwright（`--disable-features=ServiceWorker`）捕獲不到該 404——說明 404 由 Service Worker 生命週期觸發，非 page JS 直接 fetch。 |
 | **Baseline 對照** | 針對 `/app`：checkout `41f232f^`（`4c5f9ba`）rebuild 後用 PlaywrightConsoleCapture 同樣捕獲完全相同的 1×404；針對 `/admin`：checkout `ecf3856^`（`41f232f`）rebuild 後同樣 1×404。兩個頁面的 404 均在搬遷前已存在，**確認為 pre-existing，零 regression**。 |
-| **來源未定** | `sw.js`（CACHE_NAME `coeldery85-v4`，`OFFLINE_URLS: ['/app']`）curl 返回 200；`cache.addAll(['/app'])` 在 install event 中有 `.catch(() => {})` 吞錯；404 觸發時機及具體請求 URL 尚未完全確定（headless 工具因 SW 攔截無法捕獲網絡層詳情）。 |
-| **狀態** | 🟡 **pre-existing，非 regression**；來源未定，待調查。 |
-| **已照搬不改** | N/A（純 QA 發現，非搬遷引入）。 |
-| **建議後續行動** | Wave 4 或獨立安全調查時，在真實 Chrome DevTools Network 面板（清除 SW cache 後）確認 404 的具體請求 URL；若為非必要資源，可修改 `sw.js` 的 precache 清單或升級 CACHE_NAME 版本強制重安裝。 |
+
+### 副作用結論（Wave 4 勘查後更新）
+
+🟢 **無功能副作用** — 404 唔會令 SW 裝唔到，唔影響離線 / PWA 功能。
+
+| SW | OFFLINE 清單 | entry 實測 | 容錯 |
+|----|-------------|:---------:|------|
+| `sw.js` | `['/app']` | **200** ✅ | `cache.addAll(...).catch(() => {})` 有保護，即使失敗 SW 仍 install/activate（`skipWaiting()`）|
+| `colinkery-sw.js` | `['/colinkery/']` | **200** ✅ | 無 `.catch()` 保護，但 entry 實測 200，不會失敗 |
+
+### 已排除嫌疑（全部實測 200）
+
+| 嫌疑 | 結果 |
+|------|------|
+| SW precache `addAll` 死 entry | ❌ 排除：兩個 SW 的 OFFLINE entry 全 200 |
+| `<img src>`、`<link href>` 本地靜態資源 | ❌ 排除：`/icon-192.png`、`/icon-512.png?v=4`、`/manifest.webmanifest`、`/static/logo-coeldery85-white.png` 全 200 |
+| CDN 外部資源（Tailwind / FontAwesome / qrcode-generator） | ❌ 排除：全 200 |
+| newAdminShellHtml 本地靜態引用 | ❌ 排除：零本地靜態資源引用（全為 CDN https://）|
+| pwaAppHtml 外部 `<script>`/`<link>` | ❌ 排除：零外部 script/css，全部 inline style |
+
+### 未鎖定項
+
+具體返 404 的 request URL **未能鎖定**。  
+沙箱 headless Playwright 因 SW 攔截看不到 network 層；PlaywrightConsoleCapture 只截到 `404 ()`（URL 括號為空）。
+
+### 兩個待驗假設（需真實 Chrome DevTools 確認，勿在未確認前修改）
+
+| 假設 | 說明 |
+|------|------|
+| **(a) 前端 JS 發出缺參數 fetch** | `pwaAppHtml` 的 `showCard()` 會組裝 `<iframe src="/membership/card/" + memberNo>`；若 `memberNo` 為空字串或 undefined，iframe src 退化為 `/membership/card/`（無 `:no` 參數），而 route 只有 `app.get('/membership/card/:no', ...)` — 實測 `/membership/card/` 返 **404**。此路徑唯有用戶操作觸發，非 SW precache。 |
+| **(b) 舊版 SW cache stale entry** | 若用戶瀏覽器已安裝舊版 SW（`coeldery85-v1/v2/v3`），activate handler 雖然刪舊 cache，但若刪除時機或 scope 問題遺留 stale opaque response，可能於日後 cache match 時返 404。 |
+
+### 確認方法（留待有瀏覽器環境時執行）
+
+> 真實 Chrome 開 HTTPS 頁面 → DevTools → **Application** → **Service Workers** → **Unregister 全部** + **Clear Storage** → 重新整理 → **Network tab** → filter `Status: 404` → 記下 request URL。  
+> 鎖定 URL 後方能對症：假設 (a) → 修 `showCard()` 前端邏輯（加 guard 防 memberNo 空值）；假設 (b) → 升 `CACHE_NAME` 由 `coeldery85-v4` → `coeldery85-v5` 強制重安裝 SW 清除 stale cache。
+
+| **狀態** | 🟡 **已知無害 / 來源待真實瀏覽器確認 / 不修** |
+|----------|------|
+| **優先級** | 低 — 無功能影響，純 console 噪音，可留待有瀏覽器環境時一次確認 |
+| **需要 code 改動** | **否** — 未鎖定 URL 前不改動任何檔案 |
 
 ---
 
