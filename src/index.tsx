@@ -7048,7 +7048,8 @@ function getFamilyTreeApiKey(c: any): string | undefined {
   return (c.req.header('Authorization') || '').replace('Bearer ', '') || undefined
 }
 
-// 1. POST /api/member/verify — 跨 app 驗證會員身份（phone 弱綁定比對）
+// 1. POST /api/member/verify — 跨 app 驗證會員身份
+// body: { phone: string (必需), member_no?: string (optional 精準查) }
 // normalize：剝非數字 → 若長度>8 且以 852 開頭則剝前綴 → 取尾 8 位
 function normalizePhone(raw: string): string {
   let s = raw.replace(/\D/g, '')
@@ -7064,31 +7065,60 @@ app.post('/api/member/verify', async (c) => {
   let body: { member_no?: string; phone?: string } = {}
   try { body = await c.req.json() } catch (_) {}
   const memberNo = (body.member_no || '').trim()
-  const phoneRaw = (body.phone   || '').trim()
-  if (!memberNo || !phoneRaw) return c.json({ ok: false, error: '缺少 member_no 或 phone' }, 400)
-  const member = await db.prepare(
-    `SELECT member_no, status, expires_at, member_type, name_zh, tier, parent_no, relation, phone
-     FROM members WHERE member_no = ?`
-  ).bind(memberNo).first<{
-    member_no: string; status: string; expires_at: string; member_type: string
-    name_zh: string; tier: string; parent_no: string | null; relation: string | null; phone: string
-  }>()
-  // 統一 401 防列舉：查無、NODE_ONLY、空 phone、phone 不夾，全部同一 body
+  const phoneRaw = (body.phone    || '').trim()
+  // phone 必需；member_no optional
+  if (!phoneRaw) return c.json({ ok: false, error: '缺少 phone' }, 400)
+  const phoneNorm = normalizePhone(phoneRaw)
+
+  // 統一 401 防列舉：查無、NODE_ONLY、phone 不夾、撞多筆，全部同一 body
   const FAIL = { ok: false, error: '驗證失敗' } as const
-  if (!member) return c.json(FAIL, 401)
-  if (member.member_type === 'NODE_ONLY') return c.json(FAIL, 401)
-  if (!member.phone) return c.json(FAIL, 401)
-  if (normalizePhone(phoneRaw) !== normalizePhone(member.phone)) return c.json(FAIL, 401)
+
+  type MemberRow = {
+    member_no: string; status: string; expires_at: string; member_type: string
+    name_zh: string; tier: string; gender: string; birth_year: number | null; phone: string
+  }
+
+  let member: MemberRow | null = null
+
+  if (memberNo) {
+    // 有 member_no → 精準查，再比對 phone
+    member = await db.prepare(
+      `SELECT member_no, status, expires_at, member_type, name_zh, tier, gender, birth_year, phone
+       FROM members WHERE member_no = ?`
+    ).bind(memberNo).first<MemberRow>()
+    if (!member) return c.json(FAIL, 401)
+    if (member.member_type === 'NODE_ONLY') return c.json(FAIL, 401)
+    if (!member.phone) return c.json(FAIL, 401)
+    if (normalizePhone(member.phone) !== phoneNorm) return c.json(FAIL, 401)
+  } else {
+    // 只有 phone → 查所有結果，filter NODE_ONLY
+    const rows = await db.prepare(
+      `SELECT member_no, status, expires_at, member_type, name_zh, tier, gender, birth_year, phone
+       FROM members WHERE phone = ?`
+    ).bind(phoneNorm).all<MemberRow>()
+    const candidates = (rows.results ?? []).filter(
+      (r) => r.member_type !== 'NODE_ONLY' && r.phone
+    )
+    if (candidates.length === 0) return c.json(FAIL, 401)
+    if (candidates.length > 1) {
+      // 撞多筆：記 log 畀跟進，對外一律 401
+      console.error(`[verify] phone 撞多筆 phone=${phoneNorm} count=${candidates.length}`)
+      return c.json(FAIL, 401)
+    }
+    member = candidates[0]
+    // 再比對 normalizePhone（DB 應已存純8位，double-check）
+    if (normalizePhone(member.phone) !== phoneNorm) return c.json(FAIL, 401)
+  }
+
   return c.json({
-    ok: true,
-    member_no: member.member_no,
-    status:     member.status,
-    expires_at: member.expires_at,
+    ok:          true,
+    member_no:   member.member_no,
+    name_zh:     member.name_zh,
+    gender:      member.gender   ?? '',
+    birth_year:  member.birth_year ?? null,
+    tier:        member.tier,
+    status:      member.status,
     member_type: member.member_type,
-    name_zh:    member.name_zh,
-    tier:       member.tier,
-    parent_no:  member.parent_no ?? '',
-    relation:   member.relation  ?? '',
   })
 })
 
