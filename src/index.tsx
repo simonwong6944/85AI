@@ -7202,5 +7202,109 @@ app.get('/api/family-tree/members/:no', async (c) => {
   return c.json({ ok: true, member })
 })
 
+// 5. GET /api/family-tree/members/:no/children — 查直屬子節點 (mode=self) 或整棵樹 (mode=root)
+// mode=self（預設）：WHERE parent_no=:no OR managed_by=:no，回直屬子節點
+// mode=root：往上爬至 root，再 BFS 往下展開整棵樹（含 root 節點本身）
+app.get('/api/family-tree/members/:no/children', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const apiKey = getFamilyTreeApiKey(c)
+  if (!apiKey || apiKey !== (c.env as any).FAMILY_TREE_API_KEY) {
+    return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  }
+
+  const no  = c.req.param('no')
+  const mode = (c.req.query('mode') || 'self') === 'root' ? 'root' : 'self'
+
+  // ── 共用欄位（明確排除 phone / password_hash / kyc / id_prefix / 銀行）──
+  const SELECT_COLS = `member_no, name_zh, tier, relation, member_type, managed_by,
+                       deceased_date, status, parent_no`
+
+  // ── 確認起點 member_no 存在 ───────────────────────────────────────────────
+  const anchor = await db.prepare(
+    `SELECT member_no, parent_no FROM members WHERE member_no = ? LIMIT 1`
+  ).bind(no).first<{ member_no: string; parent_no: string | null }>()
+  if (!anchor) return c.json({ ok: false, error: 'not found' }, 404)
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // mode=self：一條 query 取直屬子節點
+  // ─────────────────────────────────────────────────────────────────────────
+  if (mode === 'self') {
+    const rows = await db.prepare(
+      `SELECT ${SELECT_COLS} FROM members WHERE parent_no = ? OR managed_by = ? ORDER BY member_no`
+    ).bind(no, no).all()
+    return c.json({ ok: true, mode: 'self', parent: no, nodes: rows.results })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // mode=root：第一步往上尋根，第二步 BFS 往下展開
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // 第一步：往上爬至 root（最多 20 層，Set 防 cycle）
+  const MAX_ANCESTORS = 20
+  const visited = new Set<string>()
+  let cur = anchor.member_no
+  let curParent: string | null = anchor.parent_no || null
+  visited.add(cur)
+
+  for (let i = 0; i < MAX_ANCESTORS && curParent; i++) {
+    if (visited.has(curParent)) break       // cycle 保護
+    visited.add(curParent)
+    const row = await db.prepare(
+      `SELECT member_no, parent_no FROM members WHERE member_no = ? LIMIT 1`
+    ).bind(curParent).first<{ member_no: string; parent_no: string | null }>()
+    if (!row) break                          // parent 查唔到，停
+    cur = row.member_no
+    curParent = row.parent_no || null
+  }
+  const rootNo = cur   // 爬到最頂或超出 20 層，用當前節點做 root
+
+  // 第二步：BFS 由 root 往下（深度上限 20、節點上限 500、Set 防 cycle）
+  const MAX_DEPTH  = 20
+  const MAX_NODES  = 500
+  const seen       = new Set<string>()
+  const nodes: any[] = []
+  let truncated    = false
+
+  // 先把 root 本身加入 nodes
+  const rootRow = await db.prepare(
+    `SELECT ${SELECT_COLS} FROM members WHERE member_no = ? LIMIT 1`
+  ).bind(rootNo).first()
+  if (rootRow) {
+    nodes.push(rootRow)
+    seen.add(rootNo)
+  }
+
+  // BFS queue：每個元素是 { memberNos: string[], depth: number }
+  let queue: string[] = [rootNo]
+
+  for (let depth = 0; depth < MAX_DEPTH && queue.length > 0; depth++) {
+    if (nodes.length >= MAX_NODES) { truncated = true; break }
+
+    // 組 IN 清單（去重）
+    const batch = [...new Set(queue)]
+    queue = []
+
+    // SQLite IN clause placeholder
+    const placeholders = batch.map(() => '?').join(',')
+    const childRows = await db.prepare(
+      `SELECT ${SELECT_COLS} FROM members
+       WHERE parent_no IN (${placeholders}) OR managed_by IN (${placeholders})
+       ORDER BY member_no`
+    ).bind(...batch, ...batch).all<Record<string, unknown>>()
+
+    for (const row of childRows.results) {
+      const mno = row.member_no as string
+      if (seen.has(mno)) continue            // 防重複/cycle
+      seen.add(mno)
+      nodes.push(row)
+      queue.push(mno)
+      if (nodes.length >= MAX_NODES) { truncated = true; break }
+    }
+    if (truncated) break
+  }
+
+  return c.json({ ok: true, mode: 'root', root: rootNo, nodes, truncated })
+})
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export default app
