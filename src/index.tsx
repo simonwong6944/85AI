@@ -7048,22 +7048,48 @@ function getFamilyTreeApiKey(c: any): string | undefined {
   return (c.req.header('Authorization') || '').replace('Bearer ', '') || undefined
 }
 
-// 1. POST /api/member/verify — 跨 app 驗證會員身份
+// 1. POST /api/member/verify — 跨 app 驗證會員身份（phone 弱綁定比對）
+// normalize：剝非數字 → 若長度>8 且以 852 開頭則剝前綴 → 取尾 8 位
+function normalizePhone(raw: string): string {
+  let s = raw.replace(/\D/g, '')
+  if (s.length > 8 && s.startsWith('852')) s = s.slice(3)
+  return s.slice(-8)
+}
 app.post('/api/member/verify', async (c) => {
   const db = (c.env as any).DB as D1Database
   const apiKey = getFamilyTreeApiKey(c)
   if (!apiKey || apiKey !== (c.env as any).FAMILY_TREE_API_KEY) {
     return c.json({ ok: false, error: 'Unauthorized' }, 401)
   }
-  let body: { member_no?: string } = {}
+  let body: { member_no?: string; phone?: string } = {}
   try { body = await c.req.json() } catch (_) {}
   const memberNo = (body.member_no || '').trim()
-  if (!memberNo) return c.json({ ok: false, error: '缺少 member_no' }, 400)
+  const phoneRaw = (body.phone   || '').trim()
+  if (!memberNo || !phoneRaw) return c.json({ ok: false, error: '缺少 member_no 或 phone' }, 400)
   const member = await db.prepare(
-    `SELECT member_no, status, expires_at, member_type FROM members WHERE member_no = ?`
-  ).bind(memberNo).first<{ member_no: string; status: string; expires_at: string; member_type: string }>()
-  if (!member) return c.json({ ok: false, error: 'not found' }, 404)
-  return c.json({ ok: true, member_no: member.member_no, status: member.status, expires_at: member.expires_at, member_type: member.member_type })
+    `SELECT member_no, status, expires_at, member_type, name_zh, tier, parent_no, relation, phone
+     FROM members WHERE member_no = ?`
+  ).bind(memberNo).first<{
+    member_no: string; status: string; expires_at: string; member_type: string
+    name_zh: string; tier: string; parent_no: string | null; relation: string | null; phone: string
+  }>()
+  // 統一 401 防列舉：查無、NODE_ONLY、空 phone、phone 不夾，全部同一 body
+  const FAIL = { ok: false, error: '驗證失敗' } as const
+  if (!member) return c.json(FAIL, 401)
+  if (member.member_type === 'NODE_ONLY') return c.json(FAIL, 401)
+  if (!member.phone) return c.json(FAIL, 401)
+  if (normalizePhone(phoneRaw) !== normalizePhone(member.phone)) return c.json(FAIL, 401)
+  return c.json({
+    ok: true,
+    member_no: member.member_no,
+    status:     member.status,
+    expires_at: member.expires_at,
+    member_type: member.member_type,
+    name_zh:    member.name_zh,
+    tier:       member.tier,
+    parent_no:  member.parent_no ?? '',
+    relation:   member.relation  ?? '',
+  })
 })
 
 // 2. POST /api/family-tree/members — 新增純節點成員
