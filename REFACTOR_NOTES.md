@@ -195,15 +195,16 @@
 
 ---
 
-## [NOTE-005] walletHtml Stage 標籤誤植
+## [NOTE-005] walletHtml Stage 標籤誤植【✅ RESOLVED — commit `747333c`】
 
 | 欄目 | 內容 |
 |------|------|
 | **發現於** | Wave 3，commit `b5bca2a` 事後核查 |
+| **解決於** | Wave 5，commit `747333c`（2026-09-08） |
 | **涉及函數** | `walletHtml` → `src/lib/html-templates.ts` |
 | **問題描述** | commit `b5bca2a` 的 message 及 tombstone 均寫 `Wave3/Stage1`，實為 `Stage2`（函數含 inline script）。純標籤誤植，code 內容無誤，搬遷邏輯正確。 |
-| **已照搬不改** | ✅ 純標籤誤植，無需改動 code。 |
-| **建議後續行動** | 可於 refactor 全完成後在 commit history 作備注，或直接忽略（不影響正確性）。 |
+| **修正內容** | `src/index.tsx` line 3699 tombstone comment `Wave3/Stage1` → `Wave3/Stage2`，單一 1c1 diff，純 comment 修正。`walletHtml` 為 live export，caller：`GET /app/wallet`（`index.tsx:3684`），零 build / runtime 影響。 |
+| **build 結果** | ✅ 零 error，50 modules，bundle 1,221.05 kB **不變** |
 
 ---
 
