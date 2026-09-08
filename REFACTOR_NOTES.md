@@ -208,27 +208,36 @@
 
 ---
 
-## [NOTE-006] Stage 4 dead code 清單（zero caller 模板照搬記錄）
+## [NOTE-006] Stage 4 dead code 清單（zero caller 模板照搬記錄）【✅ RESOLVED — commit `d17350a`】
 
 | 欄目 | 內容 |
 |------|------|
 | **發現於** | Wave 3 Stage 4，搬遷前置審查 |
-| **涉及函數** | `sopHtml`、`posterHtml`、`loginHtml`、`homeHtml` |
+| **解決於** | Wave 5，commit `d17350a`（2026-09-08） |
+| **涉及函數** | `sopHtml`（56 行）、`posterHtml`（126 行）、`loginHtml`（143 行）、`homeHtml`（423 行） |
 | **問題描述** | 四個模板函數在搬遷時確認為零呼叫點（dead code）：① `sopHtml` — `/sop` 路由改為 `c.redirect('/', 301)`，未呼叫此函數；② `posterHtml` — `/poster` 路由改為 `c.redirect('/', 301)`，未呼叫此函數；③ `loginHtml` — `/membership/login` 路由呼叫 `signupMainHtml()`，非此函數；④ `homeHtml` — 全檔無任何路由呼叫此函數。 |
 | **已照搬不改** | ✅ 依純機械照搬原則，四個函數已搬入 `html-templates.ts`（commits `c3b708d`、`84e8292`、`7f2e6ec`、`068ecfd`），行為未變，dead code 狀態保留。 |
-| **建議後續行動** | 待 Wave 3 全部搬遷完成後，獨立評估是否刪除。刪除前須確認無隱藏動態呼叫點（例如字串拼接呼叫）。 |
+| **Wave 5 勘查結論** | Wave 5 全倉 caller scan 確認四函數零呼叫點（定義行 + import 行 + tombstone comment 之外無任何 caller），且四函數互不依賴。 |
+| **刪除內容** | `html-templates.ts`：刪除 `sopHtml`（lines 6239–6294）、`posterHtml`（lines 6296–6421）、`loginHtml`（lines 6423–6565）、`homeHtml`（lines 6567–6989），共 **751 行 source 刪除**；`index.tsx` line 14 import 移除四個 symbol（剩 18 個）；`index.tsx` tombstone comment 四組（12 行）清除。 |
+| **指標變化** | `html-templates.ts`：17,478 → 16,727 行；export 數：22 → **18**；`index.tsx`：7,218 → 7,206 行 |
+| **build 結果** | ✅ 零 error，50 modules，bundle 1,221.05 kB **不變**（見 NOTE-014：zero-caller export 已被 tree-shaking 排除，刪除 source 對 dist 產物為 no-op） |
+| **runtime 驗證** | `/` → 200（dashboardHtml ✅）；`/membership/login` → 200（signupMainHtml ✅）；`/sop` → 301 → `/`（✅）；`/poster` → 301 → `/`（✅） |
+| **commit** | `d17350a` — `refactor: delete dead templates sopHtml posterHtml loginHtml homeHtml (NOTE-006)` |
+| **diff 統計** | `2 files changed, 1 insertion(+), 764 deletions(−)`（html-templates.ts: 751 行純刪除；index.tsx: 1 行 import 改寫 + 12 行 tombstone 純刪除） |
 
 ---
 
-## [NOTE-007] homeHtml 硬編碼地區陣列與 HK_DISTRICTS 平行維護
+## [NOTE-007] homeHtml 硬編碼地區陣列與 HK_DISTRICTS 平行維護【⚪ CANCELLED (moot)】
 
 | 欄目 | 內容 |
 |------|------|
 | **發現於** | Wave 3 Stage 4，`homeHtml` 搬遷前置審查（commit `068ecfd`） |
-| **涉及函數** | `homeHtml` → `src/lib/html-templates.ts` |
+| **作廢於** | Wave 5，NOTE-006 刪除 `homeHtml`（commit `d17350a`，2026-09-08） |
+| **涉及函數** | `homeHtml` → 已刪除 |
 | **問題描述** | `homeHtml` 函數體內含一份硬編碼 18 地區陣列 `['中西區','灣仔','東區','南區','油尖旺','深水埗','九龍城','黃大仙','觀塘','葵青','荃灣','屯門','元朗','北區','大埔','沙田','西貢','離島']`（以 `${[...].map(d=>...)}` 形式嵌入 template literal）。此陣列與 `src/lib/constants.ts` 的 `HK_DISTRICTS` 內容完全重複，屬平行維護，存在潛在資料不一致風險（若 `HK_DISTRICTS` 更新而 `homeHtml` 未同步）。 |
 | **已照搬不改** | ✅ 搬遷時維持原硬編碼陣列，未替換為 `HK_DISTRICTS` 引用（純機械搬遷原則）。 |
-| **建議後續行動** | 待 Wave 3 完成後，考慮將 `homeHtml` 內的硬編碼陣列替換為 `import { HK_DISTRICTS } from './constants'` 引用，消除 DRY 違規。 |
+| **作廢原因** | `homeHtml` 為 zero-caller dead code，已於 NOTE-006（commit `d17350a`）一併刪除。硬編碼陣列連同函數整體消失，`HK_DISTRICTS` 替換工作已無對象，毋須執行。 |
+| **建議後續行動** | 無。本條目作廢，不需要任何 code 改動。 |
 
 ---
 
@@ -429,6 +438,20 @@ Wave 3（HTML template 模組化）全部完成。`src/lib/html-templates.ts` �
 ### 最終判決
 
 **已 wire 且全部 work — Wave 2 遺留收尾項正式關閉，無需 code 改動。**
+
+---
+
+## [NOTE-014] Bundle size 對 SSR dead-code 刪除不敏感（tree-shaking 觀察）
+
+| 欄目 | 內容 |
+|------|------|
+| **發現於** | Wave 5，NOTE-006 刪除後 build 結果（commit `d17350a`，2026-09-08） |
+| **涉及範圍** | `dist/_worker.js` bundle size；`src/lib/html-templates.ts` dead export 刪除 |
+| **觀察** | 刪除四個合計 **751 行 source** 的 zero-caller export（`sopHtml`、`posterHtml`、`loginHtml`、`homeHtml`）後，bundle size **維持 1,221.05 kB 不變**，module count 維持 **50**。 |
+| **解釋** | Vite/esbuild 在 SSR bundle 模式下對 `html-templates.ts` 已執行 tree-shaking：zero-caller 的 export 函數在 bundling 時已被排除於 `dist/_worker.js` 之外，因此這些函數從未進入 bundle。刪除 source 只清理了 TypeScript 原始碼，對 dist 產物為 **no-op**。 |
+| **結論指引** | 若目標是縮減 bundle size，應從以下方向著手：① **runtime-reachable code** — 被實際路由呼叫的 template 函數或業務邏輯；② **dependencies** — `node_modules` 中的第三方套件（尤其是 `hono` 以外的）；③ **code splitting** — 將大型 template 或功能模組拆分為獨立 chunk。刪除 dead template（zero-caller export）對 bundle 無貢獻，不應以此為縮 bundle 的手段。 |
+| **數據記錄** | Wave 3 完成後 bundle 1,221.53 kB（NOTE-001 前）；NOTE-001 修復後 1,221.05 kB（+throw message 字串，+0.10 kB → 實為 NOTE-002 −0.58 kB 後穩定）；NOTE-006 刪除後仍 **1,221.05 kB**（不變，印證 tree-shaking 早已排除四個 dead export）。 |
+| **狀態** | 🟢 觀察記錄，無需行動 |
 
 ---
 
