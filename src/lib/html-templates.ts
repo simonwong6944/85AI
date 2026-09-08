@@ -8952,8 +8952,13 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 
 /* ── 頂部 ── */
 .topbar{background:var(--green-dark);color:#fff;padding:0 16px;display:flex;align-items:center;gap:10px;height:58px;position:sticky;top:0;z-index:100;}
-.topbar-logo{height:40px;width:auto;object-fit:contain;flex-shrink:0;}
+.topbar-logo{height:40px;width:auto;object-fit:contain;flex-shrink:0;max-width:90px;}
 .topbar-spacer{flex:1;}
+/* Right-side topbar icon buttons (心聲/工作) */
+.topbar-icons{display:flex;gap:6px;align-items:center;flex-shrink:0;}
+.topbar-icon-btn{background:none;border:none;color:#fff;cursor:pointer;padding:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent;position:relative;line-height:1;}
+.topbar-icon-btn .ti-icon{font-size:22px;line-height:1;}
+@media(max-width:340px){.topbar-icon-btn .ti-icon{font-size:18px;}.topbar-icon-btn{padding:4px;}.topbar-icons{gap:2px;}}
 /* Hamburger menu button (left) */
 .menu-btn{background:none;border:none;color:#fff;cursor:pointer;padding:8px;display:flex;flex-direction:column;justify-content:center;gap:5px;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
 .menu-btn span{display:block;width:24px;height:2.5px;background:#fff;border-radius:2px;}
@@ -9049,8 +9054,18 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
 <div class="topbar">
   <!-- 左：CoEldery 85 Logo -->
   <img src="/static/logo-coeldery85-white.png" alt="CoEldery 85" class="topbar-logo">
-  <!-- 右：漢堡選單 -->
+  <!-- 中：彈性空間 -->
   <div class="topbar-spacer"></div>
+  <!-- 右：心聲 + 工作 icon（搬自底部 tab）+ 漢堡選單 -->
+  <div class="topbar-icons">
+    <button class="topbar-icon-btn" onclick="switchTab('voice')" aria-label="心聲" style="position:relative;">
+      <span class="ti-icon">💬</span>
+      <span id="voiceRedDot" style="display:none;position:absolute;top:4px;right:4px;width:9px;height:9px;background:#e53935;border-radius:50%;border:2px solid var(--green-dark);"></span>
+    </button>
+    <button class="topbar-icon-btn" onclick="switchTab('work')" aria-label="工作">
+      <span class="ti-icon">💼</span>
+    </button>
+  </div>
   <button class="menu-btn" onclick="openDrawer()" aria-label="選單">
     <span></span><span></span><span></span>
   </button>
@@ -9357,6 +9372,16 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
       <div id="tst-panel-survey" style="display:none;"></div>
     </div>
   </div>
+ </div>
+
+<!-- ── CoFilmery coming-soon panel ── -->
+<div id="tabCoFilmery" style="display:none;padding:40px 18px 90px;">
+  <div style="text-align:center;padding:48px 24px;background:#fff;border-radius:20px;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+    <div style="font-size:64px;line-height:1;margin-bottom:20px;">🎬</div>
+    <div style="font-size:26px;font-weight:900;color:#111827;margin-bottom:12px;letter-spacing:0.5px;">CoFilmery</div>
+    <div style="font-size:18px;color:#6B7280;line-height:1.7;margin-bottom:28px;">即將推出<br>敬請期待</div>
+    <div style="display:inline-block;background:#F3F4F6;border-radius:20px;padding:8px 20px;font-size:15px;color:#9CA3AF;font-weight:600;">Coming Soon</div>
+  </div>
 </div>
 
 <!-- ── 底部 5-tab 導航列 ── -->
@@ -9373,14 +9398,13 @@ body{background:var(--bg);min-height:100vh;font-family:"Noto Sans TC","PingFang 
     <span class="tab-icon">💳</span>
     <span class="tab-label">我的卡</span>
   </button>
-  <button class="tab-btn" id="tabBtnVoice" onclick="switchTab('voice')" style="position:relative;">
-    <span class="tab-icon">💬</span>
-    <span class="tab-label">心聲</span>
-    <span id="voiceRedDot" style="display:none;position:absolute;top:8px;right:14px;width:10px;height:10px;background:#e53935;border-radius:50%;border:2px solid #fff;"></span>
+  <button class="tab-btn" id="tabBtnFamilyTree" onclick="switchTab('familytree')">
+    <span class="tab-icon">🌳</span>
+    <span class="tab-label">家庭樹</span>
   </button>
-  <button class="tab-btn" id="tabBtnWork" onclick="switchTab('work')">
-    <span class="tab-icon">💼</span>
-    <span class="tab-label">工作</span>
+  <button class="tab-btn" id="tabBtnCoFilmery" onclick="switchTab('cofilmery')">
+    <span class="tab-icon">🎬</span>
+    <span class="tab-label">CoFilmery</span>
   </button>
 </nav>
 
@@ -9391,6 +9415,26 @@ var TAB_BTNS   = { shop:'tabBtnShop', news:'tabBtnNews', card:'tabBtnCard', voic
 var currentTab = 'card';
 
 function switchTab(name) {
+  // ── 特殊 tab 攔截（在原 panel 邏輯之前）──
+  if (name === 'familytree') {
+    var mn = localStorage.getItem('ce85_member_no') || '';
+    window.open('https://family.coeldery85.com' + (mn ? '?member=' + encodeURIComponent(mn) : ''), '_blank');
+    return;
+  }
+  if (name === 'cofilmery') {
+    if (name === currentTab) return;
+    var oldPanelCf = document.getElementById(TAB_PANELS[currentTab]);
+    if (oldPanelCf) oldPanelCf.style.display = 'none';
+    var oldBtnCf = document.getElementById(TAB_BTNS[currentTab]);
+    if (oldBtnCf) oldBtnCf.classList.remove('active');
+    currentTab = 'cofilmery';
+    var cfPanel = document.getElementById('tabCoFilmery');
+    if (cfPanel) cfPanel.style.display = 'block';
+    var cfBtn = document.getElementById('tabBtnCoFilmery');
+    if (cfBtn) cfBtn.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
   if (name === currentTab) return;
   // 隱藏現在的 panel
   var oldPanel = document.getElementById(TAB_PANELS[currentTab]);
