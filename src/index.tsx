@@ -3696,7 +3696,7 @@ app.get('/app/team-confirm', (c) => {
 // [MOVED to src/lib/html-templates.ts @ Wave3/Stage2] teamConfirmHtml — pure mechanical move
 
 // ── 錢包頁 HTML ────────────────────────────────────────────────────────────
-// [MOVED to src/lib/html-templates.ts @ Wave3/Stage1] walletHtml — pure mechanical move
+// [MOVED to src/lib/html-templates.ts @ Wave3/Stage2] walletHtml — pure mechanical move
 
 
 // 前台 role-holder route 走 /api/partner/*
