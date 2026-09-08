@@ -93,7 +93,7 @@
 
 ---
 
-## [NOTE-003] Wave 3 模板函數偵查 — inline JS 同名函數勿混淆 grep 結果
+## [NOTE-003] Wave 3 模板函數偵查 — inline JS 同名函數勿混淆 grep 結果【✅ NOTED (Wave 3 complete, no further action)】
 
 | 欄目 | 內容 |
 |------|------|
@@ -103,6 +103,7 @@
 | **影響** | Wave 3 搬遷時用 `grep -n "funcName" src/index.tsx` 確認定義數量，上述函數名會額外 match 到 inline JS 定義，令定義計數 > 1，**誤觸「定義多過 1 即停」前置閘**。 |
 | **處理方式** | 閘 2 grep 時，若發現定義 > 1，先 `Read` 該行上下文確認是否在 template literal `<script>` block 內（non-TS）。若係 inline JS，唔計入「TS 頂層定義」計數，可繼續。 |
 | **已照搬不改** | N/A（純調查記錄，無搬遷） |
+| **狀態** | ✅ Wave 3 全部完成，施工指引已無操作對象，保留作史料參考。無需任何 code 改動。 |
 
 ---
 
@@ -144,10 +145,10 @@
 | `signupMainHtml` | 3798–4756 | 959 | 1 |
 | `signupSubHtml` | 4760–5503 | 744 | 1 |
 | `adminHtml` | 5506–6492 | 987 | 1 |
-| `posterHtml` | 6495–6620 | 126 | 1 |
-| `sopHtml` | 6623–6678 | 56 | 0 |
-| `homeHtml` | 7634–8056 | 423 | 1 |
-| `loginHtml` | 8059–8201 | 143 | 1 |
+| ~~`posterHtml`~~ | ~~6495–6620~~ | ~~126~~ | ~~1~~ | ❌ Wave 5 NOTE-006 已刪除 |
+| ~~`sopHtml`~~ | ~~6623–6678~~ | ~~56~~ | ~~0~~ | ❌ Wave 5 NOTE-006 已刪除 |
+| ~~`homeHtml`~~ | ~~7634–8056~~ | ~~423~~ | ~~1~~ | ❌ Wave 5 NOTE-006 已刪除 |
+| ~~`loginHtml`~~ | ~~8059–8201~~ | ~~143~~ | ~~1~~ | ❌ Wave 5 NOTE-006 已刪除 |
 
 ### Stage 3 — 依賴 `HK_DISTRICTS` 的模板（Stage 0 完成後）
 
@@ -176,11 +177,7 @@
 | `signupMainHtml` | GET | `/signup` 或類似 | 老有卡申請表 |
 | `signupSubHtml` | GET | `/signup/sub` 或類似 | 家庭同行卡 |
 | `adminHtml` | GET | `/admin` | 會員後台管理 |
-| `posterHtml` | GET | `/poster` | Roadshow Poster |
-| `sopHtml` | GET | `/sop` | Roadshow 作戰手冊 |
 | `memberProfileHtml` | GET | `/member/profile` 或類似 | 會員個人頁 |
-| `homeHtml` | GET | `/` | 主頁 |
-| `loginHtml` | GET | `/login` | 會員登入 |
 | `newAdminShellHtml` | GET | `/new-admin` 或類似 | 新 admin shell |
 | `coworkeryAppHtml` | GET | `/coworkery` 或類似 | |
 | `pwaAppHtml` | GET | `/app` 或類似 | PWA |
@@ -193,6 +190,8 @@
 | `qrCompleteHtml` | GET | `/qr-register/complete` | 須 HK_DISTRICTS |
 | `adminQrHtml` | GET | `/admin/qr` 或類似 | |
 | `brandFormHtml` | GET | `/brand` 或類似 | |
+
+> **Wave 5 更新（NOTE-006，commit `d17350a`）**：`posterHtml`、`sopHtml`、`homeHtml`、`loginHtml` 已確認零 caller 並刪除。相關 route 現況：`/poster` → 301 redirect `/`；`/sop` → 301 redirect `/`；`/` → `dashboardHtml()`；`/membership/login` → `signupMainHtml()`。以上四項已從 Smoke Test 清單移除。
 
 ---
 
@@ -241,26 +240,30 @@
 
 ---
 
-## [NOTE-008] signupMainHtml 搬遷 import 行事故（27d173a）
+## [NOTE-008] signupMainHtml 搬遷 import 行事故（27d173a）【✅ RESOLVED — commit `4c5f9ba`】
 
 | 欄目 | 內容 |
 |------|------|
 | **發現於** | Wave 3 Stage 4，commit `27d173a`（`signupMainHtml` 搬遷）事後審查 |
+| **解決於** | Wave 3 chore commit `4c5f9ba`（import normalize） |
 | **涉及範圍** | `src/index.tsx` 第 14 行 import 行 |
 | **問題描述** | Python surgery script 的舊 import append 邏輯（以 `.rstrip('}')` 切除閉括號後砌回）在處理行尾有 trailing space 的情況下產生 broken 語法：`} from './lib/html-templates' , signupMainHtml } from './lib/html-templates'`（雙重 `from`）。隨即以第二個 Python script 手動重寫整條 import 行（手寫死 19 symbol string）覆蓋修正。事後核實：19 symbol 齊全、每個在 `html-templates.ts` 均有對應唯一 `export function`、`from` 只出現一次，最終結果正確。 |
 | **修正措施** | 於 commit `e4d7645`（`adminHtml` 搬遷）改用安全 regex insert 邏輯：`re.sub(r'\s*(} from \'./lib/html-templates\')', ' , adminHtml \1', line)`，連續兩個 commit（`27d173a` 事後核實 + `e4d7645` 實際使用）驗證正確。 |
 | **遺留格式問題** | 手寫覆蓋雖未改動 symbol 1–18 的間距，但累積自 Stage 3–4 append 的格式漂移（symbol 13–19 使用 ` , symbol` 前後 space 風格，與 symbol 1–12 的 `symbol, ` 標準風格不一致）已於本次 chore commit normalize 統一。 |
+| **現狀核查** | ✅ Wave 5 核查確認（2026-09-08）：`src/index.tsx` line 14 現為 18 個 symbol，separator 全部 `', '`，單一 `from './lib/html-templates'`，無任何遺留問題。 |
 
 ---
 
-## [NOTE-009] html-templates import 行格式漂移（已於本 commit 修正）
+## [NOTE-009] html-templates import 行格式漂移（已於本 commit 修正）【✅ RESOLVED — commit `4c5f9ba`】
 
 | 欄目 | 內容 |
 |------|------|
 | **發現於** | Wave 3 Stage 4 收尾審查 |
+| **解決於** | Wave 3 chore commit `4c5f9ba`（import normalize） |
 | **涉及範圍** | `src/index.tsx` 第 14 行 `import { ... } from './lib/html-templates'` |
 | **問題描述** | Symbol 1–12（`dashboardHtml` 至 `partnerApplyHtml`）使用 `symbol, nextSymbol` 風格（逗號後一空格，逗號前無空格）；symbol 13–19（`qrCompleteHtml` 至 `adminHtml`）因歷次 append script 格式漂移，使用 ` , symbol` 風格（逗號前後各一空格）。兩種風格混雜同一行。 |
 | **已修正** | ✅ 本 chore commit 以程式化 normalize（split by comma → strip → join with `', '`）統一全部 20 個 symbol 為 `symbol, symbol` 標準風格，零 symbol 內容改動。 |
+| **現狀核查** | ✅ Wave 5 核查確認（2026-09-08）：Wave 5 刪除四個 dead symbol 後剩 **18 個** symbol，separator 全部 `', '`（17 occurrences），格式完全統一，無任何遺留問題。 |
 
 ---
 
@@ -322,7 +325,7 @@
 | 欄目 | 內容 |
 |------|------|
 | **完成於** | Wave 3 Stage 5，commit `ecf3856`（newAdminShellHtml，最後一個 template） |
-| **涉及範圍** | `src/index.tsx` → `src/lib/html-templates.ts`（22 個 exported functions） |
+| **涉及範圍** | `src/index.tsx` → `src/lib/html-templates.ts`（22 個 exported functions；Wave 5 後實際為 **18 個**，見下） |
 | **搬遷規模** | `src/index.tsx`：Wave 3 開始前 ~16,963 行 → 完成後 **7,227 行**（減少 **~9,736 行，約 −57%**） |
 
 > **注意**：本條 NOTE-011 所稱「24,848 行」為本次 refactor branch 整個 session 起點（Wave 1 開始前）計算值；Wave 3 開始前基線約 16,963 行；Wave 3 完成後 7,227 行，Wave 3 本身減少約 9,736 行（−57%）。全程 index.tsx 淨減幅（含 Wave 1–3）約 −71%。
@@ -331,9 +334,9 @@
 
 | 指標 | 數值 |
 |------|------|
-| html-templates.ts exported functions | **22 個** |
+| html-templates.ts exported functions | **22 個**（Wave 3 完成時）→ **18 個**（Wave 5 NOTE-006 後，−4 dead exports） |
 | index.tsx 行數（Wave 3 開始前） | ~16,963 行 |
-| index.tsx 行數（Wave 3 完成後） | **7,227 行** |
+| index.tsx 行數（Wave 3 完成後） | **7,227 行**（Wave 5 NOTE-006 後：**7,206 行**） |
 | Wave 3 減少行數 | ~9,736 行（約 −57%） |
 | index.tsx 行數（session 起點，含 Wave 1–2 前） | ~24,848 行 |
 | index.tsx 總減少行數（Wave 1–3 累計） | ~17,621 行（約 −71%） |
@@ -374,6 +377,8 @@
 ### Wave 3 完成宣告
 
 Wave 3（HTML template 模組化）全部完成。`src/lib/html-templates.ts` 現為 22 個 exported functions 的獨立模組，`src/index.tsx` 已清空所有 template 定義，僅保留路由 handler、middleware、業務邏輯及 lib 函數。
+
+> **Wave 5 後更新**（commit `d17350a`，2026-09-08）：`sopHtml`、`posterHtml`、`loginHtml`、`homeHtml` 四個 zero-caller dead export 已刪除。html-templates.ts exported functions：22 → **18**；html-templates.ts 行數：17,478 → 16,727；index.tsx 行數：7,227 → **7,206**。
 
 ---
 
