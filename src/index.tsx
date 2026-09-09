@@ -7362,5 +7362,50 @@ app.get('/api/family-tree/members/:no/children', async (c) => {
   return c.json({ ok: true, mode: 'root', root: rootNo, nodes, truncated })
 })
 
+// 6. POST /api/family-tree/lookup-by-phone — 以電話查會員（供家庭樹系統使用）
+// body: { phone: string }
+// 成功（有會員）→ 200 { ok:true, is_member:true, member_no, name_zh, status, member_type }
+// 成功（查無）  → 200 { ok:true, is_member:false }
+// 格式錯 / 空  → 400 { ok:false, error: <validateHKPhone 錯誤訊息> }
+// key 錯       → 401 { ok:false, error:'Unauthorized' }
+app.post('/api/family-tree/lookup-by-phone', async (c) => {
+  const db = (c.env as any).DB as D1Database
+  const apiKey = getFamilyTreeApiKey(c)
+  if (!apiKey || apiKey !== (c.env as any).FAMILY_TREE_API_KEY) {
+    return c.json({ ok: false, error: 'Unauthorized' }, 401)
+  }
+  let body: { phone?: string } = {}
+  try { body = await c.req.json() } catch (_) {}
+  const phoneRaw = (body.phone || '').trim()
+  if (!phoneRaw) return c.json({ ok: false, error: '請填寫電話號碼' }, 400)
+
+  // normalize：剝非數字 → 若長度>8 且以 852 開頭剝前綴 → 取尾 8 位
+  // 必須先 normalize 再餵 validateHKPhone（後者只接受 8 位）
+  const phoneNorm = normalizePhone(phoneRaw)
+  const phoneCheck = validateHKPhone(phoneNorm)
+  if (!phoneCheck.ok) return c.json({ ok: false, error: phoneCheck.error }, 400)
+
+  try {
+    const member = await db.prepare(
+      `SELECT member_no, name_zh, status, member_type
+       FROM members WHERE phone = ? LIMIT 1`
+    ).bind(phoneNorm).first<{
+      member_no: string; name_zh: string; status: string; member_type: string
+    }>()
+    if (!member) return c.json({ ok: true, is_member: false })
+    return c.json({
+      ok:          true,
+      is_member:   true,
+      member_no:   member.member_no,
+      name_zh:     member.name_zh,
+      status:      member.status,
+      member_type: member.member_type,
+    })
+  } catch (e) {
+    console.error('[lookup-by-phone] DB error:', e)
+    return c.json({ ok: false, error: 'Internal server error' }, 500)
+  }
+})
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export default app
