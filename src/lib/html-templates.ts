@@ -9417,8 +9417,21 @@ var currentTab = 'card';
 function switchTab(name) {
   // ── 特殊 tab 攔截（在原 panel 邏輯之前）──
   if (name === 'familytree') {
-    var mn = localStorage.getItem('ce85_member_no') || '';
-    window.open('https://family.coeldery85.com' + (mn ? '?member=' + encodeURIComponent(mn) : ''), '_blank');
+    /* 先向後端申請短期簽名 handoff token，再以同頁跳轉帶 token 去家族樹 sub-app。
+     * 失敗（401 未登入 / 網絡錯）時 fallback 去乾淨網址，不暴露明文 member_no。 */
+    var FAMILY_URL = 'https://family.coeldery85.com';
+    fetch('/api/family-tree/handoff', { method: 'POST', credentials: 'include' })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.ok && data.token) {
+          window.location.href = FAMILY_URL + '/?token=' + encodeURIComponent(data.token) + '#/enter';
+        } else {
+          window.location.href = FAMILY_URL;
+        }
+      })
+      .catch(function() {
+        window.location.href = FAMILY_URL;
+      });
     return;
   }
   if (name === 'cofilmery') {

@@ -10,7 +10,7 @@ import { nextCwNo } from './lib/coworkery-utils'
 import { sha256hex, appendHashChain } from './lib/revenue-utils'
 import { verifyColinkerySess, requireColinkery } from './lib/colinkery-auth'
 import { htmlHead } from './lib/html-shared'
-import { HK_DISTRICTS } from './lib/constants'
+import { HK_DISTRICTS, HANDOFF_TOKEN_TTL_SECONDS } from './lib/constants'
 import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml, qrCompleteHtml, signupSubHtml, signupMainHtml, adminHtml, pwaAppHtml, newAdminShellHtml } from './lib/html-templates'
 
 type Bindings = {
@@ -25,6 +25,7 @@ type Bindings = {
   WHATSAPP_API_TOKEN?: string     // WhatsApp Cloud API token (for sending messages)
   WHATSAPP_PHONE_ID?: string      // WhatsApp Cloud API phone number ID
   APP_SECRET?: string             // App-level secret for signing login tokens
+  FAMILY_TREE_API_KEY?: string    // HMAC-SHA256 signing secret for family-tree handoff token（Cloudflare Secret）
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -7405,6 +7406,67 @@ app.post('/api/family-tree/lookup-by-phone', async (c) => {
     console.error('[lookup-by-phone] DB error:', e)
     return c.json({ ok: false, error: 'Internal server error' }, 500)
   }
+})
+
+// ─── POST /api/family-tree/handoff — 簽發短期 handoff token 俾家族樹 sub-app ──
+//
+// 認人：讀 app_session cookie → 查 app_sessions → 取 member_no。
+// 簽名：HMAC-SHA256（Web Crypto），secret = FAMILY_TREE_API_KEY（Cloudflare Secret）。
+// Payload（JSON）：{ member_no, exp }，exp = 當前時間（秒）+ HANDOFF_TOKEN_TTL_SECONDS。
+// 格式：base64url(payload) + '.' + base64url(signature)（輕量自定義，唔用 JWT library）。
+// 家族樹 sub-app 用相同 key 驗 HMAC，確認 exp 未過期，即可信任 member_no。
+//
+// 錯誤：401 未登入 / session 過期；503 FAMILY_TREE_API_KEY 未設定。
+app.post('/api/family-tree/handoff', async (c) => {
+  const db = (c.env as any).DB as D1Database
+
+  /* ── 1. 驗 app_session cookie → 取 member_no ── */
+  const sessionId = getCookie(c, 'app_session') || ''
+  if (!sessionId) {
+    return c.json({ ok: false, error: '請先登入', code: 'AUTH_REQUIRED' }, 401)
+  }
+  const sess = await db.prepare(
+    `SELECT member_no FROM app_sessions WHERE session_id=? AND expires_at>datetime('now')`
+  ).bind(sessionId).first() as { member_no: string } | null
+  if (!sess) {
+    return c.json({ ok: false, error: '登入已過期，請重新登入', code: 'AUTH_REQUIRED' }, 401)
+  }
+  const memberNo = sess.member_no
+
+  /* ── 2. 確認 FAMILY_TREE_API_KEY 已設（Cloudflare Secret） ── */
+  const secret = (c.env as any).FAMILY_TREE_API_KEY as string | undefined
+  if (!secret) {
+    // Key 未設定 → 服務不可用；唔 hardcode fallback
+    console.error('[handoff] FAMILY_TREE_API_KEY 未設定，請於 Cloudflare Secret 配置')
+    return c.json({ ok: false, error: '服務暫不可用', code: 'CONFIG_ERROR' }, 503)
+  }
+
+  /* ── 3. 組 payload，exp = now + TTL（秒） ── */
+  const now = Math.floor(Date.now() / 1000)
+  const exp = now + HANDOFF_TOKEN_TTL_SECONDS
+  const payloadJson = JSON.stringify({ member_no: memberNo, exp })
+
+  /* ── 4. HMAC-SHA256 簽名（Web Crypto，edge runtime 相容） ── */
+  const enc = new TextEncoder()
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const sigBuffer = await crypto.subtle.sign('HMAC', keyMaterial, enc.encode(payloadJson))
+
+  /* ── 5. base64url encode（無 padding）── */
+  const b64url = (buf: ArrayBuffer): string =>
+    btoa(String.fromCharCode(...new Uint8Array(buf)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
+  const payloadB64  = b64url(enc.encode(payloadJson).buffer as ArrayBuffer)
+  const signatureB64 = b64url(sigBuffer)
+  const token = `${payloadB64}.${signatureB64}`
+
+  return c.json({ ok: true, token })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
