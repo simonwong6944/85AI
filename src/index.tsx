@@ -7486,5 +7486,58 @@ app.post('/api/family-tree/handoff', async (c) => {
   return c.json({ ok: true, token })
 })
 
+// ─── POST /api/session/init — 以 localStorage member_no 建立 app_session cookie ─
+//
+// ⚠️  暫時方案（Temporary measure）：
+//     此 endpoint 由 client 自報 member_no；安全性依賴 member 存在校驗，
+//     無法防止已知 member_no 的惡意方偽冒。
+//     待 WhatsApp Business API 上線後，應改為：
+//       (1) 後端驗 WA OTP / magic-link；
+//       (2) 由後端查出 member_no，不接受 client 自報。
+//     屆時此 endpoint 可廢棄並移除。
+//
+// 流程：讀 body.member_no → SELECT 驗存在 → INSERT app_sessions → setCookie app_session
+// 錯誤：400 缺 member_no；401 member 不存在；500 DB 錯誤
+app.post('/api/session/init', async (c) => {
+  const db = (c.env as any).DB as D1Database
+
+  /* ── 1. 讀 body ── */
+  let body: { member_no?: string }
+  try { body = await c.req.json() } catch (_) { return c.json({ ok: false, error: '無效請求' }, 400) }
+
+  const memberNo = (body.member_no || '').trim()
+  if (!memberNo) return c.json({ ok: false, error: '缺少 member_no' }, 400)
+
+  /* ── 2. 驗 member 存在（只查存在，不拿多餘資料）── */
+  let exists: { x: number } | null = null
+  try {
+    exists = await db.prepare(
+      `SELECT 1 AS x FROM members WHERE member_no = ? LIMIT 1`
+    ).bind(memberNo).first<{ x: number }>()
+  } catch (_) { return c.json({ ok: false, error: '系統錯誤' }, 500) }
+
+  if (!exists) return c.json({ ok: false, error: '會員不存在' }, 401)
+
+  /* ── 3. 建立 app_session ── */
+  const sessionId = makeToken()                        // 32-byte opaque hex（來自 auth.ts）
+  const expiresAt = sessionExpiry(SESSION_DAYS * 24)   // SESSION_DAYS 來自 constants.ts，唯一定義點
+  try {
+    await db.prepare(
+      `INSERT INTO app_sessions (session_id, member_no, expires_at) VALUES (?, ?, ?)`
+    ).bind(sessionId, memberNo, expiresAt).run()
+  } catch (_) { return c.json({ ok: false, error: 'Session 建立失敗' }, 500) }
+
+  setCookie(c, 'app_session', sessionId, {
+    httpOnly: true,
+    secure:   true,
+    sameSite: 'Lax',
+    path:     '/',
+    maxAge:   SESSION_DAYS * 24 * 3600,
+    // 不設 domain → host-only cookie（只送 coeldery85.com，不帶 subdomain）
+  })
+
+  return c.json({ ok: true })
+})
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export default app

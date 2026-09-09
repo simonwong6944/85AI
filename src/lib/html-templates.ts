@@ -9418,9 +9418,31 @@ function switchTab(name) {
   // ── 特殊 tab 攔截（在原 panel 邏輯之前）──
   if (name === 'familytree') {
     /* 先向後端申請短期簽名 handoff token，再以同頁跳轉帶 token 去家族樹 sub-app。
-     * 失敗（401 未登入 / 網絡錯）時 fallback 去乾淨網址，不暴露明文 member_no。 */
+     * 失敗（401 未登入 / 網絡錯）時 fallback 去乾淨網址，不暴露明文 member_no。
+     *
+     * 流程：
+     *   1. 若 localStorage 有 ce85_member_no，先 POST /api/session/init 種 app_session cookie
+     *      （暫時方案：待 WA Biz API 上線後改為真驗證，此 step 可移除）
+     *   2. 再 POST /api/family-tree/handoff（憑 cookie 認人）
+     *   3. 成功帶 ?token= 跳 family；失敗 fallback 乾淨網址 */
     var FAMILY_URL = 'https://family.coeldery85.com';
-    fetch('/api/family-tree/handoff', { method: 'POST', credentials: 'include' })
+    var memberNo = localStorage.getItem('ce85_member_no') || '';
+
+    /* Step 1：若有 member_no，先種 app_session cookie */
+    var initPromise = memberNo
+      ? fetch('/api/session/init', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ member_no: memberNo })
+        }).catch(function() { /* non-fatal：init 失敗仍嘗試 handoff */ })
+      : Promise.resolve();
+
+    /* Step 2：再 call handoff */
+    initPromise
+      .then(function() {
+        return fetch('/api/family-tree/handoff', { method: 'POST', credentials: 'include' });
+      })
       .then(function(res) { return res.json(); })
       .then(function(data) {
         if (data.ok && data.token) {
