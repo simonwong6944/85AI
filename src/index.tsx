@@ -10,7 +10,7 @@ import { nextCwNo } from './lib/coworkery-utils'
 import { sha256hex, appendHashChain } from './lib/revenue-utils'
 import { verifyColinkerySess, requireColinkery } from './lib/colinkery-auth'
 import { htmlHead } from './lib/html-shared'
-import { HK_DISTRICTS, HANDOFF_TOKEN_TTL_SECONDS } from './lib/constants'
+import { HK_DISTRICTS, HANDOFF_TOKEN_TTL_SECONDS, SESSION_DAYS } from './lib/constants'
 import { dashboardHtml, comingSoonHtml, adminColinkerySectionHtml, qrRegisterHtml, adminQrHtml, walletHtml, teamConfirmHtml, coworkeryAppHtml, brandFormHtml, memberProfileHtml, colinkerypwaHtml, partnerApplyHtml, qrCompleteHtml, signupSubHtml, signupMainHtml, adminHtml, pwaAppHtml, newAdminShellHtml } from './lib/html-templates'
 
 type Bindings = {
@@ -6336,6 +6336,23 @@ app.post('/api/wa-token/verify', async (c) => {
 
   if (!member) return c.json({ ok: false, error: '找不到會員資料' })
   if (member.status !== 'ACTIVE') return c.json({ ok: false, error: '此會員帳戶已停用' })
+
+  /* ── 建立 app_session（httpOnly cookie）── */
+  const sessionId = makeToken()                              // 32-byte opaque hex token
+  const expiresAt = sessionExpiry(SESSION_DAYS * 24)         // SESSION_DAYS 天；常數唯一定義於 constants.ts
+  try {
+    await db.prepare(
+      `INSERT INTO app_sessions (session_id, member_no, expires_at) VALUES (?, ?, ?)`
+    ).bind(sessionId, member.member_no, expiresAt).run()
+  } catch (_) { /* non-fatal：session 建立失敗不阻礙登入，只影響 handoff */ }
+  setCookie(c, 'app_session', sessionId, {
+    httpOnly: true,
+    secure:   true,
+    sameSite: 'Lax',
+    path:     '/',
+    maxAge:   SESSION_DAYS * 24 * 3600,
+    // 不設 domain → host-only cookie
+  })
 
   return c.json({ ok: true, member })
 })
