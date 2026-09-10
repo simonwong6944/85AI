@@ -7496,10 +7496,22 @@ app.post('/api/family-tree/handoff', async (c) => {
 //       (2) 由後端查出 member_no，不接受 client 自報。
 //     屆時此 endpoint 可廢棄並移除。
 //
+// 🔒  環境閘（Security gate）：
+//     生產環境一律 403。只有明確設定 DEV_SESSION_INIT_ENABLED=true
+//     的 preview / local 環境才允許通過。
+//     攻擊者可用任意 member_no 換取 app_session → handoff token → 家庭樹登入，
+//     故此閘必須在生產關閉，不得移除。
+//
 // 流程：讀 body.member_no → SELECT 驗存在 → INSERT app_sessions → setCookie app_session
-// 錯誤：400 缺 member_no；401 member 不存在；500 DB 錯誤
+// 錯誤：403 環境閘；400 缺 member_no；401 member 不存在；500 DB 錯誤
 app.post('/api/session/init', async (c) => {
   const db = (c.env as any).DB as D1Database
+
+  /* ── 0. 環境閘：只有 DEV_SESSION_INIT_ENABLED=true 才准通過 ── */
+  const devEnabled = (c.env as any).DEV_SESSION_INIT_ENABLED === 'true'
+  if (!devEnabled) {
+    return c.json({ ok: false, error: 'not available' }, 403)
+  }
 
   /* ── 1. 讀 body ── */
   let body: { member_no?: string }
