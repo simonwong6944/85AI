@@ -7472,14 +7472,14 @@ app.post('/api/family-tree/handoff', async (c) => {
     false,
     ['sign'],
   )
-  const sigBuffer = await crypto.subtle.sign('HMAC', keyMaterial, enc.encode(payloadJson))
-
   /* ── 5. base64url encode（無 padding）── */
   const b64url = (buf: ArrayBuffer): string =>
     btoa(String.fromCharCode(...new Uint8Array(buf)))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 
-  const payloadB64  = b64url(enc.encode(payloadJson).buffer as ArrayBuffer)
+  // 先 encode payload，再以 payloadB64 字串作為簽名輸入（依 handoff 契約規格）
+  const payloadB64   = b64url(enc.encode(payloadJson).buffer as ArrayBuffer)
+  const sigBuffer    = await crypto.subtle.sign('HMAC', keyMaterial, enc.encode(payloadB64))
   const signatureB64 = b64url(sigBuffer)
   const token = `${payloadB64}.${signatureB64}`
 
